@@ -1,0 +1,265 @@
+//
+//  AccountSettingsView.swift
+//  Axon
+//
+//  User account and profile management
+//
+
+import SwiftUI
+import FirebaseAuth
+
+struct AccountSettingsView: View {
+    @ObservedObject var viewModel: SettingsViewModel
+    @StateObject private var authService = AuthenticationService.shared
+
+    @State private var showingPasswordReset = false
+    @State private var showingSignOutConfirmation = false
+    @State private var showingDeleteAccountConfirmation = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            // Profile Section
+            SettingsSection(title: "Profile") {
+                VStack(spacing: 16) {
+                    // Profile Picture
+                    HStack {
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(AppColors.signalMercury)
+
+                        Spacer()
+                    }
+                    .padding(.bottom, 8)
+
+                    Divider()
+                        .background(AppColors.divider)
+
+                    // Display Name
+                    if let displayName = authService.displayName {
+                        HStack {
+                            Text("Display Name")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textSecondary)
+
+                            Spacer()
+
+                            Text(displayName)
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+                        }
+                    }
+
+                    // Email
+                    if let email = authService.user?.email {
+                        HStack {
+                            Text("Email")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textSecondary)
+
+                            Spacer()
+
+                            Text(email)
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+                        }
+                    }
+
+                    // User ID
+                    if let userId = authService.user?.uid {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("User ID")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textSecondary)
+
+                            Text(userId)
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textTertiary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                }
+                .padding()
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
+            }
+
+            // Security Section
+            SettingsSection(title: "Security") {
+                VStack(spacing: 0) {
+                    Button(action: {
+                        showingPasswordReset = true
+                    }) {
+                        HStack {
+                            Image(systemName: "lock.rotation")
+                                .foregroundColor(AppColors.signalMercury)
+                                .frame(width: 32)
+
+                            Text("Change Password")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14))
+                                .foregroundColor(AppColors.textTertiary)
+                        }
+                        .padding()
+                        .background(AppColors.substrateSecondary)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                .cornerRadius(8)
+            }
+
+            // Account Actions Section
+            SettingsSection(title: "Account Actions") {
+                VStack(spacing: 12) {
+                    // Sign Out
+                    Button(action: {
+                        showingSignOutConfirmation = true
+                    }) {
+                        HStack {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .foregroundColor(AppColors.signalMercury)
+                                .frame(width: 32)
+
+                            Text("Sign Out")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.signalMercury)
+
+                            Spacer()
+                        }
+                        .padding()
+                        .background(AppColors.substrateSecondary)
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    // Delete Account
+                    Button(action: {
+                        showingDeleteAccountConfirmation = true
+                    }) {
+                        HStack {
+                            Image(systemName: "trash")
+                                .foregroundColor(AppColors.accentError)
+                                .frame(width: 32)
+
+                            Text("Delete Account")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.accentError)
+
+                            Spacer()
+                        }
+                        .padding()
+                        .background(AppColors.substrateSecondary)
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+
+            // App Version
+            HStack {
+                Spacer()
+
+                VStack(spacing: 4) {
+                    Text("NeurX AxonChat")
+                        .font(AppTypography.bodySmall())
+                        .foregroundColor(AppColors.textTertiary)
+
+                    if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+                       let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
+                        Text("Version \(version) (\(build))")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+                }
+
+                Spacer()
+            }
+            .padding(.top, 16)
+        }
+        .alert("Reset Password", isPresented: $showingPasswordReset) {
+            Button("Cancel", role: .cancel) {}
+            Button("Send Reset Email") {
+                Task {
+                    await sendPasswordResetEmail()
+                }
+            }
+        } message: {
+            Text("A password reset link will be sent to your email address.")
+        }
+        .alert("Sign Out", isPresented: $showingSignOutConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Sign Out", role: .destructive) {
+                Task {
+                    await signOut()
+                }
+            }
+        } message: {
+            Text("Are you sure you want to sign out?")
+        }
+        .alert("Delete Account", isPresented: $showingDeleteAccountConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                Task {
+                    await deleteAccount()
+                }
+            }
+        } message: {
+            Text("This action cannot be undone. All your data will be permanently deleted.")
+        }
+    }
+
+    // MARK: - Actions
+
+    private func sendPasswordResetEmail() async {
+        guard let email = authService.user?.email else {
+            viewModel.error = "No email address found"
+            return
+        }
+
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                Auth.auth().sendPasswordReset(withEmail: email) { error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume()
+                    }
+                }
+            }
+            viewModel.showSuccessMessage("Password reset email sent to \(email)")
+        } catch {
+            viewModel.error = "Failed to send password reset email: \(error.localizedDescription)"
+        }
+    }
+
+    private func signOut() async {
+        do {
+            try authService.signOut()
+            viewModel.showSuccessMessage("Signed out successfully")
+        } catch {
+            viewModel.error = "Failed to sign out: \(error.localizedDescription)"
+        }
+    }
+
+    private func deleteAccount() async {
+        // TODO: Implement account deletion
+        // This should call a backend endpoint to delete all user data
+        // and then delete the Firebase Auth account
+        viewModel.error = "Account deletion not yet implemented"
+    }
+}
+
+// MARK: - Preview
+
+#Preview {
+    ScrollView {
+        AccountSettingsView(viewModel: SettingsViewModel())
+            .padding()
+    }
+    .background(AppColors.substratePrimary)
+}

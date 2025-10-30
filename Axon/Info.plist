@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>FIrebaseAPIKey</key>
+	<string>AIzaSyC03ZyhD0AmsfBl8_aI0Y84vO5Kim_BUCc</string>
+	<key>FirebaseAppID</key>
+	<string>1:597673176953:ios:ea4f811ec21a349df889a8</string>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string></string>
+		<key>UIImageName</key>
+		<string></string>
+	</dict>
+</dict>
+</plist>
