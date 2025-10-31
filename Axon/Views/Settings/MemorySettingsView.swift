@@ -28,7 +28,7 @@ struct MemorySettingsView: View {
                                 .font(AppTypography.bodyMedium(.medium))
                                 .foregroundColor(AppColors.textPrimary)
 
-                            Text("Allow the AI to remember facts and preferences across conversations")
+                            Text("Allow the Axon to remember facts about you and learn about itself in your context across conversations")
                                 .font(AppTypography.bodySmall())
                                 .foregroundColor(AppColors.textSecondary)
                         }

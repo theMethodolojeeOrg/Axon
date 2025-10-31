@@ -17,6 +17,8 @@ struct Message: Codable, Identifiable, Equatable {
     let artifacts: [String]?
     let toolCalls: [ToolCall]?
     let isStreaming: Bool?
+    let modelName: String?  // For display purposes (e.g., "GPT-4", "Claude Sonnet 4.5")
+    let providerName: String?  // For display purposes (e.g., "OpenAI", "Anthropic")
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -28,6 +30,8 @@ struct Message: Codable, Identifiable, Equatable {
         case artifacts
         case toolCalls
         case isStreaming
+        case modelName
+        case providerName
     }
 
     init(
@@ -39,7 +43,9 @@ struct Message: Codable, Identifiable, Equatable {
         tokens: TokenUsage? = nil,
         artifacts: [String]? = nil,
         toolCalls: [ToolCall]? = nil,
-        isStreaming: Bool? = nil
+        isStreaming: Bool? = nil,
+        modelName: String? = nil,
+        providerName: String? = nil
     ) {
         self.id = id
         self.conversationId = conversationId
@@ -50,6 +56,8 @@ struct Message: Codable, Identifiable, Equatable {
         self.artifacts = artifacts
         self.toolCalls = toolCalls
         self.isStreaming = isStreaming
+        self.modelName = modelName
+        self.providerName = providerName
     }
 }
 

@@ -7,6 +7,83 @@
 
 import SwiftUI
 import Combine
+import Foundation
+
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
+// MARK: - Model Provider & Icon Styling Helpers
+
+fileprivate enum ModelProvider {
+    case anthropic
+    case openAI
+    case google
+    case custom
+}
+
+fileprivate func provider(for modelName: String?) -> ModelProvider {
+    guard let name = modelName?.lowercased() else { return .custom }
+    if name.contains("claude") || name.contains("anthropic") { return .anthropic }
+    if name.contains("gpt") || name.contains("openai") { return .openAI }
+    if name.contains("gemini") || name.contains("google") { return .google }
+    return .custom
+}
+
+fileprivate func colorFromHex(_ hex: String) -> Color {
+    var hexString = hex
+    if hexString.hasPrefix("#") { hexString.removeFirst() }
+    let scanner = Scanner(string: hexString)
+    var hexNumber: UInt64 = 0
+    if scanner.scanHexInt64(&hexNumber) {
+        let r = Double((hexNumber & 0xFF0000) >> 16) / 255.0
+        let g = Double((hexNumber & 0x00FF00) >> 8) / 255.0
+        let b = Double(hexNumber & 0x0000FF) / 255.0
+        return Color(red: r, green: g, blue: b)
+    }
+    return Color.gray
+}
+
+fileprivate func iconStyle(for provider: ModelProvider, modelName: String?) -> AnyShapeStyle {
+    switch provider {
+    case .anthropic:
+        // Anthropic – official warm terra cotta/orange #d97757
+        return AnyShapeStyle(colorFromHex("#d97757"))
+    case .openAI:
+        // OpenAI – ChatGPT Green #00A67E
+        return AnyShapeStyle(colorFromHex("#00A67E"))
+    case .google:
+        // Google Gemini – multi-color gradient
+        let colors: [Color] = [
+            colorFromHex("#fabc12"), // yellow/gold
+            colorFromHex("#f94543"), // red
+            colorFromHex("#3186ff"), // blue
+            colorFromHex("#08b962")  // green
+        ]
+        return AnyShapeStyle(AngularGradient(gradient: Gradient(colors: colors), center: .center))
+    case .custom:
+        // Use persistent unique color for custom models/providers
+        let key = (modelName ?? "custom-unknown").lowercased()
+        let hex = ModelColorRegistry.shared.hex(forKey: key)
+        return AnyShapeStyle(colorFromHex(hex))
+    }
+}
+
+fileprivate struct ChatIconView: View {
+    let provider: ModelProvider
+    let modelName: String?
+
+    var body: some View {
+        Image("AxonChatIconTemplate")
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 32, height: 32)
+            .foregroundStyle(iconStyle(for: provider, modelName: modelName))
+    }
+}
 
 struct ChatView: View {
     @StateObject private var conversationService = ConversationService.shared
@@ -14,6 +91,7 @@ struct ChatView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showingError = false
+    @State private var showChatInfo = false
 
     let conversation: Conversation
 
@@ -24,8 +102,22 @@ struct ChatView: View {
                 ScrollView {
                     LazyVStack(spacing: 16) {
                         ForEach(conversationService.messages) { message in
-                            MessageBubble(message: message)
-                                .id(message.id)
+                            MessageBubble(
+                                message: message,
+                                onCopy: { msg in
+                                    #if canImport(UIKit)
+                                    UIPasteboard.general.string = msg.content
+                                    #elseif canImport(AppKit)
+                                    let pb = NSPasteboard.general
+                                    pb.clearContents()
+                                    pb.setString(msg.content, forType: .string)
+                                    #endif
+                                },
+                                onRegenerate: { msg in
+                                    Task { await regenerate(message: msg) }
+                                }
+                            )
+                            .id(message.id)
                         }
                     }
                     .padding()
@@ -49,6 +141,18 @@ struct ChatView: View {
         .background(AppColors.substratePrimary)
         .navigationTitle(conversation.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { showChatInfo = true }) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 20))
+                        .foregroundColor(AppColors.signalMercury)
+                }
+            }
+        }
+        .sheet(isPresented: $showChatInfo) {
+            ChatInfoSettingsView(conversation: conversation)
+        }
         .task {
             await loadMessages()
         }
@@ -103,12 +207,37 @@ struct ChatView: View {
             sendMessage()
         }
     }
+    
+    private func regenerate(message: Message) async {
+        guard let convId = conversationService.currentConversation?.id ?? conversation.id as String? else { return }
+        do {
+            _ = try await conversationService.regenerateAssistantMessage(conversationId: convId, messageId: message.id)
+        } catch {
+            errorMessage = "Failed to regenerate: \(error.localizedDescription)"
+            showingError = true
+        }
+    }
 }
 
 // MARK: - Message Bubble
 
 struct MessageBubble: View {
     let message: Message
+    let onCopy: (Message) -> Void
+    let onRegenerate: (Message) -> Void
+    let overrideContent: String?
+
+    init(
+        message: Message,
+        onCopy: @escaping (Message) -> Void,
+        onRegenerate: @escaping (Message) -> Void,
+        overrideContent: String? = nil
+    ) {
+        self.message = message
+        self.onCopy = onCopy
+        self.onRegenerate = onRegenerate
+        self.overrideContent = overrideContent
+    }
 
     private var isUser: Bool {
         message.role == .user
@@ -117,34 +246,80 @@ struct MessageBubble: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             if !isUser {
-                // AI avatar
-                Circle()
-                    .fill(AppColors.signalMercury)
-                    .frame(width: 32, height: 32)
-                    .overlay(
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 14))
-                            .foregroundColor(.white)
-                    )
+                // AI avatar with model label
+                VStack(spacing: 4) {
+                    ChatIconView(provider: provider(for: message.modelName), modelName: message.modelName)
+                        .frame(width: 32, height: 32)
+
+                    // Model label
+                    if let modelName = message.modelName {
+                        Text(modelName)
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(width: 60)
             }
 
             VStack(alignment: isUser ? .trailing : .leading, spacing: 8) {
+                let textToRender = overrideContent ?? message.content
+
                 // Message content
-                Text(message.content)
-                    .font(AppTypography.bodyMedium())
-                    .foregroundColor(AppColors.textPrimary)
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(isUser ? AppColors.signalLichen.opacity(0.2) : AppColors.substrateSecondary)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(
-                                        isUser ? AppColors.signalLichen.opacity(0.3) : AppColors.glassBorder,
-                                        lineWidth: 1
-                                    )
-                            )
-                    )
+                Group {
+                    if isUser {
+                        Text(textToRender)
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
+                    } else {
+                        if let attributed = try? AttributedString(markdown: textToRender) {
+                            Text(attributed)
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
+                        } else {
+                            Text(textToRender)
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
+                        }
+                    }
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(isUser ? AppColors.signalLichen.opacity(0.2) : AppColors.substrateSecondary)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(
+                                    isUser ? AppColors.signalLichen.opacity(0.3) : AppColors.glassBorder,
+                                    lineWidth: 1
+                                )
+                        )
+                )
+                .contextMenu {
+                    Button(action: { onCopy(message) }) {
+                        Label("Copy", systemImage: "doc.on.doc")
+                    }
+                    if !isUser {
+                        Button(action: { onRegenerate(message) }) {
+                            Label("Regenerate", systemImage: "arrow.clockwise")
+                        }
+
+                        Button(action: {
+                            Task {
+                                do {
+                                    // Use current app settings for TTS
+                                    let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
+                                    try await TTSPlaybackService.shared.speak(text: message.content, settings: settings)
+                                } catch {
+                                    print("[TTS] Failed to speak: \(error)")
+                                }
+                            }
+                        }) {
+                            Label("Speak", systemImage: "speaker.wave.2.fill")
+                        }
+                    }
+                }
 
                 // Timestamp
                 Text(message.timestamp, style: .time)
@@ -174,21 +349,41 @@ struct MessageInputBar: View {
     @Binding var text: String
     let isLoading: Bool
     let onSend: () -> Void
+    let focus: FocusState<Bool>.Binding?
+
+    init(
+        text: Binding<String>,
+        isLoading: Bool,
+        onSend: @escaping () -> Void,
+        focus: FocusState<Bool>.Binding? = nil
+    ) {
+        self._text = text
+        self.isLoading = isLoading
+        self.onSend = onSend
+        self.focus = focus
+    }
 
     var body: some View {
         GlassCard(padding: 12) {
             HStack(spacing: 12) {
                 // Text field
-                TextField("Type a message...", text: $text, axis: .vertical)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .font(AppTypography.bodyMedium())
-                    .foregroundColor(AppColors.textPrimary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(AppColors.substrateTertiary)
-                    .cornerRadius(20)
-                    .disabled(isLoading)
-                    .lineLimit(1...5)
+                Group {
+                    if let focus {
+                        TextField("Type a message...", text: $text, axis: .vertical)
+                            .focused(focus)
+                    } else {
+                        TextField("Type a message...", text: $text, axis: .vertical)
+                    }
+                }
+                .textFieldStyle(PlainTextFieldStyle())
+                .font(AppTypography.bodyMedium())
+                .foregroundColor(AppColors.textPrimary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(AppColors.substrateTertiary)
+                .cornerRadius(20)
+                .disabled(isLoading)
+                .lineLimit(1...5)
 
                 // Send button
                 Button(action: onSend) {

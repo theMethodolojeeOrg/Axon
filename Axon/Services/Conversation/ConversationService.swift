@@ -25,6 +25,51 @@ class ConversationService: ObservableObject {
 
     private init() {}
 
+    // MARK: - Helper: Get Provider and Model with Overrides
+
+    private func getProviderAndModel(for conversationId: String, settings: AppSettings) -> (provider: String, modelName: String, providerName: String) {
+        // Check for conversation overrides
+        let overridesKey = "conversation_overrides_\(conversationId)"
+        if let data = UserDefaults.standard.data(forKey: overridesKey),
+           let overrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data) {
+
+            // Custom provider override
+            if let customProviderId = overrides.customProviderId,
+               let customProvider = settings.customProviders.first(where: { $0.id == customProviderId }),
+               let customModelId = overrides.customModelId,
+               let customModel = customProvider.models.first(where: { $0.id == customModelId }) {
+                // Prefer explicitly saved display names; fall back to friendlyName/providerName
+                let modelDisplayName = overrides.modelDisplayName ?? customModel.friendlyName ?? customProvider.providerName
+                let providerDisplay = overrides.providerDisplayName ?? customProvider.providerName
+                return ("openai-compatible", modelDisplayName, providerDisplay)
+            }
+
+            // Built-in provider override
+            if let builtInProvider = overrides.builtInProvider,
+               let provider = AIProvider(rawValue: builtInProvider),
+               let builtInModel = overrides.builtInModel,
+               let model = provider.availableModels.first(where: { $0.id == builtInModel }) {
+                let modelDisplayName = overrides.modelDisplayName ?? model.name
+                let providerDisplay = overrides.providerDisplayName ?? provider.displayName
+                return (provider.rawValue, modelDisplayName, providerDisplay)
+            }
+        }
+
+        // Fallback to global settings (custom)
+        if let customProviderId = settings.selectedCustomProviderId,
+           let customProvider = settings.customProviders.first(where: { $0.id == customProviderId }),
+           let customModelId = settings.selectedCustomModelId,
+           let customModel = customProvider.models.first(where: { $0.id == customModelId }) {
+            let modelDisplayName = customModel.friendlyName ?? customProvider.providerName
+            return ("openai-compatible", modelDisplayName, customProvider.providerName)
+        }
+
+        // Default: built-in provider
+        let provider = settings.defaultProvider
+        let model = provider.availableModels.first(where: { $0.id == settings.defaultModel }) ?? provider.availableModels.first
+        return (provider.rawValue, model?.name ?? "Unknown", provider.displayName)
+    }
+
     // MARK: - Conversations
 
     func listConversations(limit: Int = 50, offset: Int = 0) async throws {
@@ -56,7 +101,7 @@ class ConversationService: ObservableObject {
         struct CreateConversationRequest: Encodable {
             let title: String
             let projectId: String
-            let firstMessage: String?
+            let initialMessage: String?
         }
 
         struct CreateConversationResponse: Decodable {
@@ -67,7 +112,7 @@ class ConversationService: ObservableObject {
         let request = CreateConversationRequest(
             title: title,
             projectId: defaultProjectId,
-            firstMessage: firstMessage
+            initialMessage: firstMessage
         )
 
         do {
@@ -91,12 +136,15 @@ class ConversationService: ObservableObject {
         defer { isLoading = false }
 
         do {
-            let conversation: Conversation = try await apiClient.requestWrapped(
-                endpoint: "/apiGetConversation?conversationId=\(id)",
+            struct GetConversationResponse: Decodable {
+                let conversation: Conversation
+            }
+            let response: GetConversationResponse = try await apiClient.request(
+                endpoint: "/apiGetConversation/\(id)",
                 method: .get
             )
-            self.currentConversation = conversation
-            return conversation
+            self.currentConversation = response.conversation
+            return response.conversation
         } catch {
             self.error = error.localizedDescription
             throw error
@@ -105,18 +153,23 @@ class ConversationService: ObservableObject {
 
     func updateConversation(id: String, title: String) async throws -> Conversation {
         struct UpdateRequest: Encodable {
-            let conversationId: String
             let title: String
         }
 
-        let request = UpdateRequest(conversationId: id, title: title)
+        let request = UpdateRequest(title: title)
 
         do {
-            let conversation: Conversation = try await apiClient.requestWrapped(
-                endpoint: "/apiUpdateConversation",
-                method: .post,
+            struct UpdateConversationResponse: Decodable {
+                let conversation: Conversation
+                let message: String?
+            }
+            let response: UpdateConversationResponse = try await apiClient.request(
+                endpoint: "/apiUpdateConversation/\(id)",
+                method: .patch,
                 body: request
             )
+
+            let conversation = response.conversation
 
             if let index = conversations.firstIndex(where: { $0.id == id }) {
                 conversations[index] = conversation
@@ -134,18 +187,11 @@ class ConversationService: ObservableObject {
     }
 
     func deleteConversation(id: String) async throws {
-        struct DeleteRequest: Encodable {
-            let conversationId: String
-        }
-
-        let request = DeleteRequest(conversationId: id)
-
         do {
-            struct EmptyResponse: Decodable {}
-            let _: EmptyResponse = try await apiClient.requestWrapped(
-                endpoint: "/apiDeleteConversation",
-                method: .post,
-                body: request
+            struct DeleteConversationResponse: Decodable { let message: String; let hardDelete: Bool? }
+            let _: DeleteConversationResponse = try await apiClient.request(
+                endpoint: "/apiDeleteConversation/\(id)",
+                method: .delete
             )
             conversations.removeAll { $0.id == id }
 
@@ -165,13 +211,18 @@ class ConversationService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
+        struct GetMessagesResponse: Decodable {
+            let messages: [Message]
+            let pagination: PaginationMeta?
+        }
+
         do {
-            let (messages, _) = try await apiClient.requestWrappedList(
+            let response: GetMessagesResponse = try await apiClient.request(
                 endpoint: "/apiGetMessages?conversationId=\(conversationId)&limit=\(limit)",
                 method: .get
-            ) as ([Message], PaginationMeta?)
-            self.messages = messages
-            return messages
+            )
+            self.messages = response.messages
+            return response.messages
         } catch {
             self.error = error.localizedDescription
             throw error
@@ -215,9 +266,16 @@ class ConversationService: ObservableObject {
         let openaiKey = try? apiKeysStorage.getAPIKey(for: .openai)
         let geminiKey = try? apiKeysStorage.getAPIKey(for: .gemini)
 
-        // Load provider from settings (fallback to anthropic)
+        #if DEBUG
+        print("[ConversationService] API Key Debug:")
+        print("  Anthropic: \(anthropicKey != nil ? "✓ Retrieved (\(anthropicKey!.count) chars, starts: \(String(anthropicKey!.prefix(15)))...)" : "✗ Not found")")
+        print("  OpenAI: \(openaiKey != nil ? "✓ Retrieved" : "✗ Not found")")
+        print("  Gemini: \(geminiKey != nil ? "✓ Retrieved" : "✗ Not found")")
+        #endif
+
+        // Load provider/model from settings with conversation overrides
         let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
-        let providerString = settings.defaultProvider.rawValue
+        let (providerString, modelName, providerDisplayName) = getProviderAndModel(for: conversationId, settings: settings)
 
         let request = OrchestrateRequest(
             conversationId: conversationId,
@@ -234,6 +292,17 @@ class ConversationService: ObservableObject {
                 executeTools: false
             )
         )
+
+        #if DEBUG
+        print("[ConversationService] Request Body:")
+        print("  Provider: \(providerString)")
+        print("  ConversationId: \(conversationId)")
+        print("  Message length: \(content.count) chars")
+        print("  API Keys in request body:")
+        print("    anthropic: \(request.apiKeys.anthropic != nil ? "✓ Included" : "✗ nil")")
+        print("    openai: \(request.apiKeys.openai != nil ? "✓ Included" : "✗ nil")")
+        print("    gemini: \(request.apiKeys.gemini != nil ? "✓ Included" : "✗ nil")")
+        #endif
 
         // Prepare provider API key headers for orchestrator (backend may expect headers)
         var providerHeaders: [String: String] = [:]
@@ -269,13 +338,113 @@ class ConversationService: ObservableObject {
                 messages[index] = response.userMessage
             }
 
-            // Add AI assistant response
-            messages.append(response.assistantMessage)
+            // Add AI assistant response with model metadata
+            var assistantMessage = response.assistantMessage
+            // If backend didn't provide model info, add it from our settings
+            if assistantMessage.modelName == nil || assistantMessage.providerName == nil {
+                assistantMessage = Message(
+                    id: assistantMessage.id,
+                    conversationId: assistantMessage.conversationId,
+                    role: assistantMessage.role,
+                    content: assistantMessage.content,
+                    timestamp: assistantMessage.timestamp,
+                    tokens: assistantMessage.tokens,
+                    artifacts: assistantMessage.artifacts,
+                    toolCalls: assistantMessage.toolCalls,
+                    isStreaming: assistantMessage.isStreaming,
+                    modelName: modelName,
+                    providerName: providerDisplayName
+                )
+            }
+            messages.append(assistantMessage)
 
-            return response.assistantMessage
+            return assistantMessage
         } catch {
             // Remove optimistic message on error
             messages.removeAll { $0.content == content && $0.role == .user }
+            self.error = error.localizedDescription
+            throw error
+        }
+    }
+
+    func regenerateAssistantMessage(conversationId: String, messageId: String) async throws -> Message {
+        struct RegenerateRequest: Encodable {
+            let provider: String
+            let options: Options
+            let anthropic: String?
+            let openai: String?
+            let gemini: String?
+
+            struct Options: Encodable {
+                let model: String?
+                let temperature: Double?
+                let maxTokens: Int?
+                let includeMemories: Bool
+                let replaceLastMessage: Bool
+                let projectId: String?
+            }
+        }
+
+        struct RegenerateResponse: Decodable {
+            let userMessage: Message?
+            let assistantMessage: Message
+            let conversationUpdated: Bool?
+            let metadata: AnyCodable?
+            let replacedMessageId: String?
+        }
+
+        // Load provider from settings (fallback to anthropic)
+        let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
+        let providerString = settings.defaultProvider.rawValue
+
+        // Try to include user-provided provider API keys (optional)
+        let apiKeysStorage = APIKeysStorage.shared
+        let anthropicKey = try? apiKeysStorage.getAPIKey(for: .anthropic)
+        let openaiKey = try? apiKeysStorage.getAPIKey(for: .openai)
+        let geminiKey = try? apiKeysStorage.getAPIKey(for: .gemini)
+
+        // Build request body per MD contract. We choose to replace the last assistant message by default.
+        let request = RegenerateRequest(
+            provider: providerString,
+            options: .init(
+                model: nil,
+                temperature: nil,
+                maxTokens: nil,
+                includeMemories: true,
+                replaceLastMessage: true,
+                projectId: defaultProjectId
+            ),
+            anthropic: anthropicKey,
+            openai: openaiKey,
+            gemini: geminiKey
+        )
+
+        do {
+            // MD endpoint shape: /apiRegenerateMessage/<conversationId>/regenerate
+            let response: RegenerateResponse = try await apiClient.request(
+                endpoint: "/apiRegenerateMessage/\(conversationId)/regenerate",
+                method: .post,
+                body: request
+            )
+
+            let newAssistant = response.assistantMessage
+
+            if let replacedId = response.replacedMessageId {
+                // Replace the old assistant message with the regenerated one
+                if let index = messages.firstIndex(where: { $0.id == replacedId }) {
+                    messages[index] = newAssistant
+                } else {
+                    // If we can't find it locally, append to ensure UI shows the new response
+                    messages.append(newAssistant)
+                }
+            } else {
+                // Backend may have appended a new message (replaceLastMessage == false)
+                // In that case, just append the regenerated assistant message
+                messages.append(newAssistant)
+            }
+
+            return newAssistant
+        } catch {
             self.error = error.localizedDescription
             throw error
         }
@@ -294,4 +463,3 @@ class ConversationService: ObservableObject {
         messages = []
     }
 }
-

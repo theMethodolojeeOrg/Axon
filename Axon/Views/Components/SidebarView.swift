@@ -18,6 +18,10 @@ struct SidebarView: View {
     @StateObject private var conversationService = ConversationService.shared
     @StateObject private var authService = AuthenticationService.shared
 
+    @State private var renamingConversation: Conversation? = nil
+    @State private var tempRenameTitle: String = ""
+    @State private var showingRenameSheet: Bool = false
+
     var body: some View {
         HStack(spacing: 0) {
             // Sidebar content
@@ -41,6 +45,38 @@ struct SidebarView: View {
             .shadow(color: AppColors.shadowStrong, radius: 20, x: 5, y: 0)
 
             Spacer()
+        }
+        .sheet(isPresented: $showingRenameSheet) {
+            NavigationStack {
+                ZStack {
+                    AppColors.substratePrimary.ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        TextField("Display name", text: $tempRenameTitle)
+                            .textFieldStyle(AppTextFieldStyle())
+                            .padding()
+                        Spacer()
+                    }
+                    .padding()
+                }
+                .navigationTitle("Rename Chat")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { showingRenameSheet = false }
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            if let conv = renamingConversation {
+                                let trimmed = tempRenameTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                                SettingsStorage.shared.setDisplayName(trimmed.isEmpty ? nil : trimmed, for: conv.id)
+                            }
+                            showingRenameSheet = false
+                        }
+                        .foregroundColor(AppColors.signalMercury)
+                    }
+                }
+            }
         }
     }
 
@@ -101,12 +137,36 @@ struct SidebarView: View {
                 if conversationService.conversations.isEmpty {
                     emptyConversationsView
                 } else {
-                    ForEach(conversationService.conversations) { conversation in
+                    ForEach(conversationService.conversations.filter { !SettingsStorage.shared.isConversationArchived($0.id) }) { conversation in
                         ConversationSidebarRow(
                             conversation: conversation,
-                            isSelected: selectedConversation?.id == conversation.id && currentView == .chat
+                            isSelected: selectedConversation?.id == conversation.id && currentView == .chat,
+                            displayNameOverride: SettingsStorage.shared.displayName(for: conversation.id)
                         ) {
                             onSelectConversation(conversation)
+                        }
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                Task {
+                                    do { try await conversationService.deleteConversation(id: conversation.id) } catch { print("Delete failed: \(error)") }
+                                }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+
+                            Button {
+                                SettingsStorage.shared.archiveConversation(id: conversation.id)
+                            } label: {
+                                Label("Archive", systemImage: "archivebox")
+                            }
+
+                            Button {
+                                renamingConversation = conversation
+                                tempRenameTitle = SettingsStorage.shared.displayName(for: conversation.id) ?? conversation.title
+                                showingRenameSheet = true
+                            } label: {
+                                Label("Rename", systemImage: "pencil")
+                            }
                         }
                     }
                 }
@@ -114,9 +174,13 @@ struct SidebarView: View {
             .padding()
         }
         .task {
+            let retention = SettingsStorage.shared.loadSettings()?.archiveRetentionDays ?? 30
+            SettingsStorage.shared.purgeExpiredArchived(retentionDays: retention)
             await loadConversations()
         }
         .refreshable {
+            let retention = SettingsStorage.shared.loadSettings()?.archiveRetentionDays ?? 30
+            SettingsStorage.shared.purgeExpiredArchived(retentionDays: retention)
             await loadConversations()
         }
     }
@@ -221,6 +285,7 @@ struct NavigationButton: View {
 struct ConversationSidebarRow: View {
     let conversation: Conversation
     let isSelected: Bool
+    var displayNameOverride: String? = nil
     let onTap: () -> Void
 
     var body: some View {
@@ -231,7 +296,7 @@ struct ConversationSidebarRow: View {
                     .foregroundColor(isSelected ? AppColors.signalMercury : AppColors.textTertiary)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(conversation.title)
+                    Text(displayNameOverride ?? conversation.title)
                         .font(AppTypography.bodyMedium(.medium))
                         .foregroundColor(AppColors.textPrimary)
                         .lineLimit(1)

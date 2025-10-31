@@ -23,8 +23,10 @@ struct AccountSettingsView: View {
                 VStack(spacing: 16) {
                     // Profile Picture
                     HStack {
-                        Image(systemName: "person.circle.fill")
-                            .font(.system(size: 60))
+                        Image("AxonLogoTemplate")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 60, height: 60)
                             .foregroundColor(AppColors.signalMercury)
 
                         Spacer()

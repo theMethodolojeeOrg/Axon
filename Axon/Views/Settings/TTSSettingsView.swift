@@ -9,8 +9,7 @@ import SwiftUI
 
 struct TTSSettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
-    @State private var showingAPIKeyInput = false
-    @State private var editingAPIKey = ""
+    let onManageAPIKeys: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -46,42 +45,135 @@ struct TTSSettingsView: View {
 
                         Spacer()
 
-                        Menu {
-                            Button(action: {
-                                editingAPIKey = viewModel.getAPIKey(.elevenlabs) ?? ""
-                                showingAPIKeyInput = true
-                            }) {
-                                Label(viewModel.isTTSConfigured ? "Edit Key" : "Add Key", systemImage: "pencil")
+                        Button(action: { onManageAPIKeys?() }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "key.fill")
+                                    .foregroundColor(AppColors.textSecondary)
+                                Text("Manage in API Keys")
+                                    .font(AppTypography.bodyMedium(.medium))
+                                    .foregroundColor(AppColors.textSecondary)
                             }
-
-                            if viewModel.isTTSConfigured {
-                                Button(role: .destructive, action: {
-                                    Task {
-                                        await viewModel.clearTTSAPIKey()
-                                    }
-                                }) {
-                                    Label("Remove Key", systemImage: "trash")
-                                }
-                            }
-
-                            Divider()
-
-                            Button(action: {
-                                if let url = URL(string: "https://elevenlabs.io/app/settings/api-keys") {
-                                    UIApplication.shared.open(url)
-                                }
-                            }) {
-                                Label("Get API Key", systemImage: "link")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle.fill")
-                                .foregroundColor(AppColors.textSecondary)
-                                .font(.system(size: 24))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(AppColors.substrateTertiary)
+                            )
                         }
                     }
                     .padding()
                     .background(AppColors.substrateSecondary)
                     .cornerRadius(8)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("API keys are managed centrally for security and consistency.")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        HStack(spacing: 4) {
+                            Text("To add or update your ElevenLabs key, open")
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textSecondary)
+                            Button(action: { onManageAPIKeys?() }) {
+                                Text("API Keys")
+                                    .font(AppTypography.bodySmall(.medium))
+                                    .foregroundColor(AppColors.signalMercury)
+                                    .underline()
+                            }
+                            Text(".")
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+
+            // Dynamic Catalog (Voices & Models)
+            SettingsSection(title: "Voice & Model") {
+                VStack(spacing: 12) {
+                    // Voice Picker
+                    Picker(selection: Binding(
+                        get: { viewModel.settings.ttsSettings.selectedVoiceId ?? "" },
+                        set: { newId in
+                            let voice = viewModel.availableVoices.first { $0.id == newId }
+                            Task { await viewModel.updateSelectedVoice(id: voice?.id, name: voice?.name) }
+                        }
+                    )) {
+                        if viewModel.availableVoices.isEmpty {
+                            Text("No voices found").tag("")
+                        } else {
+                            ForEach(viewModel.availableVoices) { voice in
+                                Text(voice.name).tag(voice.id)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "waveform")
+                                .font(.system(size: 20))
+                                .foregroundColor(AppColors.signalMercury)
+                                .frame(width: 32)
+
+                            Text(viewModel.settings.ttsSettings.selectedVoiceName ?? "Select a voice")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Spacer()
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(AppColors.substrateSecondary)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                                )
+                        )
+                    }
+                    .pickerStyle(.menu)
+
+                    // TTS Model Picker (from ElevenLabs if present, fallback to static)
+                    Picker(selection: Binding(
+                        get: { viewModel.settings.ttsSettings.model.rawValue },
+                        set: { newRaw in
+                            if let m = TTSModel(rawValue: newRaw) {
+                                Task { await viewModel.updateTTSSetting(\.model, m) }
+                            }
+                        }
+                    )) {
+                        if !viewModel.availableTTSModels.isEmpty {
+                            ForEach(viewModel.availableTTSModels, id: \.id) { m in
+                                Text(m.displayName).tag(m.id)
+                            }
+                        } else {
+                            ForEach(TTSModel.allCases) { m in
+                                Text(m.displayName).tag(m.rawValue)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "speaker.wave.2.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(AppColors.signalMercury)
+                                .frame(width: 32)
+
+                            Text("TTS Model")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Spacer()
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(AppColors.substrateSecondary)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                                )
+                        )
+                    }
+                    .pickerStyle(.menu)
                 }
             }
 
@@ -249,20 +341,8 @@ struct TTSSettingsView: View {
                 .cornerRadius(8)
             }
         }
-        .sheet(isPresented: $showingAPIKeyInput) {
-            APIKeyInputSheet(
-                provider: .elevenlabs,
-                keyValue: $editingAPIKey,
-                onSave: {
-                    Task {
-                        await viewModel.saveTTSAPIKey(editingAPIKey)
-                        showingAPIKeyInput = false
-                    }
-                },
-                onCancel: {
-                    showingAPIKeyInput = false
-                }
-            )
+        .task {
+            await viewModel.refreshElevenLabsCatalog()
         }
     }
 }
@@ -318,3 +398,4 @@ struct SettingsRadioRow: View {
     }
     .background(AppColors.substratePrimary)
 }
+

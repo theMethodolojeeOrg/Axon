@@ -66,8 +66,10 @@ struct MemoryListView: View {
                     // Memories list
                     if filteredMemories.isEmpty && !memoryService.isLoading {
                         VStack(spacing: 20) {
-                            Image(systemName: "brain")
-                                .font(.system(size: 60))
+                            Image("AxonLogoTemplate")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 60, height: 60)
                                 .foregroundColor(AppColors.signalMercury.opacity(0.5))
 
                             Text("No Memories Found")
@@ -372,3 +374,4 @@ struct NewMemorySheet: View {
 #Preview {
     MemoryListView()
 }
+

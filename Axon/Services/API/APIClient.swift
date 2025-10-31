@@ -137,7 +137,7 @@ class APIClient: ObservableObject {
             switch httpResponse.statusCode {
             case 200...299:
                 let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .secondsSince1970
+                decoder.dateDecodingStrategy = .millisecondsSince1970
                 do {
                     return try decoder.decode(T.self, from: data)
                 } catch {
@@ -287,4 +287,3 @@ enum APIError: LocalizedError {
         }
     }
 }
-

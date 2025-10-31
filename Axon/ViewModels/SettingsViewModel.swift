@@ -14,6 +14,8 @@ class SettingsViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var error: String?
     @Published var successMessage: String?
+    @Published var availableVoices: [ElevenLabsService.ELVoice] = []
+    @Published var availableTTSModels: [ElevenLabsService.ELTTSModel] = []
 
     private let storageService = SettingsStorage.shared
     private let apiKeysStorage = APIKeysStorage.shared
@@ -93,6 +95,30 @@ class SettingsViewModel: ObservableObject {
         settings.ttsSettings[keyPath: keyPath] = value
         await updateSetting(\.ttsSettings, settings.ttsSettings)
     }
+    
+    func refreshElevenLabsCatalog() async {
+        guard isTTSConfigured else { return }
+        do {
+            let voices = try await ElevenLabsService.shared.fetchVoices()
+            let models = try await ElevenLabsService.shared.fetchTTSModels()
+            self.availableVoices = voices
+            self.availableTTSModels = models
+            // If no voice selected yet, pick the first one
+            if settings.ttsSettings.selectedVoiceId == nil, let first = voices.first {
+                settings.ttsSettings.selectedVoiceId = first.id
+                settings.ttsSettings.selectedVoiceName = first.name
+                try? storageService.saveSettings(settings)
+            }
+        } catch {
+            self.error = "Failed to load ElevenLabs catalog: \(error.localizedDescription)"
+        }
+    }
+    
+    func updateSelectedVoice(id: String?, name: String?) async {
+        settings.ttsSettings.selectedVoiceId = id
+        settings.ttsSettings.selectedVoiceName = name
+        await updateSetting(\.ttsSettings, settings.ttsSettings)
+    }
 
     func saveTTSAPIKey(_ key: String) async {
         await saveAPIKey(key, for: .elevenlabs)
@@ -112,6 +138,86 @@ class SettingsViewModel: ObservableObject {
         settings.defaultProvider.availableModels.first { $0.id == settings.defaultModel }
     }
 
+    // MARK: - Custom Providers
+
+    func addCustomProvider(_ config: CustomProviderConfig) async {
+        settings.customProviders.append(config)
+        settings.lastUpdated = Date()
+
+        do {
+            try storageService.saveSettings(settings)
+            showSuccessMessage("Custom provider '\(config.providerName)' added successfully")
+        } catch {
+            self.error = "Failed to save custom provider: \(error.localizedDescription)"
+        }
+    }
+
+    func updateCustomProvider(_ config: CustomProviderConfig) async {
+        guard let index = settings.customProviders.firstIndex(where: { $0.id == config.id }) else {
+            self.error = "Custom provider not found"
+            return
+        }
+
+        settings.customProviders[index] = config
+        settings.lastUpdated = Date()
+
+        do {
+            try storageService.saveSettings(settings)
+            showSuccessMessage("Custom provider '\(config.providerName)' updated successfully")
+        } catch {
+            self.error = "Failed to update custom provider: \(error.localizedDescription)"
+        }
+    }
+
+    func deleteCustomProvider(id: UUID) async {
+        settings.customProviders.removeAll { $0.id == id }
+        settings.lastUpdated = Date()
+
+        do {
+            try storageService.saveSettings(settings)
+            // Also clear the API key for this provider
+            try? apiKeysStorage.clearCustomProviderAPIKey(providerId: id)
+            showSuccessMessage("Custom provider deleted successfully")
+        } catch {
+            self.error = "Failed to delete custom provider: \(error.localizedDescription)"
+        }
+    }
+
+    func getCustomProvider(id: UUID) -> CustomProviderConfig? {
+        settings.customProviders.first { $0.id == id }
+    }
+
+    // MARK: - Custom Provider API Keys
+
+    func isCustomProviderConfigured(_ providerId: UUID) -> Bool {
+        apiKeysStorage.isCustomProviderConfigured(providerId: providerId)
+    }
+
+    func getCustomProviderAPIKey(providerId: UUID) -> String? {
+        try? apiKeysStorage.getCustomProviderAPIKey(providerId: providerId)
+    }
+
+    func saveCustomProviderAPIKey(_ key: String, providerId: UUID, providerName: String) async {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            try apiKeysStorage.saveCustomProviderAPIKey(key, providerId: providerId)
+            showSuccessMessage("\(providerName) API key saved securely")
+        } catch {
+            self.error = "Failed to save API key: \(error.localizedDescription)"
+        }
+    }
+
+    func clearCustomProviderAPIKey(providerId: UUID, providerName: String) async {
+        do {
+            try apiKeysStorage.clearCustomProviderAPIKey(providerId: providerId)
+            showSuccessMessage("\(providerName) API key removed")
+        } catch {
+            self.error = "Failed to clear API key: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Messages
 
     func showSuccessMessage(_ message: String) {
@@ -121,3 +227,4 @@ class SettingsViewModel: ObservableObject {
         }
     }
 }
+

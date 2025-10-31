@@ -14,9 +14,11 @@ struct SettingsTabView: View {
     enum SettingsTab: String, CaseIterable, Identifiable {
         case general = "General"
         case apiKeys = "API Keys"
+        case custom = "Custom"
         case memory = "Memory"
         case tts = "TTS"
         case account = "Account"
+        case archived = "Archived"
 
         var id: String { rawValue }
 
@@ -24,9 +26,11 @@ struct SettingsTabView: View {
             switch self {
             case .general: return "gearshape.fill"
             case .apiKeys: return "key.fill"
-            case .memory: return "brain.head.profile"
+            case .custom: return "slider.horizontal.3"
+            case .memory: return "AxonLogoTemplate"
             case .tts: return "waveform.circle.fill"
             case .account: return "person.crop.circle.fill"
+            case .archived: return "archivebox.fill"
             }
         }
     }
@@ -63,12 +67,16 @@ struct SettingsTabView: View {
                         GeneralSettingsView(viewModel: viewModel)
                     case .apiKeys:
                         APIKeysSettingsView(viewModel: viewModel)
+                    case .custom:
+                        CustomProvidersSettingsView(viewModel: viewModel)
                     case .memory:
                         MemorySettingsView(viewModel: viewModel)
                     case .tts:
                         TTSSettingsView(viewModel: viewModel)
                     case .account:
                         AccountSettingsView(viewModel: viewModel)
+                    case .archived:
+                        ArchivedConversationsSettingsView(viewModel: viewModel)
                     }
                 }
                 .padding()
@@ -121,8 +129,16 @@ struct SettingsTabButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 16))
+                if icon == "AxonLogoTemplate" || icon == "AxonMercuryVector" {
+                    Image(icon)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 16, height: 16)
+                        .foregroundColor(.white) // will tint template images; AxonLogoTemplate is white template
+                } else {
+                    Image(systemName: icon)
+                        .font(.system(size: 16))
+                }
                 Text(title)
                     .font(AppTypography.titleSmall())
             }
@@ -142,3 +158,4 @@ struct SettingsTabButton: View {
 #Preview {
     SettingsTabView()
 }
+

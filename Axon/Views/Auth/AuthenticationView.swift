@@ -26,11 +26,13 @@ struct AuthenticationView: View {
                 VStack(spacing: 32) {
                     // Logo and title
                     VStack(spacing: 16) {
-                        Image(systemName: "brain.head.profile")
-                            .font(.system(size: 60))
-                            .foregroundColor(AppColors.signalMercury)
+                        Image("AxonMercury")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 120, height: 120)
+                            .shadow(color: AppColors.shadow, radius: 8, x: 0, y: 4)
 
-                        Text("NeurX AxonChat")
+                        Text("Axon")
                             .font(AppTypography.displaySmall())
                             .foregroundColor(AppColors.textPrimary)
 

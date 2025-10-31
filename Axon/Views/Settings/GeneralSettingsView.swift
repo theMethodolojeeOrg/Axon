@@ -47,38 +47,114 @@ struct GeneralSettingsView: View {
             // MARK: - AI Provider Section
 
             GeneralSettingsSection(title: "AI Provider") {
-                VStack(spacing: 12) {
-                    ForEach(AIProvider.allCases) { provider in
-                        SettingsOptionRow(
-                            title: provider.displayName,
-                            icon: "cpu.fill",
-                            isSelected: viewModel.settings.defaultProvider == provider
-                        ) {
+                let allProviders = viewModel.allUnifiedProviders()
+                let currentProvider = viewModel.currentUnifiedProvider()
+
+                Picker(selection: Binding(
+                    get: { currentProvider?.id ?? "builtin_anthropic" },
+                    set: { newProviderId in
+                        if let selectedProvider = allProviders.first(where: { $0.id == newProviderId }) {
                             Task {
-                                // Switch provider and reset to first model
-                                if let firstModel = provider.availableModels.first {
-                                    await viewModel.updateSetting(\.defaultModel, firstModel.id)
-                                }
-                                await viewModel.updateSetting(\.defaultProvider, provider)
+                                await viewModel.selectUnifiedProvider(selectedProvider)
                             }
                         }
                     }
+                )) {
+                    Section("Built-in Providers") {
+                        ForEach(AIProvider.allCases) { provider in
+                            Text(provider.displayName).tag("builtin_\(provider.rawValue)")
+                        }
+                    }
+
+                    if !viewModel.settings.customProviders.isEmpty {
+                        Section("Custom Providers") {
+                            ForEach(viewModel.settings.customProviders) { provider in
+                                Text(provider.providerName).tag("custom_\(provider.id.uuidString)")
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: currentProvider?.isCustom == true ? "server.rack" : "cpu.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(AppColors.signalMercury)
+                            .frame(width: 32)
+
+                        Text(currentProvider?.displayName ?? "Select Provider")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Spacer()
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(AppColors.substrateSecondary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(AppColors.glassBorder, lineWidth: 1)
+                            )
+                    )
                 }
+                .pickerStyle(.menu)
             }
 
             // MARK: - Model Selection
 
             GeneralSettingsSection(title: "Model") {
-                VStack(spacing: 12) {
-                    ForEach(viewModel.settings.defaultProvider.availableModels) { model in
-                        ModelRow(
-                            model: model,
-                            isSelected: viewModel.settings.defaultModel == model.id
-                        ) {
-                            Task {
-                                await viewModel.updateSetting(\.defaultModel, model.id)
+                let currentProvider = viewModel.currentUnifiedProvider()
+                let currentModel = viewModel.currentUnifiedModel()
+                let providerIndex = viewModel.settings.customProviders.firstIndex(where: { $0.id == viewModel.settings.selectedCustomProviderId }) ?? 0
+
+                if let provider = currentProvider {
+                    let availableModels = provider.availableModels(customProviderIndex: providerIndex + 1)
+
+                    Picker(selection: Binding(
+                        get: { currentModel?.id ?? "" },
+                        set: { newModelId in
+                            if let selectedModel = availableModels.first(where: { $0.id == newModelId }) {
+                                Task {
+                                    await viewModel.selectUnifiedModel(selectedModel)
+                                }
                             }
                         }
+                    )) {
+                        ForEach(availableModels) { model in
+                            Text(model.name).tag(model.id)
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "brain.head.profile")
+                                .font(.system(size: 20))
+                                .foregroundColor(AppColors.signalMercury)
+                                .frame(width: 32)
+
+                            Text(currentModel?.name ?? "Select a model")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Spacer()
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(AppColors.substrateSecondary)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                                )
+                        )
+                    }
+                    .pickerStyle(.menu)
+
+                    if let selectedModel = currentModel {
+                        // Selected Model Card (read-only)
+                        UnifiedModelRow(
+                            model: selectedModel,
+                            isSelected: true,
+                            action: {}
+                        )
+                        .disabled(true)
                     }
                 }
             }
@@ -124,6 +200,159 @@ struct GeneralSettingsView: View {
         case .auto: return "circle.lefthalf.filled"
         }
     }
+
+    private var supportedProviders: [AIProvider] {
+        // Show all supported providers, including Gemini (which uses 2.5 models)
+        return AIProvider.allCases
+    }
+
+    private func pricingText(for model: AIModel, provider: AIProvider) -> String? {
+        // Resolve pricing via canonical registry to stay in sync with CostService
+        if let key = PricingKeyResolver.canonicalKey(for: model.id) ?? PricingKeyResolver.canonicalKey(for: model.name) {
+            let pricing = PricingRegistry.price(for: key)
+            var parts: [String] = []
+            parts.append(String(format: "$%.2f in / $%.2f out per 1M tokens", pricing.inputPerMTokUSD, pricing.outputPerMTokUSD))
+            if let cached = pricing.cachedInputPerMTokUSD {
+                parts.append(String(format: "cached: $%.2f", cached))
+            }
+            if let notes = pricing.notes, !notes.isEmpty {
+                parts.append(notes)
+            }
+            return parts.joined(separator: " · ")
+        }
+        return nil
+    }
+
+    // Choose a sensible default model per provider based on highest version of specific families
+    private func preferredDefaultModelId(for provider: AIProvider) -> String? {
+        let models = provider.availableModels
+        switch provider {
+        case .gemini:
+            // Prefer highest-version Flash (e.g., Gemini 2.5 Flash)
+            let candidates = models.filter { containsCaseInsensitive($0.name, "flash") || containsCaseInsensitive($0.id, "flash") }
+            return candidates.max(by: { versionScore($0) < versionScore($1) })?.id
+        case .openai:
+            // Prefer highest-version Mini (e.g., GPT-5 Mini over 4.1 Mini)
+            let candidates = models.filter { containsCaseInsensitive($0.name, "mini") || containsCaseInsensitive($0.id, "mini") }
+            return candidates.max(by: { versionScore($0) < versionScore($1) })?.id
+        case .anthropic:
+            // Prefer highest-version Haiku (e.g., Claude Haiku 4.5)
+            let candidates = models.filter { containsCaseInsensitive($0.name, "haiku") || containsCaseInsensitive($0.id, "haiku") }
+            return candidates.max(by: { versionScore($0) < versionScore($1) })?.id
+        }
+    }
+
+    // Extract a comparable version score from model name/id (e.g., 5, 4.1, 2.5)
+    private func versionScore(_ model: AIModel) -> Double {
+        func extractVersion(from text: String) -> Double? {
+            // Find the first occurrence of a number with optional decimal (e.g., 5, 4.1, 2.5)
+            let pattern = #"(\d+(?:\.\d+)?)"#
+            if let range = text.range(of: pattern, options: .regularExpression) {
+                let match = String(text[range])
+                return Double(match)
+            }
+            return nil
+        }
+        // Prefer version in name, fallback to id
+        return extractVersion(from: model.name) ?? extractVersion(from: model.id) ?? 0
+    }
+
+    private func containsCaseInsensitive(_ text: String, _ needle: String) -> Bool {
+        text.range(of: needle, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+    }
+
+    // MARK: - Model Grouping Helpers
+
+    private func currentModels(for provider: AIProvider) -> [AIModel] {
+        let models = provider.availableModels
+        // Group by family and take the highest version from each family
+        let grouped = Dictionary(grouping: models, by: familyKey(for:))
+        let picks = grouped.values.compactMap { familyModels in
+            familyModels.max(by: { versionScore($0) < versionScore($1) })
+        }
+        // Sort by descending version score for nicer ordering
+        return picks.sorted { versionScore($0) > versionScore($1) }
+    }
+
+    private struct SeriesGroup: Identifiable {
+        let series: String
+        let models: [AIModel]
+        var id: String { series }
+    }
+
+    private func seriesGroupedModels(for provider: AIProvider) -> [SeriesGroup] {
+        let models = provider.availableModels
+        // Exclude those already in Current
+        let currentSet = Set(currentModels(for: provider).map { $0.id })
+        let remaining = models.filter { !currentSet.contains($0.id) }
+        let grouped = Dictionary(grouping: remaining, by: seriesKey(for:))
+        // Sort models within each series by descending version
+        let seriesGroups: [SeriesGroup] = grouped.map { (key: String, value: [AIModel]) in
+            SeriesGroup(series: key, models: value.sorted { versionScore($0) > versionScore($1) })
+        }
+        // Sort series by a numeric score extracted from the label (e.g., GPT-5 before GPT-4)
+        return seriesGroups.sorted { seriesSortKey($0.series) > seriesSortKey($1.series) }
+    }
+
+    private func familyKey(for model: AIModel) -> String {
+        let id = model.id.lowercased()
+        let name = model.name.lowercased()
+        switch model.provider {
+        case .openai:
+            if name.contains("mini") || id.contains("mini") { return "Mini" }
+            if id.contains("nano") { return "Nano" }
+            if id == "o3" || id.contains("o3-") { return "o3" }
+            if id.contains("o4-mini") { return "o4-mini" }
+            if id == "o1" || id.contains("o1-") { return "o1" }
+            if id.contains("gpt-5") { return "GPT-5" }
+            if id.contains("gpt-4.1") { return "GPT-4.1" }
+            if id.contains("gpt-4o") { return "GPT-4o" }
+            return "OpenAI Other"
+        case .anthropic:
+            if name.contains("haiku") || id.contains("haiku") { return "Haiku" }
+            if name.contains("sonnet") || id.contains("sonnet") { return "Sonnet" }
+            if name.contains("opus") || id.contains("opus") { return "Opus" }
+            return "Claude Other"
+        case .gemini:
+            if name.contains("flash") || id.contains("flash") { return "Flash" }
+            if name.contains("pro") || id.contains("pro") { return "Pro" }
+            return "Gemini Other"
+        }
+    }
+
+    private func seriesKey(for model: AIModel) -> String {
+        let id = model.id.lowercased()
+        let name = model.name.lowercased()
+        switch model.provider {
+        case .openai:
+            if id.contains("gpt-5") || name.contains("gpt-5") { return "GPT-5 Series" }
+            if id.contains("gpt-4.1") || name.contains("gpt-4.1") || id.contains("gpt-4o") || name.contains("gpt-4o") || id.contains("gpt-4") || name.contains("gpt-4") { return "GPT-4 Series" }
+            if id.contains("o3") || name.contains("o3") { return "o3 Series" }
+            if id.contains("o1") || name.contains("o1") { return "o1 Series" }
+            return "Other OpenAI"
+        case .anthropic:
+            // Use the highest granular label available
+            if name.contains("4.5") || id.contains("4.5") { return "Claude 4.5 Series" }
+            if name.contains("4.1") || id.contains("4.1") { return "Claude 4.1 Series" }
+            if name.contains("4") || id.contains("4") { return "Claude 4 Series" }
+            return "Other Claude"
+        case .gemini:
+            if name.contains("2.5") || id.contains("2.5") { return "Gemini 2.5 Series" }
+            return "Other Gemini"
+        }
+    }
+
+    private func seriesSortKey(_ series: String) -> Double {
+        // Extract the first number in the series label for sorting; default to 0
+        let pattern = #"(\d+(?:\.\d+)?)"#
+        if let range = series.range(of: pattern, options: .regularExpression) {
+            return Double(series[range]) ?? 0
+        }
+        // Prefer known order for non-numeric series
+        if series.lowercased().contains("o3") { return 3.0 }
+        if series.lowercased().contains("o1") { return 1.0 }
+        return 0
+    }
 }
 
 // MARK: - Model Row
@@ -131,6 +360,7 @@ struct GeneralSettingsView: View {
 struct ModelRow: View {
     let model: AIModel
     let isSelected: Bool
+    let footerText: String?
     let action: () -> Void
 
     var body: some View {
@@ -145,6 +375,17 @@ struct ModelRow: View {
                         .font(AppTypography.bodySmall())
                         .foregroundColor(AppColors.textSecondary)
                         .lineLimit(2)
+
+                    if let footerText = footerText {
+                        HStack(spacing: 8) {
+                            Image(systemName: "dollarsign.circle")
+                                .foregroundColor(AppColors.textTertiary)
+                            Text(footerText)
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textTertiary)
+                                .lineLimit(1)
+                        }
+                    }
 
                     HStack(spacing: 8) {
                         Label(

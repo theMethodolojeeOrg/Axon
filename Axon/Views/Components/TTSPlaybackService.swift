@@ -5,12 +5,14 @@
 
 import Foundation
 import AVFoundation
+import Combine
 
 @MainActor
 final class TTSPlaybackService: ObservableObject {
     static let shared = TTSPlaybackService()
 
     private var player: AVAudioPlayer?
+    let objectWillChange = ObservableObjectPublisher()
 
     private init() {}
 
