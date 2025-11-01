@@ -234,14 +234,21 @@ class ConversationService: ObservableObject {
             let conversationId: String
             let message: String
             let provider: String
+            let model: String?
             let apiKeys: APIKeys
             let options: OrchestrateOptions
+            let openaiCompatible: OpenAICompatible?
         }
 
         struct APIKeys: Encodable {
             let anthropic: String?
             let openai: String?
             let gemini: String?
+        }
+
+        struct OpenAICompatible: Encodable {
+            let apiKey: String
+            let baseUrl: String
         }
 
         struct OrchestrateOptions: Encodable {
@@ -277,10 +284,64 @@ class ConversationService: ObservableObject {
         let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
         let (providerString, modelName, providerDisplayName) = getProviderAndModel(for: conversationId, settings: settings)
 
+        // Handle custom provider API key, endpoint, and model code
+        var openaiCompatibleConfig: OpenAICompatible? = nil
+        var modelCode: String? = nil
+        
+        if providerString == "openai-compatible" {
+            // Get custom provider ID from conversation overrides or global settings
+            let overridesKey = "conversation_overrides_\(conversationId)"
+            var customProviderId: UUID? = nil
+            var customModelId: UUID? = nil
+            
+            // Check conversation overrides first
+            if let data = UserDefaults.standard.data(forKey: overridesKey),
+               let overrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data) {
+                customProviderId = overrides.customProviderId
+                customModelId = overrides.customModelId
+            } else {
+                // Fall back to global settings
+                customProviderId = settings.selectedCustomProviderId
+                customModelId = settings.selectedCustomModelId
+            }
+            
+            // Get custom provider config and API key
+            if let providerId = customProviderId,
+               let customProvider = settings.customProviders.first(where: { $0.id == providerId }) {
+                
+                // Get the model code
+                if let modelId = customModelId,
+                   let customModel = customProvider.models.first(where: { $0.id == modelId }) {
+                    modelCode = customModel.modelCode
+                }
+                
+                // Retrieve API key from keychain
+                if let apiKey = try? apiKeysStorage.getCustomProviderAPIKey(providerId: providerId), !apiKey.isEmpty {
+                    openaiCompatibleConfig = OpenAICompatible(
+                        apiKey: apiKey,
+                        baseUrl: customProvider.apiEndpoint
+                    )
+                    
+                    #if DEBUG
+                    print("[ConversationService] Custom Provider Config:")
+                    print("  Provider: \(customProvider.providerName)")
+                    print("  Model Code: \(modelCode ?? "none")")
+                    print("  Endpoint: \(customProvider.apiEndpoint)")
+                    print("  API Key: ✓ Retrieved (\(apiKey.count) chars)")
+                    #endif
+                } else {
+                    #if DEBUG
+                    print("[ConversationService] WARNING: Custom provider '\(customProvider.providerName)' selected but no API key found!")
+                    #endif
+                }
+            }
+        }
+
         let request = OrchestrateRequest(
             conversationId: conversationId,
             message: content,
             provider: providerString,
+            model: modelCode,
             apiKeys: APIKeys(
                 anthropic: anthropicKey,
                 openai: openaiKey,
@@ -290,7 +351,8 @@ class ConversationService: ObservableObject {
                 createArtifacts: true,
                 saveMemories: true,
                 executeTools: false
-            )
+            ),
+            openaiCompatible: openaiCompatibleConfig
         )
 
         #if DEBUG

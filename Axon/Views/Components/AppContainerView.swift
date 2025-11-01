@@ -17,6 +17,7 @@ struct AppContainerView: View {
     @StateObject private var conversationService = ConversationService.shared
     @StateObject private var authService = AuthenticationService.shared
     @StateObject private var costService = CostService.shared
+    @StateObject private var taglineManager = TaglineManager.shared
     @State private var showSidebar = false
     @State private var selectedConversation: Conversation?
     @State private var currentView: MainView = .chat
@@ -120,13 +121,16 @@ struct AppContainerView: View {
                             .font(AppTypography.displaySmall())
                             .foregroundColor(AppColors.textPrimary)
 
-                        Text("Memory-augmented AI assistant")
+                        Text(taglineManager.currentTagline)
                             .font(AppTypography.bodyLarge())
                             .foregroundColor(AppColors.textSecondary)
                     }
                 }
                 .transition(.opacity)
                 .onAppear {
+                    // Increment tagline view count
+                    taglineManager.incrementViewCount()
+                    
                     // Dismiss launch overlay after a brief moment
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                         withAnimation(AppAnimations.standardEasing) {
@@ -191,6 +195,8 @@ struct ChatContainerView: View {
 
     @StateObject private var conversationService = ConversationService.shared
     @StateObject private var costService = CostService.shared
+    @StateObject private var taglineManager = TaglineManager.shared
+    @StateObject private var promptManager = PromptManager.shared
     @State private var messageText = ""
     @State private var isLoading = false
     @State private var showWelcome = true
@@ -243,8 +249,6 @@ struct ChatContainerView: View {
             } else {
                 conversationService.clearCurrentConversation()
                 conversationService.messages = []
-                // New chat: focus the input so the keyboard is ready
-                isInputFocused = true
             }
         }
     }
@@ -269,7 +273,7 @@ struct ChatContainerView: View {
                         .font(AppTypography.displaySmall())
                         .foregroundColor(AppColors.textPrimary)
 
-                    Text("Memory-augmented AI assistant")
+                    Text(taglineManager.currentTagline)
                         .font(AppTypography.bodyLarge())
                         .foregroundColor(AppColors.textSecondary)
                 }
@@ -284,7 +288,7 @@ struct ChatContainerView: View {
                         PromptCard(
                             icon: "lightbulb.fill",
                             title: "Explain a concept",
-                            prompt: "Explain quantum computing in simple terms"
+                            prompt: promptManager.currentPrompts.explain
                         ) { prompt in
                             messageText = prompt
                             sendMessage()
@@ -293,7 +297,7 @@ struct ChatContainerView: View {
                         PromptCard(
                             icon: "chevron.left.forwardslash.chevron.right",
                             title: "Write code",
-                            prompt: "Write a Python function to sort a list"
+                            prompt: promptManager.currentPrompts.code
                         ) { prompt in
                             messageText = prompt
                             sendMessage()
@@ -302,7 +306,7 @@ struct ChatContainerView: View {
                         PromptCard(
                             icon: "brain",
                             title: "Remember something",
-                            prompt: "Remember that I prefer TypeScript over JavaScript"
+                            prompt: promptManager.currentPrompts.remember
                         ) { prompt in
                             messageText = prompt
                             sendMessage()
@@ -311,7 +315,7 @@ struct ChatContainerView: View {
                         PromptCard(
                             icon: "list.bullet",
                             title: "Create a plan",
-                            prompt: "Help me plan a mobile app project"
+                            prompt: promptManager.currentPrompts.plan
                         ) { prompt in
                             messageText = prompt
                             sendMessage()
@@ -319,6 +323,10 @@ struct ChatContainerView: View {
                     }
                 }
                 .padding(.horizontal)
+                .onAppear {
+                    // Increment prompt view count to trigger generation
+                    promptManager.incrementViewCount()
+                }
 
                 Spacer()
             }
@@ -521,4 +529,3 @@ struct PromptCard: View {
 #Preview {
     AppContainerView()
 }
-

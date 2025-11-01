@@ -16,13 +16,66 @@ import FirebaseFirestore
 struct AxonApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var authService = AuthenticationService.shared
+    @State private var showLaunchScreen = true
+    @State private var launchScreenOpacity: Double = 1.0
+    @State private var mainAppOpacity: Double = 0.0
+    @State private var blackOverlayOpacity: Double = 0.0
 
     var body: some Scene {
         WindowGroup {
-            if authService.isAuthenticated {
-                AppContainerView()
-            } else {
-                AuthenticationView()
+            ZStack {
+                // Main app (underneath)
+                if !showLaunchScreen {
+                    if authService.isAuthenticated {
+                        AppContainerView()
+                            .opacity(mainAppOpacity)
+                    } else {
+                        AuthenticationView()
+                            .opacity(mainAppOpacity)
+                    }
+                }
+                
+                // Launch screen (on top during animation)
+                if showLaunchScreen {
+                    LaunchScreenView()
+                        .opacity(launchScreenOpacity)
+                        .onAppear {
+                            startLaunchSequence()
+                        }
+                }
+                
+                // Black overlay for transitions
+                Color.black
+                    .ignoresSafeArea()
+                    .opacity(blackOverlayOpacity)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+    
+    private func startLaunchSequence() {
+        // Total animation time: 1.5s fade in + 0.5s glass + 0.8s logo + 10s hold = 12.8s
+        let animationDuration = 12.8
+        
+        // After animations complete, start fade-to-black transition
+        DispatchQueue.main.asyncAfter(deadline: .now() + animationDuration) {
+            // Step 1: Fade launch screen to black (1.0s)
+            withAnimation(.easeInOut(duration: 1.0)) {
+                launchScreenOpacity = 0.0
+                blackOverlayOpacity = 1.0
+            }
+            
+            // Step 2: Hold black briefly (0.3s), then dismiss launch screen
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                showLaunchScreen = false
+                
+                // Step 3: Fade main app in from black (1.0s)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    withAnimation(.easeInOut(duration: 1.0)) {
+                        mainAppOpacity = 1.0
+                        blackOverlayOpacity = 0.0
+                    }
+                }
             }
         }
     }
@@ -69,4 +122,3 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         return true
     }
 }
-
