@@ -186,11 +186,11 @@ class ConversationService: ObservableObject {
         }
     }
 
-    func deleteConversation(id: String) async throws {
+    func deleteConversation(id: String, hardDelete: Bool = true) async throws {
         do {
             struct DeleteConversationResponse: Decodable { let message: String; let hardDelete: Bool? }
             let _: DeleteConversationResponse = try await apiClient.request(
-                endpoint: "/apiDeleteConversation/\(id)",
+                endpoint: "/apiDeleteConversation/\(id)?hardDelete=\(hardDelete)",
                 method: .delete
             )
             conversations.removeAll { $0.id == id }

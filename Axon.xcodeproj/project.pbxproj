@@ -51,6 +51,20 @@
 			);
 			target = E254ED952EB21B76000CDD9D /* Axon */;
 		};
+		E25EA2FB2EB5A6270058351E /* Exceptions for "Axon" folder in "AxonTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"GoogleService-Info.plist",
+			);
+			target = E254EDA72EB21B77000CDD9D /* AxonTests */;
+		};
+		E25EA2FC2EB5A6270058351E /* Exceptions for "Axon" folder in "AxonUITests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"GoogleService-Info.plist",
+			);
+			target = E254EDB12EB21B77000CDD9D /* AxonUITests */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -58,6 +72,8 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				E254EE272EB229BD000CDD9D /* Exceptions for "Axon" folder in "Axon" target */,
+				E25EA2FB2EB5A6270058351E /* Exceptions for "Axon" folder in "AxonTests" target */,
+				E25EA2FC2EB5A6270058351E /* Exceptions for "Axon" folder in "AxonUITests" target */,
 			);
 			path = Axon;
 			sourceTree = "<group>";

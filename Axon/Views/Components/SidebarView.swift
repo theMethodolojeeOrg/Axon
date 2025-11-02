@@ -148,14 +148,27 @@ struct SidebarView: View {
                         .contextMenu {
                             Button(role: .destructive) {
                                 Task {
-                                    do { try await conversationService.deleteConversation(id: conversation.id) } catch { print("Delete failed: \(error)") }
+                                    do { 
+                                        try await conversationService.deleteConversation(id: conversation.id, hardDelete: true)
+                                    } catch { 
+                                        print("Delete failed: \(error)") 
+                                    }
                                 }
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
 
                             Button {
-                                SettingsStorage.shared.archiveConversation(id: conversation.id)
+                                Task {
+                                    do {
+                                        // Archive on server (soft delete)
+                                        try await conversationService.deleteConversation(id: conversation.id, hardDelete: false)
+                                        // Add to local archive storage for UI filtering
+                                        SettingsStorage.shared.archiveConversation(id: conversation.id)
+                                    } catch {
+                                        print("Archive failed: \(error)")
+                                    }
+                                }
                             } label: {
                                 Label("Archive", systemImage: "archivebox")
                             }
