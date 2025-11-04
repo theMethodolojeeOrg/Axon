@@ -378,8 +378,8 @@ struct ChatContainerView: View {
                 }
                 .padding()
             }
-            .onChange(of: conversationService.messages.count) { _ in
-                if let lastMessage = conversationService.messages.last {
+            .onChange(of: conversationService.messages.count) { oldCount, newCount in
+                if newCount > oldCount, let lastMessage = conversationService.messages.last {
                     withAnimation(AppAnimations.standardEasing) {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
                     }
@@ -392,7 +392,7 @@ struct ChatContainerView: View {
 
     private func loadMessages(for conversation: Conversation) async {
         do {
-            try await conversationService.getMessages(conversationId: conversation.id)
+            _ = try await conversationService.getMessages(conversationId: conversation.id)
         } catch {
             print("Error loading messages: \(error.localizedDescription)")
         }
@@ -424,7 +424,7 @@ struct ChatContainerView: View {
                     let title = String(content.prefix(50))
                     conv = try await conversationService.createConversation(
                         title: title,
-                        firstMessage: content
+                        firstMessage: nil  // Don't send message during creation
                     )
                     onConversationCreated(conv)
                 }

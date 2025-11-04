@@ -582,7 +582,7 @@ struct ModelEditRow: View {
                     // Color picker button
                     ColorPicker("", selection: $selectedColor, supportsOpacity: false)
                         .labelsHidden()
-                        .onChange(of: selectedColor) { newColor in
+                        .onChange(of: selectedColor) { oldColor, newColor in
                             updateModelColor(newColor)
                         }
                     
@@ -793,7 +793,7 @@ struct ModelEditRow: View {
     
     private func isColorTaken(_ hex: String) -> Bool {
         // Check if this hex is already assigned to a different model
-        let registry = ModelColorRegistry.shared
+        //let registry = ModelColorRegistry.shared
         
         // Get all existing color assignments
         // We can't directly access the registry's internal state, but we can check

@@ -1,0 +1,41 @@
+[APIClient] Using NeurX API key: sk_axon_5m...
+[APIClient] GET https://us-central1-neurx-8f122.cloudfunctions.net/apiListConversations?projectId=default&limit=50&offset=0&apiKey=sk_axon_5mCu4IVhVbmjRYK8lUgt7ebby72KmbVn -> 200
+[APIClient] Response: {"conversations":[{"id":"30a4fda5-cf75-4010-b6e4-8d11e88cfb53","userId":"1FhWczdqWfX2wMEWZhxktHSC2r13","projectId":"default","title":"Hey!","createdAt":1761827228413,"updatedAt":1761827228413,"message
+[APIClient] Using NeurX API key: sk_axon_5m...
+[APIClient] GET https://us-central1-neurx-8f122.cloudfunctions.net/apiListConversations?projectId=default&limit=50&offset=0&apiKey=sk_axon_5mCu4IVhVbmjRYK8lUgt7ebby72KmbVn -> 200
+[APIClient] Response: {"conversations":[{"id":"30a4fda5-cf75-4010-b6e4-8d11e88cfb53","userId":"1FhWczdqWfX2wMEWZhxktHSC2r13","projectId":"default","title":"Hey!","createdAt":1761827228413,"updatedAt":1761827228413,"message
+[APIClient] Using NeurX API key: sk_axon_5m...
+[APIClient] GET https://us-central1-neurx-8f122.cloudfunctions.net/apiGetMemories?limit=10&offset=0&apiKey=sk_axon_5mCu4IVhVbmjRYK8lUgt7ebby72KmbVn -> 200
+[APIClient] Response: {"memories":[{"id":"4638d202-6d41-464c-b156-96edc95166c0","type":"fact","content":"# Mobile App Project Planning\n\nI'd be happy to help you plan this","confidence":0.8,"tags":[],"context":"Learned fr
+[APIClient] Decoding error: keyNotFound(CodingKeys(stringValue: "data", intValue: nil), Swift.DecodingError.Context(codingPath: [], debugDescription: "No value associated with key CodingKeys(stringValue: \"data\", intValue: nil) (\"data\").", underlyingError: nil))
+[APIClient] Full response: {"memories":[{"id":"4638d202-6d41-464c-b156-96edc95166c0","type":"fact","content":"# Mobile App Project Planning\n\nI'd be happy to help you plan this","confidence":0.8,"tags":[],"context":"Learned from conversation in 8b1f2a49-130a-47a8-9160-6cd2ea4c22e4","evidence":"","createdAt":1761916518489,"updatedAt":1761916518489,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"8b3138f1-e301-428e-ab12-079d7de0267b","type":"fact","content":"Let me start with some foundational questions to understand your specific needs:\n\n## Key Discovery Questions\n\n**1","confidence":0.8,"tags":[],"context":"Learned from conversation in 8b1f2a49-130a-47a8-9160-6cd2ea4c22e4","evidence":"","createdAt":1761916518489,"updatedAt":1761916518489,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"c63d7178-9fa8-4ad4-9072-10722f756399","type":"fact","content":"Project Fundamentals**\n- What problem does your app solve, or what need does it address","confidence":0.8,"tags":[],"context":"Learned from conversation in 8b1f2a49-130a-47a8-9160-6cd2ea4c22e4","evidence":"","createdAt":1761916518489,"updatedAt":1761916518489,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"46c0e2b1-9102-419d-bab7-ac2a3ffea720","type":"fact","content":"**Quantum computers** use **qubits** — these can be 0, 1, *or both at the same time*","confidence":0.8,"tags":[],"context":"Learned from conversation in 565d6966-95af-45dc-998e-7c3d958355f8","evidence":"","createdAt":1761914344227,"updatedAt":1761914344227,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"63ac9ea9-edf0-48d7-a01e-9c5bd48b39e2","type":"fact","content":"# Quantum Computing: The Simple Version\n\n## Regular Computers vs","confidence":0.8,"tags":[],"context":"Learned from conversation in 565d6966-95af-45dc-998e-7c3d958355f8","evidence":"","createdAt":1761914344227,"updatedAt":1761914344227,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"dfb8d292-b283-4178-b537-ba7a3f8e426c","type":"fact","content":"Quantum Computers\n\n**Regular computers** think in **bits** — each piece of information is either a 0 or a 1, like light switches that are either off or on","confidence":0.8,"tags":[],"context":"Learned from conversation in 565d6966-95af-45dc-998e-7c3d958355f8","evidence":"","createdAt":1761914344227,"updatedAt":1761914344227,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"2074d6e5-d156-48e2-8a2d-320aed29d259","type":"fact","content":"This compressed space is the \"latent space\"—it contains the essential features and patterns distilled from the original data","confidence":0.8,"tags":[],"context":"Learned from conversation in 75cf974a-273a-4aef-a725-dc0ffe349ac4","evidence":"","createdAt":1761906770267,"updatedAt":1761906770267,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"bb6d1cf4-f1d7-4e77-8990-e5ca853f22b4","type":"fact","content":"# Latent Space\n\n**Latent space** is a foundational concept in machine learning and AI that refers to a compressed, abstract representation of data in a lower-dimensional space","confidence":0.8,"tags":[],"context":"Learned from conversation in 75cf974a-273a-4aef-a725-dc0ffe349ac4","evidence":"","createdAt":1761906770267,"updatedAt":1761906770267,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"e08b5e9a-c0c7-4238-8d25-d132487fb902","type":"fact","content":"Here's a breakdown:\n\n## Core Concept\n\nInstead of working directly with raw data (like pixels in an image or words in text), neural networks learn to map data into a simplified, hidden representation","confidence":0.8,"tags":[],"context":"Learned from conversation in 75cf974a-273a-4aef-a725-dc0ffe349ac4","evidence":"","createdAt":1761906770267,"updatedAt":1761906770267,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"0e47f39d-1fb5-4da5-b900-33c779282e79","type":"fact","content":"They are trained on vast amounts of text data, enabling them to learn patterns, grammar, context, and even nuances in language","confidence":0.8,"tags":[],"context":"Learned from conversation in 75cf974a-273a-4aef-a725-dc0ffe349ac4","evidence":"","createdAt":1761906715728,"updatedAt":1761906715728,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"}],"pagination":{"total":121,"limit":10,"offset":0,"hasMore":true}}
+[PromptManager] Error generating prompts: Decoding error: The data couldn’t be read because it is missing.
+containerToPush is nil, will not push anything to candidate receiver for request token: D61C83E0
+[APIClient] Using NeurX API key: sk_axon_5m...
+[APIClient] POST https://us-central1-neurx-8f122.cloudfunctions.net/apiCreateConversation?apiKey=sk_axon_5mCu4IVhVbmjRYK8lUgt7ebby72KmbVn -> 201
+[APIClient] Response: {"conversation":{"id":"28d82b45-ede3-461c-9124-8627d8e05462","userId":"1FhWczdqWfX2wMEWZhxktHSC2r13","projectId":"default","title":"Testing the weird double message thing. Are you ge","createdAt":1762
+[ConversationService] API Key Debug:
+  Anthropic: ✓ Retrieved (108 chars, starts: sk-ant-api03-oX...)
+  OpenAI: ✓ Retrieved
+  Gemini: ✓ Retrieved
+[ConversationService] Custom Provider Config:
+  Provider: MiniMax
+  Model Code: MiniMax-M2
+  Endpoint: https://api.minimax.io
+  API Key: ✓ Retrieved (704 chars)
+[ConversationService] Request Body:
+  Provider: openai-compatible
+  ConversationId: 28d82b45-ede3-461c-9124-8627d8e05462
+  Message length: 69 chars
+  API Keys in request body (top-level):
+    anthropic: ✓ Included
+    openai: ✓ Included
+    gemini: ✓ Included
+    openaiCompatible: ✓ Included
+[ConversationService] Added Gemini API key to headers: AIzaSyAJMzBQGex...
+[APIClient] Using NeurX API key: sk_axon_5m...
+[APIClient] Using NeurX API key: sk_axon_5m...
+[APIClient] GET https://us-central1-neurx-8f122.cloudfunctions.net/apiGetMessages?conversationId=28d82b45-ede3-461c-9124-8627d8e05462&limit=50&apiKey=sk_axon_5mCu4IVhVbmjRYK8lUgt7ebby72KmbVn -> 200
+[APIClient] Response: {"messages":[{"id":"d2c53ee9-9d6c-4346-bc27-cbb9feaca419","role":"user","content":"Testing the weird double message thing. Are you getting two of these?","createdAt":1762208769808,"updatedAt":17622087
+[APIClient] POST https://us-central1-neurx-8f122.cloudfunctions.net/apiOrchestrate?apiKey=sk_axon_5mCu4IVhVbmjRYK8lUgt7ebby72KmbVn -> 201
+[APIClient] Response: {"userMessage":{"id":"56fde8f9-2288-4d56-a6f0-0b19879a0ab5","role":"user","content":"Testing the weird double message thing. Are you getting two of these?","createdAt":1762208771072,"updatedAt":176220

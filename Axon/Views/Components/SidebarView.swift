@@ -17,34 +17,42 @@ struct SidebarView: View {
 
     @StateObject private var conversationService = ConversationService.shared
     @StateObject private var authService = AuthenticationService.shared
+    @StateObject private var syncManager = ConversationSyncManager.shared
 
     @State private var renamingConversation: Conversation? = nil
     @State private var tempRenameTitle: String = ""
     @State private var showingRenameSheet: Bool = false
+    @State private var showingDeleteAlert: Bool = false
+    @State private var deletingConversation: Conversation? = nil
+    @State private var deleteError: String? = nil
+    @State private var syncErrorMessage: String? = nil
+    @State private var showingSyncError: Bool = false
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Sidebar content
-            VStack(spacing: 0) {
-                // Header
-                sidebarHeader
+        GeometryReader { proxy in
+            HStack(spacing: 0) {
+                // Sidebar content
+                VStack(spacing: 0) {
+                    // Header
+                    sidebarHeader
 
-                Divider()
-                    .background(AppColors.divider)
+                    Divider()
+                        .background(AppColors.divider)
 
-                // Conversations list
-                conversationsSection
+                    // Conversations list
+                    conversationsSection
+
+                    Spacer()
+
+                    // Bottom navigation
+                    bottomNavigation
+                }
+                .frame(width: proxy.size.width * 0.8)
+                .background(AppColors.substrateSecondary)
+                .shadow(color: AppColors.shadowStrong, radius: 20, x: 5, y: 0)
 
                 Spacer()
-
-                // Bottom navigation
-                bottomNavigation
             }
-            .frame(width: UIScreen.main.bounds.width * 0.8)
-            .background(AppColors.substrateSecondary)
-            .shadow(color: AppColors.shadowStrong, radius: 20, x: 5, y: 0)
-
-            Spacer()
         }
         .sheet(isPresented: $showingRenameSheet) {
             NavigationStack {
@@ -78,6 +86,51 @@ struct SidebarView: View {
                 }
             }
         }
+        .alert("Delete Conversation", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) {
+                deletingConversation = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let conversation = deletingConversation {
+                    Task { @MainActor in
+                        do {
+                            try await conversationService.deleteConversation(id: conversation.id, hardDelete: true)
+                            deletingConversation = nil
+                        } catch {
+                            deleteError = error.localizedDescription
+                            deletingConversation = nil
+                        }
+                    }
+                }
+            }
+        } message: {
+            if let conversation = deletingConversation {
+                Text("Are you sure you want to delete '\(SettingsStorage.shared.displayName(for: conversation.id) ?? conversation.title)'? This action cannot be undone.")
+            }
+        }
+        .alert("Error Deleting Conversation", isPresented: .constant(deleteError != nil)) {
+            Button("OK") {
+                deleteError = nil
+            }
+        } message: {
+            if let error = deleteError {
+                Text(error)
+            }
+        }
+        .alert("Sync Error", isPresented: $showingSyncError) {
+            Button("OK") {
+                syncErrorMessage = nil
+            }
+            Button("Retry") {
+                Task {
+                    await forceFullSync()
+                }
+            }
+        } message: {
+            if let error = syncErrorMessage {
+                Text("Failed to sync conversations: \(error)")
+            }
+        }
     }
 
     // MARK: - Header
@@ -90,10 +143,28 @@ struct SidebarView: View {
                         .font(AppTypography.titleLarge())
                         .foregroundColor(AppColors.textPrimary)
 
-                    if let displayName = authService.displayName {
-                        Text(displayName)
-                            .font(AppTypography.bodySmall())
-                            .foregroundColor(AppColors.textSecondary)
+                    HStack(spacing: 8) {
+                        if let displayName = authService.displayName {
+                            Text(displayName)
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+
+                        // Sync indicator
+                        if syncManager.isSyncing {
+                            HStack(spacing: 4) {
+                                ProgressView()
+                                    .scaleEffect(0.6)
+                                    .frame(width: 12, height: 12)
+                                Text("Syncing...")
+                                    .font(AppTypography.labelSmall())
+                            }
+                            .foregroundColor(AppColors.textTertiary)
+                        } else if let lastSync = syncManager.lastSyncTime {
+                            Text("Updated \(lastSync, style: .relative)")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textTertiary)
+                        }
                     }
                 }
 
@@ -147,13 +218,8 @@ struct SidebarView: View {
                         }
                         .contextMenu {
                             Button(role: .destructive) {
-                                Task {
-                                    do { 
-                                        try await conversationService.deleteConversation(id: conversation.id, hardDelete: true)
-                                    } catch { 
-                                        print("Delete failed: \(error)") 
-                                    }
-                                }
+                                deletingConversation = conversation
+                                showingDeleteAlert = true
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -192,9 +258,10 @@ struct SidebarView: View {
             await loadConversations()
         }
         .refreshable {
+            // Pull-to-refresh: Force full sync from API
             let retention = SettingsStorage.shared.loadSettings()?.archiveRetentionDays ?? 30
             SettingsStorage.shared.purgeExpiredArchived(retentionDays: retention)
-            await loadConversations()
+            await forceFullSync()
         }
     }
 
@@ -259,6 +326,21 @@ struct SidebarView: View {
             try await conversationService.listConversations()
         } catch {
             print("Error loading conversations: \(error.localizedDescription)")
+        }
+    }
+
+    private func forceFullSync() async {
+        do {
+            print("[SidebarView] Starting force full sync...")
+            // Force full sync with listAll=true, overwriting everything
+            try await syncManager.forceFullSync()
+            // Reload conversations after sync completes
+            conversationService.conversations = syncManager.loadLocalConversations()
+            print("[SidebarView] ✅ Force full sync completed. Loaded \(conversationService.conversations.count) conversations")
+        } catch {
+            print("[SidebarView] ❌ Error forcing full sync: \(error.localizedDescription)")
+            syncErrorMessage = error.localizedDescription
+            showingSyncError = true
         }
     }
 }
@@ -357,3 +439,4 @@ struct ConversationSidebarRow: View {
         )
     }
 }
+

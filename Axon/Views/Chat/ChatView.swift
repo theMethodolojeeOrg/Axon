@@ -92,6 +92,7 @@ struct ChatView: View {
     @State private var errorMessage: String?
     @State private var showingError = false
     @State private var showChatInfo = false
+    @State private var localMessages: [Message] = []
 
     let conversation: Conversation
 
@@ -101,7 +102,7 @@ struct ChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 16) {
-                        ForEach(conversationService.messages) { message in
+                        ForEach(localMessages) { message in
                             MessageBubble(
                                 message: message,
                                 onCopy: { msg in
@@ -122,8 +123,18 @@ struct ChatView: View {
                     }
                     .padding()
                 }
-                .onChange(of: conversationService.messages.count) { newValue, oldValue in
-                    if newValue != oldValue, let lastMessage = conversationService.messages.last {
+                .refreshable {
+                    // Pull-to-refresh: Force refresh messages from API
+                    do {
+                        let refreshedMessages = try await conversationService.refreshMessages(conversationId: conversation.id)
+                        localMessages = refreshedMessages
+                    } catch {
+                        errorMessage = error.localizedDescription
+                        showingError = true
+                    }
+                }
+                .onChange(of: localMessages.count) { newValue, oldValue in
+                    if newValue != oldValue, let lastMessage = localMessages.last {
                         withAnimation(AppAnimations.standardEasing) {
                             proxy.scrollTo(lastMessage.id, anchor: .bottom)
                         }
@@ -142,6 +153,18 @@ struct ChatView: View {
         .navigationTitle(conversation.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: {
+                    Task {
+                        await loadMessages()
+                    }
+                }) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 20))
+                        .foregroundColor(AppColors.signalMercury)
+                }
+            }
+            
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showChatInfo = true }) {
                     Image(systemName: "info.circle")
@@ -155,6 +178,13 @@ struct ChatView: View {
         }
         .task {
             await loadMessages()
+        }
+        .onChange(of: conversation.id) { _, newId in
+            // Clear messages when conversation changes
+            localMessages = []
+            Task {
+                await loadMessages()
+            }
         }
         .alert("Error", isPresented: $showingError) {
             Button("OK", role: .cancel) {}
@@ -171,11 +201,31 @@ struct ChatView: View {
     }
 
     private func loadMessages() async {
+        print("[ChatView] 🔄 Loading messages...")
+        print("[ChatView] Conversation ID: \(conversation.id)")
+        print("[ChatView] Conversation Title: \(conversation.title)")
+        
+        isLoading = true
+        defer { isLoading = false }
+        
         do {
-            try await conversationService.getMessages(conversationId: conversation.id)
+            let fetchedMessages = try await conversationService.getMessages(conversationId: conversation.id)
+            localMessages = fetchedMessages
+            
+            print("[ChatView] ✅ Loaded \(fetchedMessages.count) messages")
+            if fetchedMessages.isEmpty {
+                print("[ChatView] ⚠️ WARNING: No messages returned from API!")
+                print("[ChatView] This conversation should have messages according to Firestore")
+            } else {
+                print("[ChatView] First message: \(fetchedMessages.first?.content.prefix(50) ?? "N/A")")
+                print("[ChatView] Last message: \(fetchedMessages.last?.content.prefix(50) ?? "N/A")")
+            }
         } catch {
             errorMessage = "Failed to load messages: \(error.localizedDescription)"
             showingError = true
+            
+            print("[ChatView] ❌ Error loading messages: \(error)")
+            print("[ChatView] Error details: \(String(describing: error))")
         }
     }
 
@@ -192,6 +242,9 @@ struct ChatView: View {
                     conversationId: conversation.id,
                     content: content
                 )
+                
+                // Reload messages to get both user and assistant messages
+                await loadMessages()
             } catch {
                 errorMessage = "Failed to send message: \(error.localizedDescription)\n\nPlease check:\n• Your API key is configured in Settings\n• You have internet connection\n• The message is valid"
                 showingError = true
@@ -212,6 +265,8 @@ struct ChatView: View {
         guard let convId = conversationService.currentConversation?.id ?? conversation.id as String? else { return }
         do {
             _ = try await conversationService.regenerateAssistantMessage(conversationId: convId, messageId: message.id)
+            // Reload messages after regeneration
+            await loadMessages()
         } catch {
             errorMessage = "Failed to regenerate: \(error.localizedDescription)"
             showingError = true
@@ -415,8 +470,9 @@ struct MessageInputBar: View {
         ChatView(conversation: Conversation(
             userId: "user1",
             title: "Test Conversation",
-            summary: "A test conversation",
-            messageCount: 5
+            projectId: "default",
+            messageCount: 5,
+            summary: "A test conversation"
         ))
     }
 }

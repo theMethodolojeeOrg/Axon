@@ -1,0 +1,51 @@
+12.5.0 - [FirebaseMessaging][I-FCM001000] FIRMessaging Remote Notifications proxy enabled, will swizzle remote notification receiver handlers. If you'd prefer to manually integrate Firebase Messaging, add "FirebaseAppDelegateProxyEnabled" to your Info.plist, and set it to NO. Follow the instructions at:
+https://firebase.google.com/docs/cloud-messaging/ios/client#method_swizzling_in_firebase_messaging
+to ensure proper integration.
+[AppDelegate] Firebase configured in DEBUG mode
+[FirebaseConfig] Running in DEBUG mode - will use emulators if available
+[ConversationService] Loaded 50 conversations from Core Data
+[ConversationService] Sample conversation IDs: ["28d82b45-ede3-461c-9124-8627d8e05462", "045c6f2c-c689-4ee6-8165-a624a042d63b", "3edce7ac-cfb1-4aa5-958e-fac14b99b6a8"]
+[ConversationService] Published conversations array now has 50 items
+[APIClient] Using NeurX API key: sk_axon_5m...
+[APIClient] GET https://us-central1-neurx-8f122.cloudfunctions.net/apiGetMemories?limit=10&offset=0&apiKey=sk_axon_5mCu4IVhVbmjRYK8lUgt7ebby72KmbVn -> 200
+[APIClient] Response: {"memories":[{"id":"4638d202-6d41-464c-b156-96edc95166c0","type":"fact","content":"# Mobile App Project Planning\n\nI'd be happy to help you plan this","confidence":0.8,"tags":[],"context":"Learned fr
+[APIClient] Decoding error: keyNotFound(CodingKeys(stringValue: "data", intValue: nil), Swift.DecodingError.Context(codingPath: [], debugDescription: "No value associated with key CodingKeys(stringValue: \"data\", intValue: nil) (\"data\").", underlyingError: nil))
+[APIClient] Full response: {"memories":[{"id":"4638d202-6d41-464c-b156-96edc95166c0","type":"fact","content":"# Mobile App Project Planning\n\nI'd be happy to help you plan this","confidence":0.8,"tags":[],"context":"Learned from conversation in 8b1f2a49-130a-47a8-9160-6cd2ea4c22e4","evidence":"","createdAt":1761916518489,"updatedAt":1761916518489,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"8b3138f1-e301-428e-ab12-079d7de0267b","type":"fact","content":"Let me start with some foundational questions to understand your specific needs:\n\n## Key Discovery Questions\n\n**1","confidence":0.8,"tags":[],"context":"Learned from conversation in 8b1f2a49-130a-47a8-9160-6cd2ea4c22e4","evidence":"","createdAt":1761916518489,"updatedAt":1761916518489,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"c63d7178-9fa8-4ad4-9072-10722f756399","type":"fact","content":"Project Fundamentals**\n- What problem does your app solve, or what need does it address","confidence":0.8,"tags":[],"context":"Learned from conversation in 8b1f2a49-130a-47a8-9160-6cd2ea4c22e4","evidence":"","createdAt":1761916518489,"updatedAt":1761916518489,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"46c0e2b1-9102-419d-bab7-ac2a3ffea720","type":"fact","content":"**Quantum computers** use **qubits** — these can be 0, 1, *or both at the same time*","confidence":0.8,"tags":[],"context":"Learned from conversation in 565d6966-95af-45dc-998e-7c3d958355f8","evidence":"","createdAt":1761914344227,"updatedAt":1761914344227,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"63ac9ea9-edf0-48d7-a01e-9c5bd48b39e2","type":"fact","content":"# Quantum Computing: The Simple Version\n\n## Regular Computers vs","confidence":0.8,"tags":[],"context":"Learned from conversation in 565d6966-95af-45dc-998e-7c3d958355f8","evidence":"","createdAt":1761914344227,"updatedAt":1761914344227,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"dfb8d292-b283-4178-b537-ba7a3f8e426c","type":"fact","content":"Quantum Computers\n\n**Regular computers** think in **bits** — each piece of information is either a 0 or a 1, like light switches that are either off or on","confidence":0.8,"tags":[],"context":"Learned from conversation in 565d6966-95af-45dc-998e-7c3d958355f8","evidence":"","createdAt":1761914344227,"updatedAt":1761914344227,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"2074d6e5-d156-48e2-8a2d-320aed29d259","type":"fact","content":"This compressed space is the \"latent space\"—it contains the essential features and patterns distilled from the original data","confidence":0.8,"tags":[],"context":"Learned from conversation in 75cf974a-273a-4aef-a725-dc0ffe349ac4","evidence":"","createdAt":1761906770267,"updatedAt":1761906770267,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"bb6d1cf4-f1d7-4e77-8990-e5ca853f22b4","type":"fact","content":"# Latent Space\n\n**Latent space** is a foundational concept in machine learning and AI that refers to a compressed, abstract representation of data in a lower-dimensional space","confidence":0.8,"tags":[],"context":"Learned from conversation in 75cf974a-273a-4aef-a725-dc0ffe349ac4","evidence":"","createdAt":1761906770267,"updatedAt":1761906770267,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"e08b5e9a-c0c7-4238-8d25-d132487fb902","type":"fact","content":"Here's a breakdown:\n\n## Core Concept\n\nInstead of working directly with raw data (like pixels in an image or words in text), neural networks learn to map data into a simplified, hidden representation","confidence":0.8,"tags":[],"context":"Learned from conversation in 75cf974a-273a-4aef-a725-dc0ffe349ac4","evidence":"","createdAt":1761906770267,"updatedAt":1761906770267,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"},{"id":"0e47f39d-1fb5-4da5-b900-33c779282e79","type":"fact","content":"They are trained on vast amounts of text data, enabling them to learn patterns, grammar, context, and even nuances in language","confidence":0.8,"tags":[],"context":"Learned from conversation in 75cf974a-273a-4aef-a725-dc0ffe349ac4","evidence":"","createdAt":1761906715728,"updatedAt":1761906715728,"archived":false,"userId":"1FhWczdqWfX2wMEWZhxktHSC2r13"}],"pagination":{"total":121,"limit":10,"offset":0,"hasMore":true}}
+[PromptManager] Error generating prompts: Decoding error: The data couldn’t be read because it is missing.
+[ConversationService] Loaded 50 conversations from Core Data
+[ConversationService] Sample conversation IDs: ["28d82b45-ede3-461c-9124-8627d8e05462", "045c6f2c-c689-4ee6-8165-a624a042d63b", "3edce7ac-cfb1-4aa5-958e-fac14b99b6a8"]
+[ConversationService] Published conversations array now has 50 items
+[ConversationSyncManager] Performing delta sync (updatedSince=1762213557600.0)
+[APIClient] Using NeurX API key: sk_axon_5m...
+[ConversationService] Loaded 50 conversations from Core Data
+[ConversationService] Sample conversation IDs: ["28d82b45-ede3-461c-9124-8627d8e05462", "045c6f2c-c689-4ee6-8165-a624a042d63b", "3edce7ac-cfb1-4aa5-958e-fac14b99b6a8"]
+[ConversationService] Published conversations array now has 50 items
+[ConversationSyncManager] Sync already in progress
+[ConversationService] Loaded 50 conversations from Core Data
+[ConversationService] Sample conversation IDs: ["28d82b45-ede3-461c-9124-8627d8e05462", "045c6f2c-c689-4ee6-8165-a624a042d63b", "3edce7ac-cfb1-4aa5-958e-fac14b99b6a8"]
+[ConversationService] Published conversations array now has 50 items
+[APIClient] GET https://us-central1-neurx-8f122.cloudfunctions.net/apiListConversations?projectId=default&updatedSince=1762213557600&archived=false&apiKey=sk_axon_5mCu4IVhVbmjRYK8lUgt7ebby72KmbVn -> 200
+[APIClient] Response: {"conversations":[],"pagination":{"total":0,"limit":20,"offset":0,"hasMore":false},"sync":{"mode":"delta","timestamp":1762213934245,"updatedSince":1762213557600,"conversationsUpdated":0,"conversations
+[ConversationSyncManager] Delta sync: 0 updated, 0 deleted
+[ConversationSyncManager] ✅ Delta sync completed. Server timestamp: 1762213934245.0
+[ConversationService] Loaded 50 conversations from Core Data
+[ConversationService] Sample conversation IDs: ["28d82b45-ede3-461c-9124-8627d8e05462", "045c6f2c-c689-4ee6-8165-a624a042d63b", "3edce7ac-cfb1-4aa5-958e-fac14b99b6a8"]
+[ConversationService] Published conversations array now has 50 items
+[APIClient] Using NeurX API key: sk_axon_5m...
+[APIClient] GET https://us-central1-neurx-8f122.cloudfunctions.net/apiGetMessages?conversationId=28d82b45-ede3-461c-9124-8627d8e05462&limit=50&apiKey=sk_axon_5mCu4IVhVbmjRYK8lUgt7ebby72KmbVn -> 200
+[APIClient] Response: {"messages":[{"id":"d2c53ee9-9d6c-4346-bc27-cbb9feaca419","role":"user","content":"Testing the weird double message thing. Are you getting two of these?","createdAt":1762208769808,"updatedAt":17622087
+[ConversationService] Loaded 50 conversations from Core Data
+[ConversationService] Sample conversation IDs: ["28d82b45-ede3-461c-9124-8627d8e05462", "045c6f2c-c689-4ee6-8165-a624a042d63b", "3edce7ac-cfb1-4aa5-958e-fac14b99b6a8"]
+[ConversationService] Published conversations array now has 50 items
+[ConversationSyncManager] Performing delta sync (updatedSince=1762213934245.0)
+[APIClient] Using NeurX API key: sk_axon_5m...
+[APIClient] GET https://us-central1-neurx-8f122.cloudfunctions.net/apiListConversations?projectId=default&updatedSince=1762213934245&archived=false&apiKey=sk_axon_5mCu4IVhVbmjRYK8lUgt7ebby72KmbVn -> 200
+[APIClient] Response: {"conversations":[],"pagination":{"total":0,"limit":20,"offset":0,"hasMore":false},"sync":{"mode":"delta","timestamp":1762214067248,"updatedSince":1762213934245,"conversationsUpdated":0,"conversations
+[ConversationSyncManager] Delta sync: 0 updated, 0 deleted
+[ConversationSyncManager] ✅ Delta sync completed. Server timestamp: 1762214067248.0
+[ConversationService] Loaded 50 conversations from Core Data
+[ConversationService] Sample conversation IDs: ["28d82b45-ede3-461c-9124-8627d8e05462", "045c6f2c-c689-4ee6-8165-a624a042d63b", "3edce7ac-cfb1-4aa5-958e-fac14b99b6a8"]
+[ConversationService] Published conversations array now has 50 items
+[APIClient] Using NeurX API key: sk_axon_5m...
+[APIClient] GET https://us-central1-neurx-8f122.cloudfunctions.net/apiGetMessages?conversationId=045c6f2c-c689-4ee6-8165-a624a042d63b&limit=50&apiKey=sk_axon_5mCu4IVhVbmjRYK8lUgt7ebby72KmbVn -> 200
+[APIClient] Response: {"messages":[{"id":"1bc22850-470c-4533-9913-1539c8670e9e","role":"user","content":"Continuing to test chat infrastructure. ","createdAt":1762207802879,"updatedAt":1762207802879,"conversationId":"045c6

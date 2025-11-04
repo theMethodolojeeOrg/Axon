@@ -13,6 +13,7 @@ class ConversationService: ObservableObject {
     static let shared = ConversationService()
 
     private let apiClient = APIClient.shared
+    private let syncManager = ConversationSyncManager.shared
 
     // Default project ID - can be made configurable later
     private let defaultProjectId = "default"
@@ -22,8 +23,44 @@ class ConversationService: ObservableObject {
     @Published var messages: [Message] = []
     @Published var isLoading = false
     @Published var error: String?
+    @Published var isSyncing = false
 
-    private init() {}
+    // Track recently deleted conversations to avoid showing them again
+    private var recentlyDeletedIds: Set<String> = []
+    private var lastDeletedCleanupTime = Date()
+
+    private init() {
+        // Load conversations from local Core Data immediately (instant UI)
+        loadLocalConversations()
+    }
+
+    // MARK: - Local-First Data Access
+
+    /// Load conversations from Core Data (instant, no network)
+    private func loadLocalConversations() {
+        let loaded = syncManager.loadLocalConversations()
+        print("[ConversationService] Loaded \(loaded.count) conversations from Core Data")
+        print("[ConversationService] Sample conversation IDs: \(loaded.prefix(3).map { $0.id })")
+        conversations = loaded
+        print("[ConversationService] Published conversations array now has \(conversations.count) items")
+    }
+
+    /// Sync conversations with server in background
+    func syncConversationsInBackground() {
+        Task { @MainActor in
+            isSyncing = true
+            defer { isSyncing = false }
+
+            do {
+                try await syncManager.syncConversations()
+                // Reload from Core Data after successful sync
+                loadLocalConversations()
+            } catch {
+                self.error = error.localizedDescription
+                print("[ConversationService] Sync failed: \(error)")
+            }
+        }
+    }
 
     // MARK: - Helper: Get Provider and Model with Overrides
 
@@ -72,26 +109,13 @@ class ConversationService: ObservableObject {
 
     // MARK: - Conversations
 
+    /// List conversations - loads from Core Data first, then syncs in background
     func listConversations(limit: Int = 50, offset: Int = 0) async throws {
-        isLoading = true
-        defer { isLoading = false }
+        // Load from Core Data immediately (instant)
+        loadLocalConversations()
 
-        struct ListConversationsResponse: Decodable {
-            let conversations: [Conversation]
-            let pagination: PaginationMeta?
-            let metadata: AnyCodable?
-        }
-
-        do {
-            let response: ListConversationsResponse = try await apiClient.request(
-                endpoint: "/apiListConversations?projectId=\(defaultProjectId)&limit=\(limit)&offset=\(offset)",
-                method: .get
-            )
-            self.conversations = response.conversations
-        } catch {
-            self.error = error.localizedDescription
-            throw error
-        }
+        // Trigger background sync (non-blocking)
+        syncConversationsInBackground()
     }
 
     func createConversation(title: String, firstMessage: String? = nil) async throws -> Conversation {
@@ -187,19 +211,45 @@ class ConversationService: ObservableObject {
     }
 
     func deleteConversation(id: String, hardDelete: Bool = true) async throws {
+        // Store original state for potential rollback
+        let originalConversations = conversations
+        let originalCurrentConversation = currentConversation
+        let originalMessages = messages
+        
+        // Add to recently deleted to prevent reappearing
+        recentlyDeletedIds.insert(id)
+        
+        // Optimistic update - remove from UI immediately
+        conversations.removeAll { $0.id == id }
+        if currentConversation?.id == id {
+            currentConversation = nil
+            messages = []
+        }
+        
         do {
             struct DeleteConversationResponse: Decodable { let message: String; let hardDelete: Bool? }
-            let _: DeleteConversationResponse = try await apiClient.request(
+            let response: DeleteConversationResponse = try await apiClient.request(
                 endpoint: "/apiDeleteConversation/\(id)?hardDelete=\(hardDelete)",
                 method: .delete
             )
-            conversations.removeAll { $0.id == id }
-
-            if currentConversation?.id == id {
-                currentConversation = nil
-                messages = []
-            }
+            
+            #if DEBUG
+            print("✅ [ConversationService] Successfully deleted conversation \(id)")
+            print("   Server response: \(response.message)")
+            #endif
         } catch {
+            #if DEBUG
+            print("❌ [ConversationService] Failed to delete conversation \(id): \(error.localizedDescription)")
+            #endif
+            
+            // Remove from recently deleted since the deletion failed
+            recentlyDeletedIds.remove(id)
+            
+            // Rollback optimistic update on failure
+            conversations = originalConversations
+            currentConversation = originalCurrentConversation
+            messages = originalMessages
+            
             self.error = error.localizedDescription
             throw error
         }
@@ -208,6 +258,41 @@ class ConversationService: ObservableObject {
     // MARK: - Messages
 
     func getMessages(conversationId: String, limit: Int = 50) async throws -> [Message] {
+        print("[ConversationService] 📥 getMessages called")
+        print("[ConversationService] Conversation ID: \(conversationId)")
+        print("[ConversationService] Limit: \(limit)")
+        
+        // Get the conversation to check expected message count
+        let conversation = conversations.first(where: { $0.id == conversationId })
+        let expectedMessageCount = conversation?.messageCount ?? 0
+        print("[ConversationService] Expected message count from conversation: \(expectedMessageCount)")
+        
+        // First, load from Core Data (instant)
+        let localMessages = syncManager.loadLocalMessages(conversationId: conversationId)
+        print("[ConversationService] Local messages in Core Data: \(localMessages.count)")
+
+        // Only use local messages if we have ALL of them
+        if !localMessages.isEmpty && localMessages.count >= expectedMessageCount {
+            print("[ConversationService] ✅ Loaded \(localMessages.count) messages from Core Data (complete)")
+            self.messages = localMessages
+            return localMessages
+        }
+
+        // If no local messages OR incomplete, fetch from API
+        if localMessages.isEmpty {
+            print("[ConversationService] ⚠️ No local messages found, fetching from API...")
+        } else {
+            print("[ConversationService] ⚠️ Incomplete messages in Core Data (\(localMessages.count)/\(expectedMessageCount)), fetching from API...")
+        }
+        return try await refreshMessages(conversationId: conversationId, limit: limit)
+    }
+
+    /// Force refresh messages from API (for pull-to-refresh)
+    func refreshMessages(conversationId: String, limit: Int = 50) async throws -> [Message] {
+        print("[ConversationService] 🔄 refreshMessages called")
+        print("[ConversationService] Conversation ID: \(conversationId)")
+        print("[ConversationService] API Endpoint: /apiGetMessages?conversationId=\(conversationId)&limit=\(limit)")
+        
         isLoading = true
         defer { isLoading = false }
 
@@ -221,9 +306,32 @@ class ConversationService: ObservableObject {
                 endpoint: "/apiGetMessages?conversationId=\(conversationId)&limit=\(limit)",
                 method: .get
             )
+            
+            print("[ConversationService] 📨 API Response received")
+            print("[ConversationService] Messages count: \(response.messages.count)")
+            
+            if response.messages.isEmpty {
+                print("[ConversationService] ⚠️ WARNING: API returned 0 messages!")
+                print("[ConversationService] Pagination info: \(String(describing: response.pagination))")
+            } else {
+                print("[ConversationService] ✅ Successfully fetched \(response.messages.count) messages")
+                print("[ConversationService] First message ID: \(response.messages.first?.id ?? "N/A")")
+                print("[ConversationService] First message role: \(response.messages.first?.role.rawValue ?? "N/A")")
+                print("[ConversationService] First message preview: \(response.messages.first?.content.prefix(50) ?? "N/A")")
+            }
+            
             self.messages = response.messages
+
+            // Save fetched messages to Core Data, replacing old ones
+            if !response.messages.isEmpty {
+                try await syncManager.saveMessagesToCoreData(response.messages, conversationId: conversationId)
+                print("[ConversationService] 💾 Saved messages to Core Data")
+            }
+
             return response.messages
         } catch {
+            print("[ConversationService] ❌ Error refreshing messages: \(error)")
+            print("[ConversationService] Error type: \(type(of: error))")
             self.error = error.localizedDescription
             throw error
         }
@@ -234,16 +342,12 @@ class ConversationService: ObservableObject {
             let conversationId: String
             let message: String
             let provider: String
-            let model: String?
-            let apiKeys: APIKeys
             let options: OrchestrateOptions
-            let openaiCompatible: OpenAICompatible?
-        }
-
-        struct APIKeys: Encodable {
+            // API keys at top level to match backend expectations
             let anthropic: String?
             let openai: String?
             let gemini: String?
+            let openaiCompatible: OpenAICompatible?
         }
 
         struct OpenAICompatible: Encodable {
@@ -255,6 +359,7 @@ class ConversationService: ObservableObject {
             let createArtifacts: Bool
             let saveMemories: Bool
             let executeTools: Bool
+            let model: String?
         }
 
         struct OrchestrateResponse: Decodable {
@@ -341,17 +446,15 @@ class ConversationService: ObservableObject {
             conversationId: conversationId,
             message: content,
             provider: providerString,
-            model: modelCode,
-            apiKeys: APIKeys(
-                anthropic: anthropicKey,
-                openai: openaiKey,
-                gemini: geminiKey
-            ),
             options: OrchestrateOptions(
                 createArtifacts: true,
                 saveMemories: true,
-                executeTools: false
+                executeTools: false,
+                model: modelCode
             ),
+            anthropic: anthropicKey,
+            openai: openaiKey,
+            gemini: geminiKey,
             openaiCompatible: openaiCompatibleConfig
         )
 
@@ -360,10 +463,11 @@ class ConversationService: ObservableObject {
         print("  Provider: \(providerString)")
         print("  ConversationId: \(conversationId)")
         print("  Message length: \(content.count) chars")
-        print("  API Keys in request body:")
-        print("    anthropic: \(request.apiKeys.anthropic != nil ? "✓ Included" : "✗ nil")")
-        print("    openai: \(request.apiKeys.openai != nil ? "✓ Included" : "✗ nil")")
-        print("    gemini: \(request.apiKeys.gemini != nil ? "✓ Included" : "✗ nil")")
+        print("  API Keys in request body (top-level):")
+        print("    anthropic: \(request.anthropic != nil ? "✓ Included" : "✗ nil")")
+        print("    openai: \(request.openai != nil ? "✓ Included" : "✗ nil")")
+        print("    gemini: \(request.gemini != nil ? "✓ Included" : "✗ nil")")
+        print("    openaiCompatible: \(request.openaiCompatible != nil ? "✓ Included" : "✗ nil")")
         #endif
 
         // Prepare provider API key headers for orchestrator (backend may expect headers)
@@ -376,6 +480,9 @@ class ConversationService: ObservableObject {
         }
         if let geminiKey, !geminiKey.isEmpty {
             providerHeaders["X-Gemini-Api-Key"] = geminiKey
+            #if DEBUG
+            print("[ConversationService] Added Gemini API key to headers: \(String(geminiKey.prefix(15)))...")
+            #endif
         }
 
         do {

@@ -59,6 +59,47 @@ struct Message: Codable, Identifiable, Equatable {
         self.modelName = modelName
         self.providerName = providerName
     }
+
+    // Custom decoder to handle timestamp conversion from milliseconds
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        id = try container.decode(String.self, forKey: .id)
+        conversationId = try container.decode(String.self, forKey: .conversationId)
+        role = try container.decode(MessageRole.self, forKey: .role)
+        content = try container.decode(String.self, forKey: .content)
+
+        // Handle timestamp (createdAt) as milliseconds
+        let timestampMillis = try container.decode(Double.self, forKey: .timestamp)
+        timestamp = Date(timeIntervalSince1970: timestampMillis / 1000)
+
+        tokens = try container.decodeIfPresent(TokenUsage.self, forKey: .tokens)
+        artifacts = try container.decodeIfPresent([String].self, forKey: .artifacts)
+        toolCalls = try container.decodeIfPresent([ToolCall].self, forKey: .toolCalls)
+        isStreaming = try container.decodeIfPresent(Bool.self, forKey: .isStreaming)
+        modelName = try container.decodeIfPresent(String.self, forKey: .modelName)
+        providerName = try container.decodeIfPresent(String.self, forKey: .providerName)
+    }
+
+    // Custom encoder to convert timestamp back to milliseconds
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encode(id, forKey: .id)
+        try container.encode(conversationId, forKey: .conversationId)
+        try container.encode(role, forKey: .role)
+        try container.encode(content, forKey: .content)
+
+        // Convert timestamp to milliseconds
+        try container.encode(timestamp.timeIntervalSince1970 * 1000, forKey: .timestamp)
+
+        try container.encodeIfPresent(tokens, forKey: .tokens)
+        try container.encodeIfPresent(artifacts, forKey: .artifacts)
+        try container.encodeIfPresent(toolCalls, forKey: .toolCalls)
+        try container.encodeIfPresent(isStreaming, forKey: .isStreaming)
+        try container.encodeIfPresent(modelName, forKey: .modelName)
+        try container.encodeIfPresent(providerName, forKey: .providerName)
+    }
 }
 
 enum MessageRole: String, Codable {

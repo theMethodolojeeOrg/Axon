@@ -416,6 +416,6 @@ struct ChatInfoSection<Content: View>: View {
     ChatInfoSettingsView(conversation: Conversation(
         userId: "user1",
         title: "Test Conversation",
-        messageCount: 10
+        projectId: "default", messageCount: 10
     ))
 }
