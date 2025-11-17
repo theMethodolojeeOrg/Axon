@@ -284,7 +284,7 @@ class ConversationSyncManager: ObservableObject {
 
     // MARK: - Core Data Operations
 
-    private func saveConversationsToCoreData(_ conversations: [Conversation]) async throws {
+    func saveConversationsToCoreData(_ conversations: [Conversation]) async throws {
         let context = persistence.newBackgroundContext()
 
         try await context.perform {

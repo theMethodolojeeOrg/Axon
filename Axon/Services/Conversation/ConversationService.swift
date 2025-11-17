@@ -146,6 +146,11 @@ class ConversationService: ObservableObject {
                 method: .post,
                 body: request
             )
+
+            // Save new conversation to Core Data immediately so it appears in sidebar
+            try await syncManager.saveConversationsToCoreData([response.conversation])
+
+            // Add to in-memory array and set as current
             self.conversations.insert(response.conversation, at: 0)
             self.currentConversation = response.conversation
             return response.conversation
@@ -366,7 +371,7 @@ class ConversationService: ObservableObject {
             let userMessage: Message
             let assistantMessage: Message
             let artifacts: [AnyCodable]?
-            let memories: [AnyCodable]?
+            let memories: [Memory]?
             let tools: [AnyCodable]?
             let conversationUpdated: Bool?
             let metadata: AnyCodable?
@@ -527,6 +532,32 @@ class ConversationService: ObservableObject {
             }
             messages.append(assistantMessage)
 
+            // Save both messages to Core Data immediately
+            try await syncManager.saveMessagesToCoreData([response.userMessage, assistantMessage], conversationId: conversationId)
+
+            // Process and save memories if any were created
+            if let memories = response.memories, !memories.isEmpty {
+                #if DEBUG
+                print("[ConversationService] 🧠 Orchestrator returned \(memories.count) memories")
+                for memory in memories {
+                    print("  - [\(memory.type.displayName)] \(memory.content.prefix(50))...")
+                }
+                #endif
+
+                // Save memories to Core Data via MemorySyncManager
+                let memorySyncManager = MemorySyncManager.shared
+                try await memorySyncManager.saveMemoriesToCoreData(memories)
+
+                // Update MemoryService in-memory array so they appear in the Memory tab
+                let memoryService = MemoryService.shared
+                for memory in memories {
+                    // Insert at beginning to show newest first
+                    if !memoryService.memories.contains(where: { $0.id == memory.id }) {
+                        memoryService.memories.insert(memory, at: 0)
+                    }
+                }
+            }
+
             return assistantMessage
         } catch {
             // Remove optimistic message on error
@@ -611,6 +642,9 @@ class ConversationService: ObservableObject {
                 // In that case, just append the regenerated assistant message
                 messages.append(newAssistant)
             }
+
+            // Save regenerated message to Core Data
+            try await syncManager.saveMessagesToCoreData([newAssistant], conversationId: conversationId)
 
             return newAssistant
         } catch {

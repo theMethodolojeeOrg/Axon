@@ -13,12 +13,39 @@ class MemoryService: ObservableObject {
     static let shared = MemoryService()
 
     private let apiClient = APIClient.shared
+    private let syncManager = MemorySyncManager.shared
 
     @Published var memories: [Memory] = []
     @Published var isLoading = false
     @Published var error: String?
 
-    private init() {}
+    private init() {
+        // Load memories from local Core Data immediately (instant UI)
+        loadLocalMemories()
+    }
+
+    // MARK: - Local-First Data Access
+
+    /// Load memories from Core Data (instant, no network)
+    private func loadLocalMemories() {
+        let loaded = syncManager.loadLocalMemories()
+        print("[MemoryService] Loaded \(loaded.count) memories from Core Data")
+        memories = loaded
+    }
+
+    /// Sync memories with server in background
+    func syncMemoriesInBackground() {
+        Task { @MainActor in
+            do {
+                try await syncManager.syncMemories()
+                // Reload from Core Data after successful sync
+                loadLocalMemories()
+            } catch {
+                self.error = error.localizedDescription
+                print("[MemoryService] Sync failed: \(error)")
+            }
+        }
+    }
 
     // MARK: - Create Memory
 
@@ -54,6 +81,11 @@ class MemoryService: ObservableObject {
                 method: .post,
                 body: request
             )
+
+            // Save to Core Data immediately
+            try await syncManager.saveMemoriesToCoreData([memory])
+
+            // Add to in-memory array
             memories.insert(memory, at: 0)
             return memory
         } catch {
@@ -64,25 +96,18 @@ class MemoryService: ObservableObject {
 
     // MARK: - Get Memories
 
+    /// List memories - loads from Core Data first, then syncs in background
     func getMemories(limit: Int = 50, offset: Int = 0, type: MemoryType? = nil) async throws {
-        isLoading = true
-        defer { isLoading = false }
+        // Load from Core Data immediately (instant)
+        loadLocalMemories()
 
-        var endpoint = "/apiGetMemories?limit=\(limit)&offset=\(offset)"
+        // Apply type filter if specified
         if let type = type {
-            endpoint += "&type=\(type.rawValue)"
+            memories = memories.filter { $0.type == type }
         }
 
-        do {
-            let response: MemoryListResponse = try await apiClient.requestWrapped(
-                endpoint: endpoint,
-                method: .get
-            )
-            self.memories = response.memories
-        } catch {
-            self.error = error.localizedDescription
-            throw error
-        }
+        // Trigger background sync (non-blocking)
+        syncMemoriesInBackground()
     }
 
     // MARK: - Get Single Memory
@@ -131,6 +156,10 @@ class MemoryService: ObservableObject {
                 body: request
             )
 
+            // Save updated memory to Core Data
+            try await syncManager.saveMemoriesToCoreData([memory])
+
+            // Update in-memory array
             if let index = memories.firstIndex(where: { $0.id == id }) {
                 memories[index] = memory
             }
@@ -159,6 +188,11 @@ class MemoryService: ObservableObject {
                 method: .post,
                 body: request
             )
+
+            // Delete from Core Data
+            try await syncManager.deleteMemoryFromCoreData(id: id)
+
+            // Remove from in-memory array
             memories.removeAll { $0.id == id }
         } catch {
             self.error = error.localizedDescription

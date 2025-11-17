@@ -25,6 +25,25 @@
     <entity name="Item" representedClassName="Item" syncable="YES" codeGenerationType="class">
         <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
     </entity>
+    <entity name="MemoryEntity" representedClassName="MemoryEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="accessCount" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="confidence" attributeType="Double" minValueString="0" maxValueString="1" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="content" attributeType="String" defaultValueString=""/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="String" defaultValueString=""/>
+        <attribute name="lastAccessedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="locallyModified" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="metadata" optional="YES" attributeType="Transformable"/>
+        <attribute name="relatedMemoryIds" optional="YES" attributeType="Transformable"/>
+        <attribute name="sourceConversationId" optional="YES" attributeType="String" defaultValueString="nil"/>
+        <attribute name="sourceMessageId" optional="YES" attributeType="String"/>
+        <attribute name="sourceTimestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <attribute name="tags" optional="YES" attributeType="Transformable"/>
+        <attribute name="type" attributeType="String" defaultValueString="fact"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="userId" attributeType="String" defaultValueString=""/>
+    </entity>
     <entity name="MessageEntity" representedClassName="MessageEntity" syncable="YES" codeGenerationType="class">
         <attribute name="content" attributeType="String" defaultValueString=""/>
         <attribute name="conversationId" attributeType="String" defaultValueString=""/>
