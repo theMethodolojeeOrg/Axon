@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Main Settings Container
 
-struct AppSettings: Codable, Equatable {
+struct AppSettings: Codable, Equatable, Sendable {
     // General
     var theme: Theme = .dark
     var defaultProvider: AIProvider = .anthropic
@@ -45,6 +45,12 @@ struct AppSettings: Codable, Equatable {
     // Custom Providers
     var customProviders: [CustomProviderConfig] = []
 
+    // Local API Server
+    var serverEnabled: Bool = false
+    var serverPort: Int = 8080
+    var serverPassword: String? = nil
+    var serverAllowExternal: Bool = false
+
     // Metadata
     var version: Int = 1
     var lastUpdated: Date = Date()
@@ -53,7 +59,7 @@ struct AppSettings: Codable, Equatable {
 
 // MARK: - Theme
 
-enum Theme: String, Codable, CaseIterable, Identifiable {
+enum Theme: String, Codable, CaseIterable, Identifiable, Sendable {
     case dark = "dark"
     case light = "light"
     case auto = "auto"
@@ -71,7 +77,7 @@ enum Theme: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - AI Providers
 
-enum AIProvider: String, Codable, CaseIterable, Identifiable {
+enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
     case anthropic = "anthropic"
     case openai = "openai"
     case gemini = "gemini"
@@ -244,7 +250,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - AI Model
 
-struct AIModel: Identifiable, Hashable, Codable {
+struct AIModel: Identifiable, Hashable, Codable, Sendable {
     let id: String
     let name: String
     let provider: AIProvider
@@ -297,7 +303,7 @@ enum UnifiedProvider: Identifiable, Hashable {
 }
 
 /// Unified model that can represent either built-in or custom models
-enum UnifiedModel: Identifiable, Hashable {
+enum UnifiedModel: Identifiable, Hashable, Sendable {
     case builtIn(AIModel)
     case custom(CustomModelConfig, providerName: String, providerIndex: Int, modelIndex: Int)
 
@@ -475,7 +481,7 @@ struct VoiceSettings: Codable, Equatable {
 
 // MARK: - Custom Provider Configuration
 
-struct CustomProviderConfig: Codable, Equatable, Hashable, Identifiable {
+struct CustomProviderConfig: Codable, Equatable, Hashable, Identifiable, Sendable {
     let id: UUID
     var providerName: String
     var apiEndpoint: String
@@ -489,7 +495,7 @@ struct CustomProviderConfig: Codable, Equatable, Hashable, Identifiable {
     }
 }
 
-struct CustomModelConfig: Codable, Equatable, Hashable, Identifiable {
+struct CustomModelConfig: Codable, Equatable, Hashable, Identifiable, Sendable {
     let id: UUID
     var modelCode: String
     var friendlyName: String?
@@ -527,7 +533,7 @@ struct CustomModelConfig: Codable, Equatable, Hashable, Identifiable {
     }
 }
 
-struct CustomModelPricing: Codable, Equatable, Hashable {
+struct CustomModelPricing: Codable, Equatable, Hashable, Sendable {
     var inputPerMTok: Double
     var outputPerMTok: Double
     var cachedInputPerMTok: Double?

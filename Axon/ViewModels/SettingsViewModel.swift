@@ -17,9 +17,16 @@ class SettingsViewModel: ObservableObject {
     @Published var availableVoices: [ElevenLabsService.ELVoice] = []
     @Published var availableTTSModels: [ElevenLabsService.ELTTSModel] = []
 
+    // Server status
+    @Published var isServerRunning = false
+    @Published var serverError: String?
+    @Published var serverLocalURL: String = ""
+    @Published var serverNetworkURL: String = ""
+
     private let storageService = SettingsStorage.shared
     private let apiKeysStorage = APIKeysStorage.shared
     private let authService = AuthenticationService.shared
+    private let apiServer = APIServer.shared
 
     init() {
         loadSettings()
@@ -216,6 +223,79 @@ class SettingsViewModel: ObservableObject {
         } catch {
             self.error = "Failed to clear API key: \(error.localizedDescription)"
         }
+    }
+
+    // MARK: - Local API Server
+
+    func startServer() async {
+        await apiServer.start(
+            port: UInt16(settings.serverPort),
+            password: settings.serverPassword,
+            allowExternal: settings.serverAllowExternal
+        )
+
+        // Sync server state
+        isServerRunning = apiServer.isRunning
+        serverError = apiServer.error
+        serverLocalURL = apiServer.localURL
+        serverNetworkURL = apiServer.networkURL
+
+        if isServerRunning {
+            showSuccessMessage("Server started successfully")
+        }
+    }
+
+    func stopServer() async {
+        await apiServer.stop()
+
+        // Sync server state
+        isServerRunning = apiServer.isRunning
+        serverError = apiServer.error
+        serverLocalURL = apiServer.localURL
+        serverNetworkURL = apiServer.networkURL
+
+        showSuccessMessage("Server stopped")
+    }
+
+    func updateServerPort(_ port: Int) async {
+        await updateSetting(\.serverPort, port)
+
+        // Restart server if running
+        if isServerRunning {
+            await stopServer()
+            await startServer()
+        }
+    }
+
+    func updateServerPassword(_ password: String?) async {
+        await updateSetting(\.serverPassword, password)
+
+        // Restart server if running
+        if isServerRunning {
+            await stopServer()
+            await startServer()
+        }
+    }
+
+    func updateServerAllowExternal(_ allow: Bool) async {
+        await updateSetting(\.serverAllowExternal, allow)
+
+        // Restart server if running
+        if isServerRunning {
+            await stopServer()
+            await startServer()
+        }
+    }
+
+    func generateServerPassword() async {
+        let password = generateRandomPassword()
+        await updateServerPassword(password)
+        showSuccessMessage("Password generated: \(password)")
+    }
+
+    private func generateRandomPassword(length: Int = 24) -> String {
+        let characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        return String((0..<length).compactMap { _ in characters.randomElement() })
     }
 
     // MARK: - Messages

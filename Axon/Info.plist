@@ -13,5 +13,20 @@
 		<key>UIImageName</key>
 		<string></string>
 	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Axon provides a local API server to allow developer tools like Cline to access your conversations via OpenAI-compatible endpoints.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_axon-api._tcp</string>
+	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+	</array>
 </dict>
 </plist>

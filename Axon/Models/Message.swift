@@ -65,7 +65,8 @@ struct Message: Codable, Identifiable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         id = try container.decode(String.self, forKey: .id)
-        conversationId = try container.decode(String.self, forKey: .conversationId)
+        // conversationId is optional when messages are nested in listAll responses
+        conversationId = try container.decodeIfPresent(String.self, forKey: .conversationId) ?? ""
         role = try container.decode(MessageRole.self, forKey: .role)
         content = try container.decode(String.self, forKey: .content)
 

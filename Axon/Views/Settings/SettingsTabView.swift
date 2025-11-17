@@ -16,6 +16,7 @@ struct SettingsTabView: View {
         case apiKeys = "API Keys"
         case custom = "Custom"
         case memory = "Memory"
+        case server = "API Server"
         case tts = "TTS"
         case account = "Account"
         case archived = "Archived"
@@ -28,6 +29,7 @@ struct SettingsTabView: View {
             case .apiKeys: return "key.fill"
             case .custom: return "slider.horizontal.3"
             case .memory: return "AxonLogoTemplate"
+            case .server: return "network"
             case .tts: return "waveform.circle.fill"
             case .account: return "person.crop.circle.fill"
             case .archived: return "archivebox.fill"
@@ -71,6 +73,8 @@ struct SettingsTabView: View {
                         CustomProvidersSettingsView(viewModel: viewModel)
                     case .memory:
                         MemorySettingsView(viewModel: viewModel)
+                    case .server:
+                        ServerSettingsView(viewModel: viewModel)
                     case .tts:
                         TTSSettingsView(viewModel: viewModel)
                     case .account:

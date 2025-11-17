@@ -378,6 +378,10 @@ struct ChatContainerView: View {
                 }
                 .padding()
             }
+            .refreshable {
+                // Pull-to-refresh: Force refresh messages from API
+                await loadMessages(for: conversation)
+            }
             .onChange(of: conversationService.messages.count) { oldCount, newCount in
                 if newCount > oldCount, let lastMessage = conversationService.messages.last {
                     withAnimation(AppAnimations.standardEasing) {

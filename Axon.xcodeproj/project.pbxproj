@@ -18,6 +18,8 @@
 		E254EDDC2EB222B3000CDD9D /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDDB2EB222B3000CDD9D /* FirebaseAnalytics */; };
 		E254EDDE2EB222B3000CDD9D /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDDD2EB222B3000CDD9D /* FirebaseAnalyticsCore */; };
 		E254EDE02EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDDF2EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport */; };
+		E273631A2EBD237F0031CFF7 /* FlyingFox in Frameworks */ = {isa = PBXBuildFile; productRef = E27363192EBD237F0031CFF7 /* FlyingFox */; };
+		E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */ = {isa = PBXBuildFile; productRef = E273631B2EBD237F0031CFF7 /* FlyingSocks */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -97,11 +99,13 @@
 			files = (
 				E254EDDA2EB222B3000CDD9D /* FirebaseAILogic in Frameworks */,
 				E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */,
+				E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */,
 				E23FFFA32EB23493009B116D /* FirebaseMessaging in Frameworks */,
 				E254EDE02EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport in Frameworks */,
 				E23FFFA12EB23493009B116D /* FirebaseFunctions in Frameworks */,
 				E254EDD82EB222B3000CDD9D /* FirebaseAI in Frameworks */,
 				E23FFF9D2EB23493009B116D /* FirebaseCore in Frameworks */,
+				E273631A2EBD237F0031CFF7 /* FlyingFox in Frameworks */,
 				E23FFF9F2EB23493009B116D /* FirebaseFirestore in Frameworks */,
 				E23FFFA52EB23493009B116D /* FirebaseStorage in Frameworks */,
 				E254EDDC2EB222B3000CDD9D /* FirebaseAnalytics in Frameworks */,
@@ -185,6 +189,8 @@
 				E23FFFA02EB23493009B116D /* FirebaseFunctions */,
 				E23FFFA22EB23493009B116D /* FirebaseMessaging */,
 				E23FFFA42EB23493009B116D /* FirebaseStorage */,
+				E27363192EBD237F0031CFF7 /* FlyingFox */,
+				E273631B2EBD237F0031CFF7 /* FlyingSocks */,
 			);
 			productName = Axon;
 			productReference = E254ED962EB21B76000CDD9D /* Axon.app */;
@@ -266,6 +272,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				E27363182EBD237F0031CFF7 /* XCRemoteSwiftPackageReference "FlyingFox" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E254ED972EB21B76000CDD9D /* Products */;
@@ -687,6 +694,14 @@
 				minimumVersion = 12.5.0;
 			};
 		};
+		E27363182EBD237F0031CFF7 /* XCRemoteSwiftPackageReference "FlyingFox" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swhitty/FlyingFox";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.25.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -744,6 +759,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAnalyticsIdentitySupport;
+		};
+		E27363192EBD237F0031CFF7 /* FlyingFox */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E27363182EBD237F0031CFF7 /* XCRemoteSwiftPackageReference "FlyingFox" */;
+			productName = FlyingFox;
+		};
+		E273631B2EBD237F0031CFF7 /* FlyingSocks */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E27363182EBD237F0031CFF7 /* XCRemoteSwiftPackageReference "FlyingFox" */;
+			productName = FlyingSocks;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

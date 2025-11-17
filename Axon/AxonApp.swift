@@ -119,6 +119,27 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
         firestore.settings = settings
 
+        // Start API server if enabled in settings
+        Task { @MainActor in
+            let settings = SettingsStorage.shared.loadSettings()
+            if settings?.serverEnabled == true {
+                await APIServer.shared.start(
+                    port: UInt16(settings?.serverPort ?? 8080),
+                    password: settings?.serverPassword,
+                    allowExternal: settings?.serverAllowExternal ?? false
+                )
+                print("[AppDelegate] API Server started automatically")
+            }
+        }
+
         return true
+    }
+
+    func applicationWillTerminate(_ application: UIApplication) {
+        // Stop API server on app termination
+        Task { @MainActor in
+            await APIServer.shared.stop()
+            print("[AppDelegate] API Server stopped")
+        }
     }
 }
