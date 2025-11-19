@@ -341,8 +341,14 @@ struct TTSSettingsView: View {
                 .cornerRadius(8)
             }
         }
-        .task {
+        .refreshable {
             await viewModel.refreshElevenLabsCatalog()
+        }
+        .task {
+            // Only fetch if we don't have cached voices
+            if viewModel.availableVoices.isEmpty {
+                await viewModel.refreshElevenLabsCatalog()
+            }
         }
     }
 }
@@ -398,4 +404,3 @@ struct SettingsRadioRow: View {
     }
     .background(AppColors.substratePrimary)
 }
-

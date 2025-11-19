@@ -19,6 +19,7 @@ struct Message: Codable, Identifiable, Equatable {
     let isStreaming: Bool?
     let modelName: String?  // For display purposes (e.g., "GPT-4", "Claude Sonnet 4.5")
     let providerName: String?  // For display purposes (e.g., "OpenAI", "Anthropic")
+    let attachments: [MessageAttachment]?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -32,6 +33,7 @@ struct Message: Codable, Identifiable, Equatable {
         case isStreaming
         case modelName
         case providerName
+        case attachments
     }
 
     init(
@@ -45,7 +47,8 @@ struct Message: Codable, Identifiable, Equatable {
         toolCalls: [ToolCall]? = nil,
         isStreaming: Bool? = nil,
         modelName: String? = nil,
-        providerName: String? = nil
+        providerName: String? = nil,
+        attachments: [MessageAttachment]? = nil
     ) {
         self.id = id
         self.conversationId = conversationId
@@ -58,6 +61,7 @@ struct Message: Codable, Identifiable, Equatable {
         self.isStreaming = isStreaming
         self.modelName = modelName
         self.providerName = providerName
+        self.attachments = attachments
     }
 
     // Custom decoder to handle timestamp conversion from milliseconds
@@ -68,7 +72,44 @@ struct Message: Codable, Identifiable, Equatable {
         // conversationId is optional when messages are nested in listAll responses
         conversationId = try container.decodeIfPresent(String.self, forKey: .conversationId) ?? ""
         role = try container.decode(MessageRole.self, forKey: .role)
-        content = try container.decode(String.self, forKey: .content)
+        
+        // Handle content which can be String or [ContentPart]
+        if let contentString = try? container.decode(String.self, forKey: .content) {
+            content = contentString
+            attachments = try container.decodeIfPresent([MessageAttachment].self, forKey: .attachments)
+        } else if let contentParts = try? container.decode([ContentPart].self, forKey: .content) {
+            // Extract text parts
+            content = contentParts.filter { $0.type == "text" }.compactMap { $0.text }.joined(separator: "\n")
+            
+            // Extract attachments
+            let extractedAttachments = contentParts.compactMap { part -> MessageAttachment? in
+                switch part.type {
+                case "image_base64":
+                    return MessageAttachment(type: .image, base64: part.data, mimeType: part.media_type)
+                case "image_url":
+                    return MessageAttachment(type: .image, url: part.image_url?.url)
+                case "file_url":
+                    return MessageAttachment(type: .document, url: part.file_url?.url)
+                case "audio_base64":
+                    return MessageAttachment(type: .audio, base64: part.data, mimeType: part.media_type)
+                case "audio_url":
+                    return MessageAttachment(type: .audio, url: part.audio_url?.url)
+                case "video_base64":
+                    return MessageAttachment(type: .video, base64: part.data, mimeType: part.media_type)
+                case "video_url":
+                    return MessageAttachment(type: .video, url: part.video_url?.url)
+                default:
+                    return nil
+                }
+            }
+            
+            // Merge with any explicitly provided attachments (though usually it's one or the other)
+            let explicitAttachments = try container.decodeIfPresent([MessageAttachment].self, forKey: .attachments) ?? []
+            attachments = explicitAttachments + extractedAttachments
+        } else {
+            content = ""
+            attachments = try container.decodeIfPresent([MessageAttachment].self, forKey: .attachments)
+        }
 
         // Handle timestamp (createdAt) as milliseconds
         let timestampMillis = try container.decode(Double.self, forKey: .timestamp)
@@ -100,6 +141,7 @@ struct Message: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(isStreaming, forKey: .isStreaming)
         try container.encodeIfPresent(modelName, forKey: .modelName)
         try container.encodeIfPresent(providerName, forKey: .providerName)
+        try container.encodeIfPresent(attachments, forKey: .attachments)
     }
 }
 
@@ -127,4 +169,53 @@ struct ToolCall: Codable, Equatable, Identifiable {
         case arguments
         case result
     }
+}
+
+struct MessageAttachment: Codable, Equatable, Identifiable {
+    let id: String
+    let type: AttachmentType
+    let url: String?      // For remote URLs
+    let base64: String?   // For local uploads
+    let name: String?
+    let mimeType: String?
+
+    enum AttachmentType: String, Codable {
+        case image
+        case document
+        case audio
+        case video
+    }
+
+    init(
+        id: String = UUID().uuidString,
+        type: AttachmentType,
+        url: String? = nil,
+        base64: String? = nil,
+        name: String? = nil,
+        mimeType: String? = nil
+    ) {
+        self.id = id
+        self.type = type
+        self.url = url
+        self.base64 = base64
+        self.name = name
+        self.mimeType = mimeType
+    }
+}
+
+// Helper struct for decoding multimodal content from backend
+private struct ContentPart: Codable {
+    let type: String
+    let text: String?
+    let image_url: ImageUrl?
+    let file_url: FileUrl?
+    let audio_url: AudioUrl?
+    let video_url: VideoUrl?
+    let media_type: String?
+    let data: String?
+    
+    struct ImageUrl: Codable { let url: String }
+    struct FileUrl: Codable { let url: String }
+    struct AudioUrl: Codable { let url: String }
+    struct VideoUrl: Codable { let url: String }
 }

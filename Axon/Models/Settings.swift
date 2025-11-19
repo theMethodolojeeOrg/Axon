@@ -81,6 +81,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
     case anthropic = "anthropic"
     case openai = "openai"
     case gemini = "gemini"
+    case xai = "xai"
 
     var id: String { rawValue }
 
@@ -89,6 +90,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
         case .anthropic: return "Anthropic (Claude)"
         case .openai: return "OpenAI (GPT)"
         case .gemini: return "Google Gemini"
+        case .xai: return "xAI (Grok)"
         }
     }
 
@@ -101,6 +103,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "Claude Sonnet 4.5",
                     provider: .anthropic,
                     contextWindow: 200_000,
+                    modalities: ["text", "image"],
                     description: "Best coding model. Strongest for complex agents and computer use"
                 ),
                 AIModel(
@@ -108,6 +111,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "Claude Haiku 4.5",
                     provider: .anthropic,
                     contextWindow: 200_000,
+                    modalities: ["text", "image"],
                     description: "Fast hybrid reasoning model. Great for coding and quick tasks"
                 ),
                 AIModel(
@@ -115,6 +119,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "Claude Opus 4.1",
                     provider: .anthropic,
                     contextWindow: 200_000,
+                    modalities: ["text", "image"],
                     description: "Most powerful for long-running tasks and deep reasoning"
                 ),
                 AIModel(
@@ -122,6 +127,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "Claude Sonnet 4",
                     provider: .anthropic,
                     contextWindow: 200_000,
+                    modalities: ["text", "image"],
                     description: "Previous generation Sonnet model"
                 ),
                 AIModel(
@@ -129,16 +135,34 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "Claude Opus 4",
                     provider: .anthropic,
                     contextWindow: 200_000,
+                    modalities: ["text", "image"],
                     description: "Previous generation Opus model"
                 )
             ]
         case .openai:
             return [
                 AIModel(
+                    id: "gpt-5.1",
+                    name: "GPT-5.1",
+                    provider: .openai,
+                    contextWindow: 400_000,
+                    modalities: ["text", "image"],
+                    description: "Upgraded GPT-5 with improved conversational abilities and customization"
+                ),
+                AIModel(
+                    id: "gpt-5.1-chat-latest",
+                    name: "GPT-5.1 Chat Latest",
+                    provider: .openai,
+                    contextWindow: 400_000,
+                    modalities: ["text", "image"],
+                    description: "Latest conversational variant with multimodal support"
+                ),
+                AIModel(
                     id: "gpt-5-2025-08-07",
                     name: "GPT-5",
                     provider: .openai,
                     contextWindow: 400_000,
+                    modalities: ["text", "image"],
                     description: "Flagship model for coding, reasoning, and agentic tasks"
                 ),
                 AIModel(
@@ -146,6 +170,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "GPT-5 Mini",
                     provider: .openai,
                     contextWindow: 400_000,
+                    modalities: ["text", "image"],
                     description: "Fast and cost-efficient with strong performance"
                 ),
                 AIModel(
@@ -153,6 +178,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "GPT-5 Nano",
                     provider: .openai,
                     contextWindow: 400_000,
+                    modalities: ["text", "image"],
                     description: "Smallest, fastest, cheapest. Great for classification and extraction"
                 ),
                 AIModel(
@@ -160,6 +186,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "o3",
                     provider: .openai,
                     contextWindow: 200_000,
+                    modalities: ["text", "image"],
                     description: "Most powerful reasoning model for coding, math, science, and vision"
                 ),
                 AIModel(
@@ -167,6 +194,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "o4-mini",
                     provider: .openai,
                     contextWindow: 200_000,
+                    modalities: ["text", "image"],
                     description: "Fast, cost-efficient reasoning model with multimodal support"
                 ),
                 AIModel(
@@ -174,6 +202,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "o3-mini",
                     provider: .openai,
                     contextWindow: 200_000,
+                    modalities: ["text", "image"],
                     description: "Specialized reasoning for STEM tasks with configurable effort levels"
                 ),
                 AIModel(
@@ -181,6 +210,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "GPT-4.1",
                     provider: .openai,
                     contextWindow: 1_000_000,
+                    modalities: ["text", "image"],
                     description: "Enhanced coding and instruction following with 1M context"
                 ),
                 AIModel(
@@ -188,6 +218,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "GPT-4.1 Mini",
                     provider: .openai,
                     contextWindow: 1_000_000,
+                    modalities: ["text", "image"],
                     description: "Mid-tier with 1M context. Fast and cost-effective"
                 ),
                 AIModel(
@@ -195,6 +226,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "GPT-4.1 Nano",
                     provider: .openai,
                     contextWindow: 1_000_000,
+                    modalities: ["text", "image"],
                     description: "Lightest 4.1 variant with 1M context for simple tasks"
                 ),
                 AIModel(
@@ -202,6 +234,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "o1",
                     provider: .openai,
                     contextWindow: 200_000,
+                    modalities: ["text", "image"],
                     description: "Advanced reasoning with vision API and function calling"
                 ),
                 AIModel(
@@ -209,6 +242,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "o1-mini",
                     provider: .openai,
                     contextWindow: 128_000,
+                    modalities: ["text", "image"],
                     description: "Faster reasoning focused on coding, math, and science"
                 ),
                 AIModel(
@@ -216,6 +250,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "GPT-4o",
                     provider: .openai,
                     contextWindow: 128_000,
+                    modalities: ["text", "image", "audio"],
                     description: "Multimodal flagship with text, audio, image, and video"
                 ),
                 AIModel(
@@ -223,16 +258,34 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "GPT-4o Mini",
                     provider: .openai,
                     contextWindow: 128_000,
+                    modalities: ["text", "image", "audio"],
                     description: "Cost-efficient multimodal model with vision support"
                 )
             ]
         case .gemini:
             return [
                 AIModel(
+                    id: "gemini-3-pro-preview",
+                    name: "Gemini 3 Pro Preview",
+                    provider: .gemini,
+                    contextWindow: 1_000_000,
+                    modalities: ["text", "image", "video", "audio", "pdf"],
+                    description: "Most powerful agentic and coding model with advanced reasoning"
+                ),
+                AIModel(
+                    id: "gemini-2.5-flash-lite-preview-06-17",
+                    name: "Gemini 2.5 Flash Lite Preview",
+                    provider: .gemini,
+                    contextWindow: 1_048_576,
+                    modalities: ["text", "image", "video", "audio"],
+                    description: "Ultra-low latency, cost-efficient lightweight reasoning model"
+                ),
+                AIModel(
                     id: "gemini-2.5-pro",
                     name: "Gemini 2.5 Pro",
                     provider: .gemini,
                     contextWindow: 1_000_000,
+                    modalities: ["text", "image", "video", "audio", "pdf"],
                     description: "Most capable Gemini model"
                 ),
                 AIModel(
@@ -240,7 +293,59 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "Gemini 2.5 Flash",
                     provider: .gemini,
                     contextWindow: 1_000_000,
+                    modalities: ["text", "image", "video", "audio"],
                     description: "Fast, efficient model"
+                )
+            ]
+        case .xai:
+            return [
+                AIModel(
+                    id: "grok-4-fast-reasoning",
+                    name: "Grok 4 Fast Reasoning",
+                    provider: .xai,
+                    contextWindow: 2_000_000,
+                    modalities: ["text", "image"],
+                    description: "Cost-efficient reasoning model with 2M context. 98% cheaper than previous models"
+                ),
+                AIModel(
+                    id: "grok-4-fast-non-reasoning",
+                    name: "Grok 4 Fast Non-Reasoning",
+                    provider: .xai,
+                    contextWindow: 2_000_000,
+                    modalities: ["text", "image"],
+                    description: "Ultra-fast non-reasoning model with 2M context window"
+                ),
+                AIModel(
+                    id: "grok-code-fast-1",
+                    name: "Grok Code Fast 1",
+                    provider: .xai,
+                    contextWindow: 256_000,
+                    modalities: ["text"],
+                    description: "Specialized coding model with high throughput for large codebases"
+                ),
+                AIModel(
+                    id: "grok-4-0709",
+                    name: "Grok 4 (0709)",
+                    provider: .xai,
+                    contextWindow: 256_000,
+                    modalities: ["text", "image"],
+                    description: "Flagship model with advanced reasoning and function calling"
+                ),
+                AIModel(
+                    id: "grok-3-mini",
+                    name: "Grok 3 Mini",
+                    provider: .xai,
+                    contextWindow: 131_072,
+                    modalities: ["text"],
+                    description: "Lightweight, cost-efficient model for simple tasks"
+                ),
+                AIModel(
+                    id: "grok-3",
+                    name: "Grok 3",
+                    provider: .xai,
+                    contextWindow: 131_072,
+                    modalities: ["text", "image"],
+                    description: "Previous generation flagship model"
                 )
             ]
         }
@@ -255,6 +360,7 @@ struct AIModel: Identifiable, Hashable, Codable, Sendable {
     let name: String
     let provider: AIProvider
     let contextWindow: Int
+    let modalities: [String]
     let description: String
 }
 
@@ -343,6 +449,16 @@ enum UnifiedModel: Identifiable, Hashable, Sendable {
         }
     }
 
+    var modalities: [String] {
+        switch self {
+        case .builtIn(let model):
+            return model.modalities
+        case .custom:
+            // Assume custom models support text and image by default, or make it configurable later
+            return ["text", "image"]
+        }
+    }
+
     var pricing: CustomModelPricing? {
         switch self {
         case .builtIn:
@@ -369,6 +485,7 @@ enum APIProvider: String, CaseIterable, Identifiable {
     case openai = "openai"
     case anthropic = "anthropic"
     case gemini = "gemini"
+    case xai = "xai"
     case elevenlabs = "elevenlabs"
 
     var id: String { rawValue }
@@ -379,6 +496,7 @@ enum APIProvider: String, CaseIterable, Identifiable {
         case .openai: return "OpenAI"
         case .anthropic: return "Anthropic"
         case .gemini: return "Google Gemini"
+        case .xai: return "xAI"
         case .elevenlabs: return "ElevenLabs"
         }
     }
@@ -389,6 +507,7 @@ enum APIProvider: String, CaseIterable, Identifiable {
         case .openai: return "sk-..."
         case .anthropic: return "sk-ant-..."
         case .gemini: return "AIza..."
+        case .xai: return "xai-..."
         case .elevenlabs: return "sk_..."
         }
     }
@@ -399,6 +518,7 @@ enum APIProvider: String, CaseIterable, Identifiable {
         case .openai: return URL(string: "https://platform.openai.com/account/api-keys")
         case .anthropic: return URL(string: "https://console.anthropic.com/account/keys")
         case .gemini: return URL(string: "https://aistudio.google.com/app/apikey")
+        case .xai: return URL(string: "https://console.x.ai")
         case .elevenlabs: return URL(string: "https://elevenlabs.io/app/settings/api-keys")
         }
     }
@@ -409,6 +529,7 @@ enum APIProvider: String, CaseIterable, Identifiable {
         case .openai: return "Required for GPT models"
         case .anthropic: return "Required for Claude models"
         case .gemini: return "Required for Gemini models"
+        case .xai: return "Required for Grok models"
         case .elevenlabs: return "Required for text-to-speech"
         }
     }
@@ -422,6 +543,7 @@ struct TTSSettings: Codable, Equatable {
     var voiceSettings: VoiceSettings = VoiceSettings()
     var selectedVoiceId: String? = nil
     var selectedVoiceName: String? = nil
+    var cachedVoices: [ElevenLabsService.ELVoice] = []
 }
 
 enum TTSModel: String, Codable, CaseIterable, Identifiable {

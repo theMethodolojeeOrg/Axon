@@ -12,6 +12,7 @@ struct MemoryListView: View {
     @State private var selectedType: MemoryType?
     @State private var searchText = ""
     @State private var showNewMemory = false
+    @State private var selectedMemory: Memory?
 
     var filteredMemories: [Memory] {
         var memories = memoryService.memories
@@ -83,14 +84,41 @@ struct MemoryListView: View {
                         }
                         .padding()
                     } else {
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                ForEach(filteredMemories) { memory in
-                                    MemoryCard(memory: memory)
-                                }
+                        List {
+                            ForEach(filteredMemories) { memory in
+                                MemoryCard(memory: memory)
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
+                                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        selectedMemory = memory
+                                    }
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                        Button(role: .destructive) {
+                                            deleteMemory(memory)
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                        
+                                        Button {
+                                            toggleArchive(memory)
+                                        } label: {
+                                            Label(memory.isArchived ? "Unarchive" : "Archive", systemImage: "archivebox")
+                                        }
+                                        .tint(AppColors.signalHematite)
+                                    }
+                                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                        Button {
+                                            togglePin(memory)
+                                        } label: {
+                                            Label(memory.isPinned ? "Unpin" : "Pin", systemImage: "pin")
+                                        }
+                                        .tint(AppColors.signalMercury)
+                                    }
                             }
-                            .padding()
                         }
+                        .listStyle(.plain)
                     }
 
                     if memoryService.isLoading {
@@ -111,6 +139,9 @@ struct MemoryListView: View {
             .sheet(isPresented: $showNewMemory) {
                 NewMemorySheet()
             }
+            .sheet(item: $selectedMemory) { memory in
+                MemoryDetailView(memory: memory)
+            }
             .task {
                 await loadMemories()
             }
@@ -125,6 +156,48 @@ struct MemoryListView: View {
             try await memoryService.getMemories(limit: 100, type: selectedType)
         } catch {
             print("Error loading memories: \(error.localizedDescription)")
+        }
+    }
+    
+    private func deleteMemory(_ memory: Memory) {
+        Task {
+            do {
+                try await memoryService.deleteMemory(id: memory.id)
+            } catch {
+                print("Error deleting memory: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func toggleArchive(_ memory: Memory) {
+        Task {
+            do {
+                var newMetadata = memory.metadata
+                newMetadata["isArchived"] = .bool(!memory.isArchived)
+                
+                _ = try await memoryService.updateMemory(
+                    id: memory.id,
+                    metadata: newMetadata
+                )
+            } catch {
+                print("Error toggling archive: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func togglePin(_ memory: Memory) {
+        Task {
+            do {
+                var newMetadata = memory.metadata
+                newMetadata["isPinned"] = .bool(!memory.isPinned)
+                
+                _ = try await memoryService.updateMemory(
+                    id: memory.id,
+                    metadata: newMetadata
+                )
+            } catch {
+                print("Error toggling pin: \(error.localizedDescription)")
+            }
         }
     }
 }
@@ -202,6 +275,8 @@ struct MemoryCard: View {
         case .procedure: return AppColors.signalLichen
         case .context: return AppColors.signalCopper
         case .relationship: return AppColors.signalHematite
+        @unknown default:
+            return AppColors.signalMercury
         }
     }
 }

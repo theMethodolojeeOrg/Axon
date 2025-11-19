@@ -29,13 +29,14 @@
         <attribute name="accessCount" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="confidence" attributeType="Double" minValueString="0" maxValueString="1" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="content" attributeType="String" defaultValueString=""/>
+        <attribute name="context" optional="YES" attributeType="String"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" attributeType="String" defaultValueString=""/>
         <attribute name="lastAccessedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="locallyModified" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="metadata" optional="YES" attributeType="Transformable"/>
         <attribute name="relatedMemoryIds" optional="YES" attributeType="Transformable"/>
-        <attribute name="sourceConversationId" optional="YES" attributeType="String" defaultValueString="nil"/>
+        <attribute name="sourceConversationId" optional="YES" attributeType="String"/>
         <attribute name="sourceMessageId" optional="YES" attributeType="String"/>
         <attribute name="sourceTimestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>

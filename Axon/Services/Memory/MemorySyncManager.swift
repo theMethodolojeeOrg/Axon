@@ -97,7 +97,7 @@ class MemorySyncManager: ObservableObject {
         print("[MemorySyncManager] ⚡ Performing FULL sync")
 
         do {
-            let response: MemoryListResponse = try await apiClient.requestWrapped(
+            let response: MemoryListResponse = try await apiClient.request(
                 endpoint: "/apiGetMemories?limit=1000",
                 method: .get
             )
@@ -128,7 +128,7 @@ class MemorySyncManager: ObservableObject {
         // Note: This assumes the API supports delta sync for memories
         // If not, fall back to full sync
         do {
-            let response: MemoryListResponse = try await apiClient.requestWrapped(
+            let response: MemoryListResponse = try await apiClient.request(
                 endpoint: "/apiGetMemories?limit=1000",
                 method: .get
             )
@@ -201,6 +201,8 @@ class MemorySyncManager: ObservableObject {
                 entity.accessCount = Int32(memory.accessCount)
                 entity.syncStatus = "synced"
                 entity.locallyModified = false
+                
+                entity.context = memory.context
 
                 // Source information
                 if let source = memory.source {
@@ -299,7 +301,7 @@ extension MemoryEntity {
                 timestamp: sourceTs
             )
         }
-
+        
         return Memory(
             id: id,
             userId: userId,
@@ -307,6 +309,7 @@ extension MemoryEntity {
             type: type,
             confidence: self.confidence,
             tags: self.tags as? [String] ?? [],
+            context: self.context,
             metadata: metadataDict,
             source: source,
             relatedMemories: self.relatedMemoryIds as? [String],
@@ -317,4 +320,3 @@ extension MemoryEntity {
         )
     }
 }
-

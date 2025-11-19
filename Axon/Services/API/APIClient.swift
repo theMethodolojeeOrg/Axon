@@ -142,9 +142,38 @@ class APIClient: ObservableObject {
                     return try decoder.decode(T.self, from: data)
                 } catch {
                     #if DEBUG
-                    print("[APIClient] Decoding error: \(error)")
+                    print("[APIClient] ❌ Decoding error for type \(T.self): \(error)")
+
+                    // Print detailed error information
+                    if let decodingError = error as? DecodingError {
+                        switch decodingError {
+                        case .keyNotFound(let key, let context):
+                            print("[APIClient] 🔑 Missing key: '\(key.stringValue)' at path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                            print("[APIClient] Context: \(context.debugDescription)")
+                        case .typeMismatch(let type, let context):
+                            print("[APIClient] 🔀 Type mismatch for type '\(type)' at path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                            print("[APIClient] Context: \(context.debugDescription)")
+                        case .valueNotFound(let type, let context):
+                            print("[APIClient] ❓ Value not found for type '\(type)' at path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                            print("[APIClient] Context: \(context.debugDescription)")
+                        case .dataCorrupted(let context):
+                            print("[APIClient] 💥 Data corrupted at path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                            print("[APIClient] Context: \(context.debugDescription)")
+                        @unknown default:
+                            print("[APIClient] Unknown decoding error: \(error)")
+                        }
+                    }
+
                     if let responseString = String(data: data, encoding: .utf8) {
-                        print("[APIClient] Full response: \(responseString)")
+                        print("[APIClient] 📄 Full response: \(responseString)")
+                    }
+
+                    // Try to decode as generic JSON to see structure
+                    if let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+                        print("[APIClient] 📋 Response structure keys: \(json.keys.sorted())")
+                        if let memories = json["memories"] as? [[String: Any]], let first = memories.first {
+                            print("[APIClient] 🧠 First memory keys: \(first.keys.sorted())")
+                        }
                     }
                     #endif
                     throw APIError.decodingError(error.localizedDescription)

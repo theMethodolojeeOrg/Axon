@@ -1,0 +1,67 @@
+[APIClient] ❌ Decoding error for type MemoryListResponse: typeMismatch(Swift.Dictionary<Swift.String, Any>, Swift.DecodingError.Context(codingPath: [CodingKeys(stringValue: "memories", intValue: nil), _CodingKey(stringValue: "Index 222", intValue: 222), CodingKeys(stringValue: "source", intValue: nil)], debugDescription: "Expected to decode Dictionary<String, Any> but found a string instead.", underlyingError: nil))
+[APIClient] 🔀 Type mismatch for type 'Dictionary<String, Any>' at path: memories -> Index 222 -> source
+[APIClient] Context: Expected to decode Dictionary<String, Any> but found a string instead.
+[APIClient] 📄 Full response:
+{
+    "memories": [
+        {
+            "id": "memory-1761521363498-ro9x3q9dp",
+            "keyRefreshPending": true,
+            "conversationId": 1761520348470,
+            "lastKeyRefreshRequest": {
+                "type": "firestore/timestamp/1.0",
+                "seconds": 1761594678,
+                "nanoseconds": 67000000
+            },
+            "type": "egoic",
+            "confidence": 0.8,
+            "evidence": "Tom specifically highlighted this as the distinction between sophisticated context-access vs. genuine learning; the comparison to instanced agents avoiding same errors",
+            "updatedAt": 1761521363498,
+            "archived": false,
+            "content": "In this conversation, I learned that the real test of memory utility isn't recall accuracy but behavioral improvement - whether I can avoid repeating failure patterns when encountering similar tasks in future conversations. This requires explicit failure documentation and pattern recognition across contexts.",
+            "source": "ai",
+            "tags": [
+                "memory-experiment",
+                "learning-systems",
+                "experimental-design"
+            ],
+            "createdAt": 1761521363498,
+            "projectId": "ai-experiments",
+            "context": "Tom's critique of my initial understanding - he redirected from \"measuring consistency\" to \"measuring avoidance of repeated mistakes\""
+        },
+        {
+            "id": "memory-1761519857894-4723u17h4",
+            "context": "The user explicitly stated their name in response to a question about remembering it.",
+            "source": "ai",
+            "tags": [
+                "user-profile",
+                "name"
+            ],
+            "projectId": "ai-experiments",
+            "keyRefreshPending": true,
+            "type": "allocentric",
+            "content": "The user's name is Tom.",
+            "lastKeyRefreshRequest": {
+                "type": "firestore/timestamp/1.0",
+                "seconds": 1761594678,
+                "nanoseconds": 67000000
+            },
+            "createdAt": 1761519857894,
+            "confidence": 0.8,
+            "updatedAt": 1761519857894,
+            "archived": false,
+            "evidence": "User stated: \"My name is Tom!\"",
+            "conversationId": 1761519845765
+        }
+    ],
+    "pagination": {
+        "total": 230,
+        "limit": 1000,
+        "offset": 0,
+        "hasMore": false
+    }
+}
+[APIClient] 📋 Response structure keys: ["memories", "pagination"]
+[APIClient] 🧠 First memory keys: ["archived", "confidence", "content", "context", "createdAt", "evidence", "id", "tags", "type", "updatedAt", "userId"]
+[MemorySyncManager] ❌ Full sync FAILED: decodingError("The data couldn’t be read because it isn’t in the correct format.")
+[MemoryService] Sync failed: decodingError("The data couldn’t be read because it isn’t in the correct format.")

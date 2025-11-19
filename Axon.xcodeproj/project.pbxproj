@@ -20,6 +20,10 @@
 		E254EDE02EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDDF2EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport */; };
 		E273631A2EBD237F0031CFF7 /* FlyingFox in Frameworks */ = {isa = PBXBuildFile; productRef = E27363192EBD237F0031CFF7 /* FlyingFox */; };
 		E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */ = {isa = PBXBuildFile; productRef = E273631B2EBD237F0031CFF7 /* FlyingSocks */; };
+		E27FB5ED2ECD5E2F003C52BF /* Clibsodium in Frameworks */ = {isa = PBXBuildFile; productRef = E27FB5EC2ECD5E2F003C52BF /* Clibsodium */; };
+		E27FB5EF2ECD5E2F003C52BF /* Sodium in Frameworks */ = {isa = PBXBuildFile; productRef = E27FB5EE2ECD5E2F003C52BF /* Sodium */; };
+		E27FB5F12ECD5E2F003C52BF /* SodiumFoundationCompat in Frameworks */ = {isa = PBXBuildFile; productRef = E27FB5F02ECD5E2F003C52BF /* SodiumFoundationCompat */; };
+		E27FB5F32ECD5E2F003C52BF /* SodiumNIOCompat in Frameworks */ = {isa = PBXBuildFile; productRef = E27FB5F22ECD5E2F003C52BF /* SodiumNIOCompat */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -99,9 +103,12 @@
 			files = (
 				E254EDDA2EB222B3000CDD9D /* FirebaseAILogic in Frameworks */,
 				E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */,
+				E27FB5F12ECD5E2F003C52BF /* SodiumFoundationCompat in Frameworks */,
 				E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */,
 				E23FFFA32EB23493009B116D /* FirebaseMessaging in Frameworks */,
 				E254EDE02EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport in Frameworks */,
+				E27FB5EF2ECD5E2F003C52BF /* Sodium in Frameworks */,
+				E27FB5ED2ECD5E2F003C52BF /* Clibsodium in Frameworks */,
 				E23FFFA12EB23493009B116D /* FirebaseFunctions in Frameworks */,
 				E254EDD82EB222B3000CDD9D /* FirebaseAI in Frameworks */,
 				E23FFF9D2EB23493009B116D /* FirebaseCore in Frameworks */,
@@ -109,6 +116,7 @@
 				E23FFF9F2EB23493009B116D /* FirebaseFirestore in Frameworks */,
 				E23FFFA52EB23493009B116D /* FirebaseStorage in Frameworks */,
 				E254EDDC2EB222B3000CDD9D /* FirebaseAnalytics in Frameworks */,
+				E27FB5F32ECD5E2F003C52BF /* SodiumNIOCompat in Frameworks */,
 				E254EDDE2EB222B3000CDD9D /* FirebaseAnalyticsCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -191,6 +199,10 @@
 				E23FFFA42EB23493009B116D /* FirebaseStorage */,
 				E27363192EBD237F0031CFF7 /* FlyingFox */,
 				E273631B2EBD237F0031CFF7 /* FlyingSocks */,
+				E27FB5EC2ECD5E2F003C52BF /* Clibsodium */,
+				E27FB5EE2ECD5E2F003C52BF /* Sodium */,
+				E27FB5F02ECD5E2F003C52BF /* SodiumFoundationCompat */,
+				E27FB5F22ECD5E2F003C52BF /* SodiumNIOCompat */,
 			);
 			productName = Axon;
 			productReference = E254ED962EB21B76000CDD9D /* Axon.app */;
@@ -273,6 +285,7 @@
 			packageReferences = (
 				E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				E27363182EBD237F0031CFF7 /* XCRemoteSwiftPackageReference "FlyingFox" */,
+				E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E254ED972EB21B76000CDD9D /* Products */;
@@ -702,6 +715,14 @@
 				minimumVersion = 0.25.0;
 			};
 		};
+		E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sinoru/swift-sodium.git";
+			requirement = {
+				branch = develop;
+				kind = branch;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -769,6 +790,26 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E27363182EBD237F0031CFF7 /* XCRemoteSwiftPackageReference "FlyingFox" */;
 			productName = FlyingSocks;
+		};
+		E27FB5EC2ECD5E2F003C52BF /* Clibsodium */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */;
+			productName = Clibsodium;
+		};
+		E27FB5EE2ECD5E2F003C52BF /* Sodium */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */;
+			productName = Sodium;
+		};
+		E27FB5F02ECD5E2F003C52BF /* SodiumFoundationCompat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */;
+			productName = SodiumFoundationCompat;
+		};
+		E27FB5F22ECD5E2F003C52BF /* SodiumNIOCompat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */;
+			productName = SodiumNIOCompat;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

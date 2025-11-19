@@ -7,9 +7,13 @@
 
 import SwiftUI
 import Combine
+import FirebaseAuth
+import FirebaseFirestore
 
 @MainActor
 class SettingsViewModel: ObservableObject {
+    static let shared = SettingsViewModel()
+
     @Published var settings: AppSettings = AppSettings()
     @Published var isLoading = false
     @Published var error: String?
@@ -28,6 +32,33 @@ class SettingsViewModel: ObservableObject {
     private let authService = AuthenticationService.shared
     private let apiServer = APIServer.shared
 
+    // MARK: - Cloud Sync (Manual)
+    func pushSettingsToCloud() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            try await SettingsCloudSyncService.shared.pushSettings(settings)
+            showSuccessMessage("Settings pushed to cloud")
+        } catch {
+            self.error = "Failed to push settings: \(error.localizedDescription)"
+        }
+    }
+
+    func pullSettingsFromCloud() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let cloudSettings = try await SettingsCloudSyncService.shared.pullSettings()
+            // Overwrite local settings with cloud copy
+            self.settings = cloudSettings
+            self.settings.lastUpdated = Date()
+            try storageService.saveSettings(self.settings)
+            showSuccessMessage("Settings pulled from cloud")
+        } catch {
+            self.error = "Failed to pull settings: \(error.localizedDescription)"
+        }
+    }
+
     init() {
         loadSettings()
     }
@@ -38,6 +69,8 @@ class SettingsViewModel: ObservableObject {
         // Load from local storage
         if let localSettings = storageService.loadSettings() {
             self.settings = localSettings
+            // Populate available voices from cache
+            self.availableVoices = localSettings.ttsSettings.cachedVoices
         }
     }
 
@@ -75,7 +108,23 @@ class SettingsViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
+            // 1. Save to local Keychain (always)
             try apiKeysStorage.saveAPIKey(key, for: provider)
+
+            // 2. If ElevenLabs, also sync to Firestore (encrypted)
+            if provider == .elevenlabs {
+                do {
+                    try await EncryptionService.shared.encryptAndSyncElevenLabsKey(key)
+                    // After successful sync, refresh the catalog to verify it works
+                    await refreshElevenLabsCatalog()
+                } catch {
+                    // Log the sync error but don't fail the entire save operation
+                    print("[SettingsViewModel] Warning: Key saved locally but sync to Firestore failed: \(error.localizedDescription)")
+                    self.error = "API key saved locally, but cloud sync failed. You may need to re-save it. Error: \(error.localizedDescription)"
+                    return
+                }
+            }
+
             showSuccessMessage("\(provider.displayName) API key saved securely")
         } catch {
             self.error = "Failed to save API key: \(error.localizedDescription)"
@@ -105,26 +154,68 @@ class SettingsViewModel: ObservableObject {
     
     func refreshElevenLabsCatalog() async {
         guard isTTSConfigured else { return }
-        do {
+
+        // Helper to perform the fetch
+        func performFetch() async throws {
             let voices = try await ElevenLabsService.shared.fetchVoices()
             let models = try await ElevenLabsService.shared.fetchTTSModels()
             self.availableVoices = voices
             self.availableTTSModels = models
+            
+            // Cache the voices
+            settings.ttsSettings.cachedVoices = voices
+            try? storageService.saveSettings(settings)
+
             // If no voice selected yet, pick the first one
             if settings.ttsSettings.selectedVoiceId == nil, let first = voices.first {
+                print("[SettingsViewModel] No voice selected, defaulting to first voice: \(first.name) (ID: \(first.id))")
                 settings.ttsSettings.selectedVoiceId = first.id
                 settings.ttsSettings.selectedVoiceName = first.name
                 try? storageService.saveSettings(settings)
+            } else {
+                print("[SettingsViewModel] Voice already selected: \(settings.ttsSettings.selectedVoiceName ?? "nil") (ID: \(settings.ttsSettings.selectedVoiceId ?? "nil"))")
             }
+        }
+
+        do {
+            try await performFetch()
         } catch {
+            // Check if error is "ElevenLabs API key not configured" (401)
+            let errorMsg = error.localizedDescription
+            let errorCode = (error as NSError).code
+
+            if errorCode == 401 && errorMsg.contains("ElevenLabs API key not configured") {
+                // Attempt to re-sync key if we have it locally - but only once per session
+                if let key = try? apiKeysStorage.getAPIKey(for: .elevenlabs), !key.isEmpty {
+                    do {
+                        try await EncryptionService.shared.encryptAndSyncElevenLabsKey(key)
+                        // Retry fetch once
+                        try await performFetch()
+                        return
+                    } catch let resyncError {
+                        // Silent failure - key sync didn't work, likely server-side issue
+                        // Don't spam logs or show error to user as this may be transient
+                        print("[SettingsViewModel] Failed to re-sync ElevenLabs key (will retry on next catalog refresh): \(resyncError.localizedDescription)")
+                        return // Don't show error to user for auto-retry failures
+                    }
+                } else {
+                    // No local key available, user needs to configure it
+                    self.error = "ElevenLabs API key not configured. Please set it in settings."
+                    return
+                }
+            }
+
+            // For other errors, show the actual error
             self.error = "Failed to load ElevenLabs catalog: \(error.localizedDescription)"
         }
     }
     
     func updateSelectedVoice(id: String?, name: String?) async {
+        print("[SettingsViewModel] Updating selected voice to: \(name ?? "nil") (ID: \(id ?? "nil"))")
         settings.ttsSettings.selectedVoiceId = id
         settings.ttsSettings.selectedVoiceName = name
         await updateSetting(\.ttsSettings, settings.ttsSettings)
+        print("[SettingsViewModel] Voice selection saved. Current settings - Voice ID: \(settings.ttsSettings.selectedVoiceId ?? "nil"), Voice Name: \(settings.ttsSettings.selectedVoiceName ?? "nil")")
     }
 
     func saveTTSAPIKey(_ key: String) async {
@@ -307,4 +398,3 @@ class SettingsViewModel: ObservableObject {
         }
     }
 }
-

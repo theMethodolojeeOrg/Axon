@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @StateObject private var viewModel = SettingsViewModel()
+    @ObservedObject var viewModel = SettingsViewModel.shared
 
     var body: some View {
         ZStack {
@@ -165,4 +165,3 @@ struct SettingsRow: View {
 #Preview {
     SettingsView()
 }
-

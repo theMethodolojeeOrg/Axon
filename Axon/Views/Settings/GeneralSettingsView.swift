@@ -190,6 +190,37 @@ struct GeneralSettingsView: View {
                     )
                 }
             }
+            
+            GeneralSettingsSection(title: "Cloud Sync") {
+                HStack(spacing: 12) {
+                    Button(action: { Task { await viewModel.pushSettingsToCloud() } }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.up.circle.fill")
+                            Text("Push to Cloud")
+                                .font(AppTypography.bodyMedium(.medium))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.signalMercury))
+                    }
+
+                    Button(action: { Task { await viewModel.pullSettingsFromCloud() } }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.down.circle")
+                                .foregroundColor(AppColors.signalMercury)
+                            Text("Pull from Cloud")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.substrateSecondary))
+                    }
+
+                    Spacer()
+                }
+            }
         }
     }
 
@@ -238,6 +269,10 @@ struct GeneralSettingsView: View {
         case .anthropic:
             // Prefer highest-version Haiku (e.g., Claude Haiku 4.5)
             let candidates = models.filter { containsCaseInsensitive($0.name, "haiku") || containsCaseInsensitive($0.id, "haiku") }
+            return candidates.max(by: { versionScore($0) < versionScore($1) })?.id
+        case .xai:
+            // Prefer Grok 4 Fast Reasoning as default
+            let candidates = models.filter { containsCaseInsensitive($0.name, "fast") || containsCaseInsensitive($0.id, "fast") }
             return candidates.max(by: { versionScore($0) < versionScore($1) })?.id
         }
     }
@@ -317,6 +352,13 @@ struct GeneralSettingsView: View {
             if name.contains("flash") || id.contains("flash") { return "Flash" }
             if name.contains("pro") || id.contains("pro") { return "Pro" }
             return "Gemini Other"
+        case .xai:
+            if name.contains("fast") || id.contains("fast") { return "Fast" }
+            if name.contains("code") || id.contains("code") { return "Code" }
+            if name.contains("mini") || id.contains("mini") { return "Mini" }
+            if id.contains("grok-4") { return "Grok 4" }
+            if id.contains("grok-3") { return "Grok 3" }
+            return "Grok Other"
         }
     }
 
@@ -339,6 +381,10 @@ struct GeneralSettingsView: View {
         case .gemini:
             if name.contains("2.5") || id.contains("2.5") { return "Gemini 2.5 Series" }
             return "Other Gemini"
+        case .xai:
+            if id.contains("grok-4") || name.contains("grok-4") || name.contains("grok 4") { return "Grok 4 Series" }
+            if id.contains("grok-3") || name.contains("grok-3") || name.contains("grok 3") { return "Grok 3 Series" }
+            return "Other Grok"
         }
     }
 

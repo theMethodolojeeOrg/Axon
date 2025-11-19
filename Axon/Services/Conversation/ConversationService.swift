@@ -342,16 +342,17 @@ class ConversationService: ObservableObject {
         }
     }
 
-    func sendMessage(conversationId: String, content: String) async throws -> Message {
+    func sendMessage(conversationId: String, content: String, attachments: [MessageAttachment] = []) async throws -> Message {
         struct OrchestrateRequest: Encodable {
             let conversationId: String
-            let message: String
+            let content: AnyCodable
             let provider: String
             let options: OrchestrateOptions
             // API keys at top level to match backend expectations
             let anthropic: String?
             let openai: String?
             let gemini: String?
+            let grok: String?
             let openaiCompatible: OpenAICompatible?
         }
 
@@ -382,17 +383,24 @@ class ConversationService: ObservableObject {
         let anthropicKey = try? apiKeysStorage.getAPIKey(for: .anthropic)
         let openaiKey = try? apiKeysStorage.getAPIKey(for: .openai)
         let geminiKey = try? apiKeysStorage.getAPIKey(for: .gemini)
+        let grokKey = try? apiKeysStorage.getAPIKey(for: .xai)
 
         #if DEBUG
         print("[ConversationService] API Key Debug:")
         print("  Anthropic: \(anthropicKey != nil ? "✓ Retrieved (\(anthropicKey!.count) chars, starts: \(String(anthropicKey!.prefix(15)))...)" : "✗ Not found")")
         print("  OpenAI: \(openaiKey != nil ? "✓ Retrieved" : "✗ Not found")")
         print("  Gemini: \(geminiKey != nil ? "✓ Retrieved" : "✗ Not found")")
+        print("  Grok: \(grokKey != nil ? "✓ Retrieved" : "✗ Not found")")
         #endif
 
         // Load provider/model from settings with conversation overrides
         let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
-        let (providerString, modelName, providerDisplayName) = getProviderAndModel(for: conversationId, settings: settings)
+        var (providerString, modelName, providerDisplayName) = getProviderAndModel(for: conversationId, settings: settings)
+        
+        // Fix for Grok: map "xai" to "grok"
+        if providerString == "xai" {
+            providerString = "grok"
+        }
 
         // Handle custom provider API key, endpoint, and model code
         var openaiCompatibleConfig: OpenAICompatible? = nil
@@ -447,9 +455,97 @@ class ConversationService: ObservableObject {
             }
         }
 
+        // Construct content payload (String or Array)
+        let contentPayload: AnyCodable
+        if attachments.isEmpty {
+            // Plain text content
+            contentPayload = .string(content)
+        } else {
+            // Build multimodal parts as AnyCodable array of objects
+            var partsCodable: [AnyCodable] = []
+
+            // Add text part if not empty
+            if !content.isEmpty {
+                partsCodable.append(
+                    .object([
+                        "type": .string("text"),
+                        "text": .string(content)
+                    ])
+                )
+            }
+
+            // Add attachment parts
+            for attachment in attachments {
+                switch attachment.type {
+                case .image:
+                    if let base64 = attachment.base64 {
+                        partsCodable.append(
+                            .object([
+                                "type": .string("image_base64"),
+                                "media_type": .string(attachment.mimeType ?? "image/jpeg"),
+                                "data": .string(base64)
+                            ])
+                        )
+                    } else if let url = attachment.url {
+                        partsCodable.append(
+                            .object([
+                                "type": .string("image_url"),
+                                "image_url": .object(["url": .string(url)])
+                            ])
+                        )
+                    }
+                case .document:
+                    if let url = attachment.url {
+                        partsCodable.append(
+                            .object([
+                                "type": .string("file_url"),
+                                "file_url": .object(["url": .string(url)])
+                            ])
+                        )
+                    }
+                case .audio:
+                    if let base64 = attachment.base64 {
+                        partsCodable.append(
+                            .object([
+                                "type": .string("audio_base64"),
+                                "media_type": .string(attachment.mimeType ?? "audio/mp3"),
+                                "data": .string(base64)
+                            ])
+                        )
+                    } else if let url = attachment.url {
+                        partsCodable.append(
+                            .object([
+                                "type": .string("audio_url"),
+                                "audio_url": .object(["url": .string(url)])
+                            ])
+                        )
+                    }
+                case .video:
+                    if let base64 = attachment.base64 {
+                        partsCodable.append(
+                            .object([
+                                "type": .string("video_base64"),
+                                "media_type": .string(attachment.mimeType ?? "video/mp4"),
+                                "data": .string(base64)
+                            ])
+                        )
+                    } else if let url = attachment.url {
+                        partsCodable.append(
+                            .object([
+                                "type": .string("video_url"),
+                                "video_url": .object(["url": .string(url)])
+                            ])
+                        )
+                    }
+                }
+            }
+
+            contentPayload = .array(partsCodable)
+        }
+
         let request = OrchestrateRequest(
             conversationId: conversationId,
-            message: content,
+            content: contentPayload,
             provider: providerString,
             options: OrchestrateOptions(
                 createArtifacts: true,
@@ -460,6 +556,7 @@ class ConversationService: ObservableObject {
             anthropic: anthropicKey,
             openai: openaiKey,
             gemini: geminiKey,
+            grok: grokKey,
             openaiCompatible: openaiCompatibleConfig
         )
 
@@ -467,11 +564,12 @@ class ConversationService: ObservableObject {
         print("[ConversationService] Request Body:")
         print("  Provider: \(providerString)")
         print("  ConversationId: \(conversationId)")
-        print("  Message length: \(content.count) chars")
+        print("  Content Type: \(attachments.isEmpty ? "String" : "Array (\(attachments.count) attachments)")")
         print("  API Keys in request body (top-level):")
         print("    anthropic: \(request.anthropic != nil ? "✓ Included" : "✗ nil")")
         print("    openai: \(request.openai != nil ? "✓ Included" : "✗ nil")")
         print("    gemini: \(request.gemini != nil ? "✓ Included" : "✗ nil")")
+        print("    grok: \(request.grok != nil ? "✓ Included" : "✗ nil")")
         print("    openaiCompatible: \(request.openaiCompatible != nil ? "✓ Included" : "✗ nil")")
         #endif
 
@@ -489,13 +587,20 @@ class ConversationService: ObservableObject {
             print("[ConversationService] Added Gemini API key to headers: \(String(geminiKey.prefix(15)))...")
             #endif
         }
+        if let grokKey, !grokKey.isEmpty {
+            providerHeaders["X-Grok-Api-Key"] = grokKey
+            #if DEBUG
+            print("[ConversationService] Added Grok API key to headers: \(String(grokKey.prefix(15)))...")
+            #endif
+        }
 
         do {
             // Add user message optimistically
             let userMessage = Message(
                 conversationId: conversationId,
                 role: .user,
-                content: content
+                content: content,
+                attachments: attachments
             )
             messages.append(userMessage)
 
@@ -508,8 +613,33 @@ class ConversationService: ObservableObject {
             )
 
             // Replace optimistic message with actual user message
+            // Note: If the backend doesn't return attachments in the user message response,
+            // we might lose them here if we strictly replace.
+            // Ideally, the backend should echo them back.
+            // For now, we'll assume the backend response is authoritative but if attachments are missing
+            // in response, we might want to merge them back.
+            // However, let's trust the backend response for now or keep the local one if response lacks them.
+            
             if let index = messages.firstIndex(where: { $0.id == userMessage.id }) {
-                messages[index] = response.userMessage
+                var finalUserMessage = response.userMessage
+                // If backend didn't return attachments but we sent them, preserve them locally
+                if (finalUserMessage.attachments == nil || finalUserMessage.attachments!.isEmpty) && !attachments.isEmpty {
+                    finalUserMessage = Message(
+                        id: finalUserMessage.id,
+                        conversationId: finalUserMessage.conversationId,
+                        role: finalUserMessage.role,
+                        content: finalUserMessage.content,
+                        timestamp: finalUserMessage.timestamp,
+                        tokens: finalUserMessage.tokens,
+                        artifacts: finalUserMessage.artifacts,
+                        toolCalls: finalUserMessage.toolCalls,
+                        isStreaming: finalUserMessage.isStreaming,
+                        modelName: finalUserMessage.modelName,
+                        providerName: finalUserMessage.providerName,
+                        attachments: attachments
+                    )
+                }
+                messages[index] = finalUserMessage
             }
 
             // Add AI assistant response with model metadata
@@ -574,6 +704,7 @@ class ConversationService: ObservableObject {
             let anthropic: String?
             let openai: String?
             let gemini: String?
+            let grok: String?
 
             struct Options: Encodable {
                 let model: String?
@@ -595,13 +726,19 @@ class ConversationService: ObservableObject {
 
         // Load provider from settings (fallback to anthropic)
         let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
-        let providerString = settings.defaultProvider.rawValue
+        var providerString = settings.defaultProvider.rawValue
+        
+        // Fix for Grok: map "xai" to "grok"
+        if providerString == "xai" {
+            providerString = "grok"
+        }
 
         // Try to include user-provided provider API keys (optional)
         let apiKeysStorage = APIKeysStorage.shared
         let anthropicKey = try? apiKeysStorage.getAPIKey(for: .anthropic)
         let openaiKey = try? apiKeysStorage.getAPIKey(for: .openai)
         let geminiKey = try? apiKeysStorage.getAPIKey(for: .gemini)
+        let grokKey = try? apiKeysStorage.getAPIKey(for: .xai)
 
         // Build request body per MD contract. We choose to replace the last assistant message by default.
         let request = RegenerateRequest(
@@ -616,7 +753,8 @@ class ConversationService: ObservableObject {
             ),
             anthropic: anthropicKey,
             openai: openaiKey,
-            gemini: geminiKey
+            gemini: geminiKey,
+            grok: grokKey
         )
 
         do {
@@ -666,3 +804,4 @@ class ConversationService: ObservableObject {
         messages = []
     }
 }
+

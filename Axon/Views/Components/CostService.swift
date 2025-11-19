@@ -74,6 +74,8 @@ enum CanonicalModelKey: String, CaseIterable, Hashable, Codable {
     case claudeOpus4 = "claude-opus-4"
 
     // OpenAI
+    case gpt51 = "gpt-5.1"
+    case gpt51ChatLatest = "gpt-5.1-chat-latest"
     case gpt5 = "gpt-5"
     case gpt5Mini = "gpt-5-mini"
     case gpt5Nano = "gpt-5-nano"
@@ -90,8 +92,18 @@ enum CanonicalModelKey: String, CaseIterable, Hashable, Codable {
     case gpt4oMini = "gpt-4o-mini"
 
     // Gemini
+    case gemini3ProPreview = "gemini-3-pro-preview"
+    case gemini25FlashLite = "gemini-2.5-flash-lite-preview"
     case gemini25Pro = "gemini-2.5-pro"
     case gemini25Flash = "gemini-2.5-flash"
+
+    // xAI (Grok)
+    case grok4FastReasoning = "grok-4-fast-reasoning"
+    case grok4FastNonReasoning = "grok-4-fast-non-reasoning"
+    case grokCodeFast1 = "grok-code-fast-1"
+    case grok40709 = "grok-4-0709"
+    case grok3Mini = "grok-3-mini"
+    case grok3 = "grok-3"
 }
 
 struct PricingRegistry {
@@ -104,6 +116,8 @@ struct PricingRegistry {
         .claudeOpus4: .init(inputPerMTokUSD: 15.00, outputPerMTokUSD: 75.00, cachedInputPerMTokUSD: nil, notes: nil),
 
         // OpenAI
+        .gpt51: .init(inputPerMTokUSD: 1.25, outputPerMTokUSD: 10.00, cachedInputPerMTokUSD: 0.13, notes: nil),
+        .gpt51ChatLatest: .init(inputPerMTokUSD: 1.25, outputPerMTokUSD: 10.00, cachedInputPerMTokUSD: 0.13, notes: nil),
         .gpt5: .init(inputPerMTokUSD: 1.25, outputPerMTokUSD: 10.00, cachedInputPerMTokUSD: 0.125, notes: nil),
         .gpt5Mini: .init(inputPerMTokUSD: 0.25, outputPerMTokUSD: 2.00, cachedInputPerMTokUSD: 0.025, notes: nil),
         .gpt5Nano: .init(inputPerMTokUSD: 0.05, outputPerMTokUSD: 0.40, cachedInputPerMTokUSD: 0.005, notes: nil),
@@ -120,12 +134,32 @@ struct PricingRegistry {
         .gpt4oMini: .init(inputPerMTokUSD: 0.15, outputPerMTokUSD: 0.60, cachedInputPerMTokUSD: 0.075, notes: nil),
 
         // Gemini
+        .gemini3ProPreview: .init(inputPerMTokUSD: 2.00, outputPerMTokUSD: 12.00, cachedInputPerMTokUSD: 0.20, notes: "≤200K tier"),
+        .gemini25FlashLite: .init(inputPerMTokUSD: 0.10, outputPerMTokUSD: 0.40, cachedInputPerMTokUSD: 0.01, notes: "Text/img/video; $0.30 input for audio"),
         .gemini25Pro: .init(inputPerMTokUSD: 1.25, outputPerMTokUSD: 10.00, cachedInputPerMTokUSD: nil, notes: "≤200K tier"),
-        .gemini25Flash: .init(inputPerMTokUSD: 0.30, outputPerMTokUSD: 2.50, cachedInputPerMTokUSD: nil, notes: "Text/img/video; $1.00 input for audio")
+        .gemini25Flash: .init(inputPerMTokUSD: 0.30, outputPerMTokUSD: 2.50, cachedInputPerMTokUSD: nil, notes: "Text/img/video; $1.00 input for audio"),
+
+        // xAI (Grok)
+        .grok4FastReasoning: .init(inputPerMTokUSD: 0.20, outputPerMTokUSD: 0.75, cachedInputPerMTokUSD: 0.05, notes: "≤128K tier"),
+        .grok4FastNonReasoning: .init(inputPerMTokUSD: 0.20, outputPerMTokUSD: 0.50, cachedInputPerMTokUSD: 0.05, notes: "≤128K tier"),
+        .grokCodeFast1: .init(inputPerMTokUSD: 0.20, outputPerMTokUSD: 1.50, cachedInputPerMTokUSD: 0.05, notes: nil),
+        .grok40709: .init(inputPerMTokUSD: 3.00, outputPerMTokUSD: 15.00, cachedInputPerMTokUSD: 0.75, notes: nil),
+        .grok3Mini: .init(inputPerMTokUSD: 0.30, outputPerMTokUSD: 0.50, cachedInputPerMTokUSD: nil, notes: nil),
+        .grok3: .init(inputPerMTokUSD: 3.00, outputPerMTokUSD: 15.00, cachedInputPerMTokUSD: nil, notes: nil)
     ]
 
     static func price(for key: CanonicalModelKey, usedContextTokens: Int? = nil, inputIsAudio: Bool = false) -> ModelPricing {
         switch key {
+        case .gemini3ProPreview:
+            if let used = usedContextTokens, used > 200_000 {
+                return ModelPricing(inputPerMTokUSD: 4.00, outputPerMTokUSD: 18.00, cachedInputPerMTokUSD: 0.40, notes: ">200K tier")
+            }
+            return base[.gemini3ProPreview]!
+        case .gemini25FlashLite:
+            if inputIsAudio {
+                return ModelPricing(inputPerMTokUSD: 0.30, outputPerMTokUSD: 0.40, cachedInputPerMTokUSD: 0.03, notes: "Audio input")
+            }
+            return base[.gemini25FlashLite]!
         case .gemini25Pro:
             if let used = usedContextTokens, used > 200_000 {
                 return ModelPricing(inputPerMTokUSD: 2.50, outputPerMTokUSD: 15.00, cachedInputPerMTokUSD: nil, notes: ">200K tier")
@@ -136,6 +170,16 @@ struct PricingRegistry {
                 return ModelPricing(inputPerMTokUSD: 1.00, outputPerMTokUSD: 2.50, cachedInputPerMTokUSD: nil, notes: "Audio input")
             }
             return base[.gemini25Flash]!
+        case .grok4FastReasoning:
+            if let used = usedContextTokens, used > 128_000 {
+                return ModelPricing(inputPerMTokUSD: 0.40, outputPerMTokUSD: 1.00, cachedInputPerMTokUSD: 0.05, notes: ">128K tier")
+            }
+            return base[.grok4FastReasoning]!
+        case .grok4FastNonReasoning:
+            if let used = usedContextTokens, used > 128_000 {
+                return ModelPricing(inputPerMTokUSD: 0.40, outputPerMTokUSD: 0.50, cachedInputPerMTokUSD: 0.05, notes: ">128K tier")
+            }
+            return base[.grok4FastNonReasoning]!
         default:
             return base[key]!
         }
@@ -152,6 +196,8 @@ struct PricingKeyResolver {
         if lower.contains("claude-sonnet-4") { return .claudeSonnet4 }
         if lower.contains("claude-opus-4") { return .claudeOpus4 }
         // OpenAI
+        if lower.contains("gpt-5.1-chat-latest") { return .gpt51ChatLatest }
+        if lower.contains("gpt-5.1") { return .gpt51 }
         if lower.contains("gpt-5-mini") { return .gpt5Mini }
         if lower.contains("gpt-5-nano") { return .gpt5Nano }
         if lower.contains("gpt-5") { return .gpt5 }
@@ -167,16 +213,26 @@ struct PricingKeyResolver {
         if lower.contains("gpt-4o-mini") { return .gpt4oMini }
         if lower.contains("gpt-4o") { return .gpt4o }
         // Gemini
+        if lower.contains("gemini-3-pro-preview") { return .gemini3ProPreview }
+        if lower.contains("gemini-2.5-flash-lite-preview") { return .gemini25FlashLite }
         if lower.contains("gemini-2.5-pro") { return .gemini25Pro }
         if lower.contains("gemini-2.5-flash") { return .gemini25Flash }
+        // xAI (Grok)
+        if lower.contains("grok-4-fast-reasoning") { return .grok4FastReasoning }
+        if lower.contains("grok-4-fast-non-reasoning") { return .grok4FastNonReasoning }
+        if lower.contains("grok-code-fast-1") { return .grokCodeFast1 }
+        if lower.contains("grok-4-0709") { return .grok40709 }
+        if lower.contains("grok-3-mini") { return .grok3Mini }
+        if lower.contains("grok-3") { return .grok3 }
         return nil
     }
 
     static func defaultKey(for provider: AIProvider) -> CanonicalModelKey {
         switch provider {
-        case .anthropic: return .claudeSonnet45
-        case .openai: return .gpt4o
-        case .gemini: return .gemini25Pro
+        case .anthropic: return .claudeHaiku45
+        case .openai: return .gpt5Mini
+        case .gemini: return .gemini25Flash
+        case .xai: return .grok3Mini
         }
     }
 }

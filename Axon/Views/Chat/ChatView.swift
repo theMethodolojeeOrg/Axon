@@ -3,11 +3,15 @@
 //  Axon
 //
 //  Main chat interface
+//  NOTE: This view appears to be a legacy or standalone component.
+//  The actual chat interface used in the app is ChatContainerView inside Axon/Views/Components/AppContainerView.swift.
 //
 
 import SwiftUI
 import Combine
 import Foundation
+import PhotosUI
+import UniformTypeIdentifiers
 
 #if canImport(UIKit)
 import UIKit
@@ -97,9 +101,10 @@ struct ChatView: View {
     let conversation: Conversation
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Messages list
-            ScrollViewReader { proxy in
+        ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                // Messages list
+                ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 16) {
                         ForEach(localMessages) { message in
@@ -142,12 +147,16 @@ struct ChatView: View {
                 }
             }
 
-            // Input area
-            MessageInputBar(
-                text: $messageText,
-                isLoading: isLoading,
-                onSend: sendMessage
-            )
+                // Input area
+                MessageInputBar(
+                    text: $messageText,
+                    isLoading: isLoading,
+                    onSend: sendMessage
+                )
+            }
+
+            // Audio player overlay (drops down from top)
+            AudioPlayerView(ttsService: TTSPlaybackService.shared)
         }
         .background(AppColors.substratePrimary)
         .navigationTitle(conversation.title)
@@ -282,6 +291,8 @@ struct MessageBubble: View {
     let onRegenerate: (Message) -> Void
     let overrideContent: String?
 
+    @ObservedObject private var ttsService = TTSPlaybackService.shared
+
     init(
         message: Message,
         onCopy: @escaping (Message) -> Void,
@@ -320,6 +331,34 @@ struct MessageBubble: View {
 
             VStack(alignment: isUser ? .trailing : .leading, spacing: 8) {
                 let textToRender = overrideContent ?? message.content
+
+                // Attachments
+                if let attachments = message.attachments, !attachments.isEmpty {
+                    ForEach(attachments) { attachment in
+                        if attachment.type == .image, let base64 = attachment.base64,
+                           let data = Data(base64Encoded: base64),
+                           let uiImage = UIImage(data: data) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: 200, maxHeight: 200)
+                                .cornerRadius(12)
+                                .padding(.bottom, 4)
+                        } else if attachment.type == .document {
+                            HStack {
+                                Image(systemName: "doc.fill")
+                                    .foregroundColor(AppColors.textPrimary)
+                                Text(attachment.name ?? "Document")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textPrimary)
+                            }
+                            .padding(8)
+                            .background(AppColors.substrateTertiary)
+                            .cornerRadius(8)
+                            .padding(.bottom, 4)
+                        }
+                    }
+                }
 
                 // Message content
                 Group {
@@ -360,12 +399,27 @@ struct MessageBubble: View {
                             Label("Regenerate", systemImage: "arrow.clockwise")
                         }
 
+                        // Show "Play Generated" if audio exists for this message
+                        if ttsService.hasGeneratedAudio(for: message.id) {
+                            Button(action: {
+                                Task {
+                                    do {
+                                        try await ttsService.playGenerated(messageId: message.id)
+                                    } catch {
+                                        print("[TTS] Failed to play generated audio: \(error)")
+                                    }
+                                }
+                            }) {
+                                Label("Play Generated", systemImage: "play.circle.fill")
+                            }
+                        }
+
                         Button(action: {
                             Task {
                                 do {
                                     // Use current app settings for TTS
-                                    let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
-                                    try await TTSPlaybackService.shared.speak(text: message.content, settings: settings)
+                                    let settings = SettingsViewModel.shared.settings
+                                    try await ttsService.speak(text: message.content, settings: settings, messageId: message.id)
                                 } catch {
                                     print("[TTS] Failed to speak: \(error)")
                                 }
@@ -402,64 +456,190 @@ struct MessageBubble: View {
 
 struct MessageInputBar: View {
     @Binding var text: String
+    @Binding var attachments: [MessageAttachment]
     let isLoading: Bool
     let onSend: () -> Void
     let focus: FocusState<Bool>.Binding?
 
+    @State private var selectedItem: PhotosPickerItem?
+    @State private var showFileImporter = false
+
     init(
         text: Binding<String>,
+        attachments: Binding<[MessageAttachment]> = .constant([]),
         isLoading: Bool,
         onSend: @escaping () -> Void,
         focus: FocusState<Bool>.Binding? = nil
     ) {
         self._text = text
+        self._attachments = attachments
         self.isLoading = isLoading
         self.onSend = onSend
         self.focus = focus
     }
 
     var body: some View {
-        GlassCard(padding: 12) {
-            HStack(spacing: 12) {
-                // Text field
-                Group {
-                    if let focus {
-                        TextField("Type a message...", text: $text, axis: .vertical)
-                            .focused(focus)
-                    } else {
-                        TextField("Type a message...", text: $text, axis: .vertical)
-                    }
-                }
-                .textFieldStyle(PlainTextFieldStyle())
-                .font(AppTypography.bodyMedium())
-                .foregroundColor(AppColors.textPrimary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(AppColors.substrateTertiary)
-                .cornerRadius(20)
-                .disabled(isLoading)
-                .lineLimit(1...5)
+        VStack(spacing: 0) {
+            // Attachments Preview
+            if !attachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(attachments) { attachment in
+                            ZStack(alignment: .topTrailing) {
+                                if attachment.type == .image, let base64 = attachment.base64,
+                                   let data = Data(base64Encoded: base64),
+                                   let uiImage = UIImage(data: data) {
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 60, height: 60)
+                                        .cornerRadius(8)
+                                        .clipped()
+                                } else {
+                                    VStack {
+                                        Image(systemName: "doc.fill")
+                                            .font(.system(size: 24))
+                                            .foregroundColor(AppColors.textPrimary)
+                                        Text(attachment.name ?? "File")
+                                            .font(AppTypography.labelSmall())
+                                            .lineLimit(1)
+                                            .foregroundColor(AppColors.textPrimary)
+                                    }
+                                    .frame(width: 60, height: 60)
+                                    .background(AppColors.substrateTertiary)
+                                    .cornerRadius(8)
+                                }
 
-                // Send button
-                Button(action: onSend) {
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .frame(width: 40, height: 40)
-                    } else {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(text.trimmingCharacters(in: .whitespaces).isEmpty
-                                ? AppColors.textDisabled
-                                : AppColors.signalMercury
-                            )
+                                // Remove button
+                                Button(action: {
+                                    if let index = attachments.firstIndex(where: { $0.id == attachment.id }) {
+                                        attachments.remove(at: index)
+                                    }
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.red)
+                                        .background(Color.white.clipShape(Circle()))
+                                }
+                                .offset(x: 4, y: -4)
+                            }
+                        }
                     }
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
                 }
-                .disabled(isLoading || text.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+
+            GlassCard(padding: 12) {
+                HStack(spacing: 12) {
+                    // Attachment Button
+                    Menu {
+                        Button(action: {
+                            // Trigger photo picker
+                            // This is handled by the PhotosPicker below, but we need a way to trigger it programmatically or use a label
+                        }) {
+                            Label("Photo Library", systemImage: "photo")
+                        }
+                        
+                        Button(action: {
+                            showFileImporter = true
+                        }) {
+                            Label("Document", systemImage: "doc")
+                        }
+                    } label: {
+                        Image(systemName: "paperclip")
+                            .font(.system(size: 20))
+                            .foregroundColor(AppColors.textSecondary)
+                            .frame(width: 32, height: 32)
+                    }
+                    // PhotosPicker overlay for the menu item (workaround since Menu doesn't support PhotosPicker directly easily)
+                    .overlay(
+                        PhotosPicker(selection: $selectedItem, matching: .images) {
+                            Color.clear.frame(width: 32, height: 32)
+                        }
+                    )
+
+                    // Text field
+                    Group {
+                        if let focus {
+                            TextField("Type a message...", text: $text, axis: .vertical)
+                                .focused(focus)
+                        } else {
+                            TextField("Type a message...", text: $text, axis: .vertical)
+                        }
+                    }
+                    .textFieldStyle(PlainTextFieldStyle())
+                    .font(AppTypography.bodyMedium())
+                    .foregroundColor(AppColors.textPrimary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(AppColors.substrateTertiary)
+                    .cornerRadius(20)
+                    .disabled(isLoading)
+                    .lineLimit(1...5)
+
+                    // Send button
+                    Button(action: onSend) {
+                        if isLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .frame(width: 40, height: 40)
+                        } else {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor((text.trimmingCharacters(in: .whitespaces).isEmpty && attachments.isEmpty)
+                                    ? AppColors.textDisabled
+                                    : AppColors.signalMercury
+                                )
+                        }
+                    }
+                    .disabled(isLoading || (text.trimmingCharacters(in: .whitespaces).isEmpty && attachments.isEmpty))
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+        }
+        .onChange(of: selectedItem) { newItem in
+            Task {
+                if let data = try? await newItem?.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data),
+                   let compressedData = uiImage.jpegData(compressionQuality: 0.7) {
+                    let base64 = compressedData.base64EncodedString()
+                    let attachment = MessageAttachment(
+                        type: .image,
+                        base64: base64,
+                        name: "image.jpg",
+                        mimeType: "image/jpeg"
+                    )
+                    attachments.append(attachment)
+                    selectedItem = nil
+                }
             }
         }
-        .padding(.horizontal)
-        .padding(.bottom, 8)
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: [.pdf, .text, .image],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                if url.startAccessingSecurityScopedResource() {
+                    defer { url.stopAccessingSecurityScopedResource() }
+                    if let data = try? Data(contentsOf: url) {
+                        let base64 = data.base64EncodedString()
+                        let attachment = MessageAttachment(
+                            type: .document,
+                            base64: base64,
+                            name: url.lastPathComponent,
+                            mimeType: url.pathExtension
+                        )
+                        attachments.append(attachment)
+                    }
+                }
+            case .failure(let error):
+                print("File import failed: \(error.localizedDescription)")
+            }
+        }
     }
 }
 
@@ -476,4 +656,3 @@ struct MessageInputBar: View {
         ))
     }
 }
-

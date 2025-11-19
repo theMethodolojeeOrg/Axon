@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SettingsTabView: View {
-    @StateObject private var viewModel = SettingsViewModel()
+    @EnvironmentObject var viewModel: SettingsViewModel
     @State private var selectedTab: SettingsTab = .general
 
     enum SettingsTab: String, CaseIterable, Identifiable {
@@ -161,5 +161,5 @@ struct SettingsTabButton: View {
 
 #Preview {
     SettingsTabView()
+        .environmentObject(SettingsViewModel.shared)
 }
-

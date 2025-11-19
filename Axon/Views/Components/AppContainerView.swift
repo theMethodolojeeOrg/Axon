@@ -197,7 +197,9 @@ struct ChatContainerView: View {
     @StateObject private var costService = CostService.shared
     @StateObject private var taglineManager = TaglineManager.shared
     @StateObject private var promptManager = PromptManager.shared
+    @ObservedObject private var ttsService = TTSPlaybackService.shared
     @State private var messageText = ""
+    @State private var selectedAttachments: [MessageAttachment] = []
     @State private var isLoading = false
     @State private var showWelcome = true
     @State private var streamingOverrides: [String: String] = [:]
@@ -223,6 +225,7 @@ struct ChatContainerView: View {
                 // Input bar (always visible)
                 MessageInputBar(
                     text: $messageText,
+                    attachments: $selectedAttachments,
                     isLoading: isLoading,
                     onSend: sendMessage,
                     focus: $isInputFocused
@@ -241,6 +244,9 @@ struct ChatContainerView: View {
                     .padding(.top, 8)
                 }
             }
+
+            // Audio player overlay
+            AudioPlayerView(ttsService: ttsService)
         }
         .task(id: conversation?.id) {
             if let conversation = conversation {
@@ -403,10 +409,13 @@ struct ChatContainerView: View {
     }
 
     private func sendMessage() {
-        guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty || !selectedAttachments.isEmpty else { return }
 
         let content = messageText
+        let attachments = selectedAttachments
         messageText = ""
+        selectedAttachments = []
+        
         // Dismiss keyboard on send
         #if canImport(UIKit)
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
@@ -425,7 +434,7 @@ struct ChatContainerView: View {
                     conv = existing
                 } else {
                     // Create new conversation with first message as title
-                    let title = String(content.prefix(50))
+                    let title = content.isEmpty ? "New Chat" : String(content.prefix(50))
                     conv = try await conversationService.createConversation(
                         title: title,
                         firstMessage: nil  // Don't send message during creation
@@ -436,7 +445,8 @@ struct ChatContainerView: View {
                 // Send message and get assistant response
                 let assistant = try await conversationService.sendMessage(
                     conversationId: conv.id,
-                    content: content
+                    content: content,
+                    attachments: attachments
                 )
 
                 // Pseudo-stream the assistant content

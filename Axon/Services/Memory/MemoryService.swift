@@ -54,6 +54,7 @@ class MemoryService: ObservableObject {
         type: MemoryType,
         confidence: Double,
         tags: [String] = [],
+        context: String? = nil,
         metadata: [String: AnyCodable] = [:]
     ) async throws -> Memory {
         isLoading = true
@@ -64,6 +65,7 @@ class MemoryService: ObservableObject {
             let type: String
             let confidence: Double
             let tags: [String]
+            let context: String?
             let metadata: [String: AnyCodable]
         }
 
@@ -72,6 +74,7 @@ class MemoryService: ObservableObject {
             type: type.rawValue,
             confidence: confidence,
             tags: tags,
+            context: context,
             metadata: metadata
         )
 
@@ -133,20 +136,26 @@ class MemoryService: ObservableObject {
         id: String,
         content: String? = nil,
         confidence: Double? = nil,
-        tags: [String]? = nil
+        tags: [String]? = nil,
+        context: String? = nil,
+        metadata: [String: AnyCodable]? = nil
     ) async throws -> Memory {
         struct UpdateMemoryRequest: Encodable {
             let memoryId: String
             let content: String?
             let confidence: Double?
             let tags: [String]?
+            let context: String?
+            let metadata: [String: AnyCodable]?
         }
 
         let request = UpdateMemoryRequest(
             memoryId: id,
             content: content,
             confidence: confidence,
-            tags: tags
+            tags: tags,
+            context: context,
+            metadata: metadata
         )
 
         do {
@@ -174,19 +183,14 @@ class MemoryService: ObservableObject {
     // MARK: - Delete Memory
 
     func deleteMemory(id: String) async throws {
-        struct DeleteMemoryRequest: Encodable {
-            let memoryId: String
+        struct DeleteResponse: Decodable {
+            let success: Bool
         }
 
-        struct EmptyResponse: Decodable {}
-
-        let request = DeleteMemoryRequest(memoryId: id)
-
         do {
-            let _: EmptyResponse = try await apiClient.requestWrapped(
-                endpoint: "/apiDeleteMemory",
-                method: .post,
-                body: request
+            let _: DeleteResponse = try await apiClient.request(
+                endpoint: "/apiDeleteMemory/\(id)",
+                method: .delete
             )
 
             // Delete from Core Data
