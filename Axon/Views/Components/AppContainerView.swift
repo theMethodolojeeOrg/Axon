@@ -57,6 +57,8 @@ struct AppContainerView: View {
                         Text(navigationTitle)
                             .font(AppTypography.titleMedium())
                             .foregroundColor(AppColors.textPrimary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
 
                     ToolbarItem(placement: .navigationBarTrailing) {

@@ -492,12 +492,15 @@ class ConversationService: ObservableObject {
                     }
                 case .document:
                     if let url = attachment.url {
-                        // Backend expects: { type: "file_url", file_url: { url } }
+                        // Backend expects: { type: "file_url", file_url: { url, mime_type } }
+                        var fileUrlDict: [String: AnyCodable] = ["url": .string(url)]
+                        if let mimeType = attachment.mimeType {
+                            fileUrlDict["mime_type"] = .string(mimeType)
+                        }
+                        
                         parts.append(.object([
                             "type": .string("file_url"),
-                            "file_url": .object([
-                                "url": .string(url)
-                            ])
+                            "file_url": .object(fileUrlDict)
                         ]))
                     }
                 case .audio:

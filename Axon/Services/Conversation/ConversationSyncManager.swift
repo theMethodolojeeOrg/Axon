@@ -313,7 +313,7 @@ class ConversationSyncManager: ObservableObject {
                 entity.archived = conversation.archived
                 entity.summary = conversation.summary
                 entity.lastMessage = conversation.lastMessage
-                entity.tags = conversation.tags
+                entity.tags = conversation.tags as NSArray?
                 entity.isPinned = conversation.isPinned ?? false
                 entity.syncStatus = "synced"
                 entity.locallyModified = false
@@ -457,8 +457,9 @@ extension ConversationEntity {
             archived: self.archived,
             summary: self.summary,
             lastMessage: self.lastMessage,
-            tags: self.tags,
+            tags: self.tags as? [String],
             isPinned: self.isPinned ? true : nil
         )
     }
 }
+
