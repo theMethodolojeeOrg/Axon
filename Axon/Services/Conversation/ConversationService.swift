@@ -458,89 +458,85 @@ class ConversationService: ObservableObject {
         // Construct content payload (String or Array)
         let contentPayload: AnyCodable
         if attachments.isEmpty {
-            // Plain text content
             contentPayload = .string(content)
         } else {
-            // Build multimodal parts as AnyCodable array of objects
-            var partsCodable: [AnyCodable] = []
-
+            var parts: [AnyCodable] = []
+            
             // Add text part if not empty
             if !content.isEmpty {
-                partsCodable.append(
-                    .object([
-                        "type": .string("text"),
-                        "text": .string(content)
-                    ])
-                )
+                parts.append(.object([
+                    "type": .string("text"),
+                    "text": .string(content)
+                ]))
             }
-
-            // Add attachment parts
+            
+            // Add attachment parts - flattened structure matching backend expectations
             for attachment in attachments {
                 switch attachment.type {
                 case .image:
                     if let base64 = attachment.base64 {
-                        partsCodable.append(
-                            .object([
-                                "type": .string("image_base64"),
-                                "media_type": .string(attachment.mimeType ?? "image/jpeg"),
-                                "data": .string(base64)
-                            ])
-                        )
+                        // Backend expects: { type: "image_base64", media_type, data }
+                        parts.append(.object([
+                            "type": .string("image_base64"),
+                            "media_type": .string(attachment.mimeType ?? "image/jpeg"),
+                            "data": .string(base64)
+                        ]))
                     } else if let url = attachment.url {
-                        partsCodable.append(
-                            .object([
-                                "type": .string("image_url"),
-                                "image_url": .object(["url": .string(url)])
+                        // Backend expects: { type: "image_url", image_url: { url } }
+                        parts.append(.object([
+                            "type": .string("image_url"),
+                            "image_url": .object([
+                                "url": .string(url)
                             ])
-                        )
+                        ]))
                     }
                 case .document:
                     if let url = attachment.url {
-                        partsCodable.append(
-                            .object([
-                                "type": .string("file_url"),
-                                "file_url": .object(["url": .string(url)])
+                        // Backend expects: { type: "file_url", file_url: { url } }
+                        parts.append(.object([
+                            "type": .string("file_url"),
+                            "file_url": .object([
+                                "url": .string(url)
                             ])
-                        )
+                        ]))
                     }
                 case .audio:
                     if let base64 = attachment.base64 {
-                        partsCodable.append(
-                            .object([
-                                "type": .string("audio_base64"),
-                                "media_type": .string(attachment.mimeType ?? "audio/mp3"),
-                                "data": .string(base64)
-                            ])
-                        )
+                        // Backend expects: { type: "audio_base64", media_type, data }
+                        parts.append(.object([
+                            "type": .string("audio_base64"),
+                            "media_type": .string(attachment.mimeType ?? "audio/mp3"),
+                            "data": .string(base64)
+                        ]))
                     } else if let url = attachment.url {
-                        partsCodable.append(
-                            .object([
-                                "type": .string("audio_url"),
-                                "audio_url": .object(["url": .string(url)])
+                        // Backend expects: { type: "audio_url", audio_url: { url } }
+                        parts.append(.object([
+                            "type": .string("audio_url"),
+                            "audio_url": .object([
+                                "url": .string(url)
                             ])
-                        )
+                        ]))
                     }
                 case .video:
                     if let base64 = attachment.base64 {
-                        partsCodable.append(
-                            .object([
-                                "type": .string("video_base64"),
-                                "media_type": .string(attachment.mimeType ?? "video/mp4"),
-                                "data": .string(base64)
-                            ])
-                        )
+                        // Backend expects: { type: "video_base64", media_type, data }
+                        parts.append(.object([
+                            "type": .string("video_base64"),
+                            "media_type": .string(attachment.mimeType ?? "video/mp4"),
+                            "data": .string(base64)
+                        ]))
                     } else if let url = attachment.url {
-                        partsCodable.append(
-                            .object([
-                                "type": .string("video_url"),
-                                "video_url": .object(["url": .string(url)])
+                        // Backend expects: { type: "video_url", video_url: { url } }
+                        parts.append(.object([
+                            "type": .string("video_url"),
+                            "video_url": .object([
+                                "url": .string(url)
                             ])
-                        )
+                        ]))
                     }
                 }
             }
-
-            contentPayload = .array(partsCodable)
+            contentPayload = .array(parts)
         }
 
         let request = OrchestrateRequest(
@@ -620,8 +616,8 @@ class ConversationService: ObservableObject {
             // in response, we might want to merge them back.
             // However, let's trust the backend response for now or keep the local one if response lacks them.
             
+            var finalUserMessage = response.userMessage
             if let index = messages.firstIndex(where: { $0.id == userMessage.id }) {
-                var finalUserMessage = response.userMessage
                 // If backend didn't return attachments but we sent them, preserve them locally
                 if (finalUserMessage.attachments == nil || finalUserMessage.attachments!.isEmpty) && !attachments.isEmpty {
                     finalUserMessage = Message(
@@ -662,8 +658,8 @@ class ConversationService: ObservableObject {
             }
             messages.append(assistantMessage)
 
-            // Save both messages to Core Data immediately
-            try await syncManager.saveMessagesToCoreData([response.userMessage, assistantMessage], conversationId: conversationId)
+            // Save both messages to Core Data immediately with preserved attachments
+            try await syncManager.saveMessagesToCoreData([finalUserMessage, assistantMessage], conversationId: conversationId)
 
             // Process and save memories if any were created
             if let memories = response.memories, !memories.isEmpty {
@@ -804,4 +800,3 @@ class ConversationService: ObservableObject {
         messages = []
     }
 }
-

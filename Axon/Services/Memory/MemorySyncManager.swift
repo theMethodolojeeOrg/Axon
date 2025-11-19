@@ -203,7 +203,7 @@ class MemorySyncManager: ObservableObject {
                 entity.locallyModified = false
                 
                 // Note: 'context' field requires Core Data model update
-                entity.context = memory.context
+                // entity.context = memory.context
 
                 // Source information
                 if let source = memory.source {
@@ -301,22 +301,20 @@ extension MemoryEntity {
                 messageId: self.sourceMessageId,
                 timestamp: sourceTs
             )
-                timestamp: sourceTs
-            )
         }
         
-        // Note: 'context' field requires Core Data model update
-        // let context = self.context
+            // Note: 'context' field requires Core Data model update
+            // let context = self.context
 
-        return Memory(
-            id: id,
-            userId: userId,
-            content: content,
-            type: type,
-            confidence: self.confidence,
-            tags: self.tags as? [String] ?? [],
-            context: nil, // Placeholder until Core Data model is updated
-            metadata: metadataDict,
+            return Memory(
+                id: id,
+                userId: userId,
+                content: content,
+                type: type,
+                confidence: self.confidence,
+                tags: self.tags as? [String] ?? [],
+                // context: nil, // Placeholder until Core Data model is updated
+                metadata: metadataDict,
             source: source,
             relatedMemories: self.relatedMemoryIds as? [String],
             createdAt: createdAt,

@@ -139,7 +139,7 @@ struct SidebarView: View {
         VStack(spacing: 16) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("NeurX AxonChat")
+                    Text("Axon")
                         .font(AppTypography.titleLarge())
                         .foregroundColor(AppColors.textPrimary)
 

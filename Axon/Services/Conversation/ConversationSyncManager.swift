@@ -369,6 +369,16 @@ class ConversationSyncManager: ObservableObject {
                 if let tokens = message.tokens {
                     entity.tokensUsed = Int32(tokens.total)
                 }
+
+                // Serialize attachments to JSON if present
+                if let attachments = message.attachments, !attachments.isEmpty {
+                    if let attachmentsData = try? JSONEncoder().encode(attachments),
+                       let attachmentsJSON = String(data: attachmentsData, encoding: .utf8) {
+                        entity.attachmentsJSON = attachmentsJSON
+                    }
+                } else {
+                    entity.attachmentsJSON = nil
+                }
             }
 
             try self.persistence.saveContext(context)
@@ -394,6 +404,13 @@ class ConversationSyncManager: ObservableObject {
                     return nil
                 }
 
+                // Deserialize attachments from JSON if present
+                var attachments: [MessageAttachment]? = nil
+                if let attachmentsJSON = entity.attachmentsJSON,
+                   let attachmentsData = attachmentsJSON.data(using: .utf8) {
+                    attachments = try? JSONDecoder().decode([MessageAttachment].self, from: attachmentsData)
+                }
+
                 return Message(
                     id: id,
                     conversationId: conversationId,
@@ -405,7 +422,8 @@ class ConversationSyncManager: ObservableObject {
                     toolCalls: nil,
                     isStreaming: nil,
                     modelName: entity.modelName,
-                    providerName: entity.providerName
+                    providerName: entity.providerName,
+                    attachments: attachments
                 )
             }
         } catch {

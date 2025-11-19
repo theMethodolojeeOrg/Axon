@@ -24,9 +24,11 @@ export type ContentPart =
 
 You can use these structured content parts in the following API endpoints:
 
-1.  **`POST /apiAddMessage`**
-2.  **`POST /apiAddMessageWithResponse`**
-3.  **`POST /apiOrchestrate`**
+1.  **`POST /apiAddMessage`** (Uses `content` field)
+2.  **`POST /apiAddMessageWithResponse`** (Uses `content` field)
+3.  **`POST /apiOrchestrate`** (Uses `message` field)
+
+> **Important:** For `apiOrchestrate`, the field name is `message`, but it accepts the same `string | ContentPart[]` structure.
 
 ### Example Request Body
 

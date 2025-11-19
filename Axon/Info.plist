@@ -28,5 +28,11 @@
 	<array>
 		<string>processing</string>
 	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.axon.sync.conversations</string>
+		<string>com.axon.sync.memories</string>
+		<string>com.axon.sync.background</string>
+	</array>
 </dict>
 </plist>

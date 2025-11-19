@@ -167,7 +167,7 @@ struct AccountSettingsView: View {
                 Spacer()
 
                 VStack(spacing: 4) {
-                    Text("NeurX AxonChat")
+                    Text("Axon")
                         .font(AppTypography.bodySmall())
                         .foregroundColor(AppColors.textTertiary)
 

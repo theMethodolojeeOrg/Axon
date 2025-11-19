@@ -46,6 +46,7 @@
         <attribute name="userId" attributeType="String" defaultValueString=""/>
     </entity>
     <entity name="MessageEntity" representedClassName="MessageEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="attachmentsJSON" optional="YES" attributeType="String"/>
         <attribute name="content" attributeType="String" defaultValueString=""/>
         <attribute name="conversationId" attributeType="String" defaultValueString=""/>
         <attribute name="id" attributeType="String" defaultValueString=""/>
