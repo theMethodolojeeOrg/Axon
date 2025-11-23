@@ -125,7 +125,7 @@ struct MemoryDetailView: View {
                             
                             if isEditing {
                                 Picker("Type", selection: $selectedType) {
-                                    ForEach(MemoryType.allCases, id: \.self) { type in
+                                    ForEach(MemoryType.selectableCases, id: \.self) { type in
                                         Text(type.displayName).tag(type)
                                     }
                                 }

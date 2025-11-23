@@ -51,7 +51,7 @@ struct MemoryListView: View {
                                 action: { selectedType = nil }
                             )
 
-                            ForEach(MemoryType.allCases, id: \.self) { type in
+                            ForEach(MemoryType.selectableCases, id: \.self) { type in
                                 FilterChip(
                                     title: type.displayName,
                                     icon: type.icon,
@@ -342,7 +342,7 @@ struct NewMemorySheet: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var memoryService = MemoryService.shared
     @State private var content = ""
-    @State private var selectedType = MemoryType.fact
+    @State private var selectedType = MemoryType.allocentric
     @State private var confidence: Double = 0.8
 
     var body: some View {
@@ -374,7 +374,7 @@ struct NewMemorySheet: View {
                             .foregroundColor(AppColors.textSecondary)
 
                         Picker("Type", selection: $selectedType) {
-                            ForEach(MemoryType.allCases, id: \.self) { type in
+                            ForEach(MemoryType.selectableCases, id: \.self) { type in
                                 Text(type.displayName).tag(type)
                             }
                         }

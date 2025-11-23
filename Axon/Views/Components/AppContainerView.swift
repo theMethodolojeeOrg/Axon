@@ -202,6 +202,7 @@ struct ChatContainerView: View {
     @ObservedObject private var ttsService = TTSPlaybackService.shared
     @State private var messageText = ""
     @State private var selectedAttachments: [MessageAttachment] = []
+    @State private var useGeminiTools = false
     @State private var isLoading = false
     @State private var showWelcome = true
     @State private var streamingOverrides: [String: String] = [:]
@@ -228,6 +229,7 @@ struct ChatContainerView: View {
                 MessageInputBar(
                     text: $messageText,
                     attachments: $selectedAttachments,
+                    useGeminiTools: $useGeminiTools,
                     isLoading: isLoading,
                     onSend: sendMessage,
                     focus: $isInputFocused
@@ -448,8 +450,12 @@ struct ChatContainerView: View {
                 let assistant = try await conversationService.sendMessage(
                     conversationId: conv.id,
                     content: content,
-                    attachments: attachments
+                    attachments: attachments,
+                    geminiTools: useGeminiTools
                 )
+
+                // Reset tools flag after sending
+                useGeminiTools = false
 
                 // Pseudo-stream the assistant content
                 startPseudoStream(for: assistant)

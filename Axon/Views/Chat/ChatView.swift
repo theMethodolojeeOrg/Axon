@@ -92,6 +92,7 @@ fileprivate struct ChatIconView: View {
 struct ChatView: View {
     @StateObject private var conversationService = ConversationService.shared
     @State private var messageText = ""
+    @State private var useGeminiTools = false
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showingError = false
@@ -150,6 +151,7 @@ struct ChatView: View {
                 // Input area
                 MessageInputBar(
                     text: $messageText,
+                    useGeminiTools: $useGeminiTools,
                     isLoading: isLoading,
                     onSend: sendMessage
                 )
@@ -249,8 +251,12 @@ struct ChatView: View {
             do {
                 _ = try await conversationService.sendMessage(
                     conversationId: conversation.id,
-                    content: content
+                    content: content,
+                    geminiTools: useGeminiTools
                 )
+                
+                // Reset tools flag after sending
+                useGeminiTools = false
                 
                 // Reload messages to get both user and assistant messages
                 await loadMessages()
@@ -457,6 +463,7 @@ struct MessageBubble: View {
 struct MessageInputBar: View {
     @Binding var text: String
     @Binding var attachments: [MessageAttachment]
+    @Binding var useGeminiTools: Bool
     let isLoading: Bool
     let onSend: () -> Void
     let focus: FocusState<Bool>.Binding?
@@ -467,12 +474,14 @@ struct MessageInputBar: View {
     init(
         text: Binding<String>,
         attachments: Binding<[MessageAttachment]> = .constant([]),
+        useGeminiTools: Binding<Bool> = .constant(false),
         isLoading: Bool,
         onSend: @escaping () -> Void,
         focus: FocusState<Bool>.Binding? = nil
     ) {
         self._text = text
         self._attachments = attachments
+        self._useGeminiTools = useGeminiTools
         self.isLoading = isLoading
         self.onSend = onSend
         self.focus = focus
@@ -557,6 +566,16 @@ struct MessageInputBar: View {
                             Color.clear.frame(width: 32, height: 32)
                         }
                     )
+
+                    // Gemini Tools Toggle
+                    Button(action: { useGeminiTools.toggle() }) {
+                        Image(systemName: useGeminiTools ? "sparkles" : "sparkles")
+                            .font(.system(size: 20))
+                            .foregroundColor(useGeminiTools ? AppColors.signalMercury : AppColors.textSecondary)
+                            .frame(width: 32, height: 32)
+                            .background(useGeminiTools ? AppColors.signalMercury.opacity(0.1) : Color.clear)
+                            .clipShape(Circle())
+                    }
 
                     // Text field
                     Group {

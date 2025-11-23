@@ -210,6 +210,11 @@ enum MemoryType: String, Codable, CaseIterable {
             return .egoic
         }
     }
+
+    /// The types that should be selectable in the UI for creating new memories
+    static var selectableCases: [MemoryType] {
+        [.allocentric, .egoic]
+    }
 }
 
 struct MemorySource: Codable, Equatable {

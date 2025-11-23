@@ -342,7 +342,7 @@ class ConversationService: ObservableObject {
         }
     }
 
-    func sendMessage(conversationId: String, content: String, attachments: [MessageAttachment] = []) async throws -> Message {
+    func sendMessage(conversationId: String, content: String, attachments: [MessageAttachment] = [], geminiTools: Bool = false) async throws -> Message {
         struct OrchestrateRequest: Encodable {
             let conversationId: String
             let content: AnyCodable
@@ -366,6 +366,7 @@ class ConversationService: ObservableObject {
             let saveMemories: Bool
             let executeTools: Bool
             let model: String?
+            let geminiTools: Bool?
         }
 
         struct OrchestrateResponse: Decodable {
@@ -387,7 +388,15 @@ class ConversationService: ObservableObject {
 
         #if DEBUG
         print("[ConversationService] API Key Debug:")
-        print("  Anthropic: \(anthropicKey != nil ? "✓ Retrieved (\(anthropicKey!.count) chars, starts: \(String(anthropicKey!.prefix(15)))...)" : "✗ Not found")")
+        let anthropicDebug: String = {
+            if let key = anthropicKey {
+                let start = String(key.prefix(15))
+                return "✓ Retrieved (\(key.count) chars, starts: \(start)...)"
+            } else {
+                return "✗ Not found"
+            }
+        }()
+        print("  Anthropic: \(anthropicDebug)")
         print("  OpenAI: \(openaiKey != nil ? "✓ Retrieved" : "✗ Not found")")
         print("  Gemini: \(geminiKey != nil ? "✓ Retrieved" : "✗ Not found")")
         print("  Grok: \(grokKey != nil ? "✓ Retrieved" : "✗ Not found")")
@@ -550,7 +559,8 @@ class ConversationService: ObservableObject {
                 createArtifacts: true,
                 saveMemories: true,
                 executeTools: false,
-                model: modelCode
+                model: modelCode,
+                geminiTools: geminiTools
             ),
             anthropic: anthropicKey,
             openai: openaiKey,
@@ -803,3 +813,4 @@ class ConversationService: ObservableObject {
         messages = []
     }
 }
+
