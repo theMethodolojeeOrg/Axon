@@ -64,7 +64,10 @@ class ConversationService: ObservableObject {
 
     // MARK: - Helper: Get Provider and Model with Overrides
 
-    private func getProviderAndModel(for conversationId: String, settings: AppSettings) -> (provider: String, modelName: String, providerName: String) {
+    /// Returns (providerString, modelId, modelDisplayName, providerDisplayName)
+    /// - modelId: The API model identifier to send to the provider (e.g., "claude-haiku-4-5-20251001")
+    /// - modelDisplayName: The human-readable name for UI display (e.g., "Claude Haiku 4.5")
+    private func getProviderAndModel(for conversationId: String, settings: AppSettings) -> (provider: String, modelId: String, modelDisplayName: String, providerName: String) {
         // Check for conversation overrides
         let overridesKey = "conversation_overrides_\(conversationId)"
         if let data = UserDefaults.standard.data(forKey: overridesKey),
@@ -75,10 +78,11 @@ class ConversationService: ObservableObject {
                let customProvider = settings.customProviders.first(where: { $0.id == customProviderId }),
                let customModelId = overrides.customModelId,
                let customModel = customProvider.models.first(where: { $0.id == customModelId }) {
-                // Prefer explicitly saved display names; fall back to friendlyName/providerName
+                // For custom providers, modelCode is the API identifier
+                let modelId = customModel.modelCode
                 let modelDisplayName = overrides.modelDisplayName ?? customModel.friendlyName ?? customProvider.providerName
                 let providerDisplay = overrides.providerDisplayName ?? customProvider.providerName
-                return ("openai-compatible", modelDisplayName, providerDisplay)
+                return ("openai-compatible", modelId, modelDisplayName, providerDisplay)
             }
 
             // Built-in provider override
@@ -88,7 +92,8 @@ class ConversationService: ObservableObject {
                let model = provider.availableModels.first(where: { $0.id == builtInModel }) {
                 let modelDisplayName = overrides.modelDisplayName ?? model.name
                 let providerDisplay = overrides.providerDisplayName ?? provider.displayName
-                return (provider.rawValue, modelDisplayName, providerDisplay)
+                // model.id is the API identifier (e.g., "claude-haiku-4-5-20251001")
+                return (provider.rawValue, model.id, modelDisplayName, providerDisplay)
             }
         }
 
@@ -97,14 +102,16 @@ class ConversationService: ObservableObject {
            let customProvider = settings.customProviders.first(where: { $0.id == customProviderId }),
            let customModelId = settings.selectedCustomModelId,
            let customModel = customProvider.models.first(where: { $0.id == customModelId }) {
+            let modelId = customModel.modelCode
             let modelDisplayName = customModel.friendlyName ?? customProvider.providerName
-            return ("openai-compatible", modelDisplayName, customProvider.providerName)
+            return ("openai-compatible", modelId, modelDisplayName, customProvider.providerName)
         }
 
         // Default: built-in provider
         let provider = settings.defaultProvider
         let model = provider.availableModels.first(where: { $0.id == settings.defaultModel }) ?? provider.availableModels.first
-        return (provider.rawValue, model?.name ?? "Unknown", provider.displayName)
+        // model.id is the API identifier, model.name is the display name
+        return (provider.rawValue, model?.id ?? "unknown", model?.name ?? "Unknown", provider.displayName)
     }
 
     // MARK: - Conversations
@@ -342,43 +349,16 @@ class ConversationService: ObservableObject {
         }
     }
 
+    // MARK: - Orchestration
+
+    private let cloudOrchestrator = CloudConversationOrchestrator()
+    private let onDeviceOrchestrator = OnDeviceConversationOrchestrator()
+
+    private func getOrchestrator(settings: AppSettings) -> ConversationOrchestrator {
+        return settings.useOnDeviceOrchestration ? onDeviceOrchestrator : cloudOrchestrator
+    }
+
     func sendMessage(conversationId: String, content: String, attachments: [MessageAttachment] = [], geminiTools: Bool = false) async throws -> Message {
-        struct OrchestrateRequest: Encodable {
-            let conversationId: String
-            let content: AnyCodable
-            let provider: String
-            let options: OrchestrateOptions
-            // API keys at top level to match backend expectations
-            let anthropic: String?
-            let openai: String?
-            let gemini: String?
-            let grok: String?
-            let openaiCompatible: OpenAICompatible?
-        }
-
-        struct OpenAICompatible: Encodable {
-            let apiKey: String
-            let baseUrl: String
-        }
-
-        struct OrchestrateOptions: Encodable {
-            let createArtifacts: Bool
-            let saveMemories: Bool
-            let executeTools: Bool
-            let model: String?
-            let geminiTools: Bool?
-        }
-
-        struct OrchestrateResponse: Decodable {
-            let userMessage: Message
-            let assistantMessage: Message
-            let artifacts: [AnyCodable]?
-            let memories: [Memory]?
-            let tools: [AnyCodable]?
-            let conversationUpdated: Bool?
-            let metadata: AnyCodable?
-        }
-
         // Get API keys from storage
         let apiKeysStorage = APIKeysStorage.shared
         let anthropicKey = try? apiKeysStorage.getAPIKey(for: .anthropic)
@@ -386,25 +366,11 @@ class ConversationService: ObservableObject {
         let geminiKey = try? apiKeysStorage.getAPIKey(for: .gemini)
         let grokKey = try? apiKeysStorage.getAPIKey(for: .xai)
 
-        #if DEBUG
-        print("[ConversationService] API Key Debug:")
-        let anthropicDebug: String = {
-            if let key = anthropicKey {
-                let start = String(key.prefix(15))
-                return "✓ Retrieved (\(key.count) chars, starts: \(start)...)"
-            } else {
-                return "✗ Not found"
-            }
-        }()
-        print("  Anthropic: \(anthropicDebug)")
-        print("  OpenAI: \(openaiKey != nil ? "✓ Retrieved" : "✗ Not found")")
-        print("  Gemini: \(geminiKey != nil ? "✓ Retrieved" : "✗ Not found")")
-        print("  Grok: \(grokKey != nil ? "✓ Retrieved" : "✗ Not found")")
-        #endif
-
         // Load provider/model from settings with conversation overrides
+        // modelId is the API identifier (e.g., "claude-haiku-4-5-20251001")
+        // modelDisplayName is for UI display (e.g., "Claude Haiku 4.5")
         let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
-        var (providerString, modelName, providerDisplayName) = getProviderAndModel(for: conversationId, settings: settings)
+        var (providerString, modelId, modelDisplayName, providerDisplayName) = getProviderAndModel(for: conversationId, settings: settings)
         
         // Fix for Grok: map "xai" to "grok"
         if providerString == "xai" {
@@ -412,8 +378,11 @@ class ConversationService: ObservableObject {
         }
 
         // Handle custom provider API key, endpoint, and model code
-        var openaiCompatibleConfig: OpenAICompatible? = nil
-        var modelCode: String? = nil
+        var customBaseUrl: String? = nil
+        var customApiKey: String? = nil
+        // For built-in providers, modelId is already the API identifier
+        // For custom providers, we may need to fetch the modelCode separately
+        var modelCode: String? = modelId
         
         if providerString == "openai-compatible" {
             // Get custom provider ID from conversation overrides or global settings
@@ -436,6 +405,8 @@ class ConversationService: ObservableObject {
             if let providerId = customProviderId,
                let customProvider = settings.customProviders.first(where: { $0.id == providerId }) {
                 
+                customBaseUrl = customProvider.apiEndpoint
+                
                 // Get the model code
                 if let modelId = customModelId,
                    let customModel = customProvider.models.first(where: { $0.id == modelId }) {
@@ -444,164 +415,22 @@ class ConversationService: ObservableObject {
                 
                 // Retrieve API key from keychain
                 if let apiKey = try? apiKeysStorage.getCustomProviderAPIKey(providerId: providerId), !apiKey.isEmpty {
-                    openaiCompatibleConfig = OpenAICompatible(
-                        apiKey: apiKey,
-                        baseUrl: customProvider.apiEndpoint
-                    )
-                    
-                    #if DEBUG
-                    print("[ConversationService] Custom Provider Config:")
-                    print("  Provider: \(customProvider.providerName)")
-                    print("  Model Code: \(modelCode ?? "none")")
-                    print("  Endpoint: \(customProvider.apiEndpoint)")
-                    print("  API Key: ✓ Retrieved (\(apiKey.count) chars)")
-                    #endif
-                } else {
-                    #if DEBUG
-                    print("[ConversationService] WARNING: Custom provider '\(customProvider.providerName)' selected but no API key found!")
-                    #endif
+                    customApiKey = apiKey
                 }
             }
         }
 
-        // Construct content payload (String or Array)
-        let contentPayload: AnyCodable
-        if attachments.isEmpty {
-            contentPayload = .string(content)
-        } else {
-            var parts: [AnyCodable] = []
-            
-            // Add text part if not empty
-            if !content.isEmpty {
-                parts.append(.object([
-                    "type": .string("text"),
-                    "text": .string(content)
-                ]))
-            }
-            
-            // Add attachment parts - flattened structure matching backend expectations
-            for attachment in attachments {
-                switch attachment.type {
-                case .image:
-                    if let base64 = attachment.base64 {
-                        // Backend expects: { type: "image_base64", media_type, data }
-                        parts.append(.object([
-                            "type": .string("image_base64"),
-                            "media_type": .string(attachment.mimeType ?? "image/jpeg"),
-                            "data": .string(base64)
-                        ]))
-                    } else if let url = attachment.url {
-                        // Backend expects: { type: "image_url", image_url: { url } }
-                        parts.append(.object([
-                            "type": .string("image_url"),
-                            "image_url": .object([
-                                "url": .string(url)
-                            ])
-                        ]))
-                    }
-                case .document:
-                    if let url = attachment.url {
-                        // Backend expects: { type: "file_url", file_url: { url, mime_type } }
-                        var fileUrlDict: [String: AnyCodable] = ["url": .string(url)]
-                        if let mimeType = attachment.mimeType {
-                            fileUrlDict["mime_type"] = .string(mimeType)
-                        }
-                        
-                        parts.append(.object([
-                            "type": .string("file_url"),
-                            "file_url": .object(fileUrlDict)
-                        ]))
-                    }
-                case .audio:
-                    if let base64 = attachment.base64 {
-                        // Backend expects: { type: "audio_base64", media_type, data }
-                        parts.append(.object([
-                            "type": .string("audio_base64"),
-                            "media_type": .string(attachment.mimeType ?? "audio/mp3"),
-                            "data": .string(base64)
-                        ]))
-                    } else if let url = attachment.url {
-                        // Backend expects: { type: "audio_url", audio_url: { url } }
-                        parts.append(.object([
-                            "type": .string("audio_url"),
-                            "audio_url": .object([
-                                "url": .string(url)
-                            ])
-                        ]))
-                    }
-                case .video:
-                    if let base64 = attachment.base64 {
-                        // Backend expects: { type: "video_base64", media_type, data }
-                        parts.append(.object([
-                            "type": .string("video_base64"),
-                            "media_type": .string(attachment.mimeType ?? "video/mp4"),
-                            "data": .string(base64)
-                        ]))
-                    } else if let url = attachment.url {
-                        // Backend expects: { type: "video_url", video_url: { url } }
-                        parts.append(.object([
-                            "type": .string("video_url"),
-                            "video_url": .object([
-                                "url": .string(url)
-                            ])
-                        ]))
-                    }
-                }
-            }
-            contentPayload = .array(parts)
-        }
-
-        let request = OrchestrateRequest(
-            conversationId: conversationId,
-            content: contentPayload,
+        let config = OrchestrationConfig(
             provider: providerString,
-            options: OrchestrateOptions(
-                createArtifacts: true,
-                saveMemories: true,
-                executeTools: false,
-                model: modelCode,
-                geminiTools: geminiTools
-            ),
-            anthropic: anthropicKey,
-            openai: openaiKey,
-            gemini: geminiKey,
-            grok: grokKey,
-            openaiCompatible: openaiCompatibleConfig
+            model: modelCode ?? modelId,
+            providerName: providerDisplayName,
+            anthropicKey: anthropicKey,
+            openaiKey: openaiKey,
+            geminiKey: geminiKey,
+            grokKey: grokKey,
+            customBaseUrl: customBaseUrl,
+            customApiKey: customApiKey
         )
-
-        #if DEBUG
-        print("[ConversationService] Request Body:")
-        print("  Provider: \(providerString)")
-        print("  ConversationId: \(conversationId)")
-        print("  Content Type: \(attachments.isEmpty ? "String" : "Array (\(attachments.count) attachments)")")
-        print("  API Keys in request body (top-level):")
-        print("    anthropic: \(request.anthropic != nil ? "✓ Included" : "✗ nil")")
-        print("    openai: \(request.openai != nil ? "✓ Included" : "✗ nil")")
-        print("    gemini: \(request.gemini != nil ? "✓ Included" : "✗ nil")")
-        print("    grok: \(request.grok != nil ? "✓ Included" : "✗ nil")")
-        print("    openaiCompatible: \(request.openaiCompatible != nil ? "✓ Included" : "✗ nil")")
-        #endif
-
-        // Prepare provider API key headers for orchestrator (backend may expect headers)
-        var providerHeaders: [String: String] = [:]
-        if let anthropicKey, !anthropicKey.isEmpty {
-            providerHeaders["X-Anthropic-Api-Key"] = anthropicKey
-        }
-        if let openaiKey, !openaiKey.isEmpty {
-            providerHeaders["X-OpenAI-Api-Key"] = openaiKey
-        }
-        if let geminiKey, !geminiKey.isEmpty {
-            providerHeaders["X-Gemini-Api-Key"] = geminiKey
-            #if DEBUG
-            print("[ConversationService] Added Gemini API key to headers: \(String(geminiKey.prefix(15)))...")
-            #endif
-        }
-        if let grokKey, !grokKey.isEmpty {
-            providerHeaders["X-Grok-Api-Key"] = grokKey
-            #if DEBUG
-            print("[ConversationService] Added Grok API key to headers: \(String(grokKey.prefix(15)))...")
-            #endif
-        }
 
         do {
             // Add user message optimistically
@@ -613,76 +442,30 @@ class ConversationService: ObservableObject {
             )
             messages.append(userMessage)
 
-            // Use the orchestrator - handles everything in one call
-            let response: OrchestrateResponse = try await apiClient.request(
-                endpoint: "/apiOrchestrate",
-                method: .post,
-                body: request,
-                headers: providerHeaders
+            // Select orchestrator
+            let orchestrator = getOrchestrator(settings: settings)
+            
+            // Call orchestrator
+            let (assistantMessage, memories) = try await orchestrator.sendMessage(
+                conversationId: conversationId,
+                content: content,
+                attachments: attachments,
+                geminiTools: geminiTools,
+                messages: messages, // Pass full history including the new user message
+                config: config
             )
 
-            // Replace optimistic message with actual user message
-            // Note: If the backend doesn't return attachments in the user message response,
-            // we might lose them here if we strictly replace.
-            // Ideally, the backend should echo them back.
-            // For now, we'll assume the backend response is authoritative but if attachments are missing
-            // in response, we might want to merge them back.
-            // However, let's trust the backend response for now or keep the local one if response lacks them.
+            // Replace optimistic message with actual user message (if needed, or just keep it)
+            // The orchestrator returns the assistant message.
+            // We assume the user message we created is fine.
             
-            var finalUserMessage = response.userMessage
-            if let index = messages.firstIndex(where: { $0.id == userMessage.id }) {
-                // If backend didn't return attachments but we sent them, preserve them locally
-                if (finalUserMessage.attachments == nil || finalUserMessage.attachments!.isEmpty) && !attachments.isEmpty {
-                    finalUserMessage = Message(
-                        id: finalUserMessage.id,
-                        conversationId: finalUserMessage.conversationId,
-                        role: finalUserMessage.role,
-                        content: finalUserMessage.content,
-                        timestamp: finalUserMessage.timestamp,
-                        tokens: finalUserMessage.tokens,
-                        artifacts: finalUserMessage.artifacts,
-                        toolCalls: finalUserMessage.toolCalls,
-                        isStreaming: finalUserMessage.isStreaming,
-                        modelName: finalUserMessage.modelName,
-                        providerName: finalUserMessage.providerName,
-                        attachments: attachments
-                    )
-                }
-                messages[index] = finalUserMessage
-            }
-
-            // Add AI assistant response with model metadata
-            var assistantMessage = response.assistantMessage
-            // If backend didn't provide model info, add it from our settings
-            if assistantMessage.modelName == nil || assistantMessage.providerName == nil {
-                assistantMessage = Message(
-                    id: assistantMessage.id,
-                    conversationId: assistantMessage.conversationId,
-                    role: assistantMessage.role,
-                    content: assistantMessage.content,
-                    timestamp: assistantMessage.timestamp,
-                    tokens: assistantMessage.tokens,
-                    artifacts: assistantMessage.artifacts,
-                    toolCalls: assistantMessage.toolCalls,
-                    isStreaming: assistantMessage.isStreaming,
-                    modelName: modelName,
-                    providerName: providerDisplayName
-                )
-            }
             messages.append(assistantMessage)
 
-            // Save both messages to Core Data immediately with preserved attachments
-            try await syncManager.saveMessagesToCoreData([finalUserMessage, assistantMessage], conversationId: conversationId)
+            // Save both messages to Core Data immediately
+            try await syncManager.saveMessagesToCoreData([userMessage, assistantMessage], conversationId: conversationId)
 
             // Process and save memories if any were created
-            if let memories = response.memories, !memories.isEmpty {
-                #if DEBUG
-                print("[ConversationService] 🧠 Orchestrator returned \(memories.count) memories")
-                for memory in memories {
-                    print("  - [\(memory.type.displayName)] \(memory.content.prefix(50))...")
-                }
-                #endif
-
+            if let memories = memories, !memories.isEmpty {
                 // Save memories to Core Data via MemorySyncManager
                 let memorySyncManager = MemorySyncManager.shared
                 try await memorySyncManager.saveMemoriesToCoreData(memories)
@@ -700,93 +483,87 @@ class ConversationService: ObservableObject {
             return assistantMessage
         } catch {
             // Remove optimistic message on error
-            messages.removeAll { $0.content == content && $0.role == .user }
+            messages.removeAll { $0.id == messages.last?.id && $0.role == .user }
             self.error = error.localizedDescription
             throw error
         }
     }
 
     func regenerateAssistantMessage(conversationId: String, messageId: String) async throws -> Message {
-        struct RegenerateRequest: Encodable {
-            let provider: String
-            let options: Options
-            let anthropic: String?
-            let openai: String?
-            let gemini: String?
-            let grok: String?
-
-            struct Options: Encodable {
-                let model: String?
-                let temperature: Double?
-                let maxTokens: Int?
-                let includeMemories: Bool
-                let replaceLastMessage: Bool
-                let projectId: String?
-            }
-        }
-
-        struct RegenerateResponse: Decodable {
-            let userMessage: Message?
-            let assistantMessage: Message
-            let conversationUpdated: Bool?
-            let metadata: AnyCodable?
-            let replacedMessageId: String?
-        }
-
         // Load provider from settings (fallback to anthropic)
+        // modelId is the API identifier (e.g., "claude-haiku-4-5-20251001")
+        // modelDisplayName is for UI display (e.g., "Claude Haiku 4.5")
         let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
-        var providerString = settings.defaultProvider.rawValue
+        var (providerString, modelId, modelDisplayName, providerDisplayName) = getProviderAndModel(for: conversationId, settings: settings)
         
         // Fix for Grok: map "xai" to "grok"
         if providerString == "xai" {
             providerString = "grok"
         }
-
-        // Try to include user-provided provider API keys (optional)
+        
+        // Get API keys
         let apiKeysStorage = APIKeysStorage.shared
         let anthropicKey = try? apiKeysStorage.getAPIKey(for: .anthropic)
         let openaiKey = try? apiKeysStorage.getAPIKey(for: .openai)
         let geminiKey = try? apiKeysStorage.getAPIKey(for: .gemini)
         let grokKey = try? apiKeysStorage.getAPIKey(for: .xai)
 
-        // Build request body per MD contract. We choose to replace the last assistant message by default.
-        let request = RegenerateRequest(
+        // Handle custom provider (simplified for regen, assuming same logic as sendMessage)
+        var customBaseUrl: String? = nil
+        var customApiKey: String? = nil
+        // For built-in providers, modelId is already the API identifier
+        var modelCode: String? = modelId
+        
+        if providerString == "openai-compatible" {
+             // ... (Same logic as sendMessage to get custom config)
+             // For brevity, we might want to extract this config creation logic
+             // But for now, we'll just use the basic settings if overrides aren't easily accessible without duplicating code
+             // Or we can rely on getProviderAndModel to give us the right provider/model, but we need the keys.
+             
+             // Re-implementing custom provider key fetch for regeneration:
+             if let customProviderId = settings.selectedCustomProviderId,
+                let customProvider = settings.customProviders.first(where: { $0.id == customProviderId }) {
+                 customBaseUrl = customProvider.apiEndpoint
+                 if let apiKey = try? apiKeysStorage.getCustomProviderAPIKey(providerId: customProviderId) {
+                     customApiKey = apiKey
+                 }
+                 if let modelId = settings.selectedCustomModelId,
+                    let customModel = customProvider.models.first(where: { $0.id == modelId }) {
+                     modelCode = customModel.modelCode
+                 }
+             }
+        }
+
+        let config = OrchestrationConfig(
             provider: providerString,
-            options: .init(
-                model: nil,
-                temperature: nil,
-                maxTokens: nil,
-                includeMemories: true,
-                replaceLastMessage: true,
-                projectId: defaultProjectId
-            ),
-            anthropic: anthropicKey,
-            openai: openaiKey,
-            gemini: geminiKey,
-            grok: grokKey
+            model: modelCode ?? modelId,
+            providerName: providerDisplayName,
+            anthropicKey: anthropicKey,
+            openaiKey: openaiKey,
+            geminiKey: geminiKey,
+            grokKey: grokKey,
+            customBaseUrl: customBaseUrl,
+            customApiKey: customApiKey
         )
 
         do {
-            // MD endpoint shape: /apiRegenerateMessage/<conversationId>/regenerate
-            let response: RegenerateResponse = try await apiClient.request(
-                endpoint: "/apiRegenerateMessage/\(conversationId)/regenerate",
-                method: .post,
-                body: request
+            let orchestrator = getOrchestrator(settings: settings)
+            
+            let newAssistant = try await orchestrator.regenerateAssistantMessage(
+                conversationId: conversationId,
+                messageId: messageId,
+                messages: messages,
+                config: config
             )
 
-            let newAssistant = response.assistantMessage
-
-            if let replacedId = response.replacedMessageId {
-                // Replace the old assistant message with the regenerated one
-                if let index = messages.firstIndex(where: { $0.id == replacedId }) {
-                    messages[index] = newAssistant
-                } else {
-                    // If we can't find it locally, append to ensure UI shows the new response
-                    messages.append(newAssistant)
-                }
+            // Update local state
+            // Logic depends on whether we replaced the message or appended
+            // The orchestrator returns the new message.
+            // We'll assume we replace the last assistant message if it matches messageId, or append.
+            
+            if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                messages[index] = newAssistant
             } else {
-                // Backend may have appended a new message (replaceLastMessage == false)
-                // In that case, just append the regenerated assistant message
                 messages.append(newAssistant)
             }
 
@@ -813,4 +590,3 @@ class ConversationService: ObservableObject {
         messages = []
     }
 }
-

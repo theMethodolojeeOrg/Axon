@@ -190,7 +190,25 @@ struct GeneralSettingsView: View {
                     )
                 }
             }
-            
+            // MARK: - Advanced Section
+
+            GeneralSettingsSection(title: "Advanced") {
+                SettingsToggleRow(
+                    title: "On-Device Orchestration",
+                    icon: "iphone.gen3",
+                    isOn: Binding(
+                        get: { viewModel.settings.useOnDeviceOrchestration },
+                        set: { newValue in
+                            Task {
+                                await viewModel.updateSetting(\.useOnDeviceOrchestration, newValue)
+                            }
+                        }
+                    )
+                )
+            }
+
+            // MARK: - Cloud Sync
+
             GeneralSettingsSection(title: "Cloud Sync") {
                 HStack(spacing: 12) {
                     Button(action: { Task { await viewModel.pushSettingsToCloud() } }) {

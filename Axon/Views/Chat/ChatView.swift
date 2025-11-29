@@ -12,6 +12,7 @@ import Combine
 import Foundation
 import PhotosUI
 import UniformTypeIdentifiers
+import MarkdownUI
 
 #if canImport(UIKit)
 import UIKit
@@ -28,7 +29,14 @@ fileprivate enum ModelProvider {
     case custom
 }
 
-fileprivate func provider(for modelName: String?) -> ModelProvider {
+fileprivate func provider(for modelName: String?, providerName: String? = nil) -> ModelProvider {
+    if let provider = providerName?.lowercased() {
+        if provider == "anthropic" { return .anthropic }
+        if provider == "openai" { return .openAI }
+        if provider == "gemini" || provider == "google" { return .google }
+        // Custom providers might use "openai-compatible" or other names
+    }
+
     guard let name = modelName?.lowercased() else { return .custom }
     if name.contains("claude") || name.contains("anthropic") { return .anthropic }
     if name.contains("gpt") || name.contains("openai") { return .openAI }
@@ -92,6 +100,7 @@ fileprivate struct ChatIconView: View {
 struct ChatView: View {
     @StateObject private var conversationService = ConversationService.shared
     @State private var messageText = ""
+    @State private var attachments: [MessageAttachment] = []
     @State private var useGeminiTools = false
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -100,57 +109,62 @@ struct ChatView: View {
     @State private var localMessages: [Message] = []
 
     let conversation: Conversation
+    
+    private var messagesList: some View {
+        ForEach(localMessages) { message in
+            MessageBubble(
+                message: message,
+                onCopy: { msg in
+                    #if canImport(UIKit)
+                    UIPasteboard.general.string = msg.content
+                    #elseif canImport(AppKit)
+                    let pb = NSPasteboard.general
+                    pb.clearContents()
+                    pb.setString(msg.content, forType: .string)
+                    #endif
+                },
+                onRegenerate: { msg in
+                    Task { await regenerate(message: msg) }
+                }
+            )
+            .id(message.id)
+        }
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
             VStack(spacing: 0) {
                 // Messages list
                 ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        ForEach(localMessages) { message in
-                            MessageBubble(
-                                message: message,
-                                onCopy: { msg in
-                                    #if canImport(UIKit)
-                                    UIPasteboard.general.string = msg.content
-                                    #elseif canImport(AppKit)
-                                    let pb = NSPasteboard.general
-                                    pb.clearContents()
-                                    pb.setString(msg.content, forType: .string)
-                                    #endif
-                                },
-                                onRegenerate: { msg in
-                                    Task { await regenerate(message: msg) }
-                                }
-                            )
-                            .id(message.id)
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            messagesList
+                        }
+                        .padding()
+                    }
+                    .refreshable {
+                        // Pull-to-refresh: Force refresh messages from API
+                        do {
+                            let refreshedMessages = try await conversationService.refreshMessages(conversationId: conversation.id)
+                            localMessages = refreshedMessages
+                        } catch {
+                            errorMessage = error.localizedDescription
+                            showingError = true
                         }
                     }
-                    .padding()
-                }
-                .refreshable {
-                    // Pull-to-refresh: Force refresh messages from API
-                    do {
-                        let refreshedMessages = try await conversationService.refreshMessages(conversationId: conversation.id)
-                        localMessages = refreshedMessages
-                    } catch {
-                        errorMessage = error.localizedDescription
-                        showingError = true
-                    }
-                }
-                .onChange(of: localMessages.count) { newValue, oldValue in
-                    if newValue != oldValue, let lastMessage = localMessages.last {
-                        withAnimation(AppAnimations.standardEasing) {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    .onChange(of: localMessages.count) { _ in
+                        if let lastMessage = localMessages.last {
+                            withAnimation(AppAnimations.standardEasing) {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
                         }
                     }
                 }
-            }
 
                 // Input area
                 MessageInputBar(
                     text: $messageText,
+                    attachments: $attachments,
                     useGeminiTools: $useGeminiTools,
                     isLoading: isLoading,
                     onSend: sendMessage
@@ -190,7 +204,7 @@ struct ChatView: View {
         .task {
             await loadMessages()
         }
-        .onChange(of: conversation.id) { _, newId in
+        .onChange(of: conversation.id) { _ in
             // Clear messages when conversation changes
             localMessages = []
             Task {
@@ -314,13 +328,53 @@ struct MessageBubble: View {
     private var isUser: Bool {
         message.role == .user
     }
+    
+    @ViewBuilder
+    private var contextMenuContent: some View {
+        Button(action: { onCopy(message) }) {
+            Label("Copy", systemImage: "doc.on.doc")
+        }
+        
+        if !isUser {
+            Button(action: { onRegenerate(message) }) {
+                Label("Regenerate", systemImage: "arrow.clockwise")
+            }
+            
+            if ttsService.hasGeneratedAudio(for: message.id) {
+                Button(action: {
+                    Task {
+                        do {
+                            try await ttsService.playGenerated(messageId: message.id)
+                        } catch {
+                            print("[TTS] Failed to play generated audio: \(error)")
+                        }
+                    }
+                }) {
+                    Label("Play Generated", systemImage: "play.circle.fill")
+                }
+            }
+            
+            Button(action: {
+                Task {
+                    do {
+                        let settings = SettingsViewModel.shared.settings
+                        try await ttsService.speak(text: message.content, settings: settings, messageId: message.id)
+                    } catch {
+                        print("[TTS] Failed to speak: \(error)")
+                    }
+                }
+            }) {
+                Label("Speak", systemImage: "speaker.wave.2.fill")
+            }
+        }
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             if !isUser {
                 // AI avatar with model label
                 VStack(spacing: 4) {
-                    ChatIconView(provider: provider(for: message.modelName), modelName: message.modelName)
+                    ChatIconView(provider: provider(for: message.modelName, providerName: message.providerName), modelName: message.modelName)
                         .frame(width: 32, height: 32)
 
                     // Model label
@@ -335,7 +389,9 @@ struct MessageBubble: View {
                 .frame(width: 60)
             }
 
-            VStack(alignment: isUser ? .trailing : .leading, spacing: 8) {
+            let bubbleAlignment: HorizontalAlignment = isUser ? .trailing : .leading
+            let frameAlignment: Alignment = isUser ? .trailing : .leading
+            VStack(alignment: bubbleAlignment, spacing: 8) {
                 let textToRender = overrideContent ?? message.content
 
                 // Attachments
@@ -373,15 +429,8 @@ struct MessageBubble: View {
                             .font(AppTypography.bodyMedium())
                             .foregroundColor(AppColors.textPrimary)
                     } else {
-                        if let attributed = try? AttributedString(markdown: textToRender) {
-                            Text(attributed)
-                                .font(AppTypography.bodyMedium())
-                                .foregroundColor(AppColors.textPrimary)
-                        } else {
-                            Text(textToRender)
-                                .font(AppTypography.bodyMedium())
-                                .foregroundColor(AppColors.textPrimary)
-                        }
+                        Markdown(textToRender)
+                            .markdownTheme(MarkdownTheme.axon)
                     }
                 }
                 .padding(12)
@@ -397,43 +446,7 @@ struct MessageBubble: View {
                         )
                 )
                 .contextMenu {
-                    Button(action: { onCopy(message) }) {
-                        Label("Copy", systemImage: "doc.on.doc")
-                    }
-                    if !isUser {
-                        Button(action: { onRegenerate(message) }) {
-                            Label("Regenerate", systemImage: "arrow.clockwise")
-                        }
-
-                        // Show "Play Generated" if audio exists for this message
-                        if ttsService.hasGeneratedAudio(for: message.id) {
-                            Button(action: {
-                                Task {
-                                    do {
-                                        try await ttsService.playGenerated(messageId: message.id)
-                                    } catch {
-                                        print("[TTS] Failed to play generated audio: \(error)")
-                                    }
-                                }
-                            }) {
-                                Label("Play Generated", systemImage: "play.circle.fill")
-                            }
-                        }
-
-                        Button(action: {
-                            Task {
-                                do {
-                                    // Use current app settings for TTS
-                                    let settings = SettingsViewModel.shared.settings
-                                    try await ttsService.speak(text: message.content, settings: settings, messageId: message.id)
-                                } catch {
-                                    print("[TTS] Failed to speak: \(error)")
-                                }
-                            }
-                        }) {
-                            Label("Speak", systemImage: "speaker.wave.2.fill")
-                        }
-                    }
+                    contextMenuContent
                 }
 
                 // Timestamp
@@ -441,7 +454,7 @@ struct MessageBubble: View {
                     .font(AppTypography.labelSmall())
                     .foregroundColor(AppColors.textTertiary)
             }
-            .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+            .frame(maxWidth: .infinity, alignment: frameAlignment)
 
             if isUser {
                 // User avatar
@@ -485,6 +498,16 @@ struct MessageInputBar: View {
         self.isLoading = isLoading
         self.onSend = onSend
         self.focus = focus
+    }
+    
+    @ViewBuilder
+    private var textFieldView: some View {
+        if let focus = focus {
+            TextField("Type a message...", text: $text, axis: .vertical)
+                .focused(focus)
+        } else {
+            TextField("Type a message...", text: $text, axis: .vertical)
+        }
     }
 
     var body: some View {
@@ -578,23 +601,16 @@ struct MessageInputBar: View {
                     }
 
                     // Text field
-                    Group {
-                        if let focus {
-                            TextField("Type a message...", text: $text, axis: .vertical)
-                                .focused(focus)
-                        } else {
-                            TextField("Type a message...", text: $text, axis: .vertical)
-                        }
-                    }
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .font(AppTypography.bodyMedium())
-                    .foregroundColor(AppColors.textPrimary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(AppColors.substrateTertiary)
-                    .cornerRadius(20)
-                    .disabled(isLoading)
-                    .lineLimit(1...5)
+                    textFieldView
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .font(AppTypography.bodyMedium())
+                        .foregroundColor(AppColors.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(AppColors.substrateTertiary)
+                        .cornerRadius(20)
+                        .disabled(isLoading)
+                        .lineLimit(1...5)
 
                     // Send button
                     Button(action: onSend) {

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import MarkdownUI
 
 enum MainView {
     case chat
@@ -348,45 +349,78 @@ struct ChatContainerView: View {
     private func existingChatView(conversation: Conversation) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 16) {
-                    ForEach(conversationService.messages) { message in
-                        MessageBubble(
-                            message: message,
-                            onCopy: { msg in
-                                #if canImport(UIKit)
-                                UIPasteboard.general.string = msg.content
-                                #elseif canImport(AppKit)
-                                let pb = NSPasteboard.general
-                                pb.clearContents()
-                                pb.setString(msg.content, forType: .string)
-                                #endif
-                            },
-                            onRegenerate: { msg in
-                                Task {
-                                    let convId = conversationService.currentConversation?.id ?? conversation.id
-                                    // removed guard let convId = convId else { return } because convId is non-optional
-                                    regeneratingMessageIds.insert(msg.id)
-                                    do {
-                                        let assistant = try await conversationService.regenerateAssistantMessage(
-                                            conversationId: convId,
-                                            messageId: msg.id
-                                        )
-                                        // Stream the regenerated assistant content
-                                        startPseudoStream(for: assistant) {
-                                            regeneratingMessageIds.remove(msg.id)
-                                        }
-                                    } catch {
-                                        regeneratingMessageIds.remove(msg.id)
-                                        print("Failed to regenerate: \(error)")
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(conversationService.messages.enumerated()), id: \.element.id) { index, message in
+                        VStack(spacing: 0) {
+                            // Add separator before assistant messages (except first message)
+                            if message.role == .assistant && index > 0 {
+                                MessageSeparator()
+                                    .padding(.vertical, 12)
+                            }
+                            
+                            // Render appropriate view based on role
+                            if message.role == .user {
+                                UserMessageView(
+                                    message: message,
+                                    onCopy: { msg in
+                                        #if canImport(UIKit)
+                                        UIPasteboard.general.string = msg.content
+                                        #elseif canImport(AppKit)
+                                        let pb = NSPasteboard.general
+                                        pb.clearContents()
+                                        pb.setString(msg.content, forType: .string)
+                                        #endif
                                     }
+                                )
+                                .padding(.vertical, 8)
+                            } else {
+                                AssistantMessageView(
+                                    message: message,
+                                    overrideContent: streamingOverrides[message.id],
+                                    onCopy: { msg in
+                                        #if canImport(UIKit)
+                                        UIPasteboard.general.string = msg.content
+                                        #elseif canImport(AppKit)
+                                        let pb = NSPasteboard.general
+                                        pb.clearContents()
+                                        pb.setString(msg.content, forType: .string)
+                                        #endif
+                                    },
+                                    onRegenerate: { msg in
+                                        Task {
+                                            let convId = conversationService.currentConversation?.id ?? conversation.id
+                                            regeneratingMessageIds.insert(msg.id)
+                                            do {
+                                                let assistant = try await conversationService.regenerateAssistantMessage(
+                                                    conversationId: convId,
+                                                    messageId: msg.id
+                                                )
+                                                // Stream the regenerated assistant content
+                                                startPseudoStream(for: assistant) {
+                                                    regeneratingMessageIds.remove(msg.id)
+                                                }
+                                            } catch {
+                                                regeneratingMessageIds.remove(msg.id)
+                                                print("Failed to regenerate: \(error)")
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                            
+                            // Add separator after assistant messages (before next user message)
+                            if message.role == .assistant && index < conversationService.messages.count - 1 {
+                                let nextMessage = conversationService.messages[index + 1]
+                                if nextMessage.role == .user {
+                                    MessageSeparator()
+                                        .padding(.vertical, 12)
                                 }
-                            },
-                            overrideContent: streamingOverrides[message.id]
-                        )
+                            }
+                        }
                         .id(message.id)
                     }
                 }
-                .padding()
+                .padding(.vertical)
             }
             .refreshable {
                 // Pull-to-refresh: Force refresh messages from API
@@ -460,10 +494,31 @@ struct ChatContainerView: View {
                 // Pseudo-stream the assistant content
                 startPseudoStream(for: assistant)
 
-                // Record an approximate input usage so the cost pill can tick up
-                // TODO: Replace with real token usage and provider/model values from ConversationService
-                let approxInputTokens = max(1, content.count / 4) // rough 4 chars per token heuristic
-                costService.recordUsage(provider: .anthropic, modelId: "claude-sonnet-4-5-20250929", inputTokens: approxInputTokens, outputTokens: 0)
+                // Record usage with actual provider/model from response
+                let inputTokens = max(1, content.count / 4)
+                let outputTokens = max(1, assistant.content.count / 4)
+                
+                // Map provider string to AIProvider
+                var provider: AIProvider? = AIProvider(rawValue: assistant.providerName ?? "")
+                if provider == nil {
+                    if assistant.providerName == "openai-compatible" {
+                        provider = .openai // Fallback for pricing
+                    } else if let name = assistant.providerName?.lowercased() {
+                        if name.contains("anthropic") { provider = .anthropic }
+                        else if name.contains("openai") { provider = .openai }
+                        else if name.contains("gemini") || name.contains("google") { provider = .gemini }
+                        else if name.contains("grok") || name.contains("xai") { provider = .xai }
+                    }
+                }
+                
+                if let provider = provider {
+                    costService.recordUsage(
+                        provider: provider,
+                        modelId: assistant.modelName ?? "unknown",
+                        inputTokens: inputTokens,
+                        outputTokens: outputTokens
+                    )
+                }
             } catch {
                 print("Error sending message: \(error.localizedDescription)")
             }

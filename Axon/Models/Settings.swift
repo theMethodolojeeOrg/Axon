@@ -21,6 +21,7 @@ struct AppSettings: Codable, Equatable, Sendable {
 
     var showArtifactsByDefault: Bool = true
     var enableKeyboardShortcuts: Bool = true
+    var useOnDeviceOrchestration: Bool = false
 
     // Account
     var firstName: String = ""
