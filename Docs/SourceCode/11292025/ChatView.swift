@@ -164,10 +164,12 @@ struct ChatView: View {
                 // Input area
                 MessageInputBar(
                     text: $messageText,
-                    attachments: $attachments,
+                    attachments: $selectedAttachments,
                     useGeminiTools: $useGeminiTools,
                     isLoading: isLoading,
-                    onSend: sendMessage
+                    onSend: sendMessage,
+                    focus: $isInputFocused,
+                    conversationId: conversation?.id
                 )
             }
 
@@ -255,10 +257,13 @@ struct ChatView: View {
     }
 
     private func sendMessage() {
-        guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let trimmed = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !(trimmed.isEmpty && attachments.isEmpty) else { return }
 
         let content = messageText
+        let attachmentsToSend = attachments
         messageText = ""
+        attachments = []
         isLoading = true
 
         Task {
@@ -266,6 +271,7 @@ struct ChatView: View {
                 _ = try await conversationService.sendMessage(
                     conversationId: conversation.id,
                     content: content,
+                    attachments: attachmentsToSend,
                     geminiTools: useGeminiTools
                 )
                 
@@ -279,6 +285,7 @@ struct ChatView: View {
                 showingError = true
                 // Restore the message text so user can retry
                 messageText = content
+                attachments = attachmentsToSend
             }
             isLoading = false
         }
@@ -483,6 +490,15 @@ struct MessageInputBar: View {
 
     @State private var selectedItem: PhotosPickerItem?
     @State private var showFileImporter = false
+    @State private var showPhotoPicker = false
+    
+    private let conversationId: String?
+
+    private struct AttachmentCapability {
+        let images: Bool
+        let documents: Bool
+        let description: String
+    }
 
     init(
         text: Binding<String>,
@@ -490,7 +506,8 @@ struct MessageInputBar: View {
         useGeminiTools: Binding<Bool> = .constant(false),
         isLoading: Bool,
         onSend: @escaping () -> Void,
-        focus: FocusState<Bool>.Binding? = nil
+        focus: FocusState<Bool>.Binding? = nil,
+        conversationId: String? = nil
     ) {
         self._text = text
         self._attachments = attachments
@@ -498,6 +515,44 @@ struct MessageInputBar: View {
         self.isLoading = isLoading
         self.onSend = onSend
         self.focus = focus
+        self.conversationId = conversationId
+    }
+    
+    private var attachmentCapability: AttachmentCapability {
+        let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
+        var providerString = settings.defaultProvider.rawValue
+        
+        if let conversationId = conversationId {
+            let overridesKey = "conversation_overrides_\(conversationId)"
+            if let data = UserDefaults.standard.data(forKey: overridesKey),
+               let overrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data) {
+                
+                if overrides.customProviderId != nil {
+                    providerString = "openai-compatible"
+                } else if let builtInProvider = overrides.builtInProvider {
+                    providerString = builtInProvider
+                }
+            } else if settings.selectedCustomProviderId != nil {
+                providerString = "openai-compatible"
+            }
+        } else if settings.selectedCustomProviderId != nil {
+            providerString = "openai-compatible"
+        }
+        
+        switch providerString {
+        case "anthropic":
+            return AttachmentCapability(images: true, documents: true, description: "Claude supports images and PDFs.")
+        case "gemini":
+            return AttachmentCapability(images: true, documents: true, description: "Gemini supports images and documents.")
+        case "openai":
+            return AttachmentCapability(images: true, documents: false, description: "GPT supports images only.")
+        case "grok":
+            return AttachmentCapability(images: true, documents: false, description: "Grok supports images only.")
+        case "openai-compatible":
+            return AttachmentCapability(images: true, documents: false, description: "Images supported; docs depend on the provider.")
+        default:
+            return AttachmentCapability(images: true, documents: false, description: "Images supported.")
+        }
     }
     
     @ViewBuilder
@@ -563,32 +618,49 @@ struct MessageInputBar: View {
 
             GlassCard(padding: 12) {
                 HStack(spacing: 12) {
+                    let capability = attachmentCapability
+
                     // Attachment Button
-                    Menu {
-                        Button(action: {
-                            // Trigger photo picker
-                            // This is handled by the PhotosPicker below, but we need a way to trigger it programmatically or use a label
-                        }) {
-                            Label("Photo Library", systemImage: "photo")
+                    Group {
+                        if capability.images {
+                            Menu {
+                                Button(action: { showPhotoPicker = true }) {
+                                    Label("Photo Library", systemImage: "photo")
+                                }
+                                
+                                if capability.documents {
+                                    Button(action: { showFileImporter = true }) {
+                                        Label("Document", systemImage: "doc")
+                                    }
+                                }
+                                
+                                Text(capability.description)
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                            } label: {
+                                Image(systemName: "paperclip")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(AppColors.textSecondary)
+                                    .frame(width: 32, height: 32)
+                            }
+                            .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
+                        } else if capability.documents {
+                            Menu {
+                                Button(action: { showFileImporter = true }) {
+                                    Label("Document", systemImage: "doc")
+                                }
+                                
+                                Text(capability.description)
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                            } label: {
+                                Image(systemName: "paperclip")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(AppColors.textSecondary)
+                                    .frame(width: 32, height: 32)
+                            }
                         }
-                        
-                        Button(action: {
-                            showFileImporter = true
-                        }) {
-                            Label("Document", systemImage: "doc")
-                        }
-                    } label: {
-                        Image(systemName: "paperclip")
-                            .font(.system(size: 20))
-                            .foregroundColor(AppColors.textSecondary)
-                            .frame(width: 32, height: 32)
                     }
-                    // PhotosPicker overlay for the menu item (workaround since Menu doesn't support PhotosPicker directly easily)
-                    .overlay(
-                        PhotosPicker(selection: $selectedItem, matching: .images) {
-                            Color.clear.frame(width: 32, height: 32)
-                        }
-                    )
 
                     // Gemini Tools Toggle
                     Button(action: { useGeminiTools.toggle() }) {
@@ -652,7 +724,7 @@ struct MessageInputBar: View {
         }
         .fileImporter(
             isPresented: $showFileImporter,
-            allowedContentTypes: [.pdf, .text, .image],
+            allowedContentTypes: attachmentCapability.documents ? [.pdf, .text, .image, .item] : [.item],
             allowsMultipleSelection: false
         ) { result in
             switch result {

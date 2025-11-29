@@ -54,12 +54,18 @@ class CloudConversationOrchestrator: ConversationOrchestrator {
                         ]))
                     }
                 case .document:
-                    if let url = attachment.url {
+                    if let base64 = attachment.base64 {
+                        parts.append(.object([
+                            "type": .string("file_base64"),
+                            "media_type": .string(attachment.mimeType ?? "application/pdf"),
+                            "data": .string(base64)
+                        ]))
+                    } else if let url = attachment.url {
                         var fileUrlDict: [String: AnyCodable] = ["url": .string(url)]
                         if let mimeType = attachment.mimeType {
                             fileUrlDict["mime_type"] = .string(mimeType)
                         }
-                        
+
                         parts.append(.object([
                             "type": .string("file_url"),
                             "file_url": .object(fileUrlDict)

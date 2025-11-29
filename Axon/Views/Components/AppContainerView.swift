@@ -233,7 +233,8 @@ struct ChatContainerView: View {
                     useGeminiTools: $useGeminiTools,
                     isLoading: isLoading,
                     onSend: sendMessage,
-                    focus: $isInputFocused
+                    focus: $isInputFocused,
+                    conversationId: conversation?.id
                 )
             }
             .overlay(alignment: .top) {

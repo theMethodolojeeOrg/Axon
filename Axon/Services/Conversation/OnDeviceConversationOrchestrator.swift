@@ -18,7 +18,14 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         config: OrchestrationConfig
     ) async throws -> (assistantMessage: Message, memories: [Memory]?) {
         
-        let systemPrompt = "You are Axon, a helpful AI assistant." // Could be configurable
+        // Combine default system prompt with any system-role messages in history
+        let mergedMessages = mergeLatestUserMessage(
+            messages,
+            conversationId: conversationId,
+            content: content,
+            attachments: attachments
+        )
+        let systemPrompt = buildSystemPrompt(base: "You are Axon, a helpful AI assistant.", messages: mergedMessages)
         
         // 1. Prepare context (history)
         // Convert internal Message format to provider-specific format
@@ -29,19 +36,40 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         switch config.provider {
         case "anthropic":
             guard let apiKey = config.anthropicKey else { throw APIError.unauthorized }
-            responseContent = try await callAnthropic(apiKey: apiKey, model: config.model, system: systemPrompt, messages: messages, newContent: content)
+            responseContent = try await callAnthropic(
+                apiKey: apiKey,
+                model: config.model,
+                system: systemPrompt,
+                messages: mergedMessages
+            )
             
         case "openai":
             guard let apiKey = config.openaiKey else { throw APIError.unauthorized }
-            responseContent = try await callOpenAI(apiKey: apiKey, model: config.model, system: systemPrompt, messages: messages, newContent: content)
+            responseContent = try await callOpenAI(
+                apiKey: apiKey,
+                model: config.model,
+                system: systemPrompt,
+                messages: mergedMessages
+            )
             
         case "gemini":
             guard let apiKey = config.geminiKey else { throw APIError.unauthorized }
-            responseContent = try await callGemini(apiKey: apiKey, model: config.model, system: systemPrompt, messages: messages, newContent: content)
+            responseContent = try await callGemini(
+                apiKey: apiKey,
+                model: config.model,
+                system: systemPrompt,
+                messages: mergedMessages
+            )
             
         case "openai-compatible":
              guard let apiKey = config.customApiKey, let baseUrl = config.customBaseUrl else { throw APIError.unauthorized }
-             responseContent = try await callOpenAICompatible(apiKey: apiKey, baseUrl: baseUrl, model: config.model, system: systemPrompt, messages: messages, newContent: content)
+             responseContent = try await callOpenAICompatible(
+                apiKey: apiKey,
+                baseUrl: baseUrl,
+                model: config.model,
+                system: systemPrompt,
+                messages: mergedMessages
+             )
             
         default:
             throw APIError.networkError("Provider \(config.provider) not supported in On-Device mode yet.")
@@ -87,7 +115,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     
     // MARK: - Provider Implementations
     
-    private func callAnthropic(apiKey: String, model: String, system: String, messages: [Message], newContent: String) async throws -> String {
+    private func callAnthropic(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
         let url = URL(string: "https://api.anthropic.com/v1/messages")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -97,17 +125,17 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         
         // Convert messages
         var apiMessages: [[String: Any]] = []
-        for msg in messages {
-            apiMessages.append(["role": msg.role.rawValue, "content": msg.content])
+        for msg in messages where msg.role != .system {
+            let role = msg.role == .assistant ? "assistant" : "user"
+            let contentBlocks = anthropicContentBlocks(for: msg)
+            apiMessages.append(["role": role, "content": contentBlocks])
         }
-        apiMessages.append(["role": "user", "content": newContent])
         
         let body: [String: Any] = [
             "model": model,
             "max_tokens": 4096,
-            "system": system,
             "messages": apiMessages
-        ]
+        ].merging(system.flatMap { ["system": $0] } ?? [:]) { $1 }
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         
@@ -132,11 +160,17 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         return decoded.content.first?.text ?? ""
     }
     
-    private func callOpenAI(apiKey: String, model: String, system: String, messages: [Message], newContent: String) async throws -> String {
-        return try await callOpenAICompatible(apiKey: apiKey, baseUrl: "https://api.openai.com/v1", model: model, system: system, messages: messages, newContent: newContent)
+    private func callOpenAI(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
+        return try await callOpenAICompatible(
+            apiKey: apiKey,
+            baseUrl: "https://api.openai.com/v1",
+            model: model,
+            system: system,
+            messages: messages
+        )
     }
     
-    private func callOpenAICompatible(apiKey: String, baseUrl: String, model: String, system: String, messages: [Message], newContent: String) async throws -> String {
+    private func callOpenAICompatible(apiKey: String, baseUrl: String, model: String, system: String?, messages: [Message]) async throws -> String {
         let url = URL(string: "\(baseUrl)/chat/completions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -144,11 +178,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         
         var apiMessages: [[String: Any]] = []
-        apiMessages.append(["role": "system", "content": system])
-        for msg in messages {
-            apiMessages.append(["role": msg.role.rawValue, "content": msg.content])
+        if let system = system, !system.isEmpty {
+            apiMessages.append(["role": "system", "content": system])
         }
-        apiMessages.append(["role": "user", "content": newContent])
+        for msg in messages where msg.role != .system {
+            let content = openAIContent(for: msg)
+            apiMessages.append(["role": msg.role.rawValue, "content": content])
+        }
         
         let body: [String: Any] = [
             "model": model,
@@ -180,7 +216,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         return decoded.choices.first?.message.content ?? ""
     }
     
-    private func callGemini(apiKey: String, model: String, system: String, messages: [Message], newContent: String) async throws -> String {
+    private func callGemini(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
         // Gemini API: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
         // Model name usually needs "models/" prefix or just the ID.
         // The app uses "gemini-2.5-flash" etc.
@@ -196,24 +232,18 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         // Gemini roles: "user", "model" (not "assistant")
         var contents: [[String: Any]] = []
         
-        for msg in messages {
+        for msg in messages where msg.role != .system {
             let role = msg.role == .user ? "user" : "model"
+            let parts = geminiParts(for: msg)
             contents.append([
                 "role": role,
-                "parts": [["text": msg.content]]
+                "parts": parts
             ])
         }
-        contents.append([
-            "role": "user",
-            "parts": [["text": newContent]]
-        ])
         
         let body: [String: Any] = [
-            "contents": contents,
-            "system_instruction": [
-                "parts": [["text": system]]
-            ]
-        ]
+            "contents": contents
+        ].merging(system.flatMap { ["system_instruction": ["parts": [["text": $0]]]] } ?? [:]) { $1 }
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         
@@ -241,5 +271,244 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         
         let decoded = try JSONDecoder().decode(GeminiResponse.self, from: data)
         return decoded.candidates?.first?.content.parts.first?.text ?? ""
+    }
+    
+    // MARK: - Helpers
+    
+    /// Ensures the latest user message includes attachments and avoids duplicating it in history.
+    private func mergeLatestUserMessage(_ messages: [Message], conversationId: String, content: String, attachments: [MessageAttachment]) -> [Message] {
+        guard let last = messages.last else {
+            if content.isEmpty && attachments.isEmpty { return messages }
+            return messages + [Message(conversationId: conversationId, role: .user, content: content, attachments: attachments)]
+        }
+        
+        var updated = messages
+        
+        if last.role == .user && last.content == content {
+            let lastAttachments = last.attachments ?? []
+            if lastAttachments.isEmpty && !attachments.isEmpty {
+                let amended = Message(
+                    id: last.id,
+                    conversationId: last.conversationId,
+                    role: last.role,
+                    content: last.content,
+                    timestamp: last.timestamp,
+                    tokens: last.tokens,
+                    artifacts: last.artifacts,
+                    toolCalls: last.toolCalls,
+                    isStreaming: last.isStreaming,
+                    modelName: last.modelName,
+                    providerName: last.providerName,
+                    attachments: attachments
+                )
+                updated[updated.count - 1] = amended
+            }
+            return updated
+        }
+        
+        if !content.isEmpty || !attachments.isEmpty {
+            let newMessage = Message(
+                conversationId: conversationId,
+                role: .user,
+                content: content,
+                attachments: attachments
+            )
+            updated.append(newMessage)
+        }
+        
+        return updated
+    }
+    
+    private func buildSystemPrompt(base: String, messages: [Message]) -> String? {
+        let systemMessages = messages
+            .filter { $0.role == .system }
+            .map { $0.content.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        
+        let parts = [base] + systemMessages
+        let combined = parts
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+        
+        return combined.isEmpty ? nil : combined
+    }
+    
+    private func anthropicContentBlocks(for message: Message) -> [[String: Any]] {
+        var blocks: [[String: Any]] = []
+        
+        let trimmedText = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedText.isEmpty {
+            blocks.append(["type": "text", "text": trimmedText])
+        }
+        
+        for attachment in message.attachments ?? [] {
+            switch attachment.type {
+            case .image:
+                if let block = anthropicMediaBlock(type: "image", attachment: attachment) {
+                    blocks.append(block)
+                }
+            case .document:
+                if let block = anthropicMediaBlock(type: "document", attachment: attachment) {
+                    blocks.append(block)
+                }
+            default:
+                continue
+            }
+        }
+        
+        if blocks.isEmpty {
+            blocks.append(["type": "text", "text": ""])
+        }
+        
+        return blocks
+    }
+    
+    private func anthropicMediaBlock(type: String, attachment: MessageAttachment) -> [String: Any]? {
+        if let base64 = attachment.base64 {
+            return [
+                "type": type,
+                "source": [
+                    "type": "base64",
+                    "media_type": resolvedMimeType(for: attachment),
+                    "data": base64
+                ]
+            ]
+        } else if let url = attachment.url {
+            return [
+                "type": type,
+                "source": [
+                    "type": "url",
+                    "url": url
+                ]
+            ]
+        }
+        return nil
+    }
+    
+    private func openAIContent(for message: Message) -> Any {
+        let attachments = message.attachments ?? []
+        if attachments.isEmpty {
+            return message.content
+        }
+        
+        var parts: [[String: Any]] = []
+        
+        let trimmedText = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedText.isEmpty {
+            parts.append(["type": "text", "text": trimmedText])
+        }
+        
+        for attachment in attachments {
+            guard attachment.type == .image else { continue }
+            
+            if let base64 = attachment.base64 {
+                let mimeType = resolvedMimeType(for: attachment)
+                parts.append([
+                    "type": "image_url",
+                    "image_url": [
+                        "url": "data:\(mimeType);base64,\(base64)",
+                        "detail": "high"
+                    ]
+                ])
+            } else if let url = attachment.url {
+                parts.append([
+                    "type": "image_url",
+                    "image_url": [
+                        "url": url,
+                        "detail": "high"
+                    ]
+                ])
+            }
+        }
+        
+        if parts.isEmpty {
+            return message.content
+        }
+        
+        return parts
+    }
+    
+    private func geminiParts(for message: Message) -> [[String: Any]] {
+        var parts: [[String: Any]] = []
+        let trimmedText = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedText.isEmpty {
+            parts.append(["text": trimmedText])
+        }
+        
+        for attachment in message.attachments ?? [] {
+            if let base64 = attachment.base64 {
+                parts.append([
+                    "inline_data": [
+                        "mime_type": resolvedMimeType(for: attachment),
+                        "data": base64
+                    ]
+                ])
+            } else if let url = attachment.url {
+                parts.append([
+                    "file_data": [
+                        "file_uri": url
+                    ]
+                ])
+            }
+        }
+        
+        if parts.isEmpty {
+            parts.append(["text": ""])
+        }
+        
+        return parts
+    }
+    
+    private func resolvedMimeType(for attachment: MessageAttachment) -> String {
+        if let mime = attachment.mimeType, mime.contains("/") {
+            return mime
+        }
+        
+        if let mime = attachment.mimeType?.lowercased() {
+            switch mime {
+            case "jpg", "jpeg": return "image/jpeg"
+            case "png": return "image/png"
+            case "gif": return "image/gif"
+            case "webp": return "image/webp"
+            case "pdf": return "application/pdf"
+            case "txt", "text": return "text/plain"
+            case "mp3", "mpeg", "mpga": return "audio/mpeg"
+            case "wav": return "audio/wav"
+            case "aac": return "audio/aac"
+            case "flac": return "audio/flac"
+            case "ogg": return "audio/ogg"
+            case "mp4": return "video/mp4"
+            case "mov": return "video/quicktime"
+            default: break
+            }
+        }
+        
+        if let name = attachment.name?.lowercased() {
+            let ext = (name as NSString).pathExtension
+            switch ext {
+            case "jpg", "jpeg": return "image/jpeg"
+            case "png": return "image/png"
+            case "gif": return "image/gif"
+            case "webp": return "image/webp"
+            case "pdf": return "application/pdf"
+            case "txt": return "text/plain"
+            case "mp3", "mpeg", "mpga": return "audio/mpeg"
+            case "wav": return "audio/wav"
+            case "aac": return "audio/aac"
+            case "flac": return "audio/flac"
+            case "ogg": return "audio/ogg"
+            case "mp4", "m4v": return "video/mp4"
+            case "mov": return "video/quicktime"
+            default: break
+            }
+        }
+        
+        switch attachment.type {
+        case .image: return "image/jpeg"
+        case .document: return "application/octet-stream"
+        case .audio: return "audio/mpeg"
+        case .video: return "video/mp4"
+        }
     }
 }

@@ -53,7 +53,11 @@ struct ConversationListView: View {
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(conversationService.conversations) { conversation in
-                                NavigationLink(destination: ChatView(conversation: conversation)) {
+                                NavigationLink(destination: ChatContainerView(
+                                    conversation: conversation,
+                                    onNewChat: {},
+                                    onConversationCreated: { _ in }
+                                )) {
                                     ConversationRow(conversation: conversation)
                                 }
                                 .buttonStyle(PlainButtonStyle())
