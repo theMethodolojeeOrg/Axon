@@ -12,82 +12,108 @@ struct AudioPlayerView: View {
 
     var body: some View {
         VStack {
-            if let messageId = ttsService.currentMessageId {
+            if ttsService.isGenerating || ttsService.currentMessageId != nil {
                 HStack(spacing: 16) {
-                    // Play/Pause button
-                    Button(action: {
-                        if ttsService.isPlaying {
-                            ttsService.pause()
-                        } else {
-                            ttsService.resume()
-                        }
-                    }) {
+                    if ttsService.isGenerating {
                         ZStack {
                             Circle()
                                 .fill(
                                     LinearGradient(
-                                        colors: [AppColors.signalMercury, AppColors.signalMercury.opacity(0.8)],
+                                        colors: [AppColors.signalMercury.opacity(0.2), AppColors.signalMercury.opacity(0.15)],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     )
                                 )
                                 .frame(width: 44, height: 44)
-                                .shadow(color: AppColors.signalMercury.opacity(0.3), radius: 8, x: 0, y: 4)
-                            
-                            Image(systemName: ttsService.isPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(AppColors.substratePrimary)
+
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: AppColors.signalMercury))
                         }
-                    }
-                    .buttonStyle(ScaleButtonStyle())
 
-                    // Time and progress
-                    VStack(spacing: 6) {
-                        // Progress slider
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                // Background track
-                                Capsule()
-                                    .fill(AppColors.textTertiary.opacity(0.2))
-                                    .frame(height: 6)
-
-                                // Progress track
-                                Capsule()
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Generating audio…")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+                            Text("Hang tight while we prepare playback")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                    } else {
+                        // Play/Pause button
+                        Button(action: {
+                            if ttsService.isPlaying {
+                                ttsService.pause()
+                            } else {
+                                ttsService.resume()
+                            }
+                        }) {
+                            ZStack {
+                                Circle()
                                     .fill(
                                         LinearGradient(
-                                            colors: [AppColors.signalMercury, AppColors.signalMercury.opacity(0.7)],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
+                                            colors: [AppColors.signalMercury, AppColors.signalMercury.opacity(0.8)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
                                         )
                                     )
-                                    .frame(width: max(0, min(geometry.size.width * CGFloat(ttsService.currentTime / max(ttsService.duration, 0.1)), geometry.size.width)), height: 6)
+                                    .frame(width: 44, height: 44)
+                                    .shadow(color: AppColors.signalMercury.opacity(0.3), radius: 8, x: 0, y: 4)
+                                
+                                Image(systemName: ttsService.isPlaying ? "pause.fill" : "play.fill")
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundColor(AppColors.substratePrimary)
                             }
-                            .gesture(
-                                DragGesture(minimumDistance: 0)
-                                    .onChanged { value in
-                                        let percentage = value.location.x / geometry.size.width
-                                        let newTime = min(max(0, percentage * ttsService.duration), ttsService.duration)
-                                        ttsService.seek(to: newTime)
-                                    }
-                            )
                         }
-                        .frame(height: 6)
+                        .buttonStyle(ScaleButtonStyle())
 
-                        // Time labels
-                        HStack {
-                            Text(formatTime(ttsService.currentTime))
-                                .font(AppTypography.labelSmall().monospacedDigit())
-                                .foregroundColor(AppColors.textSecondary)
+                        // Time and progress
+                        VStack(spacing: 6) {
+                            // Progress slider
+                            GeometryReader { geometry in
+                                ZStack(alignment: .leading) {
+                                    // Background track
+                                    Capsule()
+                                        .fill(AppColors.textTertiary.opacity(0.2))
+                                        .frame(height: 6)
 
-                            Spacer()
+                                    // Progress track
+                                    Capsule()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [AppColors.signalMercury, AppColors.signalMercury.opacity(0.7)],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                        .frame(width: max(0, min(geometry.size.width * CGFloat(ttsService.currentTime / max(ttsService.duration, 0.1)), geometry.size.width)), height: 6)
+                                }
+                                .gesture(
+                                    DragGesture(minimumDistance: 0)
+                                        .onChanged { value in
+                                            let percentage = value.location.x / geometry.size.width
+                                            let newTime = min(max(0, percentage * ttsService.duration), ttsService.duration)
+                                            ttsService.seek(to: newTime)
+                                        }
+                                )
+                            }
+                            .frame(height: 6)
 
-                            Text(formatTime(ttsService.duration))
-                                .font(AppTypography.labelSmall().monospacedDigit())
-                                .foregroundColor(AppColors.textSecondary)
+                            // Time labels
+                            HStack {
+                                Text(formatTime(ttsService.currentTime))
+                                    .font(AppTypography.labelSmall().monospacedDigit())
+                                    .foregroundColor(AppColors.textSecondary)
+
+                                Spacer()
+
+                                Text(formatTime(ttsService.duration))
+                                    .font(AppTypography.labelSmall().monospacedDigit())
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
                         }
                     }
 
-                    // Close button
+                    // Close button (available during loading and playback)
                     Button(action: {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             ttsService.stop()
@@ -120,6 +146,7 @@ struct AudioPlayerView: View {
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: ttsService.currentMessageId)
         .animation(.easeInOut(duration: 0.2), value: ttsService.isPlaying)
+        .animation(.easeInOut(duration: 0.2), value: ttsService.isGenerating)
     }
 
     private func formatTime(_ time: TimeInterval) -> String {

@@ -14,6 +14,7 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
     private var player: AVAudioPlayer?
 
     @Published var isPlaying = false
+    @Published var isGenerating = false
     @Published var currentTime: TimeInterval = 0
     @Published var duration: TimeInterval = 0
     @Published var currentMessageId: String?
@@ -25,6 +26,7 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
             hasCachedAudio = !audioCache.isEmpty
         }
     }
+    private var generationToken: UUID?
 
     // Timer for updating playback position
     private var playbackTimer: Timer?
@@ -61,9 +63,11 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         player?.stop()
         player = nil
         isPlaying = false
+        isGenerating = false
         currentMessageId = nil
         currentTime = 0
         duration = 0
+        generationToken = nil
     }
 
     func pause() {
@@ -173,6 +177,15 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
             throw NSError(domain: "TTSPlaybackService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No voice selected in TTS settings. Please select a voice in Settings > Text-to-Speech."])
         }
 
+        // Prime UI state so the player can show a loading indicator while we fetch audio
+        isGenerating = true
+        isPlaying = false
+        currentMessageId = messageId
+        currentTime = 0
+        duration = 0
+        let token = UUID()
+        generationToken = token
+
         print("[TTSPlaybackService] Using voice ID: \(voiceId)")
         print("[TTSPlaybackService] Using voice name: \(settings.ttsSettings.selectedVoiceName ?? "unknown")")
         print("[TTSPlaybackService] Using model: \(settings.ttsSettings.model.rawValue)")
@@ -185,24 +198,45 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
             useSpeakerBoost: vs.useSpeakerBoost
         )
 
-        print("[TTSPlaybackService] Requesting audio generation from ElevenLabs...")
-        let audioData = try await ElevenLabsService.shared.generateTTSBase64(
-            text: text,
-            voiceId: voiceId,
-            model: settings.ttsSettings.model.rawValue,
-            format: settings.ttsSettings.outputFormat.rawValue,
-            voiceSettings: payload
-        )
+        do {
+            print("[TTSPlaybackService] Requesting audio generation from ElevenLabs...")
+            let audioData = try await ElevenLabsService.shared.generateTTSBase64(
+                text: text,
+                voiceId: voiceId,
+                model: settings.ttsSettings.model.rawValue,
+                format: settings.ttsSettings.outputFormat.rawValue,
+                voiceSettings: payload
+            )
 
-        print("[TTSPlaybackService] Received audio data: \(audioData.count) bytes")
+            print("[TTSPlaybackService] Received audio data: \(audioData.count) bytes")
 
-        // Cache the audio if we have a message ID
-        if let messageId = messageId {
-            cacheAudio(audioData, for: messageId)
+            // Cache the audio if we have a message ID
+            if let messageId = messageId {
+                cacheAudio(audioData, for: messageId)
+            }
+
+            // Switch UI from generating to playback
+            isGenerating = false
+
+            // If generation was cancelled mid-flight, skip playback
+            guard generationToken == token else {
+                print("[TTSPlaybackService] Generation cancelled; skipping playback")
+                return
+            }
+            generationToken = nil
+
+            // Play the audio
+            try await playAudio(audioData, messageId: messageId)
+        } catch {
+            isGenerating = false
+            if generationToken == token {
+                generationToken = nil
+            }
+            if !isPlaying {
+                currentMessageId = nil
+            }
+            throw error
         }
-
-        // Play the audio
-        try await playAudio(audioData, messageId: messageId)
     }
 
     func playGenerated(messageId: String) async throws {

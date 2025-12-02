@@ -174,6 +174,29 @@ struct TTSSettingsView: View {
                         )
                     }
                     .pickerStyle(.menu)
+
+                    // Manual refresh for voices/models so we don't auto-fetch on every view load
+                    Button(action: {
+                        Task {
+                            await viewModel.refreshElevenLabsCatalog()
+                        }
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundColor(AppColors.textSecondary)
+                            Text("Refresh Voices & Models")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(AppColors.substrateSecondary)
+                        )
+                    }
+                    .disabled(!viewModel.isTTSConfigured)
                 }
             }
 
@@ -343,12 +366,6 @@ struct TTSSettingsView: View {
         }
         .refreshable {
             await viewModel.refreshElevenLabsCatalog()
-        }
-        .task {
-            // Only fetch if we don't have cached voices
-            if viewModel.availableVoices.isEmpty {
-                await viewModel.refreshElevenLabsCatalog()
-            }
         }
     }
 }

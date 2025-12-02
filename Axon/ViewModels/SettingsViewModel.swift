@@ -146,10 +146,11 @@ class SettingsViewModel: ObservableObject {
         _ keyPath: WritableKeyPath<TTSSettings, T>,
         _ value: T
     ) async {
-        guard settings.ttsSettings[keyPath: keyPath] != value else { return }
+        var updated = settings.ttsSettings
+        guard updated[keyPath: keyPath] != value else { return }
 
-        settings.ttsSettings[keyPath: keyPath] = value
-        await updateSetting(\.ttsSettings, settings.ttsSettings)
+        updated[keyPath: keyPath] = value
+        await updateSetting(\.ttsSettings, updated)
     }
     
     func refreshElevenLabsCatalog() async {
@@ -212,9 +213,10 @@ class SettingsViewModel: ObservableObject {
     
     func updateSelectedVoice(id: String?, name: String?) async {
         print("[SettingsViewModel] Updating selected voice to: \(name ?? "nil") (ID: \(id ?? "nil"))")
-        settings.ttsSettings.selectedVoiceId = id
-        settings.ttsSettings.selectedVoiceName = name
-        await updateSetting(\.ttsSettings, settings.ttsSettings)
+        var updated = settings.ttsSettings
+        updated.selectedVoiceId = id
+        updated.selectedVoiceName = name
+        await updateSetting(\.ttsSettings, updated)
         print("[SettingsViewModel] Voice selection saved. Current settings - Voice ID: \(settings.ttsSettings.selectedVoiceId ?? "nil"), Voice Name: \(settings.ttsSettings.selectedVoiceName ?? "nil")")
     }
 
