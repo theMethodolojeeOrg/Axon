@@ -76,6 +76,10 @@ struct AppSettings: Codable, Equatable, Sendable {
     // Onboarding
     var hasCompletedOnboarding: Bool = false
 
+    // Backend Configuration (optional - for cloud features)
+    var backendAPIURL: String? = nil  // e.g., "https://us-central1-your-project.cloudfunctions.net"
+    var backendAuthToken: String? = nil  // Optional auth token for backend (stored in Keychain separately)
+
     // Metadata
     var version: Int = 1
     var lastUpdated: Date = Date()

@@ -80,7 +80,7 @@ private struct LaunchScreenContent: View {
             // Layer 3: Copyright text on top of everything
             VStack {
                 Spacer()
-                Text("Axon by NeurX.org ©2025")
+                Text("Axon by NeurX.org, MIT 2025")
                     .font(.system(size: 14, weight: .regular, design: .default))
                     .italic()
                     .foregroundColor(.white)

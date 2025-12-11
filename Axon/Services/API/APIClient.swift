@@ -2,27 +2,26 @@
 //  APIClient.swift
 //  Axon
 //
-//  REST API Client with Firebase Auth integration
+//  REST API Client with optional backend support
+//  Works with user-configured backend or Firebase
 //
 
 import Foundation
 import Combine
-import FirebaseCore
-import FirebaseAuth
 
 @MainActor
 class APIClient: ObservableObject {
     static let shared = APIClient()
 
     private let session: URLSession
-    private let config = FirebaseConfig.shared
+    private var backendConfig: BackendConfig { BackendConfig.shared }
 
     @Published var isLoading = false
     @Published var error: APIError?
 
-    private var authService: AuthenticationService { AuthenticationService.shared }
     private var tokenStorage: SecureTokenStorage { SecureTokenStorage.shared }
     private var apiKeysStorage: APIKeysStorage { APIKeysStorage.shared }
+    private var settingsStorage: SettingsStorage { SettingsStorage.shared }
 
     init() {
         let configuration = URLSessionConfiguration.default
@@ -34,6 +33,13 @@ class APIClient: ObservableObject {
         self.session = URLSession(configuration: configuration)
     }
 
+    // MARK: - Backend Availability
+
+    /// Check if backend is configured before making requests
+    var isBackendConfigured: Bool {
+        backendConfig.isBackendConfigured
+    }
+
     // MARK: - Generic Request Method
 
     func request<T: Decodable>(
@@ -42,6 +48,11 @@ class APIClient: ObservableObject {
         body: Encodable? = nil,
         headers: [String: String]? = nil
     ) async throws -> T {
+        // Check if backend is configured
+        guard let baseURL = backendConfig.apiURL else {
+            throw APIError.backendNotConfigured
+        }
+
         isLoading = true
         error = nil
         defer { isLoading = false }
@@ -52,7 +63,7 @@ class APIClient: ObservableObject {
         let existingQuery = components.count > 1 ? String(components[1]) : nil
 
         guard var urlComponents = URLComponents(
-            url: config.environment.apiURL.appendingPathComponent(path),
+            url: baseURL.appendingPathComponent(path),
             resolvingAgainstBaseURL: false
         ) else {
             throw APIError.invalidURL
@@ -98,8 +109,12 @@ class APIClient: ObservableObject {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = method.rawValue
 
-        // Add Firebase ID token
-        if let token = authService.authToken {
+        // Add auth token if configured (from settings or Keychain)
+        if let settings = settingsStorage.loadSettings(),
+           let token = settings.backendAuthToken, !token.isEmpty {
+            urlRequest.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        } else if let token = try? tokenStorage.getIdToken() {
+            // Fallback to stored token for backward compatibility
             urlRequest.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
@@ -180,10 +195,9 @@ class APIClient: ObservableObject {
                 }
 
             case 401:
-                // Token expired, refresh and retry
-                print("[APIClient] Token expired, refreshing...")
-                _ = try await authService.refreshToken()
-                return try await request(endpoint: endpoint, method: method, body: body, headers: headers)
+                // Token expired or invalid
+                print("[APIClient] Unauthorized (401) - check backend auth token")
+                throw APIError.unauthorized
 
             case 403:
                 throw APIError.forbidden
@@ -288,6 +302,7 @@ enum APIError: LocalizedError {
     case networkError(String)
     case decodingError(String)
     case tokenRefreshFailed
+    case backendNotConfigured
 
     var errorDescription: String? {
         switch self {
@@ -313,6 +328,8 @@ enum APIError: LocalizedError {
             return "Decoding error: \(message)"
         case .tokenRefreshFailed:
             return "Failed to refresh authentication token"
+        case .backendNotConfigured:
+            return "No backend configured. Set a backend URL in Settings to enable cloud features."
         }
     }
 }

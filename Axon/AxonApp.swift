@@ -8,14 +8,10 @@
 import SwiftUI
 import CoreData
 import Combine
-import FirebaseCore
-import FirebaseAuth
-import FirebaseFirestore
 
 @main
 struct AxonApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var authService = AuthenticationService.shared
     @StateObject private var settingsViewModel = SettingsViewModel.shared
     @StateObject private var biometricService = BiometricAuthService.shared
     @Environment(\.scenePhase) private var scenePhase
@@ -37,17 +33,16 @@ struct AxonApp: App {
         WindowGroup {
             ZStack {
                 // Main app (underneath)
+                // Local-first: No auth required. Go straight to app after onboarding.
                 if !showLaunchScreen {
                     if !settingsViewModel.settings.hasCompletedOnboarding {
                         OnboardingView {
                             // Callback triggers view refresh via @Published settings
                         }
                         .opacity(mainAppOpacity)
-                    } else if authService.isAuthenticated {
-                        AppContainerView()
-                            .opacity(mainAppOpacity)
                     } else {
-                        AuthenticationView()
+                        // Local-first mode: Go directly to app
+                        AppContainerView()
                             .opacity(mainAppOpacity)
                     }
                 }
@@ -157,43 +152,18 @@ struct AxonApp: App {
     }
 }
 
-// MARK: - App Delegate for Firebase
+// MARK: - App Delegate
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        // Initialize Firebase
-        FirebaseApp.configure()
-
+        // Local-first mode: Firebase is optional
+        // Firebase will only be initialized if user configures a backend that uses it
         #if DEBUG
-        print("[AppDelegate] Firebase configured in DEBUG mode")
-        // Note: Emulator configuration can be enabled in FirebaseConfig
-        #else
-        print("[AppDelegate] Firebase configured in PRODUCTION mode")
+        print("[AppDelegate] Axon starting in local-first mode")
         #endif
-
-        // Configure Firestore settings with cache options compatible across SDK versions
-        let firestore = Firestore.firestore()
-        let settings = firestore.settings
-
-        // Prefer an in-memory cache with an explicit size if supported; otherwise, fall back to persistent cache
-        if let MemoryCacheSettingsType = NSClassFromString("FIRMemoryCacheSettings") as? NSObject.Type,
-           let memoryCache = MemoryCacheSettingsType.init() as? NSObject {
-            // Use KVC to set sizeBytes if available to avoid compile-time symbol dependency
-            let desiredSize = 40 * 1024 * 1024 // 40 MB
-            if memoryCache.responds(to: Selector(("setSizeBytes:"))) {
-                memoryCache.setValue(desiredSize, forKey: "sizeBytes")
-            }
-            settings.setValue(memoryCache, forKey: "cacheSettings")
-        } else {
-            // Fallback to persistent cache with default settings
-            let persistentCache = PersistentCacheSettings()
-            settings.cacheSettings = persistentCache
-        }
-
-        firestore.settings = settings
 
         // Start API server if enabled in settings
         Task { @MainActor in

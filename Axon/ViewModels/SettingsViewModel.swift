@@ -7,8 +7,6 @@
 
 import SwiftUI
 import Combine
-import FirebaseAuth
-import FirebaseFirestore
 
 @MainActor
 class SettingsViewModel: ObservableObject {
@@ -32,7 +30,6 @@ class SettingsViewModel: ObservableObject {
 
     private let storageService = SettingsStorage.shared
     private let apiKeysStorage = APIKeysStorage.shared
-    private let authService = AuthenticationService.shared
     private let apiServer = APIServer.shared
     private let iCloudSync = iCloudKeyValueSync.shared
     private var cancellables = Set<AnyCancellable>()
@@ -441,6 +438,22 @@ class SettingsViewModel: ObservableObject {
     private func generateRandomPassword(length: Int = 24) -> String {
         let characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         return String((0..<length).compactMap { _ in characters.randomElement() })
+    }
+
+    // MARK: - Backend Settings
+
+    func updateBackendURL(_ url: String?) async {
+        await updateSetting(\.backendAPIURL, url)
+        if url != nil {
+            showSuccessMessage("Backend URL saved")
+        } else {
+            showSuccessMessage("Backend URL cleared - running in local-only mode")
+        }
+    }
+
+    func updateBackendAuthToken(_ token: String?) async {
+        await updateSetting(\.backendAuthToken, token)
+        showSuccessMessage("Auth token updated")
     }
 
     // MARK: - Messages

@@ -9,24 +9,11 @@ import SwiftUI
 
 struct SettingsTabView: View {
     @EnvironmentObject var viewModel: SettingsViewModel
-    @StateObject private var authService = AuthenticationService.shared
     @State private var selectedTab: SettingsTab = .general
 
-    /// Authorized developer email for dev tools
-    private let authorizedDeveloperEmail = "oury.tom@gmail.com"
-
-    /// Check if current user is authorized developer
-    private var isAuthorizedDeveloper: Bool {
-        authService.userEmail?.lowercased() == authorizedDeveloperEmail.lowercased()
-    }
-
-    /// Available tabs (includes developer tab only for authorized users)
+    /// Available tabs - developer tab available to everyone in local-first mode
     private var availableTabs: [SettingsTab] {
-        var tabs = SettingsTab.allCases.filter { $0 != .developer }
-        if isAuthorizedDeveloper {
-            tabs.append(.developer)
-        }
-        return tabs
+        SettingsTab.allCases
     }
 
     enum SettingsTab: String, CaseIterable, Identifiable {
@@ -37,8 +24,8 @@ struct SettingsTabView: View {
         case memory = "Memory"
         case security = "Security"
         case server = "API Server"
+        case backend = "Backend"
         case tts = "TTS"
-        case account = "Account"
         case archived = "Archived"
         case developer = "Developer"
 
@@ -53,8 +40,8 @@ struct SettingsTabView: View {
             case .memory: return "AxonLogoTemplate"
             case .security: return "lock.shield.fill"
             case .server: return "network"
+            case .backend: return "server.rack"
             case .tts: return "waveform.circle.fill"
-            case .account: return "person.crop.circle.fill"
             case .archived: return "archivebox.fill"
             case .developer: return "hammer.fill"
             }
@@ -103,10 +90,10 @@ struct SettingsTabView: View {
                         SecuritySettingsView(viewModel: viewModel)
                     case .server:
                         ServerSettingsView(viewModel: viewModel)
+                    case .backend:
+                        BackendSettingsView(viewModel: viewModel)
                     case .tts:
                         TTSSettingsView(viewModel: viewModel)
-                    case .account:
-                        AccountSettingsView(viewModel: viewModel)
                     case .archived:
                         ArchivedConversationsSettingsView(viewModel: viewModel)
                     case .developer:

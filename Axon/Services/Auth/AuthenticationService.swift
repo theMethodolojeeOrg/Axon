@@ -2,7 +2,8 @@
 //  AuthenticationService.swift
 //  Axon
 //
-//  Firebase Authentication Service
+//  Authentication Service (Optional - only active if backend is configured)
+//  In local-first mode, this service is dormant and all auth methods are no-ops
 //
 
 import SwiftUI
@@ -22,14 +23,40 @@ class AuthenticationService: NSObject, ObservableObject {
 
     private var authStateHandle: AuthStateDidChangeListenerHandle?
 
+    /// Whether Firebase has been initialized
+    private var isFirebaseInitialized = false
+
+    /// Check if auth service is available (Firebase initialized)
+    var isAvailable: Bool { isFirebaseInitialized }
+
     override private init() {
         super.init()
+        // Don't setup Firebase listener on init - wait until explicitly needed
+        // This allows the app to run without Firebase configured
+    }
+
+    // MARK: - Firebase Initialization (Lazy)
+
+    /// Initialize Firebase if not already done
+    /// Call this only when user explicitly wants to use cloud features
+    func initializeFirebaseIfNeeded() {
+        guard !isFirebaseInitialized else { return }
+
+        // Check if Firebase is already configured
+        if FirebaseApp.app() == nil {
+            FirebaseApp.configure()
+            print("[AuthService] Firebase configured")
+        }
+
+        isFirebaseInitialized = true
         setupAuthStateListener()
     }
 
     // MARK: - Setup
 
     private func setupAuthStateListener() {
+        guard isFirebaseInitialized else { return }
+
         authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             Task { @MainActor in
                 self?.user = user
@@ -55,6 +82,10 @@ class AuthenticationService: NSObject, ObservableObject {
     // MARK: - Sign Up
 
     func signUp(email: String, password: String, displayName: String) async throws {
+        guard isFirebaseInitialized else {
+            throw AuthError.notAuthenticated
+        }
+
         isLoading = true
         error = nil
         defer { isLoading = false }
@@ -83,6 +114,10 @@ class AuthenticationService: NSObject, ObservableObject {
     // MARK: - Sign In
 
     func signIn(email: String, password: String) async throws {
+        guard isFirebaseInitialized else {
+            throw AuthError.notAuthenticated
+        }
+
         isLoading = true
         error = nil
         defer { isLoading = false }
@@ -112,6 +147,8 @@ class AuthenticationService: NSObject, ObservableObject {
     // MARK: - Sign Out
 
     func signOut() throws {
+        guard isFirebaseInitialized else { return }
+
         do {
             try Auth.auth().signOut()
             self.user = nil
@@ -133,6 +170,10 @@ class AuthenticationService: NSObject, ObservableObject {
     // MARK: - Password Reset
 
     func resetPassword(email: String) async throws {
+        guard isFirebaseInitialized else {
+            throw AuthError.notAuthenticated
+        }
+
         isLoading = true
         error = nil
         defer { isLoading = false }
@@ -150,6 +191,10 @@ class AuthenticationService: NSObject, ObservableObject {
     // MARK: - Token Management
 
     func refreshToken() async throws -> String {
+        guard isFirebaseInitialized else {
+            throw AuthError.notAuthenticated
+        }
+
         guard let user = Auth.auth().currentUser else {
             throw AuthError.notAuthenticated
         }
@@ -161,6 +206,10 @@ class AuthenticationService: NSObject, ObservableObject {
     }
 
     func getIdToken() async throws -> String {
+        guard isFirebaseInitialized else {
+            throw AuthError.notAuthenticated
+        }
+
         guard let user = Auth.auth().currentUser else {
             throw AuthError.notAuthenticated
         }
@@ -185,7 +234,7 @@ class AuthenticationService: NSObject, ObservableObject {
     // MARK: - Cleanup
 
     deinit {
-        if let handle = authStateHandle {
+        if isFirebaseInitialized, let handle = authStateHandle {
             Auth.auth().removeStateDidChangeListener(handle)
         }
     }
@@ -203,6 +252,7 @@ enum AuthError: LocalizedError {
     case invalidCredentials
     case userAlreadyExists
     case networkError
+    case firebaseNotInitialized
 
     var errorDescription: String? {
         switch self {
@@ -224,6 +274,8 @@ enum AuthError: LocalizedError {
             return "User with this email already exists"
         case .networkError:
             return "Network connection error"
+        case .firebaseNotInitialized:
+            return "Authentication service not available. Configure a backend first."
         }
     }
 }

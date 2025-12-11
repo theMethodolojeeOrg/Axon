@@ -30,13 +30,13 @@ struct APIKeysSettingsView: View {
             .background(AppColors.signalMercury.opacity(0.1))
             .cornerRadius(8)
 
-            // NeurX Admin Key Section (Featured)
+            // NeurX Admin Key Section (Optional)
             SettingsSection(title: "NeurX Admin Key") {
                 VStack(spacing: 12) {
                     APIKeyRow(
                         provider: .neurx,
                         isConfigured: viewModel.isAPIKeyConfigured(.neurx),
-                        isAdminKey: true,
+                        isAdminKey: false,
                         onEdit: {
                             // Set state atomically before showing sheet to prevent race condition
                             selectedProvider = .neurx
