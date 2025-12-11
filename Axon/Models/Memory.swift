@@ -274,3 +274,73 @@ struct MemorySearchRequest: Codable {
         self.minConfidence = minConfidence
     }
 }
+
+// MARK: - Temporal Tags
+
+extension Memory {
+    /// Generate temporal tags based on a date for automatic temporal context
+    /// These tags help the assistant understand WHEN things happened
+    /// - Parameter date: The date to generate tags for (typically memory creation date)
+    /// - Returns: Array of temporal tags like "today", "this_week", "2025", "winter"
+    static func temporalTags(for date: Date) -> [String] {
+        var tags: [String] = []
+        let calendar = Calendar.current
+        let now = Date()
+
+        // Calculate days difference
+        let daysDiff = calendar.dateComponents([.day], from: date, to: now).day ?? 0
+
+        // Relative time tags (mutually exclusive buckets)
+        if daysDiff == 0 {
+            tags.append("today")
+        } else if daysDiff == 1 {
+            tags.append("yesterday")
+        } else if daysDiff <= 7 {
+            tags.append("this_week")
+        } else if daysDiff <= 30 {
+            tags.append("this_month")
+        } else if daysDiff <= 90 {
+            tags.append("recent_months")
+        } else {
+            tags.append("older")
+        }
+
+        // Season/time of year
+        let month = calendar.component(.month, from: date)
+        let seasons = ["winter", "winter", "spring", "spring", "spring", "summer",
+                       "summer", "summer", "fall", "fall", "fall", "winter"]
+        tags.append(seasons[month - 1])
+
+        // Year tag
+        tags.append("\(calendar.component(.year, from: date))")
+
+        // Day of week for recent memories (helps with "what did we discuss on Monday")
+        if daysDiff <= 7 {
+            let weekday = calendar.component(.weekday, from: date)
+            let weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+            tags.append(weekdays[weekday - 1])
+        }
+
+        return tags
+    }
+
+    /// Refresh temporal tags based on current date
+    /// Used when retrieving memories to ensure relative tags are accurate
+    var refreshedTemporalTags: [String] {
+        // Filter out old temporal tags and add fresh ones
+        let temporalPatterns = ["today", "yesterday", "this_week", "this_month",
+                                "recent_months", "older", "winter", "spring",
+                                "summer", "fall", "monday", "tuesday", "wednesday",
+                                "thursday", "friday", "saturday", "sunday"]
+
+        var nonTemporalTags = tags.filter { tag in
+            // Keep tags that aren't temporal (year tags like "2025" are also temporal but static)
+            !temporalPatterns.contains(tag.lowercased()) && Int(tag) == nil
+        }
+
+        // Add fresh temporal tags
+        nonTemporalTags.append(contentsOf: Memory.temporalTags(for: createdAt))
+
+        return nonTemporalTags
+    }
+}

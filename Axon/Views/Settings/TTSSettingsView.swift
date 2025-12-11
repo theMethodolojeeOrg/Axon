@@ -2,405 +2,384 @@
 //  TTSSettingsView.swift
 //  Axon
 //
-//  Text-to-Speech settings with voice configuration
+//  Text-to-Speech settings with provider selection (ElevenLabs vs Gemini)
 //
 
 import SwiftUI
 
 struct TTSSettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
-    let onManageAPIKeys: (() -> Void)? = nil
+    @State private var elevenLabsExpanded = true
+    @State private var geminiExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            // ElevenLabs API Key Section
-            SettingsSection(title: "ElevenLabs API Key") {
-                VStack(spacing: 12) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "key.fill")
-                            .foregroundColor(AppColors.signalMercury)
-                            .frame(width: 32)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("ElevenLabs API Key")
-                                .font(AppTypography.bodyMedium(.medium))
-                                .foregroundColor(AppColors.textPrimary)
-
-                            HStack(spacing: 8) {
-                                if viewModel.isTTSConfigured {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(AppColors.accentSuccess)
-                                    Text("Configured")
-                                        .font(AppTypography.labelSmall())
-                                        .foregroundColor(AppColors.accentSuccess)
-                                } else {
-                                    Image(systemName: "exclamationmark.circle.fill")
-                                        .foregroundColor(AppColors.accentWarning)
-                                    Text("Not Configured")
-                                        .font(AppTypography.labelSmall())
-                                        .foregroundColor(AppColors.accentWarning)
-                                }
-                            }
-                        }
-
-                        Spacer()
-
-                        Button(action: { onManageAPIKeys?() }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "key.fill")
-                                    .foregroundColor(AppColors.textSecondary)
-                                Text("Manage in API Keys")
-                                    .font(AppTypography.bodyMedium(.medium))
-                                    .foregroundColor(AppColors.textSecondary)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(AppColors.substrateTertiary)
-                            )
-                        }
-                    }
-                    .padding()
-                    .background(AppColors.substrateSecondary)
-                    .cornerRadius(8)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("API keys are managed centrally for security and consistency.")
-                            .font(AppTypography.bodySmall())
-                            .foregroundColor(AppColors.textSecondary)
-
-                        HStack(spacing: 4) {
-                            Text("To add or update your ElevenLabs key, open")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
-                            Button(action: { onManageAPIKeys?() }) {
-                                Text("API Keys")
-                                    .font(AppTypography.bodySmall(.medium))
-                                    .foregroundColor(AppColors.signalMercury)
-                                    .underline()
-                            }
-                            Text(".")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-                    }
-                    .padding(.horizontal)
-                }
+            // Provider Selection Header
+            SettingsSection(title: "TTS Provider") {
+                Text("Select your preferred text-to-speech provider. Only one can be active at a time.")
+                    .font(AppTypography.bodySmall())
+                    .foregroundColor(AppColors.textSecondary)
+                    .padding(.bottom, 8)
             }
 
-            // Dynamic Catalog (Voices & Models)
-            SettingsSection(title: "Voice & Model") {
-                VStack(spacing: 12) {
-                    // Voice Picker
-                    Picker(selection: Binding(
-                        get: { viewModel.settings.ttsSettings.selectedVoiceId ?? "" },
-                        set: { newId in
-                            let voice = viewModel.availableVoices.first { $0.id == newId }
-                            Task { await viewModel.updateSelectedVoice(id: voice?.id, name: voice?.name) }
-                        }
-                    )) {
-                        if viewModel.availableVoices.isEmpty {
-                            Text("No voices found").tag("")
-                        } else {
-                            ForEach(viewModel.availableVoices) { voice in
-                                Text(voice.name).tag(voice.id)
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "waveform")
-                                .font(.system(size: 20))
-                                .foregroundColor(AppColors.signalMercury)
-                                .frame(width: 32)
-
-                            Text(viewModel.settings.ttsSettings.selectedVoiceName ?? "Select a voice")
-                                .font(AppTypography.bodyMedium())
-                                .foregroundColor(AppColors.textPrimary)
-
-                            Spacer()
-                        }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(AppColors.substrateSecondary)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(AppColors.glassBorder, lineWidth: 1)
-                                )
-                        )
+            // ElevenLabs Accordion
+            TTSProviderAccordion(
+                provider: .elevenlabs,
+                isSelected: viewModel.settings.ttsSettings.provider == .elevenlabs,
+                isExpanded: $elevenLabsExpanded,
+                onSelect: {
+                    Task {
+                        await viewModel.updateTTSSetting(\.provider, TTSProvider.elevenlabs)
                     }
-                    .pickerStyle(.menu)
-
-                    // TTS Model Picker (from ElevenLabs if present, fallback to static)
-                    Picker(selection: Binding(
-                        get: { viewModel.settings.ttsSettings.model.rawValue },
-                        set: { newRaw in
-                            if let m = TTSModel(rawValue: newRaw) {
-                                Task { await viewModel.updateTTSSetting(\.model, m) }
-                            }
-                        }
-                    )) {
-                        if !viewModel.availableTTSModels.isEmpty {
-                            ForEach(viewModel.availableTTSModels, id: \.id) { m in
-                                Text(m.displayName).tag(m.id)
-                            }
-                        } else {
-                            ForEach(TTSModel.allCases) { m in
-                                Text(m.displayName).tag(m.rawValue)
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "speaker.wave.2.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(AppColors.signalMercury)
-                                .frame(width: 32)
-
-                            Text("TTS Model")
-                                .font(AppTypography.bodyMedium())
-                                .foregroundColor(AppColors.textPrimary)
-
-                            Spacer()
-                        }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(AppColors.substrateSecondary)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(AppColors.glassBorder, lineWidth: 1)
-                                )
-                        )
-                    }
-                    .pickerStyle(.menu)
-
-                    // Manual refresh for voices/models so we don't auto-fetch on every view load
-                    Button(action: {
-                        Task {
-                            await viewModel.refreshElevenLabsCatalog()
-                        }
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.clockwise")
-                                .foregroundColor(AppColors.textSecondary)
-                            Text("Refresh Voices & Models")
-                                .font(AppTypography.bodyMedium(.medium))
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(AppColors.substrateSecondary)
-                        )
-                    }
-                    .disabled(!viewModel.isTTSConfigured)
+                    withAnimation { geminiExpanded = false }
                 }
+            ) {
+                ElevenLabsSettingsContent(viewModel: viewModel)
             }
 
-            // TTS Model Section
-            SettingsSection(title: "TTS Model") {
-                VStack(spacing: 12) {
-                    ForEach(TTSModel.allCases) { model in
-                        SettingsRadioRow(
-                            title: model.displayName,
-                            subtitle: model.description,
-                            isSelected: viewModel.settings.ttsSettings.model == model
-                        ) {
-                            Task {
-                                await viewModel.updateTTSSetting(\.model, model)
-                            }
-                        }
+            // Gemini Accordion
+            TTSProviderAccordion(
+                provider: .gemini,
+                isSelected: viewModel.settings.ttsSettings.provider == .gemini,
+                isExpanded: $geminiExpanded,
+                onSelect: {
+                    Task {
+                        await viewModel.updateTTSSetting(\.provider, TTSProvider.gemini)
                     }
+                    withAnimation { elevenLabsExpanded = false }
                 }
+            ) {
+                GeminiTTSSettingsContent(viewModel: viewModel)
             }
-
-            // Output Format Section
-            SettingsSection(title: "Output Format") {
-                VStack(spacing: 12) {
-                    ForEach(TTSOutputFormat.allCases) { format in
-                        SettingsRadioRow(
-                            title: format.displayName,
-                            subtitle: format.description,
-                            isSelected: viewModel.settings.ttsSettings.outputFormat == format
-                        ) {
-                            Task {
-                                await viewModel.updateTTSSetting(\.outputFormat, format)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Voice Settings Section
-            SettingsSection(title: "Voice Settings") {
-                VStack(spacing: 20) {
-                    // Stability
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Stability")
-                                .font(AppTypography.bodyMedium())
-                                .foregroundColor(AppColors.textPrimary)
-
-                            Spacer()
-
-                            Text("\(Int(viewModel.settings.ttsSettings.voiceSettings.stability * 100))%")
-                                .font(AppTypography.bodyMedium(.medium))
-                                .foregroundColor(AppColors.signalMercury)
-                        }
-
-                        Slider(
-                            value: Binding(
-                                get: { viewModel.settings.ttsSettings.voiceSettings.stability },
-                                set: { newValue in
-                                    Task {
-                                        await viewModel.updateTTSSetting(\.voiceSettings.stability, newValue)
-                                    }
-                                }
-                            ),
-                            in: 0...1,
-                            step: 0.01
-                        )
-                        .tint(AppColors.signalMercury)
-
-                        Text("Higher values create more consistent voice, lower values add variation")
-                            .font(AppTypography.labelSmall())
-                            .foregroundColor(AppColors.textTertiary)
-                    }
-
-                    // Similarity Boost
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Similarity Boost")
-                                .font(AppTypography.bodyMedium())
-                                .foregroundColor(AppColors.textPrimary)
-
-                            Spacer()
-
-                            Text("\(Int(viewModel.settings.ttsSettings.voiceSettings.similarityBoost * 100))%")
-                                .font(AppTypography.bodyMedium(.medium))
-                                .foregroundColor(AppColors.signalMercury)
-                        }
-
-                        Slider(
-                            value: Binding(
-                                get: { viewModel.settings.ttsSettings.voiceSettings.similarityBoost },
-                                set: { newValue in
-                                    Task {
-                                        await viewModel.updateTTSSetting(\.voiceSettings.similarityBoost, newValue)
-                                    }
-                                }
-                            ),
-                            in: 0...1,
-                            step: 0.01
-                        )
-                        .tint(AppColors.signalMercury)
-
-                        Text("Boosts similarity to the original voice at expense of stability")
-                            .font(AppTypography.labelSmall())
-                            .foregroundColor(AppColors.textTertiary)
-                    }
-
-                    // Style
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Style")
-                                .font(AppTypography.bodyMedium())
-                                .foregroundColor(AppColors.textPrimary)
-
-                            Spacer()
-
-                            Text("\(Int(viewModel.settings.ttsSettings.voiceSettings.style * 100))%")
-                                .font(AppTypography.bodyMedium(.medium))
-                                .foregroundColor(AppColors.signalMercury)
-                        }
-
-                        Slider(
-                            value: Binding(
-                                get: { viewModel.settings.ttsSettings.voiceSettings.style },
-                                set: { newValue in
-                                    Task {
-                                        await viewModel.updateTTSSetting(\.voiceSettings.style, newValue)
-                                    }
-                                }
-                            ),
-                            in: 0...1,
-                            step: 0.01
-                        )
-                        .tint(AppColors.signalMercury)
-
-                        Text("Higher values exaggerate the style, lower values are more neutral")
-                            .font(AppTypography.labelSmall())
-                            .foregroundColor(AppColors.textTertiary)
-                    }
-
-                    // Speaker Boost
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Toggle(isOn: Binding(
-                                get: { viewModel.settings.ttsSettings.voiceSettings.useSpeakerBoost },
-                                set: { newValue in
-                                    Task {
-                                        await viewModel.updateTTSSetting(\.voiceSettings.useSpeakerBoost, newValue)
-                                    }
-                                }
-                            )) {
-                                Text("Speaker Boost")
-                                    .font(AppTypography.bodyMedium())
-                                    .foregroundColor(AppColors.textPrimary)
-                            }
-                            .tint(AppColors.signalMercury)
-                        }
-
-                        Text("Boosts similarity to the speaker but may cause artifacts")
-                            .font(AppTypography.labelSmall())
-                            .foregroundColor(AppColors.textTertiary)
-                    }
-                }
-                .padding()
-                .background(AppColors.substrateSecondary)
-                .cornerRadius(8)
-            }
-        }
-        .refreshable {
-            await viewModel.refreshElevenLabsCatalog()
         }
     }
 }
 
-// MARK: - Settings Radio Row
+// MARK: - Provider Accordion
 
-struct SettingsRadioRow: View {
-    let title: String
-    let subtitle: String
+struct TTSProviderAccordion<Content: View>: View {
+    let provider: TTSProvider
     let isSelected: Bool
-    let action: () -> Void
+    @Binding var isExpanded: Bool
+    let onSelect: () -> Void
+    @ViewBuilder let content: () -> Content
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(AppTypography.bodyMedium(.medium))
-                        .foregroundColor(AppColors.textPrimary)
+        VStack(spacing: 0) {
+            // Header with toggle and expand button
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack(spacing: 12) {
+                    // Provider toggle (radio button style)
+                    Button(action: onSelect) {
+                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 22))
+                            .foregroundColor(isSelected ? AppColors.signalMercury : AppColors.textTertiary)
+                    }
+                    .buttonStyle(PlainButtonStyle())
 
-                    Text(subtitle)
+                    // Provider icon
+                    Image(systemName: provider.icon)
+                        .font(.system(size: 20))
+                        .foregroundColor(isSelected ? AppColors.signalMercury : AppColors.textSecondary)
+                        .frame(width: 28)
+
+                    // Provider info
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(provider.displayName)
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Text(provider.description)
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+
+                    Spacer()
+
+                    // Expand indicator
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(AppColors.textTertiary)
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(isSelected ? AppColors.signalMercury.opacity(0.3) : AppColors.glassBorder, lineWidth: 1)
+                        )
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+
+            // Expandable content
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 16) {
+                    content()
+                }
+                .padding(16)
+                .background(AppColors.substrateSecondary.opacity(0.5))
+                .cornerRadius(12)
+                .padding(.top, 8)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+}
+
+// MARK: - ElevenLabs Settings Content
+
+struct ElevenLabsSettingsContent: View {
+    @ObservedObject var viewModel: SettingsViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // API Key Status
+            HStack(spacing: 12) {
+                if viewModel.isTTSConfigured {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(AppColors.accentSuccess)
+                    Text("API Key Configured")
                         .font(AppTypography.bodySmall())
-                        .foregroundColor(AppColors.textSecondary)
+                        .foregroundColor(AppColors.accentSuccess)
+                } else {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundColor(AppColors.accentWarning)
+                    Text("API Key Required")
+                        .font(AppTypography.bodySmall())
+                        .foregroundColor(AppColors.accentWarning)
+                }
+                Spacer()
+            }
+
+            // Voice Picker
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Voice")
+                    .font(AppTypography.labelMedium())
+                    .foregroundColor(AppColors.textSecondary)
+
+                Picker(selection: Binding(
+                    get: { viewModel.settings.ttsSettings.selectedVoiceId ?? "" },
+                    set: { newId in
+                        let voice = viewModel.availableVoices.first { $0.id == newId }
+                        Task { await viewModel.updateSelectedVoice(id: voice?.id, name: voice?.name) }
+                    }
+                )) {
+                    if viewModel.availableVoices.isEmpty {
+                        Text("No voices found").tag("")
+                    } else {
+                        ForEach(viewModel.availableVoices) { voice in
+                            Text(voice.name).tag(voice.id)
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text(viewModel.settings.ttsSettings.selectedVoiceName ?? "Select a voice")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background(AppColors.substrateTertiary)
+                    .cornerRadius(8)
+                }
+                .pickerStyle(.menu)
+            }
+
+            // Model Picker
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Model")
+                    .font(AppTypography.labelMedium())
+                    .foregroundColor(AppColors.textSecondary)
+
+                Picker(selection: Binding(
+                    get: { viewModel.settings.ttsSettings.model },
+                    set: { newModel in
+                        Task { await viewModel.updateTTSSetting(\.model, newModel) }
+                    }
+                )) {
+                    ForEach(TTSModel.allCases) { model in
+                        Text("\(model.displayName) - \(model.description)").tag(model)
+                    }
+                } label: {
+                    HStack {
+                        Text(viewModel.settings.ttsSettings.model.displayName)
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background(AppColors.substrateTertiary)
+                    .cornerRadius(8)
+                }
+                .pickerStyle(.menu)
+            }
+
+            // Voice Settings (Stability, Similarity, etc.)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Voice Settings")
+                    .font(AppTypography.labelMedium())
+                    .foregroundColor(AppColors.textSecondary)
+
+                // Stability Slider
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Stability")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textPrimary)
+                        Spacer()
+                        Text("\(Int(viewModel.settings.ttsSettings.voiceSettings.stability * 100))%")
+                            .font(AppTypography.bodySmall(.medium))
+                            .foregroundColor(AppColors.signalMercury)
+                    }
+                    Slider(
+                        value: Binding(
+                            get: { viewModel.settings.ttsSettings.voiceSettings.stability },
+                            set: { newValue in
+                                Task { await viewModel.updateTTSSetting(\.voiceSettings.stability, newValue) }
+                            }
+                        ),
+                        in: 0...1
+                    )
+                    .tint(AppColors.signalMercury)
                 }
 
-                Spacer()
-
-                Image(systemName: isSelected ? "circle.fill" : "circle")
-                    .foregroundColor(isSelected ? AppColors.signalMercury : AppColors.textTertiary)
-                    .font(.system(size: 20))
+                // Similarity Boost Slider
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Similarity")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textPrimary)
+                        Spacer()
+                        Text("\(Int(viewModel.settings.ttsSettings.voiceSettings.similarityBoost * 100))%")
+                            .font(AppTypography.bodySmall(.medium))
+                            .foregroundColor(AppColors.signalMercury)
+                    }
+                    Slider(
+                        value: Binding(
+                            get: { viewModel.settings.ttsSettings.voiceSettings.similarityBoost },
+                            set: { newValue in
+                                Task { await viewModel.updateTTSSetting(\.voiceSettings.similarityBoost, newValue) }
+                            }
+                        ),
+                        in: 0...1
+                    )
+                    .tint(AppColors.signalMercury)
+                }
             }
-            .padding()
+
+            // Refresh button
+            Button(action: {
+                Task { await viewModel.refreshElevenLabsCatalog() }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Refresh Voices")
+                }
+                .font(AppTypography.bodySmall(.medium))
+                .foregroundColor(AppColors.signalMercury)
+            }
+            .disabled(!viewModel.isTTSConfigured)
+        }
+    }
+}
+
+// MARK: - Gemini TTS Settings Content
+
+struct GeminiTTSSettingsContent: View {
+    @ObservedObject var viewModel: SettingsViewModel
+
+    private var hasGeminiKey: Bool {
+        // Reuse existing configuration flag until a dedicated Gemini flag is available
+        return viewModel.isTTSConfigured
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // API Key Status
+            HStack(spacing: 12) {
+                if hasGeminiKey {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(AppColors.accentSuccess)
+                    Text("Gemini API Key Configured")
+                        .font(AppTypography.bodySmall())
+                        .foregroundColor(AppColors.accentSuccess)
+                } else {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundColor(AppColors.accentWarning)
+                    Text("Gemini API Key Required")
+                        .font(AppTypography.bodySmall())
+                        .foregroundColor(AppColors.accentWarning)
+                }
+                Spacer()
+            }
+
+            // Voice Selection
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Voice")
+                    .font(AppTypography.labelMedium())
+                    .foregroundColor(AppColors.textSecondary)
+
+                // Voice grid
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    ForEach(GeminiTTSVoice.allCases) { voice in
+                        GeminiVoiceCard(
+                            voice: voice,
+                            isSelected: viewModel.settings.ttsSettings.geminiVoice == voice,
+                            onSelect: {
+                                Task { await viewModel.updateTTSSetting(\.geminiVoice, voice) }
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Info about Gemini TTS
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle")
+                    .foregroundColor(AppColors.textTertiary)
+                Text("Gemini TTS outputs 24kHz WAV audio. Uses your Gemini API key.")
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(AppColors.textTertiary)
+            }
+        }
+    }
+}
+
+// MARK: - Gemini Voice Card
+
+struct GeminiVoiceCard: View {
+    let voice: GeminiTTSVoice
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(voice.displayName)
+                        .font(AppTypography.bodyMedium(.medium))
+                        .foregroundColor(AppColors.textPrimary)
+                    Spacer()
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(AppColors.signalMercury)
+                    }
+                }
+
+                Text(voice.toneDescription)
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(AppColors.textSecondary)
+            }
+            .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
+                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateTertiary)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(isSelected ? AppColors.signalMercury : AppColors.glassBorder, lineWidth: 1)
@@ -410,7 +389,6 @@ struct SettingsRadioRow: View {
         .buttonStyle(PlainButtonStyle())
     }
 }
-
 
 // MARK: - Preview
 

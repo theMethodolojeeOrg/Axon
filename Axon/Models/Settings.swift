@@ -73,6 +73,9 @@ struct AppSettings: Codable, Equatable, Sendable {
     var serverPassword: String? = nil
     var serverAllowExternal: Bool = false
 
+    // Onboarding
+    var hasCompletedOnboarding: Bool = false
+
     // Metadata
     var version: Int = 1
     var lastUpdated: Date = Date()
@@ -815,13 +818,77 @@ enum APIProvider: String, CaseIterable, Identifiable {
 
 // MARK: - TTS Settings
 
+/// TTS provider selection - mutually exclusive
+enum TTSProvider: String, Codable, CaseIterable, Identifiable {
+    case elevenlabs = "elevenlabs"
+    case gemini = "gemini"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .elevenlabs: return "ElevenLabs"
+        case .gemini: return "Gemini"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .elevenlabs: return "High-quality voices with fine-tuned controls"
+        case .gemini: return "Google's TTS with expressive voices"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .elevenlabs: return "waveform"
+        case .gemini: return "sparkles"
+        }
+    }
+}
+
+/// Gemini TTS voice options
+enum GeminiTTSVoice: String, Codable, CaseIterable, Identifiable {
+    case puck = "Puck"
+    case charon = "Charon"
+    case kore = "Kore"
+    case fenrir = "Fenrir"
+    case aoede = "Aoede"
+    case zephyr = "Zephyr"
+    case orus = "Orus"
+    case leda = "Leda"
+
+    var id: String { rawValue }
+    var displayName: String { rawValue }
+
+    var toneDescription: String {
+        switch self {
+        case .puck: return "Upbeat, energetic"
+        case .charon: return "Deep, informative"
+        case .kore: return "Firm, authoritative"
+        case .fenrir: return "Excitable, fast-paced"
+        case .aoede: return "Breezy, light"
+        case .zephyr: return "Bright, clear"
+        case .orus: return "Firm, direct"
+        case .leda: return "Youthful"
+        }
+    }
+}
+
 struct TTSSettings: Codable, Equatable {
+    /// Active TTS provider
+    var provider: TTSProvider = .elevenlabs
+
+    // MARK: - ElevenLabs Settings
     var model: TTSModel = .turboV25
     var outputFormat: TTSOutputFormat = .mp3128
     var voiceSettings: VoiceSettings = VoiceSettings()
     var selectedVoiceId: String? = nil
     var selectedVoiceName: String? = nil
     var cachedVoices: [ElevenLabsService.ELVoice] = []
+
+    // MARK: - Gemini TTS Settings
+    var geminiVoice: GeminiTTSVoice = .puck
 }
 
 enum TTSModel: String, Codable, CaseIterable, Identifiable {
@@ -895,6 +962,14 @@ struct ToolSettings: Codable, Equatable, Sendable {
     /// Tool execution timeout in seconds
     var toolTimeout: Int = 30
 
+    /// Enable experimental features
+    var experimentalFeaturesEnabled: Bool = false
+
+    /// Enable Gemini media proxy for video/audio understanding (experimental)
+    /// When enabled, video/audio attachments sent to non-Gemini providers
+    /// will be analyzed by Gemini first, with the analysis passed to the primary model
+    var mediaProxyEnabled: Bool = false
+
     /// Helper to check if a specific tool is enabled
     func isToolEnabled(_ tool: ToolId) -> Bool {
         toolsEnabled && enabledToolIds.contains(tool.rawValue)
@@ -927,13 +1002,16 @@ struct ToolSettings: Codable, Equatable, Sendable {
 
 /// Available tool identifiers
 enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
-    // Gemini Native Tools (proxied via backend)
-    case googleSearch = "perform_google_search"
-    case codeExecution = "execute_python_code"
-    case googleMaps = "query_google_maps"
+    // Gemini Native Tools (called directly via Gemini API)
+    case googleSearch = "google_search"
+    case codeExecution = "code_execution"
+    case urlContext = "url_context"
+    case googleMaps = "google_maps"
+    case fileSearch = "file_search"  // RAG-based document search (Gemini 2.5+, 3.0+)
 
-    // Memory Tool
+    // Built-in Tools
     case createMemory = "create_memory"
+    case conversationSearch = "conversation_search"  // Search recent conversations for context
 
     var id: String { rawValue }
 
@@ -941,8 +1019,11 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .googleSearch: return "Google Search"
         case .codeExecution: return "Code Execution"
+        case .urlContext: return "URL Context"
         case .googleMaps: return "Google Maps"
+        case .fileSearch: return "File Search"
         case .createMemory: return "Memory Creation"
+        case .conversationSearch: return "Conversation History"
         }
     }
 
@@ -950,8 +1031,11 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .googleSearch: return "Real-time web search grounded by Google"
         case .codeExecution: return "Execute Python code in a sandbox"
+        case .urlContext: return "Fetch and analyze content from URLs"
         case .googleMaps: return "Location queries and place information"
+        case .fileSearch: return "Search uploaded documents using semantic RAG"
         case .createMemory: return "AI creates memories about you during chat"
+        case .conversationSearch: return "Search recent conversations for context"
         }
     }
 
@@ -959,27 +1043,30 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .googleSearch: return "magnifyingglass"
         case .codeExecution: return "terminal"
+        case .urlContext: return "link"
         case .googleMaps: return "map"
+        case .fileSearch: return "doc.text.magnifyingglass"
         case .createMemory: return "brain.head.profile"
+        case .conversationSearch: return "clock.arrow.circlepath"
         }
     }
 
     var provider: ToolProvider {
         switch self {
-        case .googleSearch, .codeExecution, .googleMaps:
+        case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
             return .gemini
-        case .createMemory:
+        case .createMemory, .conversationSearch:
             return .internal
         }
     }
 
-    /// Whether this tool requires cloud orchestration mode
-    var requiresCloudMode: Bool {
+    /// Whether this tool requires a Gemini API key
+    var requiresGeminiKey: Bool {
         switch self {
-        case .googleSearch, .codeExecution, .googleMaps:
-            return true  // Gemini proxy only works via backend
-        case .createMemory:
-            return false  // Can work locally
+        case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
+            return true
+        case .createMemory, .conversationSearch:
+            return false
         }
     }
 
@@ -1019,12 +1106,12 @@ enum ToolProvider: String, Codable, CaseIterable, Sendable {
         }
     }
 
-    /// Whether tools from this provider require cloud mode
-    var requiresCloudMode: Bool {
+    /// Whether tools from this provider require a specific API key
+    var requiredApiKey: String? {
         switch self {
-        case .gemini: return true
-        case .openai: return true
-        case .internal: return false
+        case .gemini: return "Gemini"
+        case .openai: return "OpenAI"
+        case .internal: return nil
         }
     }
 }

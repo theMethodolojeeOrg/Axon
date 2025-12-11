@@ -9,7 +9,25 @@ import SwiftUI
 
 struct SettingsTabView: View {
     @EnvironmentObject var viewModel: SettingsViewModel
+    @StateObject private var authService = AuthenticationService.shared
     @State private var selectedTab: SettingsTab = .general
+
+    /// Authorized developer email for dev tools
+    private let authorizedDeveloperEmail = "oury.tom@gmail.com"
+
+    /// Check if current user is authorized developer
+    private var isAuthorizedDeveloper: Bool {
+        authService.userEmail?.lowercased() == authorizedDeveloperEmail.lowercased()
+    }
+
+    /// Available tabs (includes developer tab only for authorized users)
+    private var availableTabs: [SettingsTab] {
+        var tabs = SettingsTab.allCases.filter { $0 != .developer }
+        if isAuthorizedDeveloper {
+            tabs.append(.developer)
+        }
+        return tabs
+    }
 
     enum SettingsTab: String, CaseIterable, Identifiable {
         case general = "General"
@@ -22,6 +40,7 @@ struct SettingsTabView: View {
         case tts = "TTS"
         case account = "Account"
         case archived = "Archived"
+        case developer = "Developer"
 
         var id: String { rawValue }
 
@@ -37,6 +56,7 @@ struct SettingsTabView: View {
             case .tts: return "waveform.circle.fill"
             case .account: return "person.crop.circle.fill"
             case .archived: return "archivebox.fill"
+            case .developer: return "hammer.fill"
             }
         }
     }
@@ -46,7 +66,7 @@ struct SettingsTabView: View {
             // Tab selector
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(SettingsTab.allCases) { tab in
+                    ForEach(availableTabs) { tab in
                         SettingsTabButton(
                             title: tab.rawValue,
                             icon: tab.icon,
@@ -89,6 +109,8 @@ struct SettingsTabView: View {
                         AccountSettingsView(viewModel: viewModel)
                     case .archived:
                         ArchivedConversationsSettingsView(viewModel: viewModel)
+                    case .developer:
+                        DeveloperSettingsView(viewModel: viewModel)
                     }
                 }
                 .padding()

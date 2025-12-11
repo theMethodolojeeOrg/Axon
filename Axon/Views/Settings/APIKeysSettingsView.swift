@@ -14,6 +14,7 @@ struct APIKeysSettingsView: View {
     @State private var editingKeyValue = ""
     @State private var showingKeyInput = false
     @State private var showingCustomKeyInput = false
+    @State private var isSavingKey = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -37,9 +38,12 @@ struct APIKeysSettingsView: View {
                         isConfigured: viewModel.isAPIKeyConfigured(.neurx),
                         isAdminKey: true,
                         onEdit: {
+                            // Set state atomically before showing sheet to prevent race condition
                             selectedProvider = .neurx
                             editingKeyValue = viewModel.getAPIKey(.neurx) ?? ""
-                            showingKeyInput = true
+                            DispatchQueue.main.async {
+                                showingKeyInput = true
+                            }
                         },
                         onClear: {
                             Task {
@@ -63,9 +67,12 @@ struct APIKeysSettingsView: View {
                             provider: provider,
                             isConfigured: viewModel.isAPIKeyConfigured(provider),
                             onEdit: {
+                                // Set state atomically before showing sheet to prevent race condition
                                 selectedProvider = provider
                                 editingKeyValue = viewModel.getAPIKey(provider) ?? ""
-                                showingKeyInput = true
+                                DispatchQueue.main.async {
+                                    showingKeyInput = true
+                                }
                             },
                             onClear: {
                                 Task {
@@ -89,9 +96,12 @@ struct APIKeysSettingsView: View {
                         provider: .elevenlabs,
                         isConfigured: viewModel.isAPIKeyConfigured(.elevenlabs),
                         onEdit: {
+                            // Set state atomically before showing sheet to prevent race condition
                             selectedProvider = .elevenlabs
                             editingKeyValue = viewModel.getAPIKey(.elevenlabs) ?? ""
-                            showingKeyInput = true
+                            DispatchQueue.main.async {
+                                showingKeyInput = true
+                            }
                         },
                         onClear: {
                             Task {
@@ -116,9 +126,12 @@ struct APIKeysSettingsView: View {
                                 provider: provider,
                                 isConfigured: viewModel.isCustomProviderConfigured(provider.id),
                                 onEdit: {
+                                    // Set state atomically before showing sheet to prevent race condition
                                     selectedCustomProviderId = provider.id
                                     editingKeyValue = viewModel.getCustomProviderAPIKey(providerId: provider.id) ?? ""
-                                    showingCustomKeyInput = true
+                                    DispatchQueue.main.async {
+                                        showingCustomKeyInput = true
+                                    }
                                 },
                                 onClear: {
                                     Task {
@@ -136,9 +149,12 @@ struct APIKeysSettingsView: View {
                 APIKeyInputSheet(
                     provider: provider,
                     keyValue: $editingKeyValue,
+                    isSaving: isSavingKey,
                     onSave: {
+                        isSavingKey = true
                         Task {
                             await viewModel.saveAPIKey(editingKeyValue, for: provider)
+                            isSavingKey = false
                             showingKeyInput = false
                         }
                     },
@@ -253,6 +269,7 @@ struct APIKeyRow: View {
 struct APIKeyInputSheet: View {
     let provider: APIProvider
     @Binding var keyValue: String
+    var isSaving: Bool = false
     let onSave: () -> Void
     let onCancel: () -> Void
 
@@ -290,10 +307,12 @@ struct APIKeyInputSheet: View {
                                         .autocorrectionDisabled()
                                         .font(.system(.body, design: .monospaced))
                                         .foregroundColor(AppColors.textPrimary)
+                                        .disabled(isSaving)
                                 } else {
                                     SecureField("Paste your API key", text: $keyValue)
                                         .font(.system(.body, design: .monospaced))
                                         .foregroundColor(AppColors.textPrimary)
+                                        .disabled(isSaving)
                                 }
 
                                 Button(action: { isShowingKey.toggle() }) {
@@ -301,6 +320,7 @@ struct APIKeyInputSheet: View {
                                         .foregroundColor(AppColors.textSecondary)
                                 }
                                 .buttonStyle(PlainButtonStyle())
+                                .disabled(isSaving)
                             }
                             .padding()
                             .background(AppColors.substrateSecondary)
@@ -309,6 +329,21 @@ struct APIKeyInputSheet: View {
                             Text("Expected format: \(provider.apiKeyPlaceholder)")
                                 .font(AppTypography.labelSmall())
                                 .foregroundColor(AppColors.textTertiary)
+                        }
+
+                        // Saving indicator for ElevenLabs (requires cloud sync)
+                        if isSaving && provider == .elevenlabs {
+                            HStack(spacing: 12) {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: AppColors.signalMercury))
+                                Text("Syncing key to cloud...")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(AppColors.signalMercury.opacity(0.1))
+                            .cornerRadius(8)
                         }
 
                         // Get Key Link
@@ -321,6 +356,7 @@ struct APIKeyInputSheet: View {
                                 }
                                 .foregroundColor(AppColors.signalMercury)
                             }
+                            .disabled(isSaving)
                         }
 
                         Spacer()
@@ -336,16 +372,23 @@ struct APIKeyInputSheet: View {
                         onCancel()
                     }
                     .foregroundColor(AppColors.textSecondary)
+                    .disabled(isSaving)
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        onSave()
+                    if isSaving {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: AppColors.signalMercury))
+                    } else {
+                        Button("Save") {
+                            onSave()
+                        }
+                        .disabled(keyValue.isEmpty)
+                        .foregroundColor(keyValue.isEmpty ? AppColors.textDisabled : AppColors.signalMercury)
                     }
-                    .disabled(keyValue.isEmpty)
-                    .foregroundColor(keyValue.isEmpty ? AppColors.textDisabled : AppColors.signalMercury)
                 }
             }
+            .interactiveDismissDisabled(isSaving)
         }
     }
 }

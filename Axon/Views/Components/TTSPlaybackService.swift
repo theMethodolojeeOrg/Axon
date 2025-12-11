@@ -7,6 +7,19 @@ import Foundation
 import AVFoundation
 import Combine
 
+/// Audio format enum to track provider-specific formats
+enum TTSAudioFormat: String {
+    case mp3 = "mp3"
+    case wav = "wav"
+
+    var fileTypeHint: String {
+        switch self {
+        case .mp3: return AVFileType.mp3.rawValue
+        case .wav: return AVFileType.wav.rawValue
+        }
+    }
+}
+
 @MainActor
 final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     static let shared = TTSPlaybackService()
@@ -26,6 +39,8 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
             hasCachedAudio = !audioCache.isEmpty
         }
     }
+    // Track audio format for each cached message
+    private var audioFormatCache: [String: TTSAudioFormat] = [:]
     private var generationToken: UUID?
 
     // Timer for updating playback position
@@ -87,32 +102,39 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
 
     func hasGeneratedAudio(for messageId: String) -> Bool {
         if audioCache[messageId] != nil { return true }
-        return FileManager.default.fileExists(atPath: audioFileURL(for: messageId).path)
+        // Check both mp3 and wav formats on disk
+        return FileManager.default.fileExists(atPath: audioFileURL(for: messageId, format: .mp3).path) ||
+               FileManager.default.fileExists(atPath: audioFileURL(for: messageId, format: .wav).path)
     }
 
-    private func cacheAudio(_ data: Data, for messageId: String) {
+    private func cacheAudio(_ data: Data, for messageId: String, format: TTSAudioFormat) {
         // Save to memory
         audioCache[messageId] = data
-        
-        // Save to disk
-        saveAudioToDisk(data, for: messageId)
-        
-        print("[TTSPlaybackService] Cached audio for message: \(messageId) (\(data.count) bytes)")
+        audioFormatCache[messageId] = format
+
+        // Save to disk with correct extension
+        saveAudioToDisk(data, for: messageId, format: format)
+
+        print("[TTSPlaybackService] Cached audio for message: \(messageId) (\(data.count) bytes, format: \(format.rawValue))")
     }
 
-    private func getCachedAudio(for messageId: String) -> Data? {
+    private func getCachedAudio(for messageId: String) -> (data: Data, format: TTSAudioFormat)? {
         // Check memory first
         if let data = audioCache[messageId] {
-            return data
+            let format = audioFormatCache[messageId] ?? .mp3
+            return (data, format)
         }
-        
-        // Check disk
-        if let data = loadAudioFromDisk(for: messageId) {
-            // Populate memory cache
-            audioCache[messageId] = data
-            return data
+
+        // Check disk - try both formats
+        for format in [TTSAudioFormat.mp3, .wav] {
+            if let data = loadAudioFromDisk(for: messageId, format: format) {
+                // Populate memory cache
+                audioCache[messageId] = data
+                audioFormatCache[messageId] = format
+                return (data, format)
+            }
         }
-        
+
         return nil
     }
     
@@ -122,16 +144,16 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 
-    private func audioFileURL(for messageId: String) -> URL {
+    private func audioFileURL(for messageId: String, format: TTSAudioFormat = .mp3) -> URL {
         let directory = getDocumentsDirectory().appendingPathComponent("AudioCache")
         if !FileManager.default.fileExists(atPath: directory.path) {
             try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         }
-        return directory.appendingPathComponent("\(messageId).mp3")
+        return directory.appendingPathComponent("\(messageId).\(format.rawValue)")
     }
 
-    private func saveAudioToDisk(_ data: Data, for messageId: String) {
-        let url = audioFileURL(for: messageId)
+    private func saveAudioToDisk(_ data: Data, for messageId: String, format: TTSAudioFormat) {
+        let url = audioFileURL(for: messageId, format: format)
         do {
             try data.write(to: url)
             print("[TTSPlaybackService] Saved audio to disk: \(url.path)")
@@ -140,8 +162,8 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         }
     }
 
-    private func loadAudioFromDisk(for messageId: String) -> Data? {
-        let url = audioFileURL(for: messageId)
+    private func loadAudioFromDisk(for messageId: String, format: TTSAudioFormat = .mp3) -> Data? {
+        let url = audioFileURL(for: messageId, format: format)
         do {
             let data = try Data(contentsOf: url)
             print("[TTSPlaybackService] Loaded audio from disk: \(url.path)")
@@ -170,12 +192,7 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
     func speak(text: String, settings: AppSettings, messageId: String? = nil) async throws {
         print("[TTSPlaybackService] Starting TTS playback")
         print("[TTSPlaybackService] Text length: \(text.count) characters")
-        print("[TTSPlaybackService] Settings loaded - Voice ID: \(settings.ttsSettings.selectedVoiceId ?? "nil"), Voice Name: \(settings.ttsSettings.selectedVoiceName ?? "nil")")
-
-        guard let voiceId = settings.ttsSettings.selectedVoiceId else {
-            print("[TTSPlaybackService] Error: No voice selected in TTS settings")
-            throw NSError(domain: "TTSPlaybackService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No voice selected in TTS settings. Please select a voice in Settings > Text-to-Speech."])
-        }
+        print("[TTSPlaybackService] Provider: \(settings.ttsSettings.provider.displayName)")
 
         // Prime UI state so the player can show a loading indicator while we fetch audio
         isGenerating = true
@@ -186,33 +203,25 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         let token = UUID()
         generationToken = token
 
-        print("[TTSPlaybackService] Using voice ID: \(voiceId)")
-        print("[TTSPlaybackService] Using voice name: \(settings.ttsSettings.selectedVoiceName ?? "unknown")")
-        print("[TTSPlaybackService] Using model: \(settings.ttsSettings.model.rawValue)")
-
-        let vs = settings.ttsSettings.voiceSettings
-        let payload = ElevenLabsService.VoiceSettingsPayload(
-            stability: vs.stability,
-            similarityBoost: vs.similarityBoost,
-            style: vs.style,
-            useSpeakerBoost: vs.useSpeakerBoost
-        )
-
         do {
-            print("[TTSPlaybackService] Requesting audio generation from ElevenLabs...")
-            let audioData = try await ElevenLabsService.shared.generateTTSBase64(
-                text: text,
-                voiceId: voiceId,
-                model: settings.ttsSettings.model.rawValue,
-                format: settings.ttsSettings.outputFormat.rawValue,
-                voiceSettings: payload
-            )
+            let audioData: Data
+            let audioFormat: TTSAudioFormat
 
-            print("[TTSPlaybackService] Received audio data: \(audioData.count) bytes")
+            switch settings.ttsSettings.provider {
+            case .elevenlabs:
+                audioData = try await generateElevenLabsAudio(text: text, settings: settings)
+                audioFormat = .mp3
+
+            case .gemini:
+                audioData = try await generateGeminiAudio(text: text, settings: settings)
+                audioFormat = .wav  // Gemini returns WAV format (24kHz)
+            }
+
+            print("[TTSPlaybackService] Received audio data: \(audioData.count) bytes (format: \(audioFormat.rawValue))")
 
             // Cache the audio if we have a message ID
             if let messageId = messageId {
-                cacheAudio(audioData, for: messageId)
+                cacheAudio(audioData, for: messageId, format: audioFormat)
             }
 
             // Switch UI from generating to playback
@@ -225,8 +234,8 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
             }
             generationToken = nil
 
-            // Play the audio
-            try await playAudio(audioData, messageId: messageId)
+            // Play the audio with correct format hint
+            try await playAudio(audioData, messageId: messageId, format: audioFormat)
         } catch {
             isGenerating = false
             if generationToken == token {
@@ -239,18 +248,68 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         }
     }
 
+    // MARK: - ElevenLabs TTS
+
+    private func generateElevenLabsAudio(text: String, settings: AppSettings) async throws -> Data {
+        guard let voiceId = settings.ttsSettings.selectedVoiceId else {
+            print("[TTSPlaybackService] Error: No ElevenLabs voice selected")
+            throw NSError(domain: "TTSPlaybackService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No voice selected in TTS settings. Please select a voice in Settings > Text-to-Speech."])
+        }
+
+        print("[TTSPlaybackService] Using ElevenLabs voice ID: \(voiceId)")
+        print("[TTSPlaybackService] Using voice name: \(settings.ttsSettings.selectedVoiceName ?? "unknown")")
+        print("[TTSPlaybackService] Using model: \(settings.ttsSettings.model.rawValue)")
+
+        let vs = settings.ttsSettings.voiceSettings
+        let payload = ElevenLabsService.VoiceSettingsPayload(
+            stability: vs.stability,
+            similarityBoost: vs.similarityBoost,
+            style: vs.style,
+            useSpeakerBoost: vs.useSpeakerBoost
+        )
+
+        print("[TTSPlaybackService] Requesting audio generation from ElevenLabs...")
+        return try await ElevenLabsService.shared.generateTTSBase64(
+            text: text,
+            voiceId: voiceId,
+            model: settings.ttsSettings.model.rawValue,
+            format: settings.ttsSettings.outputFormat.rawValue,
+            voiceSettings: payload
+        )
+    }
+
+    // MARK: - Gemini TTS
+
+    private func generateGeminiAudio(text: String, settings: AppSettings) async throws -> Data {
+        // Get Gemini API key from settings
+        guard let geminiKey = SettingsViewModel.shared.getAPIKey(.gemini), !geminiKey.isEmpty else {
+            print("[TTSPlaybackService] Error: No Gemini API key configured")
+            throw NSError(domain: "TTSPlaybackService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Gemini API key is required for Gemini TTS. Please add your key in Settings > API Keys."])
+        }
+
+        let voice = settings.ttsSettings.geminiVoice
+        print("[TTSPlaybackService] Using Gemini voice: \(voice.displayName) (\(voice.toneDescription))")
+
+        print("[TTSPlaybackService] Requesting audio generation from Gemini...")
+        return try await GeminiTTSService.shared.generateSpeech(
+            text: text,
+            voice: GeminiTTSService.GeminiVoice(rawValue: voice.rawValue) ?? .puck,
+            apiKey: geminiKey
+        )
+    }
+
     func playGenerated(messageId: String) async throws {
-        guard let audioData = getCachedAudio(for: messageId) else {
+        guard let cached = getCachedAudio(for: messageId) else {
             print("[TTSPlaybackService] No cached audio for message: \(messageId)")
             throw NSError(domain: "TTSPlaybackService", code: -2, userInfo: [NSLocalizedDescriptionKey: "No generated audio found for this message"])
         }
 
-        print("[TTSPlaybackService] Playing cached audio for message: \(messageId)")
-        try await playAudio(audioData, messageId: messageId)
+        print("[TTSPlaybackService] Playing cached audio for message: \(messageId) (format: \(cached.format.rawValue))")
+        try await playAudio(cached.data, messageId: messageId, format: cached.format)
     }
 
-    private func playAudio(_ audioData: Data, messageId: String?) async throws {
-        print("[TTSPlaybackService] Preparing to play audio data: \(audioData.count) bytes")
+    private func playAudio(_ audioData: Data, messageId: String?, format: TTSAudioFormat = .mp3) async throws {
+        print("[TTSPlaybackService] Preparing to play audio data: \(audioData.count) bytes (format: \(format.rawValue))")
 
         // Ensure audio session is active before creating player
         do {
@@ -262,10 +321,11 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
             throw error
         }
 
-        // Create and configure audio player
-        self.player = try AVAudioPlayer(data: audioData)
+        // Create and configure audio player with format hint
+        // This is critical for WAV data from Gemini TTS to play correctly
+        self.player = try AVAudioPlayer(data: audioData, fileTypeHint: format.fileTypeHint)
         self.player?.delegate = self
-        print("[TTSPlaybackService] AVAudioPlayer created successfully")
+        print("[TTSPlaybackService] AVAudioPlayer created successfully with format hint: \(format.fileTypeHint)")
 
         // Set volume to maximum to ensure we can hear it
         self.player?.volume = 1.0

@@ -25,6 +25,8 @@ struct MessageInputBar: View {
     @State private var selectedItem: PhotosPickerItem?
     @State private var showFileImporter = false
     @State private var showPhotoPicker = false
+    @State private var showVideoImporter = false
+    @State private var showAudioImporter = false
     @ObservedObject private var settingsViewModel = SettingsViewModel.shared
 
     private let conversationId: String?
@@ -32,6 +34,8 @@ struct MessageInputBar: View {
     private struct AttachmentCapability {
         let images: Bool
         let documents: Bool
+        let video: Bool
+        let audio: Bool
         let description: String
     }
 
@@ -85,17 +89,21 @@ struct MessageInputBar: View {
 
         switch providerString {
         case "anthropic":
-            return AttachmentCapability(images: true, documents: true, description: "Claude supports images and PDFs.")
+            // Claude: images and PDFs only
+            return AttachmentCapability(images: true, documents: true, video: false, audio: false, description: "Claude supports images and PDFs.")
         case "gemini":
-            return AttachmentCapability(images: true, documents: true, description: "Gemini supports images and documents.")
+            // Gemini: full multimodal support including video and audio
+            return AttachmentCapability(images: true, documents: true, video: true, audio: true, description: "Gemini supports images, documents, video, and audio.")
         case "openai":
-            return AttachmentCapability(images: true, documents: false, description: "GPT supports images only.")
+            // GPT-4o: images only (audio input requires special handling)
+            return AttachmentCapability(images: true, documents: false, video: false, audio: false, description: "GPT supports images.")
         case "grok":
-            return AttachmentCapability(images: true, documents: false, description: "Grok supports images only.")
+            // Grok: images only (JPEG, PNG)
+            return AttachmentCapability(images: true, documents: false, video: false, audio: false, description: "Grok supports images only.")
         case "openai-compatible":
-            return AttachmentCapability(images: true, documents: false, description: "Images supported; docs depend on the provider.")
+            return AttachmentCapability(images: true, documents: false, video: false, audio: false, description: "Images supported; other formats depend on the provider.")
         default:
-            return AttachmentCapability(images: true, documents: false, description: "Images supported.")
+            return AttachmentCapability(images: true, documents: false, video: false, audio: false, description: "Images supported.")
         }
     }
 
@@ -128,9 +136,9 @@ struct MessageInputBar: View {
                                         .clipped()
                                 } else {
                                     VStack {
-                                        Image(systemName: "doc.fill")
+                                        Image(systemName: attachmentIcon(for: attachment.type))
                                             .font(.system(size: 24))
-                                            .foregroundColor(AppColors.textPrimary)
+                                            .foregroundColor(attachmentIconColor(for: attachment.type))
                                         Text(attachment.name ?? "File")
                                             .font(AppTypography.labelSmall())
                                             .lineLimit(1)
@@ -166,10 +174,24 @@ struct MessageInputBar: View {
 
                     // Attachment Button
                     Group {
-                        if capability.images {
+                        if capability.images || capability.documents || capability.video || capability.audio {
                             Menu {
-                                Button(action: { showPhotoPicker = true }) {
-                                    Label("Photo Library", systemImage: "photo")
+                                if capability.images {
+                                    Button(action: { showPhotoPicker = true }) {
+                                        Label("Photo Library", systemImage: "photo")
+                                    }
+                                }
+
+                                if capability.video {
+                                    Button(action: { showVideoImporter = true }) {
+                                        Label("Video", systemImage: "video")
+                                    }
+                                }
+
+                                if capability.audio {
+                                    Button(action: { showAudioImporter = true }) {
+                                        Label("Audio", systemImage: "waveform")
+                                    }
                                 }
 
                                 if capability.documents {
@@ -177,6 +199,8 @@ struct MessageInputBar: View {
                                         Label("Document", systemImage: "doc")
                                     }
                                 }
+
+                                Divider()
 
                                 Text(capability.description)
                                     .font(AppTypography.labelSmall())
@@ -188,21 +212,6 @@ struct MessageInputBar: View {
                                     .frame(width: 32, height: 32)
                             }
                             .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
-                        } else if capability.documents {
-                            Menu {
-                                Button(action: { showFileImporter = true }) {
-                                    Label("Document", systemImage: "doc")
-                                }
-
-                                Text(capability.description)
-                                    .font(AppTypography.labelSmall())
-                                    .foregroundColor(AppColors.textSecondary)
-                            } label: {
-                                Image(systemName: "paperclip")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(AppColors.textSecondary)
-                                    .frame(width: 32, height: 32)
-                            }
                         }
                     }
 
@@ -267,10 +276,25 @@ struct MessageInputBar: View {
             .padding(.bottom, 8)
         }
         .onChange(of: selectedItem) { newItem in
+            guard let newItem = newItem else { return }
             Task {
-                if let data = try? await newItem?.loadTransferable(type: Data.self),
-                   let uiImage = UIImage(data: data),
-                   let compressedData = uiImage.jpegData(compressionQuality: 0.7) {
+                // Always reset selectedItem to allow re-selecting the same photo
+                defer { selectedItem = nil }
+
+                do {
+                    guard let data = try await newItem.loadTransferable(type: Data.self) else {
+                        print("[MessageInputBar] Failed to load photo data")
+                        return
+                    }
+                    guard let uiImage = UIImage(data: data) else {
+                        print("[MessageInputBar] Failed to create UIImage from data")
+                        return
+                    }
+                    guard let compressedData = uiImage.jpegData(compressionQuality: 0.7) else {
+                        print("[MessageInputBar] Failed to compress image")
+                        return
+                    }
+
                     let base64 = compressedData.base64EncodedString()
                     let attachment = MessageAttachment(
                         type: .image,
@@ -279,7 +303,9 @@ struct MessageInputBar: View {
                         mimeType: "image/jpeg"
                     )
                     attachments.append(attachment)
-                    selectedItem = nil
+                    print("[MessageInputBar] Successfully added image attachment (\(compressedData.count) bytes)")
+                } catch {
+                    print("[MessageInputBar] Photo loading error: \(error.localizedDescription)")
                 }
             }
         }
@@ -290,23 +316,113 @@ struct MessageInputBar: View {
         ) { result in
             switch result {
             case .success(let urls):
-                guard let url = urls.first else { return }
-                if url.startAccessingSecurityScopedResource() {
-                    defer { url.stopAccessingSecurityScopedResource() }
-                    if let data = try? Data(contentsOf: url) {
-                        let base64 = data.base64EncodedString()
-                        let mimeType = getMimeType(for: url)
-                        let attachment = MessageAttachment(
-                            type: .document,
-                            base64: base64,
-                            name: url.lastPathComponent,
-                            mimeType: mimeType
-                        )
-                        attachments.append(attachment)
-                    }
+                guard let url = urls.first else {
+                    print("[MessageInputBar] File import: No URL returned")
+                    return
+                }
+                guard url.startAccessingSecurityScopedResource() else {
+                    print("[MessageInputBar] Failed to access security-scoped resource: \(url.lastPathComponent)")
+                    return
+                }
+                defer { url.stopAccessingSecurityScopedResource() }
+
+                do {
+                    let data = try Data(contentsOf: url)
+                    let base64 = data.base64EncodedString()
+                    let mimeType = getMimeType(for: url)
+                    let attachment = MessageAttachment(
+                        type: .document,
+                        base64: base64,
+                        name: url.lastPathComponent,
+                        mimeType: mimeType
+                    )
+                    attachments.append(attachment)
+                    print("[MessageInputBar] Successfully added document: \(url.lastPathComponent) (\(data.count) bytes)")
+                } catch {
+                    print("[MessageInputBar] Failed to read file data: \(error.localizedDescription)")
                 }
             case .failure(let error):
-                print("File import failed: \(error.localizedDescription)")
+                print("[MessageInputBar] File import failed: \(error.localizedDescription)")
+            }
+        }
+        // Video file importer
+        .fileImporter(
+            isPresented: $showVideoImporter,
+            allowedContentTypes: [.movie, .video, .mpeg4Movie, .quickTimeMovie, .avi],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else {
+                    print("[MessageInputBar] Video import: No URL returned")
+                    return
+                }
+                guard url.startAccessingSecurityScopedResource() else {
+                    print("[MessageInputBar] Failed to access security-scoped resource for video: \(url.lastPathComponent)")
+                    return
+                }
+                defer { url.stopAccessingSecurityScopedResource() }
+
+                do {
+                    let data = try Data(contentsOf: url)
+                    // Check file size - warn if >20MB (Gemini inline limit)
+                    let fileSizeMB = Double(data.count) / (1024 * 1024)
+                    if fileSizeMB > 20 {
+                        print("[MessageInputBar] Warning: Video file is \(String(format: "%.1f", fileSizeMB))MB. Files >20MB should use File API upload.")
+                    }
+
+                    let base64 = data.base64EncodedString()
+                    let mimeType = getMimeType(for: url)
+                    let attachment = MessageAttachment(
+                        type: .video,
+                        base64: base64,
+                        name: url.lastPathComponent,
+                        mimeType: mimeType
+                    )
+                    attachments.append(attachment)
+                    print("[MessageInputBar] Successfully added video: \(url.lastPathComponent) (\(String(format: "%.1f", fileSizeMB))MB)")
+                } catch {
+                    print("[MessageInputBar] Failed to read video data: \(error.localizedDescription)")
+                }
+            case .failure(let error):
+                print("[MessageInputBar] Video import failed: \(error.localizedDescription)")
+            }
+        }
+        // Audio file importer
+        .fileImporter(
+            isPresented: $showAudioImporter,
+            allowedContentTypes: [.audio, .mp3, .wav, .aiff, .mpeg4Audio],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else {
+                    print("[MessageInputBar] Audio import: No URL returned")
+                    return
+                }
+                guard url.startAccessingSecurityScopedResource() else {
+                    print("[MessageInputBar] Failed to access security-scoped resource for audio: \(url.lastPathComponent)")
+                    return
+                }
+                defer { url.stopAccessingSecurityScopedResource() }
+
+                do {
+                    let data = try Data(contentsOf: url)
+                    let base64 = data.base64EncodedString()
+                    let mimeType = getMimeType(for: url)
+                    let attachment = MessageAttachment(
+                        type: .audio,
+                        base64: base64,
+                        name: url.lastPathComponent,
+                        mimeType: mimeType
+                    )
+                    attachments.append(attachment)
+                    print("[MessageInputBar] Successfully added audio: \(url.lastPathComponent) (\(data.count) bytes)")
+                } catch {
+                    print("[MessageInputBar] Failed to read audio data: \(error.localizedDescription)")
+                }
+            case .failure(let error):
+                print("[MessageInputBar] Audio import failed: \(error.localizedDescription)")
             }
         }
     }
@@ -314,6 +430,7 @@ struct MessageInputBar: View {
     private func getMimeType(for url: URL) -> String {
         let pathExtension = url.pathExtension.lowercased()
         switch pathExtension {
+        // Documents
         case "pdf":
             return "application/pdf"
         case "txt", "text":
@@ -328,6 +445,8 @@ struct MessageInputBar: View {
             return "application/vnd.ms-excel"
         case "ppt", "pptx":
             return "application/vnd.ms-powerpoint"
+
+        // Images
         case "jpg", "jpeg":
             return "image/jpeg"
         case "png":
@@ -336,8 +455,93 @@ struct MessageInputBar: View {
             return "image/gif"
         case "webp":
             return "image/webp"
+
+        // Video formats (Gemini supported)
+        case "mp4", "m4v":
+            return "video/mp4"
+        case "mpeg", "mpg":
+            return "video/mpeg"
+        case "mov":
+            return "video/mov"
+        case "avi":
+            return "video/avi"
+        case "flv":
+            return "video/x-flv"
+        case "webm":
+            return "video/webm"
+        case "wmv":
+            return "video/wmv"
+        case "3gp", "3gpp":
+            return "video/3gpp"
+
+        // Audio formats (Gemini supported)
+        case "wav":
+            return "audio/wav"
+        case "mp3":
+            return "audio/mp3"
+        case "aiff", "aif":
+            return "audio/aiff"
+        case "aac", "m4a":
+            return "audio/aac"
+        case "ogg":
+            return "audio/ogg"
+        case "flac":
+            return "audio/flac"
+
         default:
             return "application/octet-stream"
         }
+    }
+
+    private func attachmentIcon(for type: MessageAttachment.AttachmentType) -> String {
+        switch type {
+        case .image:
+            return "photo.fill"
+        case .document:
+            return "doc.fill"
+        case .video:
+            return "video.fill"
+        case .audio:
+            return "waveform"
+        }
+    }
+
+    private func attachmentIconColor(for type: MessageAttachment.AttachmentType) -> Color {
+        switch type {
+        case .image:
+            return AppColors.textPrimary
+        case .document:
+            return AppColors.textPrimary
+        case .video:
+            return Color.red
+        case .audio:
+            return Color.purple
+        }
+    }
+
+    /// Determine attachment type from URL extension
+    private func attachmentType(for url: URL) -> MessageAttachment.AttachmentType {
+        let ext = url.pathExtension.lowercased()
+
+        // Video extensions
+        let videoExtensions = ["mp4", "m4v", "mpeg", "mpg", "mov", "avi", "flv", "webm", "wmv", "3gp", "3gpp"]
+        if videoExtensions.contains(ext) {
+            return .video
+        }
+
+        // Audio extensions
+        let audioExtensions = ["wav", "mp3", "aiff", "aif", "aac", "m4a", "ogg", "flac"]
+        if audioExtensions.contains(ext) {
+            return .audio
+        }
+
+        // Image extensions
+        let imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif"]
+        if imageExtensions.contains(ext) {
+            return .image
+        }
+
+        // Default to document
+        return .document
     }
 }

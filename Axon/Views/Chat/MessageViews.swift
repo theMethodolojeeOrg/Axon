@@ -184,7 +184,8 @@ struct AssistantMessageView: View {
     let overrideContent: String?
     let onCopy: (Message) -> Void
     let onRegenerate: (Message) -> Void
-    
+    var onQuote: ((String) -> Void)? = nil
+
     @ObservedObject private var ttsService = TTSPlaybackService.shared
     
     private var textToRender: String {
@@ -211,12 +212,19 @@ struct AssistantMessageView: View {
             Markdown(textToRender)
                 .markdownTheme(MarkdownTheme.axon)
                 .textSelection(.enabled)
-            
+
+            // Grounding sources (from tool calls like web search, maps)
+            if let sources = message.groundingSources, !sources.isEmpty {
+                MessageSourcesView(sources: sources)
+                    .padding(.top, 12)
+            }
+
             // Footer toolbar
             AssistantToolbar(
                 message: message,
                 onCopy: onCopy,
-                onRegenerate: onRegenerate
+                onRegenerate: onRegenerate,
+                onQuote: onQuote
             )
             .padding(.top, 12)
         }
@@ -255,13 +263,16 @@ struct AssistantToolbar: View {
     let message: Message
     let onCopy: (Message) -> Void
     let onRegenerate: (Message) -> Void
-    
+    var onQuote: ((String) -> Void)? = nil
+
     @ObservedObject private var ttsService = TTSPlaybackService.shared
-    
+    @State private var showQuoteToast = false
+    @State private var showTextSelector = false
+
     private var modelProvider: ModelProvider {
         provider(for: message.modelName, providerName: message.providerName)
     }
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Model icon
@@ -271,7 +282,7 @@ struct AssistantToolbar: View {
                 .scaledToFit()
                 .frame(width: 18, height: 18)
                 .foregroundStyle(iconStyle(for: modelProvider, modelName: message.modelName))
-            
+
             // Model name
             if let modelName = message.modelName {
                 Text(modelName)
@@ -279,25 +290,41 @@ struct AssistantToolbar: View {
                     .foregroundColor(AppColors.textTertiary)
                     .lineLimit(1)
             }
-            
+
             Spacer()
-            
+
             // Action buttons
             HStack(spacing: 16) {
+                // Select Text button - opens sheet with selectable text
+                Button(action: { showTextSelector = true }) {
+                    Image(systemName: "selection.pin.in.out")
+                        .font(.system(size: 14))
+                        .foregroundColor(AppColors.textTertiary)
+                }
+
+                // Quote button - inserts clipboard content as formatted quote
+                if onQuote != nil {
+                    Button(action: quoteFromClipboard) {
+                        Image(systemName: "text.quote")
+                            .font(.system(size: 14))
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+                }
+
                 // Copy button
                 Button(action: { onCopy(message) }) {
                     Image(systemName: "doc.on.doc")
                         .font(.system(size: 14))
                         .foregroundColor(AppColors.textTertiary)
                 }
-                
+
                 // Regenerate button
                 Button(action: { onRegenerate(message) }) {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 14))
                         .foregroundColor(AppColors.textTertiary)
                 }
-                
+
                 // TTS button
                 if ttsService.hasGeneratedAudio(for: message.id) {
                     Button(action: {
@@ -330,14 +357,145 @@ struct AssistantToolbar: View {
                     }
                 }
             }
-            
+
             // Timestamp
             Text(message.timestamp, style: .time)
                 .font(AppTypography.labelSmall())
                 .foregroundColor(AppColors.textTertiary)
         }
+        .overlay(alignment: .top) {
+            if showQuoteToast {
+                Text("Copy text first, then tap quote")
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(AppColors.substrateSecondary)
+                    .cornerRadius(8)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .offset(y: -30)
+            }
+        }
+        .sheet(isPresented: $showTextSelector) {
+            TextSelectorSheet(
+                content: message.content,
+                onQuote: onQuote
+            )
+        }
+    }
+
+    private func quoteFromClipboard() {
+        #if canImport(UIKit)
+        guard let clipboardText = UIPasteboard.general.string, !clipboardText.isEmpty else {
+            // Show toast if clipboard is empty
+            withAnimation {
+                showQuoteToast = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation {
+                    showQuoteToast = false
+                }
+            }
+            return
+        }
+
+        // Format as a quote block
+        let formattedQuote = formatAsQuote(clipboardText)
+        onQuote?(formattedQuote)
+        #endif
+    }
+
+    private func formatAsQuote(_ text: String) -> String {
+        // Format as markdown quote with line prefix
+        let lines = text.components(separatedBy: .newlines)
+        let quotedLines = lines.map { "> \($0)" }
+        return quotedLines.joined(separator: "\n") + "\n\n"
     }
 }
+
+// MARK: - Text Selector Sheet
+
+struct TextSelectorSheet: View {
+    let content: String
+    var onQuote: ((String) -> Void)?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            SelectableTextView(text: content)
+                .padding()
+                .background(AppColors.substratePrimary)
+                .navigationTitle("Select Text")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") {
+                            dismiss()
+                        }
+                    }
+
+                    if onQuote != nil {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button(action: quoteFromClipboard) {
+                                Label("Quote", systemImage: "text.quote")
+                            }
+                        }
+                    }
+                }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func quoteFromClipboard() {
+        #if canImport(UIKit)
+        guard let clipboardText = UIPasteboard.general.string, !clipboardText.isEmpty else {
+            return
+        }
+
+        // Format as a quote block
+        let lines = clipboardText.components(separatedBy: .newlines)
+        let quotedLines = lines.map { "> \($0)" }
+        let formattedQuote = quotedLines.joined(separator: "\n") + "\n\n"
+        onQuote?(formattedQuote)
+        dismiss()
+        #endif
+    }
+}
+
+// MARK: - Selectable Text View (UIKit wrapper)
+
+#if canImport(UIKit)
+struct SelectableTextView: UIViewRepresentable {
+    let text: String
+
+    func makeUIView(context: Context) -> UITextView {
+        let textView = UITextView()
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.font = UIFont.preferredFont(forTextStyle: .body)
+        textView.textColor = UIColor(AppColors.textPrimary)
+        textView.backgroundColor = .clear
+        textView.textContainerInset = .zero
+        textView.textContainer.lineFragmentPadding = 0
+        textView.dataDetectorTypes = []
+        return textView
+    }
+
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        uiView.text = text
+    }
+}
+#else
+struct SelectableTextView: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .textSelection(.enabled)
+    }
+}
+#endif
 
 // MARK: - Message Separator
 

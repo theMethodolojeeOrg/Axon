@@ -71,7 +71,7 @@ class SettingsViewModel: ObservableObject {
 
     // MARK: - Load Settings
 
-    private func loadSettings() {
+    func loadSettings() {
         // Load from local storage
         if let localSettings = storageService.loadSettings() {
             self.settings = localSettings

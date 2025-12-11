@@ -190,12 +190,13 @@ struct ConversationSummary: Codable {
     let timestamp: Date
 
     /// Format the summary for injection into system prompt
+    /// Uses first-person framing for intrinsic memory feel
     func formattedForInjection() -> String {
         let relativeTime = formatRelativeTime(from: timestamp)
         return """
 
-        ## Recent Context
-        *From your last conversation (\(relativeTime))*
+        ## From Our Last Conversation
+        *\(relativeTime)*
 
         \(summary)
 

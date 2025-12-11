@@ -447,7 +447,16 @@ class ConversationService: ObservableObject {
     private let onDeviceOrchestrator = OnDeviceConversationOrchestrator()
 
     private func getOrchestrator(settings: AppSettings) -> ConversationOrchestrator {
-        return settings.useOnDeviceOrchestration ? onDeviceOrchestrator : cloudOrchestrator
+        // Check the actual device mode settings, not just the legacy flag
+        // On-device orchestration is enabled when:
+        // 1. Device mode is .onDevice, AND
+        // 2. AI processing mode is .onDevice
+        let useOnDevice = (settings.deviceMode == .onDevice && settings.deviceModeConfig.aiProcessing == .onDevice)
+
+        // Also respect the legacy flag for backwards compatibility
+        let shouldUseOnDevice = useOnDevice || settings.useOnDeviceOrchestration
+
+        return shouldUseOnDevice ? onDeviceOrchestrator : cloudOrchestrator
     }
 
     func sendMessage(conversationId: String, content: String, attachments: [MessageAttachment] = [], enabledTools: [String] = []) async throws -> Message {
@@ -536,7 +545,12 @@ class ConversationService: ObservableObject {
 
             // Select orchestrator
             let orchestrator = getOrchestrator(settings: settings)
-            
+            let orchestratorType = orchestrator is OnDeviceConversationOrchestrator ? "OnDevice" : "Cloud"
+            print("[ConversationService] Using \(orchestratorType) orchestrator (deviceMode=\(settings.deviceMode.rawValue), aiProcessing=\(settings.deviceModeConfig.aiProcessing.rawValue), legacyFlag=\(settings.useOnDeviceOrchestration))")
+            if !enabledTools.isEmpty {
+                print("[ConversationService] Enabled tools: \(enabledTools)")
+            }
+
             // Call orchestrator
             let (assistantMessage, memories) = try await orchestrator.sendMessage(
                 conversationId: conversationId,

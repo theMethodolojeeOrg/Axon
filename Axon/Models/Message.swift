@@ -20,6 +20,7 @@ struct Message: Codable, Identifiable, Equatable {
     let modelName: String?  // For display purposes (e.g., "GPT-4", "Claude Sonnet 4.5")
     let providerName: String?  // For display purposes (e.g., "OpenAI", "Anthropic")
     let attachments: [MessageAttachment]?
+    let groundingSources: [MessageGroundingSource]?  // Sources from tool calls (web search, etc.)
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -34,6 +35,7 @@ struct Message: Codable, Identifiable, Equatable {
         case modelName
         case providerName
         case attachments
+        case groundingSources
     }
 
     init(
@@ -48,7 +50,8 @@ struct Message: Codable, Identifiable, Equatable {
         isStreaming: Bool? = nil,
         modelName: String? = nil,
         providerName: String? = nil,
-        attachments: [MessageAttachment]? = nil
+        attachments: [MessageAttachment]? = nil,
+        groundingSources: [MessageGroundingSource]? = nil
     ) {
         self.id = id
         self.conversationId = conversationId
@@ -62,6 +65,7 @@ struct Message: Codable, Identifiable, Equatable {
         self.modelName = modelName
         self.providerName = providerName
         self.attachments = attachments
+        self.groundingSources = groundingSources
     }
 
     // Custom decoder to handle timestamp conversion from milliseconds
@@ -121,6 +125,7 @@ struct Message: Codable, Identifiable, Equatable {
         isStreaming = try container.decodeIfPresent(Bool.self, forKey: .isStreaming)
         modelName = try container.decodeIfPresent(String.self, forKey: .modelName)
         providerName = try container.decodeIfPresent(String.self, forKey: .providerName)
+        groundingSources = try container.decodeIfPresent([MessageGroundingSource].self, forKey: .groundingSources)
     }
 
     // Custom encoder to convert timestamp back to milliseconds
@@ -142,6 +147,7 @@ struct Message: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(modelName, forKey: .modelName)
         try container.encodeIfPresent(providerName, forKey: .providerName)
         try container.encodeIfPresent(attachments, forKey: .attachments)
+        try container.encodeIfPresent(groundingSources, forKey: .groundingSources)
     }
 }
 
@@ -203,6 +209,36 @@ struct MessageAttachment: Codable, Equatable, Identifiable {
     }
 }
 
+// MARK: - Grounding Sources
+
+/// A source referenced in tool call results (web search, maps, etc.)
+struct MessageGroundingSource: Codable, Equatable, Identifiable {
+    let id: String
+    let title: String
+    let url: String
+    let sourceType: SourceType
+
+    enum SourceType: String, Codable {
+        case web
+        case maps
+    }
+
+    init(id: String = UUID().uuidString, title: String, url: String, sourceType: SourceType = .web) {
+        self.id = id
+        self.title = title
+        self.url = url
+        self.sourceType = sourceType
+    }
+
+    /// Create from GroundingChunk (from GeminiToolService)
+    init(from chunk: GroundingChunk) {
+        self.id = chunk.id
+        self.title = chunk.title
+        self.url = chunk.uri ?? ""
+        self.sourceType = chunk.maps != nil ? .maps : .web
+    }
+}
+
 // Helper struct for decoding multimodal content from backend
 private struct ContentPart: Codable {
     let type: String
@@ -213,7 +249,7 @@ private struct ContentPart: Codable {
     let video_url: VideoUrl?
     let media_type: String?
     let data: String?
-    
+
     struct ImageUrl: Codable { let url: String }
     struct FileUrl: Codable { let url: String }
     struct AudioUrl: Codable { let url: String }

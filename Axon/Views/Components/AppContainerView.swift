@@ -170,6 +170,19 @@ struct AppContainerView: View {
     }
 
     private func startNewChat() {
+        // Generate summary for the previous conversation before starting new chat
+        // This provides continuity context for the new conversation
+        if let previousConversation = selectedConversation,
+           !conversationService.messages.isEmpty {
+            Task {
+                await ConversationSummaryService.shared.generateSummary(
+                    messages: conversationService.messages,
+                    conversationId: previousConversation.id,
+                    conversationTitle: previousConversation.title
+                )
+            }
+        }
+
         selectedConversation = nil
         conversationService.clearCurrentConversation()
         currentView = .chat
@@ -177,6 +190,19 @@ struct AppContainerView: View {
     }
 
     private func selectConversation(_ conversation: Conversation) {
+        // Generate summary for the previous conversation before switching
+        // This provides continuity context for future conversations
+        if let previousConversation = selectedConversation,
+           !conversationService.messages.isEmpty {
+            Task {
+                await ConversationSummaryService.shared.generateSummary(
+                    messages: conversationService.messages,
+                    conversationId: previousConversation.id,
+                    conversationTitle: previousConversation.title
+                )
+            }
+        }
+
         selectedConversation = conversation
         conversationService.currentConversation = conversation
         currentView = .chat
@@ -210,6 +236,10 @@ struct ChatContainerView: View {
     @State private var streamingOverrides: [String: String] = [:]
     @State private var regeneratingMessageIds: Set<String> = []
     @FocusState private var isInputFocused: Bool
+
+    // Scroll tracking for scroll-to-bottom button
+    @State private var showScrollToBottom = false
+    @State private var scrollProxy: ScrollViewProxy?
 
     var body: some View {
         ZStack {
@@ -348,91 +378,154 @@ struct ChatContainerView: View {
     // MARK: - Existing Chat View
 
     private func existingChatView(conversation: Conversation) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(conversationService.messages.enumerated()), id: \.element.id) { index, message in
-                        VStack(spacing: 0) {
-                            // Add separator before assistant messages (except first message)
-                            if message.role == .assistant && index > 0 {
-                                MessageSeparator()
-                                    .padding(.vertical, 12)
-                            }
-                            
-                            // Render appropriate view based on role
-                            if message.role == .user {
-                                UserMessageView(
-                                    message: message,
-                                    onCopy: { msg in
-                                        #if canImport(UIKit)
-                                        UIPasteboard.general.string = msg.content
-                                        #elseif canImport(AppKit)
-                                        let pb = NSPasteboard.general
-                                        pb.clearContents()
-                                        pb.setString(msg.content, forType: .string)
-                                        #endif
-                                    }
-                                )
-                                .padding(.vertical, 8)
-                            } else {
-                                AssistantMessageView(
-                                    message: message,
-                                    overrideContent: streamingOverrides[message.id],
-                                    onCopy: { msg in
-                                        #if canImport(UIKit)
-                                        UIPasteboard.general.string = msg.content
-                                        #elseif canImport(AppKit)
-                                        let pb = NSPasteboard.general
-                                        pb.clearContents()
-                                        pb.setString(msg.content, forType: .string)
-                                        #endif
-                                    },
-                                    onRegenerate: { msg in
-                                        Task {
-                                            let convId = conversationService.currentConversation?.id ?? conversation.id
-                                            regeneratingMessageIds.insert(msg.id)
-                                            do {
-                                                let assistant = try await conversationService.regenerateAssistantMessage(
-                                                    conversationId: convId,
-                                                    messageId: msg.id
-                                                )
-                                                // Stream the regenerated assistant content
-                                                startPseudoStream(for: assistant) {
-                                                    regeneratingMessageIds.remove(msg.id)
-                                                }
-                                            } catch {
-                                                regeneratingMessageIds.remove(msg.id)
-                                                print("Failed to regenerate: \(error)")
-                                            }
-                                        }
-                                    }
-                                )
-                            }
-                            
-                            // Add separator after assistant messages (before next user message)
-                            if message.role == .assistant && index < conversationService.messages.count - 1 {
-                                let nextMessage = conversationService.messages[index + 1]
-                                if nextMessage.role == .user {
+        ZStack(alignment: .bottom) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        // Invisible anchor at top for scroll detection
+                        Color.clear
+                            .frame(height: 1)
+                            .id("scroll_top")
+
+                        ForEach(Array(conversationService.messages.enumerated()), id: \.element.id) { index, message in
+                            VStack(spacing: 0) {
+                                // Add separator before assistant messages (except first message)
+                                if message.role == .assistant && index > 0 {
                                     MessageSeparator()
                                         .padding(.vertical, 12)
                                 }
+
+                                // Render appropriate view based on role
+                                if message.role == .user {
+                                    UserMessageView(
+                                        message: message,
+                                        onCopy: { msg in
+                                            #if canImport(UIKit)
+                                            UIPasteboard.general.string = msg.content
+                                            #elseif canImport(AppKit)
+                                            let pb = NSPasteboard.general
+                                            pb.clearContents()
+                                            pb.setString(msg.content, forType: .string)
+                                            #endif
+                                        }
+                                    )
+                                    .padding(.vertical, 8)
+                                } else {
+                                    AssistantMessageView(
+                                        message: message,
+                                        overrideContent: streamingOverrides[message.id],
+                                        onCopy: { msg in
+                                            #if canImport(UIKit)
+                                            UIPasteboard.general.string = msg.content
+                                            #elseif canImport(AppKit)
+                                            let pb = NSPasteboard.general
+                                            pb.clearContents()
+                                            pb.setString(msg.content, forType: .string)
+                                            #endif
+                                        },
+                                        onRegenerate: { msg in
+                                            Task {
+                                                let convId = conversationService.currentConversation?.id ?? conversation.id
+                                                regeneratingMessageIds.insert(msg.id)
+                                                do {
+                                                    let assistant = try await conversationService.regenerateAssistantMessage(
+                                                        conversationId: convId,
+                                                        messageId: msg.id
+                                                    )
+                                                    // Stream the regenerated assistant content
+                                                    startPseudoStream(for: assistant) {
+                                                        regeneratingMessageIds.remove(msg.id)
+                                                    }
+                                                } catch {
+                                                    regeneratingMessageIds.remove(msg.id)
+                                                    print("Failed to regenerate: \(error)")
+                                                }
+                                            }
+                                        },
+                                        onQuote: { quotedText in
+                                            // Insert quoted text at cursor position in message input
+                                            if messageText.isEmpty {
+                                                messageText = quotedText
+                                            } else {
+                                                messageText += "\n\n" + quotedText
+                                            }
+                                        }
+                                    )
+                                }
+
+                                // Add separator after assistant messages (before next user message)
+                                if message.role == .assistant && index < conversationService.messages.count - 1 {
+                                    let nextMessage = conversationService.messages[index + 1]
+                                    if nextMessage.role == .user {
+                                        MessageSeparator()
+                                            .padding(.vertical, 12)
+                                    }
+                                }
                             }
+                            .id(message.id)
                         }
-                        .id(message.id)
+
+                        // Invisible anchor at bottom for scroll-to-bottom
+                        Color.clear
+                            .frame(height: 1)
+                            .id("scroll_bottom")
+                    }
+                    .padding(.vertical)
+                    .background(
+                        // Geometry reader to detect scroll position
+                        GeometryReader { geometry in
+                            Color.clear
+                                .preference(
+                                    key: ScrollOffsetPreferenceKey.self,
+                                    value: geometry.frame(in: .named("chat_scroll")).minY
+                                )
+                        }
+                    )
+                }
+                .coordinateSpace(name: "chat_scroll")
+                .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
+                    // Show button when scrolled up (offset becomes more positive as you scroll up)
+                    let threshold: CGFloat = -100
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showScrollToBottom = offset < threshold
                     }
                 }
-                .padding(.vertical)
+                .refreshable {
+                    // Pull-to-refresh: Force refresh messages from API
+                    await loadMessages(for: conversation)
+                }
+                .onChange(of: conversationService.messages.count) { oldCount, newCount in
+                    if newCount > oldCount, let lastMessage = conversationService.messages.last {
+                        withAnimation(AppAnimations.standardEasing) {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                        // Hide the button since we auto-scrolled
+                        showScrollToBottom = false
+                    }
+                }
+                .onAppear {
+                    scrollProxy = proxy
+                    // Auto-scroll to bottom when entering chat
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        if let lastMessage = conversationService.messages.last {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                    }
+                }
             }
-            .refreshable {
-                // Pull-to-refresh: Force refresh messages from API
-                await loadMessages(for: conversation)
-            }
-            .onChange(of: conversationService.messages.count) { oldCount, newCount in
-                if newCount > oldCount, let lastMessage = conversationService.messages.last {
+
+            // Glass scroll-to-bottom button
+            if showScrollToBottom {
+                ScrollToBottomButton {
                     withAnimation(AppAnimations.standardEasing) {
-                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        if let lastMessage = conversationService.messages.last {
+                            scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                        showScrollToBottom = false
                     }
                 }
+                .padding(.bottom, 16)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
     }
@@ -600,6 +693,45 @@ struct PromptCard: View {
                             .stroke(AppColors.glassBorder, lineWidth: 1)
                     )
             )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Scroll Offset Preference Key
+
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+// MARK: - Scroll To Bottom Button
+
+struct ScrollToBottomButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Jump to latest")
+                    .font(AppTypography.labelSmall())
+            }
+            .foregroundColor(AppColors.textPrimary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        Capsule()
+                            .stroke(AppColors.glassBorder, lineWidth: 1)
+                    )
+            )
+            .shadow(color: AppColors.shadow.opacity(0.3), radius: 8, x: 0, y: 4)
         }
         .buttonStyle(PlainButtonStyle())
     }

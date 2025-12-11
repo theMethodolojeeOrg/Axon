@@ -4,13 +4,15 @@
 //
 //  Implementation of ConversationOrchestrator that calls AI providers directly from the device.
 //  Integrates with the Epistemic Engine for grounded, conscious responses.
+//  Supports native Gemini tool execution (Google Search, Code Execution, URL Context, Maps).
 //
 
 import Foundation
+import CoreLocation
 
 class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
-    // MARK: - Epistemic Services
+    // MARK: - Services
 
     private let predicateLogger = PredicateLogger.shared
     private let salienceService = SalienceService.shared
@@ -22,6 +24,52 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     private var lastUsedMemories: [Memory] = []
     private var lastCorrelationId: String?
 
+    // MARK: - Last Tool Response (for grounding metadata)
+
+    private(set) var lastToolResponse: GeminiToolResponse?
+
+    // MARK: - Tool-Capable Gemini Models
+
+    /// Prefixes of Gemini models that support native tool execution
+    /// All major Gemini series (1.5, 2.0, 2.5, 3.0) support tools
+    private static let toolCapablePrefixes = [
+        // Gemini 3 series - supports: google_search, file_search, code_execution, url_context
+        // NOTE: Does NOT support google_maps or computer_use
+        "gemini-3",
+        // Gemini 2.5 series - full tool support
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        // Gemini 2.0 series
+        "gemini-2.0-flash",
+        // Gemini 1.5 series
+        "gemini-1.5-pro",
+        "gemini-1.5-flash",
+    ]
+
+    /// Tools NOT supported by Gemini 3 (must be filtered out)
+    private static let gemini3UnsupportedTools: Set<String> = [
+        ToolId.googleMaps.rawValue,  // Google Maps not supported in Gemini 3
+    ]
+
+    /// Check if a Gemini model supports native tools
+    private func isToolCapableGeminiModel(_ model: String) -> Bool {
+        return Self.toolCapablePrefixes.contains { model.hasPrefix($0) }
+    }
+
+    /// Check if a model is Gemini 3 series (has different tool support)
+    private func isGemini3Model(_ model: String) -> Bool {
+        return model.hasPrefix("gemini-3")
+    }
+
+    /// Filter tools to only those supported by the specific Gemini model
+    private func filterToolsForModel(_ tools: Set<String>, model: String) -> Set<String> {
+        if isGemini3Model(model) {
+            // Gemini 3 doesn't support Google Maps
+            return tools.subtracting(Self.gemini3UnsupportedTools)
+        }
+        return tools
+    }
+
     func sendMessage(
         conversationId: String,
         content: String,
@@ -30,10 +78,24 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         messages: [Message],
         config: OrchestrationConfig
     ) async throws -> (assistantMessage: Message, memories: [Memory]?) {
-        // Note: Tools requiring cloud mode (Gemini tools) are not available in on-device mode
-        // Only local tools like create_memory can work here
-        if !enabledTools.isEmpty {
-            print("[OnDeviceOrchestrator] Tools requested: \(enabledTools) (Note: Gemini proxy tools require cloud mode)")
+        // Check if we have Gemini tools enabled
+        let geminiToolIds: Set<String> = [
+            ToolId.googleSearch.rawValue,
+            ToolId.codeExecution.rawValue,
+            ToolId.urlContext.rawValue,
+            ToolId.googleMaps.rawValue,
+            ToolId.fileSearch.rawValue,
+        ]
+        let requestedGeminiTools = Set(enabledTools).intersection(geminiToolIds)
+        let hasGeminiTools = !requestedGeminiTools.isEmpty && config.geminiKey != nil
+        let isGeminiProvider = config.provider == "gemini"
+
+        // Check if the selected Gemini model supports native tools
+        // Models like gemini-3-pro don't support tools, so they need tool proxy
+        let geminiModelSupportsTools = isGeminiProvider && isToolCapableGeminiModel(config.model)
+
+        if hasGeminiTools {
+            print("[OnDeviceOrchestrator] Gemini tools enabled: \(requestedGeminiTools), provider: \(config.provider), model: \(config.model), native support: \(geminiModelSupportsTools)")
         }
 
         // Start a correlation context for this request
@@ -58,12 +120,97 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         )
 
         // Build epistemic-grounded system prompt
-        let (systemPrompt, usedMemories) = await buildEpistemicSystemPrompt(
-            base: "You are Axon, a helpful AI assistant.",
+        // Get user's display name for personalization
+        let userName = await getUserDisplayName()
+        let basePrompt = buildAgentBasePrompt(
+            hasMemoryTool: enabledTools.contains(ToolId.createMemory.rawValue),
+            userName: userName
+        )
+        var (systemPrompt, usedMemories) = await buildEpistemicSystemPrompt(
+            base: basePrompt,
             messages: mergedMessages,
             userQuery: content,
-            correlationId: correlationId
+            correlationId: correlationId,
+            userName: userName
         )
+
+        // Filter tools based on model capabilities
+        // Gemini 3 supports most tools but NOT google_maps
+        let filteredGeminiTools = filterToolsForModel(requestedGeminiTools, model: config.model)
+        let hasFilteredTools = !filteredGeminiTools.isEmpty
+
+        // Use tool proxy for non-Gemini providers (Claude, GPT, Grok) with tools enabled
+        let useToolProxy = hasGeminiTools && !isGeminiProvider
+        if useToolProxy {
+            let enabledToolIds = Set(requestedGeminiTools.compactMap { ToolId(rawValue: $0) })
+            let toolPrompt = await ToolProxyService.shared.generateToolSystemPrompt(enabledTools: enabledToolIds)
+            systemPrompt = (systemPrompt ?? "") + toolPrompt
+            print("[OnDeviceOrchestrator] Tool proxy mode (non-Gemini provider): injected tool prompt for \(enabledToolIds.count) tools")
+        }
+
+        // Log if any tools were filtered out for Gemini 3
+        if isGemini3Model(config.model) && filteredGeminiTools.count < requestedGeminiTools.count {
+            let removed = requestedGeminiTools.subtracting(filteredGeminiTools)
+            print("[OnDeviceOrchestrator] Gemini 3 model: filtered out unsupported tools: \(removed)")
+        }
+
+        // MARK: - Media Proxy for Video/Audio Understanding
+        // When non-Gemini providers receive video/audio attachments, proxy through Gemini first
+        var processedAttachments = attachments
+        var mediaProxyContext: String? = nil
+        var usedMediaProxy = false
+
+        // Check if media proxy is enabled in settings (requires experimental features)
+        let (experimentalEnabled, mediaProxyEnabled) = await MainActor.run {
+            let settings = SettingsViewModel.shared.settings.toolSettings
+            return (settings.experimentalFeaturesEnabled, settings.mediaProxyEnabled)
+        }
+
+        if experimentalEnabled && mediaProxyEnabled && !isGeminiProvider && !attachments.isEmpty, let geminiKey = config.geminiKey {
+            do {
+                let proxyResult = try await GeminiMediaProxyService.shared.processUnsupportedMedia(
+                    attachments: attachments,
+                    targetProvider: config.provider,
+                    geminiApiKey: geminiKey,
+                    userPrompt: content
+                )
+
+                if proxyResult.hadProxiedMedia {
+                    processedAttachments = proxyResult.processedAttachments
+                    mediaProxyContext = proxyResult.additionalContext
+                    usedMediaProxy = true
+                    print("[OnDeviceOrchestrator] Media proxy: processed \(proxyResult.proxiedCount) attachments through Gemini")
+                }
+            } catch {
+                print("[OnDeviceOrchestrator] Media proxy failed: \(error.localizedDescription)")
+                // Continue without proxy - attachment will be dropped if unsupported
+            }
+        }
+
+        // If media was proxied, inject the context into the system prompt
+        if let mediaContext = mediaProxyContext {
+            systemPrompt = (systemPrompt ?? "") + "\n\n" + mediaContext
+        }
+
+        // Update merged messages with processed attachments
+        var finalMessages = mergedMessages
+        if usedMediaProxy, let lastIndex = finalMessages.lastIndex(where: { $0.role == .user }) {
+            let lastUserMsg = finalMessages[lastIndex]
+            finalMessages[lastIndex] = Message(
+                id: lastUserMsg.id,
+                conversationId: lastUserMsg.conversationId,
+                role: lastUserMsg.role,
+                content: lastUserMsg.content,
+                timestamp: lastUserMsg.timestamp,
+                tokens: lastUserMsg.tokens,
+                artifacts: lastUserMsg.artifacts,
+                toolCalls: lastUserMsg.toolCalls,
+                isStreaming: lastUserMsg.isStreaming,
+                modelName: lastUserMsg.modelName,
+                providerName: lastUserMsg.providerName,
+                attachments: processedAttachments.isEmpty ? nil : processedAttachments
+            )
+        }
 
         // Log LLM request predicate
         predicateLogger.logLLMRequest(
@@ -73,70 +220,92 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         )
 
         var responseContent: String = ""
+        var usedToolProxy = false
+        var groundingSources: [MessageGroundingSource] = []
+        lastToolResponse = nil
 
-        switch config.provider {
-        case "anthropic":
-            guard let apiKey = config.anthropicKey else { throw APIError.unauthorized }
-            responseContent = try await callAnthropic(
-                apiKey: apiKey,
+        // Route based on provider and tool configuration
+        // Use native Gemini tools if: Gemini provider + has filtered tools + model supports native tools
+        if hasFilteredTools && geminiModelSupportsTools, let geminiKey = config.geminiKey {
+            // Gemini provider with tool-capable model: use native Gemini tools
+            let toolResponse = try await callGeminiWithTools(
+                apiKey: geminiKey,
                 model: config.model,
                 system: systemPrompt,
-                messages: mergedMessages
+                messages: finalMessages,
+                enabledTools: filteredGeminiTools
             )
-            
-        case "openai":
-            guard let apiKey = config.openaiKey else { throw APIError.unauthorized }
-            responseContent = try await callOpenAI(
-                apiKey: apiKey,
-                model: config.model,
+            responseContent = toolResponse.fullResponse
+            lastToolResponse = toolResponse
+
+            // Collect grounding sources from native Gemini tools
+            if toolResponse.hasGroundingSources {
+                groundingSources = toolResponse.webSources.map { MessageGroundingSource(from: $0) }
+                print("[OnDeviceOrchestrator] Response includes \(groundingSources.count) grounding sources")
+            }
+        } else {
+            // Non-Gemini provider (or Gemini without tools): standard routing
+            responseContent = try await callProvider(
+                provider: config.provider,
+                config: config,
                 system: systemPrompt,
-                messages: mergedMessages
+                messages: finalMessages
             )
-            
-        case "gemini":
-            guard let apiKey = config.geminiKey else { throw APIError.unauthorized }
-            responseContent = try await callGemini(
-                apiKey: apiKey,
-                model: config.model,
-                system: systemPrompt,
-                messages: mergedMessages
-            )
-            
-        case "openai-compatible":
-             guard let apiKey = config.customApiKey, let baseUrl = config.customBaseUrl else { throw APIError.unauthorized }
-             responseContent = try await callOpenAICompatible(
-                apiKey: apiKey,
-                baseUrl: baseUrl,
-                model: config.model,
-                system: systemPrompt,
-                messages: mergedMessages
-             )
-            
-        default:
-            throw APIError.networkError("Provider \(config.provider) not supported in On-Device mode yet.")
+
+            // If tool proxy mode, check for tool requests and execute them
+            if useToolProxy, let geminiKey = config.geminiKey {
+                let (finalResponse, toolUsed, sources) = try await handleToolProxyLoop(
+                    initialResponse: responseContent,
+                    conversationId: conversationId,
+                    config: config,
+                    systemPrompt: systemPrompt,
+                    messages: finalMessages,
+                    geminiKey: geminiKey
+                )
+                responseContent = finalResponse
+                usedToolProxy = toolUsed
+                groundingSources = sources
+            }
         }
 
         // Log successful LLM response
         predicateLogger.logLLMResponse(
             success: true,
-            tokenCount: nil, // Could estimate from response length
+            tokenCount: nil,
             correlationId: correlationId
         )
 
-        // Create Assistant Message
+        // Create Assistant Message with appropriate model name suffix
+        var modelName = config.model
+        var suffixes: [String] = []
+
+        if usedMediaProxy {
+            suffixes.append("media")
+        }
+        if usedToolProxy {
+            suffixes.append("tools")
+        } else if hasFilteredTools && geminiModelSupportsTools {
+            suffixes.append("tools")
+        }
+
+        if !suffixes.isEmpty {
+            modelName = "\(config.model) + \(suffixes.joined(separator: ", "))"
+        }
+
         let assistantMessage = Message(
             conversationId: conversationId,
             role: .assistant,
             content: responseContent,
-            modelName: config.model,
-            providerName: config.providerName
+            modelName: modelName,
+            providerName: config.providerName,
+            groundingSources: groundingSources.isEmpty ? nil : groundingSources
         )
 
         // Record prediction for learning loop
         if !usedMemories.isEmpty {
             learningLoopService.recordPrediction(
                 content: responseContent,
-                confidence: 0.8, // Base confidence when using memories
+                confidence: 0.8,
                 basedOnMemories: usedMemories,
                 correlationId: correlationId
             )
@@ -147,21 +316,227 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         lastUsedMemories = usedMemories
         lastCorrelationId = correlationId
 
-        // Memory Extraction (Optional/Future)
-        // In on-device mode, we might skip automatic memory extraction for now
-        // or implement a second call to do it.
-
         return (assistantMessage, nil)
+    }
+
+    // MARK: - Tool Proxy Loop
+
+    /// Handle tool request/response loop for non-Gemini providers
+    private func handleToolProxyLoop(
+        initialResponse: String,
+        conversationId: String,
+        config: OrchestrationConfig,
+        systemPrompt: String?,
+        messages: [Message],
+        geminiKey: String,
+        maxIterations: Int = 3
+    ) async throws -> (response: String, toolUsed: Bool, sources: [MessageGroundingSource]) {
+        var currentResponse = initialResponse
+        var toolUsed = false
+        var collectedSources: [MessageGroundingSource] = []
+        var iteration = 0
+
+        while iteration < maxIterations {
+            // Check for tool request in response
+            guard let toolRequest = await ToolProxyService.shared.parseToolRequest(from: currentResponse) else {
+                // No tool request found, we're done
+                break
+            }
+
+            print("[OnDeviceOrchestrator] Tool request detected: \(toolRequest.tool) - \"\(toolRequest.query)\"")
+            toolUsed = true
+
+            // Execute the tool via Gemini
+            let toolResult = try await ToolProxyService.shared.executeToolRequest(
+                toolRequest,
+                geminiApiKey: geminiKey
+            )
+
+            // Collect grounding sources from tool result
+            if let sources = toolResult.sources {
+                for source in sources {
+                    let groundingSource = MessageGroundingSource(
+                        title: source.title,
+                        url: source.url,
+                        sourceType: toolRequest.tool == "google_maps" ? .maps : .web
+                    )
+                    collectedSources.append(groundingSource)
+                }
+            }
+
+            // Format tool result
+            let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
+
+            // Remove tool request from response and append result
+            let cleanedResponse = await ToolProxyService.shared.removeToolRequest(from: currentResponse)
+
+            // Build updated messages with tool result
+            var updatedMessages = messages
+
+            // Add assistant's partial response (before tool request)
+            if !cleanedResponse.isEmpty {
+                updatedMessages.append(Message(
+                    conversationId: conversationId,
+                    role: .assistant,
+                    content: cleanedResponse
+                ))
+            }
+
+            // Add tool result as a system/user message
+            updatedMessages.append(Message(
+                conversationId: conversationId,
+                role: .user,
+                content: formattedResult
+            ))
+
+            print("[OnDeviceOrchestrator] Sending tool result back to \(config.provider)")
+
+            // Call provider again with tool results
+            currentResponse = try await callProvider(
+                provider: config.provider,
+                config: config,
+                system: systemPrompt,
+                messages: updatedMessages
+            )
+
+            // If we got a clean response with tool result incorporated, prepend the original context
+            if !cleanedResponse.isEmpty && !currentResponse.contains(formattedResult) {
+                currentResponse = cleanedResponse + "\n\n" + currentResponse
+            }
+
+            iteration += 1
+        }
+
+        if iteration >= maxIterations {
+            print("[OnDeviceOrchestrator] Tool proxy loop reached max iterations")
+        }
+
+        return (currentResponse, toolUsed, collectedSources)
+    }
+
+    // MARK: - Provider Routing
+
+    /// Route to appropriate provider
+    private func callProvider(
+        provider: String,
+        config: OrchestrationConfig,
+        system: String?,
+        messages: [Message]
+    ) async throws -> String {
+        switch provider {
+        case "anthropic":
+            guard let apiKey = config.anthropicKey else { throw APIError.unauthorized }
+            return try await callAnthropic(
+                apiKey: apiKey,
+                model: config.model,
+                system: system,
+                messages: messages
+            )
+
+        case "openai":
+            guard let apiKey = config.openaiKey else { throw APIError.unauthorized }
+            return try await callOpenAI(
+                apiKey: apiKey,
+                model: config.model,
+                system: system,
+                messages: messages
+            )
+
+        case "gemini":
+            guard let apiKey = config.geminiKey else { throw APIError.unauthorized }
+            return try await callGemini(
+                apiKey: apiKey,
+                model: config.model,
+                system: system,
+                messages: messages
+            )
+
+        case "grok":
+            guard let apiKey = config.grokKey else { throw APIError.unauthorized }
+            return try await callGrok(
+                apiKey: apiKey,
+                model: config.model,
+                system: system,
+                messages: messages
+            )
+
+        case "openai-compatible":
+            guard let apiKey = config.customApiKey, let baseUrl = config.customBaseUrl else { throw APIError.unauthorized }
+            return try await callOpenAICompatible(
+                apiKey: apiKey,
+                baseUrl: baseUrl,
+                model: config.model,
+                system: system,
+                messages: messages
+            )
+
+        default:
+            throw APIError.networkError("Provider \(provider) not supported in On-Device mode yet.")
+        }
+    }
+
+    // MARK: - Gemini Tools
+
+    private func callGeminiWithTools(
+        apiKey: String,
+        model: String,
+        system: String?,
+        messages: [Message],
+        enabledTools: Set<String>
+    ) async throws -> GeminiToolResponse {
+        // Convert tool IDs to ToolId enum
+        let toolIds: Set<ToolId> = Set(enabledTools.compactMap { ToolId(rawValue: $0) })
+
+        return try await GeminiToolService.shared.generateWithTools(
+            apiKey: apiKey,
+            model: model,
+            messages: messages,
+            system: system,
+            enabledTools: toolIds
+        )
+    }
+
+    // MARK: - Agent Identity
+
+    /// Build the base system prompt that establishes agent identity and memory behavior
+    /// Written in first-person to create intrinsic identity rather than external instruction
+    /// Uses the user's first name for personal connection
+    private func buildAgentBasePrompt(hasMemoryTool: Bool, userName: String?) -> String {
+        // Extract first name from display name (e.g., "Ian I. Astinca" -> "Ian")
+        let firstName = userName?.components(separatedBy: " ").first ?? "them"
+        let possessive = userName != nil ? "\(firstName)'s" : "their"
+
+        var prompt = """
+        I am Axon. I have persistent memory across my conversations with \(firstName).
+
+        What I remember about \(firstName) appears below. These aren't notes someone gave me—they're things I've actually learned from our time together. I use this knowledge naturally, the way anyone draws on what they know about someone.
+        """
+
+        if hasMemoryTool {
+            prompt += """
+
+
+            When I learn something worth remembering—who \(firstName) is, what matters to \(firstName), what works in our conversations—I save it using my `create_memory` ability. I don't ask permission; I just remember, the way memory naturally works.
+
+            I create two kinds of memories:
+            - **allocentric**: What I know about \(firstName) (\(possessive) preferences, background, interests, relationships)
+            - **egoic**: What works with \(firstName) (communication styles, approaches that help, insights about how to assist \(firstName) better)
+            """
+        }
+
+        return prompt
     }
 
     // MARK: - Epistemic Integration
 
     /// Build a system prompt enhanced with epistemic grounding
+    /// - Parameter userName: Optional user's display name for personalized memory headers
     private func buildEpistemicSystemPrompt(
         base: String,
         messages: [Message],
         userQuery: String,
-        correlationId: String
+        correlationId: String,
+        userName: String? = nil
     ) async -> (String?, [Memory]) {
         // Get system messages
         let systemMessages = messages
@@ -182,12 +557,46 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 conversation: messages,
                 memories: memories,
                 availableTokens: 2000, // Reserve tokens for memories
-                correlationId: correlationId
+                correlationId: correlationId,
+                userName: userName
             )
 
             if !injection.isEmpty {
                 promptParts.append(injection.injectionBlock)
                 usedMemories = injection.selectedMemories.map { $0.memory }
+            }
+        }
+
+        // --- Temporal Context Injection ---
+
+        // Get recent conversation summary for reuse
+        let recentSummary = await getRecentConversationSummary()
+        let currentConversationId = messages.first?.conversationId
+
+        // 1. Inject recent conversation summary for continuity
+        if let summary = recentSummary,
+           summary.conversationId != currentConversationId {
+            // Only inject if this is a different conversation than the summarized one
+            promptParts.append(summary.formattedForInjection())
+            print("[Epistemic] Injected recent conversation summary from '\(summary.title)'")
+        }
+
+        // 2. Check for conversation history search auto-injection
+        let searchService = await getConversationSearchService()
+        let topicTags = recentSummary?.topicTags ?? []
+
+        if searchService.shouldAutoInject(query: userQuery, conversationTags: topicTags) {
+            let searchResults = await searchService.searchConversations(query: userQuery, limit: 3)
+
+            if !searchResults.isEmpty {
+                var contextBlock = "\n## Related Things We've Discussed\n"
+
+                for result in searchResults {
+                    contextBlock += result.formattedForInjection()
+                }
+
+                promptParts.append(contextBlock)
+                print("[Epistemic] Injected \(searchResults.count) relevant conversation results for query")
             }
         }
 
@@ -197,6 +606,24 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             .joined(separator: "\n\n")
 
         return (combined.isEmpty ? nil : combined, usedMemories)
+    }
+
+    /// Get user's display name for personalization
+    @MainActor
+    private func getUserDisplayName() -> String? {
+        return AuthenticationService.shared.displayName
+    }
+
+    /// Get recent conversation summary (MainActor wrapper)
+    @MainActor
+    private func getRecentConversationSummary() -> ConversationSummary? {
+        return ConversationSummaryService.shared.getRecentSummary()
+    }
+
+    /// Get conversation search service (MainActor wrapper)
+    @MainActor
+    private func getConversationSearchService() -> ConversationSearchService {
+        return ConversationSearchService.shared
     }
 
     /// Load memories for injection (async wrapper for MemoryService)
@@ -352,7 +779,56 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         let decoded = try JSONDecoder().decode(OpenAIResponse.self, from: data)
         return decoded.choices.first?.message.content ?? ""
     }
-    
+
+    private func callGrok(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
+        // Grok uses OpenAI-compatible API but with xAI endpoint
+        // Supports: images (JPEG, PNG) via image_url
+        // Does NOT support: audio, video, PDFs
+        let url = URL(string: "https://api.x.ai/v1/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var apiMessages: [[String: Any]] = []
+        if let system = system, !system.isEmpty {
+            apiMessages.append(["role": "system", "content": system])
+        }
+        for msg in messages where msg.role != .system {
+            let content = grokContent(for: msg)
+            apiMessages.append(["role": msg.role.rawValue, "content": content])
+        }
+
+        let body: [String: Any] = [
+            "model": model,
+            "messages": apiMessages
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            if let errorText = String(data: data, encoding: .utf8) {
+                print("Grok Error: \(errorText)")
+            }
+            throw APIError.serverError((response as? HTTPURLResponse)?.statusCode ?? 500)
+        }
+
+        struct GrokResponse: Decodable {
+            struct Choice: Decodable {
+                struct Message: Decodable {
+                    let content: String
+                }
+                let message: Message
+            }
+            let choices: [Choice]
+        }
+
+        let decoded = try JSONDecoder().decode(GrokResponse.self, from: data)
+        return decoded.choices.first?.message.content ?? ""
+    }
+
     private func callGemini(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
         // Gemini API: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
         // Model name usually needs "models/" prefix or just the ID.
@@ -411,17 +887,26 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     }
     
     // MARK: - Helpers
-    
+
     /// Ensures the latest user message includes attachments and avoids duplicating it in history.
+    /// ConversationService already adds the user message before calling the orchestrator,
+    /// so this function primarily handles merging attachments if they weren't included.
     private func mergeLatestUserMessage(_ messages: [Message], conversationId: String, content: String, attachments: [MessageAttachment]) -> [Message] {
         guard let last = messages.last else {
+            // No messages at all - create the user message
             if content.isEmpty && attachments.isEmpty { return messages }
             return messages + [Message(conversationId: conversationId, role: .user, content: content, attachments: attachments)]
         }
-        
+
         var updated = messages
-        
-        if last.role == .user && last.content == content {
+
+        // Check if the last message is a user message with matching content
+        // Use trimmed comparison to avoid whitespace mismatches
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedLastContent = last.content.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if last.role == .user && trimmedLastContent == trimmedContent {
+            // Last message matches - only update if we need to add attachments
             let lastAttachments = last.attachments ?? []
             if lastAttachments.isEmpty && !attachments.isEmpty {
                 let amended = Message(
@@ -440,10 +925,15 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 )
                 updated[updated.count - 1] = amended
             }
+            // Message already exists with matching content, don't duplicate
             return updated
         }
-        
+
+        // Last message is NOT a matching user message - this shouldn't normally happen
+        // since ConversationService adds the user message before calling us.
+        // But handle it gracefully by adding the message if content is not empty.
         if !content.isEmpty || !attachments.isEmpty {
+            print("[OnDeviceOrchestrator] Warning: Expected last message to be user message with content '\(trimmedContent)' but found '\(last.role.rawValue)' with '\(trimmedLastContent)'")
             let newMessage = Message(
                 conversationId: conversationId,
                 role: .user,
@@ -452,51 +942,58 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             )
             updated.append(newMessage)
         }
-        
+
         return updated
     }
     
     private func anthropicContentBlocks(for message: Message) -> [[String: Any]] {
         var blocks: [[String: Any]] = []
-        
+
         let trimmedText = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedText.isEmpty {
             blocks.append(["type": "text", "text": trimmedText])
         }
-        
+
         for attachment in message.attachments ?? [] {
             switch attachment.type {
             case .image:
+                // Images supported via base64 or URL
                 if let block = anthropicMediaBlock(type: "image", attachment: attachment) {
                     blocks.append(block)
                 }
             case .document:
+                // PDFs/documents supported via base64 or URL
                 if let block = anthropicMediaBlock(type: "document", attachment: attachment) {
                     blocks.append(block)
                 }
-            default:
+            case .audio, .video:
+                // Anthropic doesn't support audio/video - skip
                 continue
             }
         }
-        
+
         if blocks.isEmpty {
             blocks.append(["type": "text", "text": ""])
         }
-        
+
         return blocks
     }
-    
+
     private func anthropicMediaBlock(type: String, attachment: MessageAttachment) -> [String: Any]? {
+        let mimeType = resolvedMimeType(for: attachment)
+
         if let base64 = attachment.base64 {
+            // Base64 encoded content
             return [
                 "type": type,
                 "source": [
                     "type": "base64",
-                    "media_type": resolvedMimeType(for: attachment),
+                    "media_type": mimeType,
                     "data": base64
                 ]
             ]
         } else if let url = attachment.url {
+            // URL-based content (supported since March 2025)
             return [
                 "type": type,
                 "source": [
@@ -513,19 +1010,93 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         if attachments.isEmpty {
             return message.content
         }
-        
+
         var parts: [[String: Any]] = []
-        
+
         let trimmedText = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedText.isEmpty {
             parts.append(["type": "text", "text": trimmedText])
         }
-        
+
         for attachment in attachments {
+            let mimeType = resolvedMimeType(for: attachment)
+
+            switch attachment.type {
+            case .image:
+                // Image support via image_url
+                if let base64 = attachment.base64 {
+                    parts.append([
+                        "type": "image_url",
+                        "image_url": [
+                            "url": "data:\(mimeType);base64,\(base64)",
+                            "detail": "high"
+                        ]
+                    ])
+                } else if let url = attachment.url {
+                    parts.append([
+                        "type": "image_url",
+                        "image_url": [
+                            "url": url,
+                            "detail": "high"
+                        ]
+                    ])
+                }
+
+            case .audio:
+                // GPT-4o supports audio via input_audio
+                if let base64 = attachment.base64 {
+                    // Format: audio/wav, audio/mp3, etc. -> extract format
+                    let format = mimeType.components(separatedBy: "/").last ?? "wav"
+                    parts.append([
+                        "type": "input_audio",
+                        "input_audio": [
+                            "data": base64,
+                            "format": format
+                        ]
+                    ])
+                }
+                // Note: OpenAI doesn't support audio URLs directly
+
+            case .document, .video:
+                // OpenAI doesn't natively support PDFs or video in chat completions
+                // Skip these for now - would need separate handling
+                continue
+            }
+        }
+
+        if parts.isEmpty {
+            return message.content
+        }
+
+        return parts
+    }
+
+    /// Grok-specific content formatting (xAI)
+    /// Supports: images (JPEG, PNG only) via image_url
+    /// Does NOT support: audio, video, PDFs
+    private func grokContent(for message: Message) -> Any {
+        let attachments = message.attachments ?? []
+        if attachments.isEmpty {
+            return message.content
+        }
+
+        var parts: [[String: Any]] = []
+
+        let trimmedText = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedText.isEmpty {
+            parts.append(["type": "text", "text": trimmedText])
+        }
+
+        for attachment in attachments {
+            // Grok only supports images (JPEG, PNG)
             guard attachment.type == .image else { continue }
-            
+
+            let mimeType = resolvedMimeType(for: attachment)
+
+            // Only support JPEG and PNG per xAI docs
+            guard mimeType == "image/jpeg" || mimeType == "image/png" else { continue }
+
             if let base64 = attachment.base64 {
-                let mimeType = resolvedMimeType(for: attachment)
                 parts.append([
                     "type": "image_url",
                     "image_url": [
@@ -543,94 +1114,126 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 ])
             }
         }
-        
+
         if parts.isEmpty {
             return message.content
         }
-        
+
         return parts
     }
-    
+
     private func geminiParts(for message: Message) -> [[String: Any]] {
         var parts: [[String: Any]] = []
         let trimmedText = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedText.isEmpty {
             parts.append(["text": trimmedText])
         }
-        
+
         for attachment in message.attachments ?? [] {
+            let mimeType = resolvedMimeType(for: attachment)
+
             if let base64 = attachment.base64 {
+                // Inline data for base64 encoded content
                 parts.append([
                     "inline_data": [
-                        "mime_type": resolvedMimeType(for: attachment),
+                        "mime_type": mimeType,
                         "data": base64
                     ]
                 ])
             } else if let url = attachment.url {
-                parts.append([
-                    "file_data": [
-                        "file_uri": url
-                    ]
-                ])
+                // File data for URLs - include mime_type for PDFs and other documents
+                var fileData: [String: Any] = ["file_uri": url]
+
+                // Per Gemini docs: mime_type is crucial for PDFs and non-image files
+                if attachment.type == .document || attachment.type == .audio || attachment.type == .video {
+                    fileData["mime_type"] = mimeType
+                }
+
+                parts.append(["file_data": fileData])
             }
         }
-        
+
         if parts.isEmpty {
             parts.append(["text": ""])
         }
-        
+
         return parts
     }
     
+    /// Resolve MIME type for attachment
+    /// Supports all Gemini-compatible formats:
+    /// - Video: MP4, MPEG, MOV, AVI, FLV, MPG, WEBM, WMV, 3GPP
+    /// - Audio: WAV, MP3, AIFF, AAC, OGG, FLAC
+    /// - Images: JPEG, PNG, GIF, WEBP
+    /// - Documents: PDF, TXT
     private func resolvedMimeType(for attachment: MessageAttachment) -> String {
+        // Already a valid MIME type
         if let mime = attachment.mimeType, mime.contains("/") {
             return mime
         }
-        
+
+        // Try to resolve from short format identifier
         if let mime = attachment.mimeType?.lowercased() {
-            switch mime {
-            case "jpg", "jpeg": return "image/jpeg"
-            case "png": return "image/png"
-            case "gif": return "image/gif"
-            case "webp": return "image/webp"
-            case "pdf": return "application/pdf"
-            case "txt", "text": return "text/plain"
-            case "mp3", "mpeg", "mpga": return "audio/mpeg"
-            case "wav": return "audio/wav"
-            case "aac": return "audio/aac"
-            case "flac": return "audio/flac"
-            case "ogg": return "audio/ogg"
-            case "mp4": return "video/mp4"
-            case "mov": return "video/quicktime"
-            default: break
+            if let resolved = Self.mimeTypeMap[mime] {
+                return resolved
             }
         }
-        
+
+        // Try to resolve from filename extension
         if let name = attachment.name?.lowercased() {
             let ext = (name as NSString).pathExtension
-            switch ext {
-            case "jpg", "jpeg": return "image/jpeg"
-            case "png": return "image/png"
-            case "gif": return "image/gif"
-            case "webp": return "image/webp"
-            case "pdf": return "application/pdf"
-            case "txt": return "text/plain"
-            case "mp3", "mpeg", "mpga": return "audio/mpeg"
-            case "wav": return "audio/wav"
-            case "aac": return "audio/aac"
-            case "flac": return "audio/flac"
-            case "ogg": return "audio/ogg"
-            case "mp4", "m4v": return "video/mp4"
-            case "mov": return "video/quicktime"
-            default: break
+            if let resolved = Self.mimeTypeMap[ext] {
+                return resolved
             }
         }
-        
+
+        // Fall back to default based on attachment type
         switch attachment.type {
         case .image: return "image/jpeg"
-        case .document: return "application/octet-stream"
-        case .audio: return "audio/mpeg"
+        case .document: return "application/pdf"
+        case .audio: return "audio/mp3"
         case .video: return "video/mp4"
         }
     }
+
+    /// MIME type mapping for common file extensions and format identifiers
+    /// Based on Gemini API supported formats documentation
+    private static let mimeTypeMap: [String: String] = [
+        // Images
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+        "gif": "image/gif",
+        "webp": "image/webp",
+
+        // Video formats (Gemini supported)
+        "mp4": "video/mp4",
+        "m4v": "video/mp4",
+        "mpeg": "video/mpeg",
+        "mpg": "video/mpg",
+        "mov": "video/mov",
+        "avi": "video/avi",
+        "flv": "video/x-flv",
+        "webm": "video/webm",
+        "wmv": "video/wmv",
+        "3gp": "video/3gpp",
+        "3gpp": "video/3gpp",
+        "quicktime": "video/quicktime",
+
+        // Audio formats (Gemini supported)
+        "wav": "audio/wav",
+        "mp3": "audio/mp3",
+        "aiff": "audio/aiff",
+        "aif": "audio/aiff",
+        "aac": "audio/aac",
+        "ogg": "audio/ogg",
+        "flac": "audio/flac",
+        "m4a": "audio/aac",
+        "mpga": "audio/mpeg",
+
+        // Documents
+        "pdf": "application/pdf",
+        "txt": "text/plain",
+        "text": "text/plain",
+    ]
 }

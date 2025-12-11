@@ -38,7 +38,12 @@ struct AxonApp: App {
             ZStack {
                 // Main app (underneath)
                 if !showLaunchScreen {
-                    if authService.isAuthenticated {
+                    if !settingsViewModel.settings.hasCompletedOnboarding {
+                        OnboardingView {
+                            // Callback triggers view refresh via @Published settings
+                        }
+                        .opacity(mainAppOpacity)
+                    } else if authService.isAuthenticated {
                         AppContainerView()
                             .opacity(mainAppOpacity)
                     } else {

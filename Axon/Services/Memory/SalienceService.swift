@@ -27,12 +27,14 @@ class SalienceService: ObservableObject {
     // MARK: - Main Injection Method
 
     /// Generate salient memory injection for a conversation
+    /// - Parameter userName: Optional user's display name for personalized headers
     func injectSalient(
         conversation: [Message],
         memories: [Memory],
         availableTokens: Int,
         correlationId: String,
-        settings: MemoryInjectionSettings = .default
+        settings: MemoryInjectionSettings = .default,
+        userName: String? = nil
     ) -> SalienceInjectionResult {
         // 1. Extract context from recent conversation
         let conversationContext = extractConversationContext(from: conversation)
@@ -58,11 +60,12 @@ class SalienceService: ObservableObject {
             settings: settings
         )
 
-        // 5. Format injection block
+        // 5. Format injection block with personalized name
         let injectionBlock = formatInjectionBlock(
             memories: selectedMemories,
             epistemicContext: epistemicContext,
-            settings: settings
+            settings: settings,
+            userName: userName
         )
 
         // 6. Log predicate
@@ -162,6 +165,11 @@ class SalienceService: ObservableObject {
             score += 0.05 // Prefer allocentric/egoic over legacy types
         }
 
+        // 6. Temporal Relevance Boost (0-0.3)
+        // When user asks about specific times ("yesterday", "last week"), boost matching memories
+        let temporalBoost = calculateTemporalRelevanceBoost(memory: memory, query: context.recentQuery)
+        score += temporalBoost
+
         return min(score, 1.0)
     }
 
@@ -213,6 +221,70 @@ class SalienceService: ObservableObject {
         }
     }
 
+    /// Calculate temporal relevance boost based on query keywords
+    /// When user asks about "yesterday" or "last week", boost memories with matching temporal tags
+    private func calculateTemporalRelevanceBoost(memory: Memory, query: String) -> Double {
+        let queryLower = query.lowercased()
+        var boost: Double = 0.0
+
+        // Get refreshed temporal tags for accurate matching
+        let memoryTags = memory.refreshedTemporalTags
+
+        // Temporal patterns: (query keywords, matching tags, boost value)
+        let temporalPatterns: [(keywords: [String], matchTags: [String], boost: Double)] = [
+            // Today/recent
+            (["today", "just now", "earlier today", "this morning", "this afternoon"],
+             ["today"], 0.3),
+
+            // Yesterday
+            (["yesterday", "last night", "night before"],
+             ["yesterday"], 0.25),
+
+            // This week
+            (["this week", "few days ago", "recently", "the other day", "past few days"],
+             ["this_week"], 0.2),
+
+            // Specific days of week
+            (["monday"], ["monday"], 0.25),
+            (["tuesday"], ["tuesday"], 0.25),
+            (["wednesday"], ["wednesday"], 0.25),
+            (["thursday"], ["thursday"], 0.25),
+            (["friday"], ["friday"], 0.25),
+            (["saturday"], ["saturday"], 0.25),
+            (["sunday"], ["sunday"], 0.25),
+
+            // Last week / month
+            (["last week", "week ago", "past week"],
+             ["this_month"], 0.15),
+            (["last month", "few weeks ago", "month ago"],
+             ["this_month", "recent_months"], 0.1),
+
+            // Seasons
+            (["winter", "this winter"],
+             ["winter"], 0.1),
+            (["spring", "this spring"],
+             ["spring"], 0.1),
+            (["summer", "this summer"],
+             ["summer"], 0.1),
+            (["fall", "autumn", "this fall"],
+             ["fall"], 0.1),
+        ]
+
+        for pattern in temporalPatterns {
+            // Check if query contains any of the keywords
+            if pattern.keywords.contains(where: { queryLower.contains($0) }) {
+                // Check if memory has any matching temporal tag
+                if memoryTags.contains(where: { tag in
+                    pattern.matchTags.contains(tag.lowercased())
+                }) {
+                    boost = max(boost, pattern.boost)
+                }
+            }
+        }
+
+        return boost
+    }
+
     // MARK: - Budget Selection
 
     /// Select memories within token budget
@@ -254,10 +326,12 @@ class SalienceService: ObservableObject {
     // MARK: - Formatting
 
     /// Format the injection block for the system prompt
+    /// Uses the user's first name for personalized headers
     private func formatInjectionBlock(
         memories: [RankedMemory],
         epistemicContext: EpistemicContext,
-        settings: MemoryInjectionSettings
+        settings: MemoryInjectionSettings,
+        userName: String? = nil
     ) -> String {
         var lines: [String] = []
 
@@ -266,22 +340,28 @@ class SalienceService: ObservableObject {
             return ""
         }
 
-        // Header
+        // Extract first name for personalization
+        let firstName = userName?.components(separatedBy: " ").first
+
+        // Header - first-person framing for intrinsic memory
         lines.append("")
-        lines.append("## Grounded Context")
+        if let name = firstName {
+            lines.append("## What I Remember About \(name)")
+        } else {
+            lines.append("## What I Remember")
+        }
         lines.append("")
 
-        // Confidence indicator
-        let confidencePercent = Int(epistemicContext.compositeConfidence * 100)
-        lines.append("*Epistemic Confidence: \(confidencePercent)%*")
-        lines.append("")
-
-        // Memories by type
+        // Memories by type - first-person framing with personalized headers
         let allocentricMemories = memories.filter { $0.memory.type == .allocentric || $0.memory.type.toNewSchema == .allocentric }
         let egoicMemories = memories.filter { $0.memory.type == .egoic || $0.memory.type.toNewSchema == .egoic }
 
         if !allocentricMemories.isEmpty {
-            lines.append("### About the User")
+            if let name = firstName {
+                lines.append("### About \(name)")
+            } else {
+                lines.append("### About them")
+            }
             for ranked in allocentricMemories {
                 lines.append(formatMemoryLine(ranked, includeConfidence: settings.showConfidence))
             }
@@ -289,7 +369,11 @@ class SalienceService: ObservableObject {
         }
 
         if !egoicMemories.isEmpty {
-            lines.append("### What Works")
+            if let name = firstName {
+                lines.append("### What works with \(name)")
+            } else {
+                lines.append("### What works")
+            }
             for ranked in egoicMemories {
                 lines.append(formatMemoryLine(ranked, includeConfidence: settings.showConfidence))
             }

@@ -69,11 +69,18 @@ class MemoryService: ObservableObject {
             let metadata: [String: AnyCodable]
         }
 
+        // Auto-inject temporal tags for time awareness
+        var enrichedTags = tags
+        let temporalTags = Memory.temporalTags(for: Date())
+        enrichedTags.append(contentsOf: temporalTags)
+        // Remove duplicates while preserving order
+        enrichedTags = Array(NSOrderedSet(array: enrichedTags)) as? [String] ?? enrichedTags
+
         let request = CreateMemoryRequest(
             content: content,
             type: type.rawValue,
             confidence: confidence,
-            tags: tags,
+            tags: enrichedTags,
             context: context,
             metadata: metadata
         )
