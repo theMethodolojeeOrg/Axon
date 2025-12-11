@@ -12,7 +12,7 @@ protocol ConversationOrchestrator {
         conversationId: String,
         content: String,
         attachments: [MessageAttachment],
-        geminiTools: Bool,
+        enabledTools: [String],
         messages: [Message],
         config: OrchestrationConfig
     ) async throws -> (assistantMessage: Message, memories: [Memory]?)
@@ -65,6 +65,7 @@ struct OrchestrateOptions: Encodable {
     let executeTools: Bool
     let model: String?
     let geminiTools: Bool?
+    let enabledTools: [String]?  // List of specific tool IDs to enable
 }
 
 struct OrchestrateResponse: Decodable {

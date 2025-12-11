@@ -10,9 +10,10 @@ import SwiftUI
 struct MemoryDetailView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var memoryService = MemoryService.shared
-    
+    @StateObject private var learningService = LearningLoopService.shared
+
     let memory: Memory
-    
+
     @State private var content: String
     @State private var selectedType: MemoryType
     @State private var confidence: Double
@@ -20,7 +21,17 @@ struct MemoryDetailView: View {
     @State private var context: String
     @State private var isEditing = false
     @State private var showingDeleteConfirmation = false
-    
+
+    /// Get learning data for this memory
+    private var learningData: MemoryLearningData? {
+        learningService.learningData[memory.id]
+    }
+
+    /// Get refinement suggestions
+    private var refinementSuggestions: [RefinementSuggestion] {
+        learningService.getRefinementSuggestions(for: memory.id)
+    }
+
     init(memory: Memory) {
         self.memory = memory
         _content = State(initialValue: memory.content)
@@ -207,7 +218,74 @@ struct MemoryDetailView: View {
                             }
                         }
                         .padding(.horizontal)
-                        
+
+                        // Learning Stats (if available)
+                        if let learning = learningData, !isEditing {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Learning Stats")
+                                    .font(AppTypography.labelMedium())
+                                    .foregroundColor(AppColors.textSecondary)
+
+                                HStack(spacing: 16) {
+                                    // Reliability indicator
+                                    VStack(spacing: 4) {
+                                        Text("\(Int(learning.reliability * 100))%")
+                                            .font(AppTypography.titleMedium())
+                                            .foregroundColor(learning.reliability >= 0.7 ? AppColors.accentSuccess : AppColors.signalHematite)
+                                        Text("Reliability")
+                                            .font(AppTypography.labelSmall())
+                                            .foregroundColor(AppColors.textTertiary)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(AppColors.substrateSecondary)
+                                    .cornerRadius(8)
+
+                                    // Success/Failure counts
+                                    VStack(spacing: 4) {
+                                        HStack(spacing: 8) {
+                                            Label("\(learning.successCount)", systemImage: "checkmark.circle.fill")
+                                                .foregroundColor(AppColors.accentSuccess)
+                                            Label("\(learning.failureCount)", systemImage: "xmark.circle.fill")
+                                                .foregroundColor(AppColors.signalHematite)
+                                        }
+                                        .font(AppTypography.bodyMedium())
+                                        Text("Predictions")
+                                            .font(AppTypography.labelSmall())
+                                            .foregroundColor(AppColors.textTertiary)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(AppColors.substrateSecondary)
+                                    .cornerRadius(8)
+                                }
+
+                                // Refinement suggestions
+                                if !refinementSuggestions.isEmpty {
+                                    ForEach(refinementSuggestions, id: \.reason) { suggestion in
+                                        HStack(alignment: .top, spacing: 8) {
+                                            Image(systemName: suggestionIcon(for: suggestion.type))
+                                                .foregroundColor(suggestionColor(for: suggestion.type))
+                                                .font(.system(size: 14))
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(suggestion.reason)
+                                                    .font(AppTypography.labelSmall())
+                                                    .foregroundColor(AppColors.textSecondary)
+                                                Text(suggestion.suggestedAction)
+                                                    .font(AppTypography.labelSmall())
+                                                    .foregroundColor(AppColors.textTertiary)
+                                            }
+                                        }
+                                        .padding(8)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(suggestionColor(for: suggestion.type).opacity(0.1))
+                                        .cornerRadius(8)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+
                         // Actions
                         if !isEditing {
                             VStack(spacing: 16) {
@@ -223,7 +301,7 @@ struct MemoryDetailView: View {
                                     .background(AppColors.substrateSecondary)
                                     .cornerRadius(12)
                                 }
-                                
+
                                 Button(action: { showingDeleteConfirmation = true }) {
                                     HStack {
                                         Image(systemName: "trash")
@@ -331,6 +409,38 @@ struct MemoryDetailView: View {
             } catch {
                 print("Error deleting memory: \(error.localizedDescription)")
             }
+        }
+    }
+
+    // MARK: - Refinement Suggestion Helpers
+
+    private func suggestionIcon(for type: RefinementType) -> String {
+        switch type {
+        case .reduceConfidence:
+            return "arrow.down.circle"
+        case .increaseConfidence:
+            return "arrow.up.circle"
+        case .addConditions:
+            return "plus.circle"
+        case .split:
+            return "arrow.triangle.branch"
+        case .archive:
+            return "archivebox"
+        }
+    }
+
+    private func suggestionColor(for type: RefinementType) -> Color {
+        switch type {
+        case .reduceConfidence:
+            return AppColors.signalHematite
+        case .increaseConfidence:
+            return AppColors.accentSuccess
+        case .addConditions:
+            return AppColors.signalMercury
+        case .split:
+            return AppColors.signalCopper
+        case .archive:
+            return AppColors.textTertiary
         }
     }
 }

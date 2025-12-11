@@ -112,10 +112,11 @@ struct UserMessageView: View {
                     }
                 }
                 
-                // Message content
+                // Message content (text selection enabled for partial copy)
                 Text(message.content)
                     .font(AppTypography.bodyMedium())
                     .foregroundColor(AppColors.textPrimary)
+                    .textSelection(.enabled)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(
@@ -128,7 +129,7 @@ struct UserMessageView: View {
                     )
                     .contextMenu {
                         Button(action: { onCopy(message) }) {
-                            Label("Copy", systemImage: "doc.on.doc")
+                            Label("Copy All", systemImage: "doc.on.doc")
                         }
                     }
                 
@@ -206,9 +207,10 @@ struct AssistantMessageView: View {
                 .padding(.bottom, 12)
             }
             
-            // Main content - free flowing markdown
+            // Main content - free flowing markdown (text selection enabled for partial copy)
             Markdown(textToRender)
                 .markdownTheme(MarkdownTheme.axon)
+                .textSelection(.enabled)
             
             // Footer toolbar
             AssistantToolbar(

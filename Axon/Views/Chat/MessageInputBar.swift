@@ -18,7 +18,6 @@ import AppKit
 struct MessageInputBar: View {
     @Binding var text: String
     @Binding var attachments: [MessageAttachment]
-    @Binding var useGeminiTools: Bool
     let isLoading: Bool
     let onSend: () -> Void
     let focus: FocusState<Bool>.Binding?
@@ -26,6 +25,7 @@ struct MessageInputBar: View {
     @State private var selectedItem: PhotosPickerItem?
     @State private var showFileImporter = false
     @State private var showPhotoPicker = false
+    @ObservedObject private var settingsViewModel = SettingsViewModel.shared
 
     private let conversationId: String?
 
@@ -35,10 +35,20 @@ struct MessageInputBar: View {
         let description: String
     }
 
+    /// Whether tools are enabled based on settings
+    private var hasToolsEnabled: Bool {
+        settingsViewModel.settings.toolSettings.toolsEnabled &&
+        !settingsViewModel.settings.toolSettings.enabledToolIds.isEmpty
+    }
+
+    /// Count of enabled tools for display
+    private var enabledToolCount: Int {
+        settingsViewModel.settings.toolSettings.enabledToolIds.count
+    }
+
     init(
         text: Binding<String>,
         attachments: Binding<[MessageAttachment]> = .constant([]),
-        useGeminiTools: Binding<Bool> = .constant(false),
         isLoading: Bool,
         onSend: @escaping () -> Void,
         focus: FocusState<Bool>.Binding? = nil,
@@ -46,7 +56,6 @@ struct MessageInputBar: View {
     ) {
         self._text = text
         self._attachments = attachments
-        self._useGeminiTools = useGeminiTools
         self.isLoading = isLoading
         self.onSend = onSend
         self.focus = focus
@@ -197,13 +206,30 @@ struct MessageInputBar: View {
                         }
                     }
 
-                    // Gemini Tools Toggle
-                    Button(action: { useGeminiTools.toggle() }) {
-                        Image(systemName: useGeminiTools ? "sparkles" : "sparkles")
+                    // Tools Status Indicator
+                    // Shows if tools are enabled in Settings > Tools
+                    // Tapping shows info tooltip
+                    Menu {
+                        if hasToolsEnabled {
+                            Text("\(enabledToolCount) tool\(enabledToolCount == 1 ? "" : "s") enabled")
+                            ForEach(settingsViewModel.settings.toolSettings.enabledTools, id: \.id) { tool in
+                                Label(tool.displayName, systemImage: tool.icon)
+                            }
+                            Divider()
+                            Text("Configure in Settings > Tools")
+                                .font(.caption)
+                        } else {
+                            Text("No tools enabled")
+                            Divider()
+                            Text("Enable tools in Settings > Tools")
+                                .font(.caption)
+                        }
+                    } label: {
+                        Image(systemName: "sparkles")
                             .font(.system(size: 20))
-                            .foregroundColor(useGeminiTools ? AppColors.signalMercury : AppColors.textSecondary)
+                            .foregroundColor(hasToolsEnabled ? AppColors.signalMercury : AppColors.textTertiary)
                             .frame(width: 32, height: 32)
-                            .background(useGeminiTools ? AppColors.signalMercury.opacity(0.1) : Color.clear)
+                            .background(hasToolsEnabled ? AppColors.signalMercury.opacity(0.1) : Color.clear)
                             .clipShape(Circle())
                     }
 

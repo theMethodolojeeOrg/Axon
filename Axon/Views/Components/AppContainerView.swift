@@ -203,7 +203,8 @@ struct ChatContainerView: View {
     @ObservedObject private var ttsService = TTSPlaybackService.shared
     @State private var messageText = ""
     @State private var selectedAttachments: [MessageAttachment] = []
-    @State private var useGeminiTools = false
+    // Tools are now controlled via Settings > Tools tab
+    // This computed property reflects the enabled tools from settings
     @State private var isLoading = false
     @State private var showWelcome = true
     @State private var streamingOverrides: [String: String] = [:]
@@ -230,7 +231,6 @@ struct ChatContainerView: View {
                 MessageInputBar(
                     text: $messageText,
                     attachments: $selectedAttachments,
-                    useGeminiTools: $useGeminiTools,
                     isLoading: isLoading,
                     onSend: sendMessage,
                     focus: $isInputFocused,
@@ -481,16 +481,19 @@ struct ChatContainerView: View {
                     onConversationCreated(conv)
                 }
 
+                // Get enabled tools from settings
+                let settings = SettingsViewModel.shared.settings
+                let enabledTools: [String] = settings.toolSettings.toolsEnabled
+                    ? Array(settings.toolSettings.enabledToolIds)
+                    : []
+
                 // Send message and get assistant response
                 let assistant = try await conversationService.sendMessage(
                     conversationId: conv.id,
                     content: content,
                     attachments: attachments,
-                    geminiTools: useGeminiTools
+                    enabledTools: enabledTools
                 )
-
-                // Reset tools flag after sending
-                useGeminiTools = false
 
                 // Pseudo-stream the assistant content
                 startPseudoStream(for: assistant)

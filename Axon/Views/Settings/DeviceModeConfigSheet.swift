@@ -89,6 +89,9 @@ struct DeviceModeConfigSheet: View {
                         }
                     }
 
+                    // Cloud Sync Provider Section
+                    CloudSyncSection(localConfig: $localConfig)
+
                     // Sync Options Section
                     ConfigSection(title: "Sync Options", icon: "arrow.triangle.2.circlepath") {
                         VStack(spacing: 12) {
@@ -274,6 +277,166 @@ private struct ConfigToggleRow: View {
             RoundedRectangle(cornerRadius: 10)
                 .fill(AppColors.substrateSecondary)
         )
+    }
+}
+
+// MARK: - Cloud Sync Section
+
+private struct CloudSyncSection: View {
+    @Binding var localConfig: DeviceModeConfig
+    @StateObject private var cloudKitService = CloudKitSyncService.shared
+    @StateObject private var iCloudKVSync = iCloudKeyValueSync.shared
+
+    var body: some View {
+        ConfigSection(title: "Cross-Device Sync", icon: "icloud.fill") {
+            VStack(spacing: 12) {
+                ForEach(CloudSyncProvider.allCases) { provider in
+                    CloudSyncProviderCard(
+                        provider: provider,
+                        isSelected: localConfig.cloudSyncProvider == provider,
+                        isAvailable: provider == .iCloud ? cloudKitService.isCloudKitAvailable : true
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            localConfig.cloudSyncProvider = provider
+                        }
+                    }
+                }
+
+                // iCloud status message
+                if localConfig.cloudSyncProvider == .iCloud {
+                    VStack(spacing: 8) {
+                        // CloudKit status (for conversation sync)
+                        HStack(spacing: 8) {
+                            Image(systemName: cloudKitService.isCloudKitAvailable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .foregroundColor(cloudKitService.isCloudKitAvailable ? AppColors.accentSuccess : AppColors.accentWarning)
+
+                            Text(cloudKitService.isCloudKitAvailable
+                                 ? "Conversations: Ready to sync"
+                                 : "Sign in to iCloud in Settings")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textSecondary)
+
+                            Spacer()
+                        }
+
+                        // Key-Value status (for settings sync)
+                        HStack(spacing: 8) {
+                            Image(systemName: iCloudKVSync.isAvailable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .foregroundColor(iCloudKVSync.isAvailable ? AppColors.accentSuccess : AppColors.accentWarning)
+
+                            Text(iCloudKVSync.isAvailable
+                                 ? "Settings: Syncing across devices"
+                                 : "Settings sync unavailable")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textSecondary)
+
+                            Spacer()
+                        }
+                    }
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill((cloudKitService.isCloudKitAvailable ? AppColors.accentSuccess : AppColors.accentWarning).opacity(0.1))
+                    )
+                }
+
+                // Custom Server note
+                if localConfig.cloudSyncProvider == .firestore {
+                    HStack(spacing: 8) {
+                        Image(systemName: "info.circle.fill")
+                            .foregroundColor(AppColors.signalMercury)
+
+                        Text("Configure your server in the API Server settings tab")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(AppColors.signalMercury.opacity(0.1))
+                    )
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Cloud Sync Provider Card
+
+private struct CloudSyncProviderCard: View {
+    let provider: CloudSyncProvider
+    let isSelected: Bool
+    let isAvailable: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 16) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? AppColors.signalMercury.opacity(0.2) : AppColors.substrateSecondary)
+                        .frame(width: 44, height: 44)
+
+                    Image(systemName: provider.icon)
+                        .font(.system(size: 18))
+                        .foregroundColor(isSelected ? AppColors.signalMercury : AppColors.textSecondary)
+                }
+
+                // Text
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(provider.displayName)
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        if provider == .iCloud && !isAvailable {
+                            Text("Unavailable")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.accentWarning)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(AppColors.accentWarning.opacity(0.2))
+                                )
+                        }
+                    }
+
+                    Text(provider.description)
+                        .font(AppTypography.bodySmall())
+                        .foregroundColor(AppColors.textSecondary)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                // Selection indicator
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(AppColors.signalMercury)
+                } else {
+                    Circle()
+                        .stroke(AppColors.glassBorder, lineWidth: 1.5)
+                        .frame(width: 22, height: 22)
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isSelected ? AppColors.signalMercury.opacity(0.08) : AppColors.substrateSecondary)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isSelected ? AppColors.signalMercury.opacity(0.3) : AppColors.glassBorder, lineWidth: 1)
+                    )
+            )
+            .opacity(provider == .iCloud && !isAvailable ? 0.6 : 1.0)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(provider == .iCloud && !isAvailable)
     }
 }
 

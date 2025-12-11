@@ -17,6 +17,7 @@ enum SyncStatus: String {
     case pending = "pending"
     case failed = "failed"
     case conflict = "conflict"
+    case deleted = "deleted"  // Soft-delete tombstone - prevents resurrection during sync
 }
 
 // MARK: - Pending Operation
@@ -204,8 +205,64 @@ class LocalConversationStore: ObservableObject {
         print("[LocalConversationStore] Updated local conversation: \(id)")
     }
 
-    /// Delete a conversation locally
+    /// Delete a conversation locally (uses soft-delete to prevent resurrection)
     func deleteLocalConversation(id: String) throws {
+        let context = persistence.container.viewContext
+
+        // For local-only conversations, hard delete immediately
+        if id.hasPrefix("local_") {
+            let convFetch: NSFetchRequest<ConversationEntity> = ConversationEntity.fetchRequest()
+            convFetch.predicate = NSPredicate(format: "id == %@", id)
+
+            if let entity = try context.fetch(convFetch).first {
+                context.delete(entity)
+            }
+
+            // Delete associated messages
+            let msgFetch: NSFetchRequest<MessageEntity> = MessageEntity.fetchRequest()
+            msgFetch.predicate = NSPredicate(format: "conversationId == %@", id)
+
+            let messages = try context.fetch(msgFetch)
+            for msg in messages {
+                context.delete(msg)
+            }
+
+            try persistence.saveContext(context)
+
+            // Remove any pending create operations for this local conversation
+            pendingOperations.removeAll { $0.entityId == id }
+            savePendingOperations()
+
+            print("[LocalConversationStore] Hard deleted local-only conversation: \(id)")
+            return
+        }
+
+        // For synced conversations, use soft-delete (tombstone pattern)
+        // This prevents resurrection during sync until server confirms deletion
+        let convFetch: NSFetchRequest<ConversationEntity> = ConversationEntity.fetchRequest()
+        convFetch.predicate = NSPredicate(format: "id == %@", id)
+
+        if let entity = try context.fetch(convFetch).first {
+            entity.syncStatus = SyncStatus.deleted.rawValue
+            entity.updatedAt = Date()
+            print("[LocalConversationStore] Soft-deleted conversation (tombstone): \(id)")
+        }
+
+        try persistence.saveContext(context)
+
+        // Queue the API deletion
+        let operation = PendingOperation(
+            type: .delete,
+            entityType: .conversation,
+            entityId: id
+        )
+        addPendingOperation(operation)
+
+        print("[LocalConversationStore] Queued delete operation for conversation: \(id)")
+    }
+
+    /// Hard delete a conversation after server confirms deletion
+    func hardDeleteLocalConversation(id: String) throws {
         let context = persistence.container.viewContext
 
         // Delete conversation
@@ -226,32 +283,21 @@ class LocalConversationStore: ObservableObject {
         }
 
         try persistence.saveContext(context)
-
-        // Only queue for sync if it's a synced conversation
-        if !id.hasPrefix("local_") {
-            let operation = PendingOperation(
-                type: .delete,
-                entityType: .conversation,
-                entityId: id
-            )
-            addPendingOperation(operation)
-        } else {
-            // Remove any pending create operations for this local conversation
-            pendingOperations.removeAll { $0.entityId == id }
-            savePendingOperations()
-        }
-
-        print("[LocalConversationStore] Deleted local conversation: \(id)")
+        print("[LocalConversationStore] Hard deleted conversation after server confirmation: \(id)")
     }
 
     // MARK: - Load Local Data
 
-    /// Load all local conversations
+    /// Load all local conversations (excludes soft-deleted and archived)
     func loadConversations() -> [Conversation] {
         let context = persistence.container.viewContext
         let fetchRequest: NSFetchRequest<ConversationEntity> = ConversationEntity.fetchRequest()
         fetchRequest.sortDescriptors = [NSSortDescriptor(key: "updatedAt", ascending: false)]
-        fetchRequest.predicate = NSPredicate(format: "archived == %@", NSNumber(value: false))
+        // CRITICAL: Filter out soft-deleted (syncStatus == "deleted") AND archived conversations
+        fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "archived == %@", NSNumber(value: false)),
+            NSPredicate(format: "syncStatus != %@", SyncStatus.deleted.rawValue)
+        ])
 
         do {
             let entities = try context.fetch(fetchRequest)
@@ -494,6 +540,10 @@ class LocalConversationStore: ObservableObject {
             endpoint: "/apiDeleteConversation/\(operation.entityId)?hardDelete=true",
             method: .delete
         )
+
+        // Server confirmed deletion - now hard delete locally
+        try hardDeleteLocalConversation(id: operation.entityId)
+        print("[LocalConversationStore] ✅ Server confirmed deletion, hard-deleted locally: \(operation.entityId)")
     }
 
     private func markEntityAsFailed(_ operation: PendingOperation) async {

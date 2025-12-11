@@ -190,22 +190,9 @@ struct GeneralSettingsView: View {
                     )
                 }
             }
-            // MARK: - Advanced Section
+            // MARK: - Device Mode Section
 
-            GeneralSettingsSection(title: "Advanced") {
-                SettingsToggleRow(
-                    title: "On-Device Orchestration",
-                    icon: "iphone.gen3",
-                    isOn: Binding(
-                        get: { viewModel.settings.useOnDeviceOrchestration },
-                        set: { newValue in
-                            Task {
-                                await viewModel.updateSetting(\.useOnDeviceOrchestration, newValue)
-                            }
-                        }
-                    )
-                )
-            }
+            DeviceModeSection(viewModel: viewModel)
 
             // MARK: - Cloud Sync
 
@@ -564,6 +551,243 @@ struct SettingsToggleRow: View {
         .padding()
         .background(AppColors.substrateSecondary)
         .cornerRadius(8)
+    }
+}
+
+// MARK: - Device Mode Section
+
+struct DeviceModeSection: View {
+    @ObservedObject var viewModel: SettingsViewModel
+    @State private var showConfigSheet = false
+    @StateObject private var conversationService = ConversationService.shared
+
+    var body: some View {
+        GeneralSettingsSection(title: "Device Mode") {
+            VStack(spacing: 16) {
+                // Main mode toggle
+                DeviceModeToggle(
+                    selectedMode: Binding(
+                        get: { viewModel.settings.deviceMode },
+                        set: { newMode in
+                            Task {
+                                await viewModel.updateSetting(\.deviceMode, newMode)
+
+                                // Sync the legacy toggle for backwards compatibility
+                                let useOnDevice = (newMode == .onDevice && viewModel.settings.deviceModeConfig.aiProcessing == .onDevice)
+                                await viewModel.updateSetting(\.useOnDeviceOrchestration, useOnDevice)
+                            }
+                        }
+                    )
+                )
+
+                // Config button (only shown in On-Device mode)
+                if viewModel.settings.deviceMode == .onDevice {
+                    Button(action: { showConfigSheet = true }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 16))
+                                .foregroundColor(AppColors.signalMercury)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Configure On-Device Settings")
+                                    .font(AppTypography.bodyMedium())
+                                    .foregroundColor(AppColors.textPrimary)
+
+                                Text(configSummary)
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14))
+                                .foregroundColor(AppColors.textTertiary)
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(AppColors.substrateSecondary)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                                )
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+
+                // Sync status indicator
+                if viewModel.settings.deviceModeConfig.showSyncStatus {
+                    SyncStatusIndicator()
+                }
+            }
+        }
+        .sheet(isPresented: $showConfigSheet) {
+            DeviceModeConfigSheet(viewModel: viewModel)
+        }
+    }
+
+    private var configSummary: String {
+        let config = viewModel.settings.deviceModeConfig
+        var parts: [String] = []
+
+        parts.append(config.dataStorage.displayName)
+        parts.append(config.aiProcessing.displayName + " AI")
+        parts.append(config.memoryStorage.displayName)
+
+        return parts.joined(separator: " · ")
+    }
+}
+
+// MARK: - Device Mode Toggle
+
+private struct DeviceModeToggle: View {
+    @Binding var selectedMode: DeviceMode
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(DeviceMode.allCases) { mode in
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedMode = mode
+                    }
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: mode.icon)
+                            .font(.system(size: 16))
+
+                        Text(mode.displayName)
+                            .font(AppTypography.bodyMedium(.medium))
+                    }
+                    .foregroundColor(selectedMode == mode ? .white : AppColors.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(selectedMode == mode ? AppColors.signalMercury : Color.clear)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+        .padding(4)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(AppColors.substrateSecondary)
+        )
+    }
+}
+
+// MARK: - Sync Status Indicator
+
+private struct SyncStatusIndicator: View {
+    @StateObject private var conversationService = ConversationService.shared
+
+    var body: some View {
+        if conversationService.pendingOperationsCount > 0 || conversationService.isOfflineMode {
+            HStack(spacing: 12) {
+                // Status icon
+                ZStack {
+                    Circle()
+                        .fill(statusColor.opacity(0.2))
+                        .frame(width: 32, height: 32)
+
+                    if conversationService.isSyncing {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: statusColor))
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: statusIcon)
+                            .font(.system(size: 14))
+                            .foregroundColor(statusColor)
+                    }
+                }
+
+                // Status text
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(statusTitle)
+                        .font(AppTypography.labelMedium())
+                        .foregroundColor(AppColors.textPrimary)
+
+                    Text(statusSubtitle)
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textSecondary)
+                }
+
+                Spacer()
+
+                // Sync button
+                if conversationService.pendingOperationsCount > 0 && !conversationService.isSyncing {
+                    Button(action: {
+                        Task {
+                            await conversationService.syncPendingOperations()
+                        }
+                    }) {
+                        Text("Sync")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.signalMercury)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(AppColors.signalMercury, lineWidth: 1)
+                            )
+                    }
+                }
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(statusColor.opacity(0.08))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(statusColor.opacity(0.2), lineWidth: 1)
+                    )
+            )
+        }
+    }
+
+    private var statusColor: Color {
+        if conversationService.isSyncing {
+            return AppColors.signalMercury
+        } else if conversationService.isOfflineMode {
+            return AppColors.accentWarning
+        } else if conversationService.pendingOperationsCount > 0 {
+            return AppColors.accentWarning
+        }
+        return AppColors.accentSuccess
+    }
+
+    private var statusIcon: String {
+        if conversationService.isOfflineMode {
+            return "wifi.slash"
+        } else if conversationService.pendingOperationsCount > 0 {
+            return "exclamationmark.arrow.triangle.2.circlepath"
+        }
+        return "checkmark.circle"
+    }
+
+    private var statusTitle: String {
+        if conversationService.isSyncing {
+            return "Syncing..."
+        } else if conversationService.isOfflineMode {
+            return "Offline Mode"
+        } else if conversationService.pendingOperationsCount > 0 {
+            return "Pending Sync"
+        }
+        return "Synced"
+    }
+
+    private var statusSubtitle: String {
+        if conversationService.isSyncing {
+            return "Uploading changes..."
+        } else if conversationService.isOfflineMode {
+            return "Changes will sync when connected"
+        } else if conversationService.pendingOperationsCount > 0 {
+            return "\(conversationService.pendingOperationsCount) operations pending"
+        }
+        return "All changes saved"
     }
 }
 

@@ -15,7 +15,7 @@ class CloudConversationOrchestrator: ConversationOrchestrator {
         conversationId: String,
         content: String,
         attachments: [MessageAttachment],
-        geminiTools: Bool,
+        enabledTools: [String],
         messages: [Message],
         config: OrchestrationConfig
     ) async throws -> (assistantMessage: Message, memories: [Memory]?) {
@@ -112,6 +112,10 @@ class CloudConversationOrchestrator: ConversationOrchestrator {
             openaiCompatibleConfig = OpenAICompatible(apiKey: apiKey, baseUrl: baseUrl)
         }
 
+        // Determine if gemini tools should be enabled (any Gemini-provider tools in the list)
+        let geminiToolIds = ["perform_google_search", "execute_python_code", "query_google_maps"]
+        let hasGeminiTools = enabledTools.contains { geminiToolIds.contains($0) }
+
         let request = OrchestrateRequest(
             conversationId: conversationId,
             content: contentPayload,
@@ -121,7 +125,8 @@ class CloudConversationOrchestrator: ConversationOrchestrator {
                 saveMemories: true,
                 executeTools: false,
                 model: config.model,
-                geminiTools: geminiTools
+                geminiTools: hasGeminiTools,  // Backward compatible: true if any Gemini tools enabled
+                enabledTools: enabledTools.isEmpty ? nil : enabledTools  // Pass specific tools list
             ),
             anthropic: config.anthropicKey,
             openai: config.openaiKey,
@@ -129,6 +134,11 @@ class CloudConversationOrchestrator: ConversationOrchestrator {
             grok: config.grokKey,
             openaiCompatible: openaiCompatibleConfig
         )
+
+        // Log tool configuration for debugging
+        if !enabledTools.isEmpty {
+            print("[CloudOrchestrator] Sending with enabled tools: \(enabledTools)")
+        }
 
         // Prepare provider API key headers
         var providerHeaders: [String: String] = [:]

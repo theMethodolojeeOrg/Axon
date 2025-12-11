@@ -135,29 +135,42 @@ class SettingsStorage {
     }
 }
 
-// MARK: - API Keys Storage (Keychain)
+// MARK: - API Keys Storage (SecureVault - CryptoKit Encrypted)
 
+/// API Keys are now stored using SecureVault which provides:
+/// - CryptoKit ChaCha20-Poly1305 encryption
+/// - Device-bound keys that never leave the device
+/// - Automatic migration from legacy Keychain storage
 class APIKeysStorage {
     static let shared = APIKeysStorage()
 
-    private init() {}
+    private let vault = SecureVault.shared
+    private let legacyStorage = SecureTokenStorage.shared
+    private let migrationKey = "APIKeysStorage.migrated.v1"
+
+    private init() {
+        // Migrate legacy keys on first access
+        migrateFromLegacyIfNeeded()
+    }
 
     // MARK: - Save API Key
 
     func saveAPIKey(_ key: String, for provider: APIProvider) throws {
-        try SecureTokenStorage.shared.save(key, forKey: keychainKey(for: provider))
+        try vault.storeAPIKey(key, provider: provider.rawValue)
+        print("[APIKeysStorage] Saved API key for \(provider.rawValue) to SecureVault")
     }
 
     // MARK: - Get API Key
 
     func getAPIKey(for provider: APIProvider) throws -> String? {
-        try SecureTokenStorage.shared.retrieve(forKey: keychainKey(for: provider))
+        return try vault.retrieveAPIKey(provider: provider.rawValue)
     }
 
     // MARK: - Clear API Key
 
     func clearAPIKey(for provider: APIProvider) throws {
-        try SecureTokenStorage.shared.delete(forKey: keychainKey(for: provider))
+        try vault.deleteAPIKey(provider: provider.rawValue)
+        print("[APIKeysStorage] Cleared API key for \(provider.rawValue)")
     }
 
     // MARK: - Check if Configured
@@ -170,15 +183,17 @@ class APIKeysStorage {
     // MARK: - Custom Provider API Keys
 
     func saveCustomProviderAPIKey(_ key: String, providerId: UUID) throws {
-        try SecureTokenStorage.shared.save(key, forKey: customProviderKeychainKey(for: providerId))
+        try vault.store(key, forKey: customProviderVaultKey(for: providerId))
+        print("[APIKeysStorage] Saved custom provider API key to SecureVault")
     }
 
     func getCustomProviderAPIKey(providerId: UUID) throws -> String? {
-        try SecureTokenStorage.shared.retrieve(forKey: customProviderKeychainKey(for: providerId))
+        return try vault.retrieveString(forKey: customProviderVaultKey(for: providerId))
     }
 
     func clearCustomProviderAPIKey(providerId: UUID) throws {
-        try SecureTokenStorage.shared.delete(forKey: customProviderKeychainKey(for: providerId))
+        try vault.delete(forKey: customProviderVaultKey(for: providerId))
+        print("[APIKeysStorage] Cleared custom provider API key")
     }
 
     func isCustomProviderConfigured(providerId: UUID) -> Bool {
@@ -186,14 +201,59 @@ class APIKeysStorage {
         return !key.isEmpty
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Migration from Legacy Keychain
 
-    private func keychainKey(for provider: APIProvider) -> String {
-        return "api_key_\(provider.rawValue)"
+    private func migrateFromLegacyIfNeeded() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: migrationKey) else { return }
+
+        print("[APIKeysStorage] Checking for legacy API keys to migrate...")
+
+        var migratedCount = 0
+
+        // Migrate built-in provider keys
+        for provider in APIProvider.allCases {
+            let legacyKey = "api_key_\(provider.rawValue)"
+            if let legacyValue = try? legacyStorage.retrieve(forKey: legacyKey), !legacyValue.isEmpty {
+                do {
+                    try vault.storeAPIKey(legacyValue, provider: provider.rawValue)
+                    // Clear from legacy storage after successful migration
+                    try? legacyStorage.delete(forKey: legacyKey)
+                    migratedCount += 1
+                    print("[APIKeysStorage] Migrated \(provider.rawValue) API key to SecureVault")
+                } catch {
+                    print("[APIKeysStorage] Failed to migrate \(provider.rawValue): \(error)")
+                }
+            }
+        }
+
+        // Mark migration as complete
+        defaults.set(true, forKey: migrationKey)
+
+        if migratedCount > 0 {
+            print("[APIKeysStorage] Migration complete. Migrated \(migratedCount) API keys to SecureVault")
+        } else {
+            print("[APIKeysStorage] No legacy API keys found to migrate")
+        }
     }
 
-    private func customProviderKeychainKey(for providerId: UUID) -> String {
+    // MARK: - Private Helpers
+
+    private func customProviderVaultKey(for providerId: UUID) -> String {
         return "custom_provider_api_key_\(providerId.uuidString)"
+    }
+
+    // MARK: - Debug / Export (for backup purposes)
+
+    /// List all stored API key providers (not the keys themselves)
+    func listStoredProviders() -> [String] {
+        do {
+            let allKeys = try vault.listKeys()
+            return allKeys.filter { $0.hasPrefix("apikey.") }
+                .map { String($0.dropFirst("apikey.".count)) }
+        } catch {
+            return []
+        }
     }
 }
 

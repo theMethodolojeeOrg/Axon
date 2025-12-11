@@ -8,11 +8,13 @@
 import CoreData
 
 struct PersistenceController {
-    static let shared = PersistenceController()
+    // Default to CloudKit disabled - users can enable via Settings once they set up their Apple Developer account
+    // This ensures the app works out of the box without CloudKit entitlements
+    static let shared = PersistenceController(useCloudKit: false)
 
     @MainActor
     static let preview: PersistenceController = {
-        let result = PersistenceController(inMemory: true)
+        let result = PersistenceController(inMemory: true, useCloudKit: false)
         let viewContext = result.container.viewContext
         for _ in 0..<10 {
             let newItem = Item(context: viewContext)
@@ -29,18 +31,42 @@ struct PersistenceController {
 
     let container: NSPersistentCloudKitContainer
 
-    init(inMemory: Bool = false) {
+    init(inMemory: Bool = false, useCloudKit: Bool = true) {
         container = NSPersistentCloudKitContainer(name: "Axon")
+
         if inMemory {
             container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
         }
 
-        // Configure merge policies for conflict resolution
-        container.persistentStoreDescriptions.first?.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
-        container.persistentStoreDescriptions.first?.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+        // Configure the store description
+        if let storeDescription = container.persistentStoreDescriptions.first {
+            // Enable history tracking for sync
+            storeDescription.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
+            storeDescription.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+
+            // Disable CloudKit sync if not needed (local-only mode)
+            // This prevents the entitlement error when CloudKit isn't configured
+            if !useCloudKit {
+                storeDescription.cloudKitContainerOptions = nil
+                print("[Persistence] CloudKit sync DISABLED - running in local-only mode")
+            } else {
+                print("[Persistence] CloudKit sync ENABLED")
+            }
+        }
 
         container.loadPersistentStores(completionHandler: { (storeDescription, error) in
             if let error = error as NSError? {
+                // Log the error but don't crash - fall back gracefully
+                print("[Persistence] Error loading persistent store: \(error), \(error.userInfo)")
+
+                // Check if it's a CloudKit-related error
+                if error.domain == NSCocoaErrorDomain && error.code == 134060 {
+                    print("[Persistence] CloudKit integration error - this may require entitlements setup")
+                    print("[Persistence] For local-only operation, set useCloudKit: false")
+                }
+
+                // In production, you might want to handle this more gracefully
+                // For now, we'll still crash to surface the issue during development
                 fatalError("Unresolved error \(error), \(error.userInfo)")
             }
         })

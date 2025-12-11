@@ -36,11 +36,16 @@ class ConversationSyncManager: ObservableObject {
     // MARK: - Public API
 
     /// Load conversations from local Core Data (instant)
+    /// Excludes soft-deleted (syncStatus == "deleted") and archived conversations
     func loadLocalConversations() -> [Conversation] {
         let context = persistence.container.viewContext
         let fetchRequest: NSFetchRequest<ConversationEntity> = ConversationEntity.fetchRequest()
         fetchRequest.sortDescriptors = [NSSortDescriptor(key: "updatedAt", ascending: false)]
-        fetchRequest.predicate = NSPredicate(format: "archived == %@", NSNumber(value: false))
+        // CRITICAL: Filter out soft-deleted AND archived conversations
+        fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "archived == %@", NSNumber(value: false)),
+            NSPredicate(format: "syncStatus != %@", "deleted")
+        ])
 
         do {
             let entities = try context.fetch(fetchRequest)
@@ -288,12 +293,22 @@ class ConversationSyncManager: ObservableObject {
         let context = persistence.newBackgroundContext()
 
         try await context.perform {
+            var savedCount = 0
+            var skippedCount = 0
+
             for conversation in conversations {
                 let fetchRequest: NSFetchRequest<ConversationEntity> = ConversationEntity.fetchRequest()
                 fetchRequest.predicate = NSPredicate(format: "id == %@", conversation.id)
 
                 let entity: ConversationEntity
                 if let existing = try context.fetch(fetchRequest).first {
+                    // CRITICAL: Don't overwrite soft-deleted conversations
+                    // This prevents resurrection during sync
+                    if existing.syncStatus == "deleted" {
+                        print("[ConversationSyncManager] ⚠️ Skipping soft-deleted conversation: \(conversation.id)")
+                        skippedCount += 1
+                        continue
+                    }
                     // Update existing
                     entity = existing
                 } else {
@@ -317,10 +332,15 @@ class ConversationSyncManager: ObservableObject {
                 entity.isPinned = conversation.isPinned ?? false
                 entity.syncStatus = "synced"
                 entity.locallyModified = false
+                savedCount += 1
             }
 
             try self.persistence.saveContext(context)
-            print("[ConversationSyncManager] Saved \(conversations.count) conversations to Core Data")
+            if skippedCount > 0 {
+                print("[ConversationSyncManager] Saved \(savedCount) conversations, skipped \(skippedCount) soft-deleted")
+            } else {
+                print("[ConversationSyncManager] Saved \(savedCount) conversations to Core Data")
+            }
         }
     }
 
@@ -338,6 +358,47 @@ class ConversationSyncManager: ObservableObject {
 
             try self.persistence.saveContext(context)
             print("[ConversationSyncManager] Deleted \(entities.count) conversations from Core Data")
+        }
+    }
+
+    /// Clean up old soft-deleted conversation tombstones (call periodically)
+    func cleanupOldTombstones(olderThan days: Int = 7) async throws {
+        let context = persistence.newBackgroundContext()
+        let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+
+        try await context.perform {
+            // Find old conversation tombstones
+            let convFetch: NSFetchRequest<ConversationEntity> = ConversationEntity.fetchRequest()
+            convFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                NSPredicate(format: "syncStatus == %@", "deleted"),
+                NSPredicate(format: "updatedAt < %@", cutoffDate as NSDate)
+            ])
+
+            let convEntities = try context.fetch(convFetch)
+            var deletedConvIds: [String] = []
+
+            for entity in convEntities {
+                if let id = entity.id {
+                    deletedConvIds.append(id)
+                }
+                context.delete(entity)
+            }
+
+            // Also delete messages for those conversations
+            if !deletedConvIds.isEmpty {
+                let msgFetch: NSFetchRequest<MessageEntity> = MessageEntity.fetchRequest()
+                msgFetch.predicate = NSPredicate(format: "conversationId IN %@", deletedConvIds)
+
+                let msgEntities = try context.fetch(msgFetch)
+                for entity in msgEntities {
+                    context.delete(entity)
+                }
+            }
+
+            if !convEntities.isEmpty {
+                try self.persistence.saveContext(context)
+                print("[ConversationSyncManager] Cleaned up \(convEntities.count) old conversation tombstones")
+            }
         }
     }
 

@@ -148,32 +148,157 @@ struct MemorySettingsView: View {
             SettingsSection(title: "Memory Types") {
                 VStack(spacing: 12) {
                     MemoryTypeInfo(
-                        icon: "lightbulb.fill",
-                        title: "Facts",
-                        description: "Specific information and data points",
+                        icon: "brain.head.profile",
+                        title: "Allocentric",
+                        description: "Knowledge about you: preferences, facts, relationships, context",
                         color: AppColors.signalMercury
                     )
 
                     MemoryTypeInfo(
-                        icon: "gearshape.fill",
-                        title: "Procedures",
-                        description: "Step-by-step processes and how-to information",
+                        icon: "person.fill",
+                        title: "Egoic",
+                        description: "What works for the AI: procedures, insights, learnings",
                         color: AppColors.signalLichen
                     )
+                }
+            }
 
-                    MemoryTypeInfo(
-                        icon: "text.quote",
-                        title: "Context",
-                        description: "Background information and situational awareness",
-                        color: AppColors.signalCopper
-                    )
+            // Epistemic Engine Section
+            if viewModel.settings.memoryEnabled {
+                SettingsSection(title: "Epistemic Engine") {
+                    VStack(spacing: 16) {
+                        // Epistemic Grounding Toggle
+                        Toggle(isOn: Binding(
+                            get: { viewModel.settings.epistemicEnabled },
+                            set: { newValue in
+                                Task {
+                                    await viewModel.updateSetting(\.epistemicEnabled, newValue)
+                                }
+                            }
+                        )) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Epistemic Grounding")
+                                    .font(AppTypography.bodyMedium(.medium))
+                                    .foregroundColor(AppColors.textPrimary)
 
-                    MemoryTypeInfo(
-                        icon: "arrow.triangle.branch",
-                        title: "Relationships",
-                        description: "Connections between concepts and entities",
-                        color: AppColors.signalHematite
-                    )
+                                Text("Ground responses with verified facts and confidence metrics")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
+                        }
+                        .tint(AppColors.signalMercury)
+
+                        if viewModel.settings.epistemicEnabled {
+                            Divider()
+                                .background(AppColors.divider)
+
+                            // Verbose Mode Toggle
+                            Toggle(isOn: Binding(
+                                get: { viewModel.settings.epistemicVerbose },
+                                set: { newValue in
+                                    Task {
+                                        await viewModel.updateSetting(\.epistemicVerbose, newValue)
+                                    }
+                                }
+                            )) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Verbose Boundaries")
+                                        .font(AppTypography.bodyMedium(.medium))
+                                        .foregroundColor(AppColors.textPrimary)
+
+                                    Text("Include detailed epistemic boundaries in prompts")
+                                        .font(AppTypography.bodySmall())
+                                        .foregroundColor(AppColors.textSecondary)
+                                }
+                            }
+                            .tint(AppColors.signalMercury)
+
+                            Divider()
+                                .background(AppColors.divider)
+
+                            // Learning Loop Toggle
+                            Toggle(isOn: Binding(
+                                get: { viewModel.settings.learningLoopEnabled },
+                                set: { newValue in
+                                    Task {
+                                        await viewModel.updateSetting(\.learningLoopEnabled, newValue)
+                                    }
+                                }
+                            )) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Learning Loop")
+                                        .font(AppTypography.bodyMedium(.medium))
+                                        .foregroundColor(AppColors.textPrimary)
+
+                                    Text("Refine memory confidence when predictions don't match reality")
+                                        .font(AppTypography.bodySmall())
+                                        .foregroundColor(AppColors.textSecondary)
+                                }
+                            }
+                            .tint(AppColors.signalMercury)
+                        }
+                    }
+                    .padding()
+                    .background(AppColors.substrateSecondary)
+                    .cornerRadius(8)
+                }
+
+                // Predicate Logging Section
+                SettingsSection(title: "Debugging") {
+                    VStack(spacing: 16) {
+                        Toggle(isOn: Binding(
+                            get: { viewModel.settings.predicateLoggingEnabled },
+                            set: { newValue in
+                                Task {
+                                    await viewModel.updateSetting(\.predicateLoggingEnabled, newValue)
+                                }
+                            }
+                        )) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Predicate Logging")
+                                    .font(AppTypography.bodyMedium(.medium))
+                                    .foregroundColor(AppColors.textPrimary)
+
+                                Text("Log formal proof trees for debugging and verification")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
+                        }
+                        .tint(AppColors.signalMercury)
+
+                        if viewModel.settings.predicateLoggingEnabled {
+                            Divider()
+                                .background(AppColors.divider)
+
+                            // Verbosity Picker
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Verbosity Level")
+                                    .font(AppTypography.bodyMedium())
+                                    .foregroundColor(AppColors.textPrimary)
+
+                                Picker("Verbosity", selection: Binding(
+                                    get: { viewModel.settings.predicateLoggingVerbosity },
+                                    set: { newValue in
+                                        Task {
+                                            await viewModel.updateSetting(\.predicateLoggingVerbosity, newValue)
+                                        }
+                                    }
+                                )) {
+                                    ForEach(PredicateVerbosity.allCases, id: \.self) { level in
+                                        Text(level.displayName).tag(level)
+                                    }
+                                }
+                                .pickerStyle(SegmentedPickerStyle())
+
+                                Text(viewModel.settings.predicateLoggingVerbosity.description)
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(AppColors.substrateSecondary)
+                    .cornerRadius(8)
                 }
             }
 

@@ -14,6 +14,7 @@ class ConversationService: ObservableObject {
 
     private let apiClient = APIClient.shared
     private let syncManager = ConversationSyncManager.shared
+    private let localStore = LocalConversationStore.shared
 
     // Default project ID - can be made configurable later
     private let defaultProjectId = "default"
@@ -25,24 +26,63 @@ class ConversationService: ObservableObject {
     @Published var error: String?
     @Published var isSyncing = false
 
-    // Track recently deleted conversations to avoid showing them again
+    // Offline mode support
+    @Published var isOfflineMode = false
+    @Published var pendingOperationsCount = 0
+
+    // Track recently deleted conversations to prevent resurrection from sync
     private var recentlyDeletedIds: Set<String> = []
-    private var lastDeletedCleanupTime = Date()
+    private var deletedIdsTimestamps: [String: Date] = [:]
+    private let deletionRetentionPeriod: TimeInterval = 300 // 5 minutes to prevent resurrection
 
     private init() {
         // Load conversations from local Core Data immediately (instant UI)
         loadLocalConversations()
+
+        // Update pending operations count
+        pendingOperationsCount = localStore.pendingOperationCount
     }
 
     // MARK: - Local-First Data Access
 
     /// Load conversations from Core Data (instant, no network)
     private func loadLocalConversations() {
-        let loaded = syncManager.loadLocalConversations()
+        // Clean up old deletion records (older than retention period)
+        cleanupOldDeletionRecords()
+
+        var loaded = syncManager.loadLocalConversations()
+
+        // CRITICAL: Filter out recently deleted conversations to prevent resurrection
+        if !recentlyDeletedIds.isEmpty {
+            let beforeCount = loaded.count
+            loaded = loaded.filter { !recentlyDeletedIds.contains($0.id) }
+            if beforeCount != loaded.count {
+                print("[ConversationService] Filtered out \(beforeCount - loaded.count) recently deleted conversations")
+            }
+        }
+
         print("[ConversationService] Loaded \(loaded.count) conversations from Core Data")
-        print("[ConversationService] Sample conversation IDs: \(loaded.prefix(3).map { $0.id })")
         conversations = loaded
-        print("[ConversationService] Published conversations array now has \(conversations.count) items")
+    }
+
+    /// Clean up deletion records older than retention period
+    private func cleanupOldDeletionRecords() {
+        let now = Date()
+        let expiredIds = deletedIdsTimestamps.filter { now.timeIntervalSince($0.value) > deletionRetentionPeriod }.keys
+        for id in expiredIds {
+            recentlyDeletedIds.remove(id)
+            deletedIdsTimestamps.removeValue(forKey: id)
+        }
+        if !expiredIds.isEmpty {
+            print("[ConversationService] Cleaned up \(expiredIds.count) expired deletion records")
+        }
+    }
+
+    /// Mark a conversation as recently deleted (prevents resurrection during sync)
+    private func markAsRecentlyDeleted(_ id: String) {
+        recentlyDeletedIds.insert(id)
+        deletedIdsTimestamps[id] = Date()
+        print("[ConversationService] Marked conversation \(id) as recently deleted")
     }
 
     /// Sync conversations with server in background
@@ -52,14 +92,31 @@ class ConversationService: ObservableObject {
             defer { isSyncing = false }
 
             do {
+                // First, process any pending local operations
+                await localStore.processPendingOperations()
+                pendingOperationsCount = localStore.pendingOperationCount
+
+                // Then sync with server
                 try await syncManager.syncConversations()
                 // Reload from Core Data after successful sync
                 loadLocalConversations()
+
+                isOfflineMode = false
             } catch {
                 self.error = error.localizedDescription
                 print("[ConversationService] Sync failed: \(error)")
+                isOfflineMode = true
             }
         }
+    }
+
+    /// Process pending offline operations
+    func syncPendingOperations() async {
+        await localStore.processPendingOperations()
+        pendingOperationsCount = localStore.pendingOperationCount
+
+        // Reload conversations to reflect any ID changes from synced local conversations
+        loadLocalConversations()
     }
 
     // MARK: - Helper: Get Provider and Model with Overrides
@@ -129,6 +186,19 @@ class ConversationService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
+        // Try online creation first, fall back to offline if it fails
+        do {
+            return try await createConversationOnline(title: title, firstMessage: firstMessage)
+        } catch {
+            print("[ConversationService] Online creation failed, trying offline: \(error)")
+
+            // Fall back to local-only creation
+            return try createConversationOffline(title: title)
+        }
+    }
+
+    /// Create conversation via API (online mode)
+    private func createConversationOnline(title: String, firstMessage: String? = nil) async throws -> Conversation {
         struct CreateConversationRequest: Encodable {
             let title: String
             let projectId: String
@@ -146,25 +216,33 @@ class ConversationService: ObservableObject {
             initialMessage: firstMessage
         )
 
-        do {
-            // This endpoint returns { "conversation": {...}, "message": "..." }
-            let response: CreateConversationResponse = try await apiClient.request(
-                endpoint: "/apiCreateConversation",
-                method: .post,
-                body: request
-            )
+        // This endpoint returns { "conversation": {...}, "message": "..." }
+        let response: CreateConversationResponse = try await apiClient.request(
+            endpoint: "/apiCreateConversation",
+            method: .post,
+            body: request
+        )
 
-            // Save new conversation to Core Data immediately so it appears in sidebar
-            try await syncManager.saveConversationsToCoreData([response.conversation])
+        // Save new conversation to Core Data immediately so it appears in sidebar
+        try await syncManager.saveConversationsToCoreData([response.conversation])
 
-            // Add to in-memory array and set as current
-            self.conversations.insert(response.conversation, at: 0)
-            self.currentConversation = response.conversation
-            return response.conversation
-        } catch {
-            self.error = error.localizedDescription
-            throw error
-        }
+        // Add to in-memory array and set as current
+        self.conversations.insert(response.conversation, at: 0)
+        self.currentConversation = response.conversation
+        return response.conversation
+    }
+
+    /// Create conversation locally (offline mode)
+    func createConversationOffline(title: String) throws -> Conversation {
+        let conversation = try localStore.createLocalConversation(title: title, projectId: defaultProjectId)
+
+        // Add to in-memory array and set as current
+        self.conversations.insert(conversation, at: 0)
+        self.currentConversation = conversation
+        self.pendingOperationsCount = localStore.pendingOperationCount
+
+        print("[ConversationService] Created offline conversation: \(conversation.id)")
+        return conversation
     }
 
     func getConversation(id: String) async throws -> Conversation {
@@ -223,45 +301,51 @@ class ConversationService: ObservableObject {
     }
 
     func deleteConversation(id: String, hardDelete: Bool = true) async throws {
-        // Store original state for potential rollback
-        let originalConversations = conversations
-        let originalCurrentConversation = currentConversation
-        let originalMessages = messages
-        
-        // Add to recently deleted to prevent reappearing
-        recentlyDeletedIds.insert(id)
-        
+        // CRITICAL: Mark as recently deleted FIRST to prevent resurrection during sync
+        markAsRecentlyDeleted(id)
+
         // Optimistic update - remove from UI immediately
         conversations.removeAll { $0.id == id }
         if currentConversation?.id == id {
             currentConversation = nil
             messages = []
         }
-        
+
+        // For local-only conversations, hard delete immediately (no server sync needed)
+        if id.hasPrefix("local_") {
+            try localStore.deleteLocalConversation(id: id)
+            pendingOperationsCount = localStore.pendingOperationCount
+            print("[ConversationService] Deleted local-only conversation: \(id)")
+            return
+        }
+
+        // Soft-delete from Core Data first (sets syncStatus = "deleted")
+        // This prevents resurrection during sync until server confirms deletion
+        try localStore.deleteLocalConversation(id: id)
+        pendingOperationsCount = localStore.pendingOperationCount
+        print("[ConversationService] Soft-deleted conversation locally: \(id)")
+
+        // Try API deletion
         do {
             struct DeleteConversationResponse: Decodable { let message: String; let hardDelete: Bool? }
-            let response: DeleteConversationResponse = try await apiClient.request(
+            let _: DeleteConversationResponse = try await apiClient.request(
                 endpoint: "/apiDeleteConversation/\(id)?hardDelete=\(hardDelete)",
                 method: .delete
             )
-            
-            #if DEBUG
-            print("✅ [ConversationService] Successfully deleted conversation \(id)")
-            print("   Server response: \(response.message)")
-            #endif
-        } catch {
-            #if DEBUG
-            print("❌ [ConversationService] Failed to delete conversation \(id): \(error.localizedDescription)")
-            #endif
-            
-            // Remove from recently deleted since the deletion failed
+
+            print("[ConversationService] ✅ Server confirmed deletion of conversation \(id)")
+
+            // Server confirmed - hard delete the tombstone
+            try localStore.hardDeleteLocalConversation(id: id)
+
+            // Can safely remove from recentlyDeletedIds now
             recentlyDeletedIds.remove(id)
-            
-            // Rollback optimistic update on failure
-            conversations = originalConversations
-            currentConversation = originalCurrentConversation
-            messages = originalMessages
-            
+            deletedIdsTimestamps.removeValue(forKey: id)
+        } catch {
+            // Server delete failed, but soft-delete tombstone remains
+            // The pending operation queue will retry the API deletion
+            // Tombstone prevents resurrection on next sync
+            print("[ConversationService] ⚠️ Server delete failed for \(id), tombstone preserved: \(error.localizedDescription)")
             self.error = error.localizedDescription
             throw error
         }
@@ -273,12 +357,20 @@ class ConversationService: ObservableObject {
         print("[ConversationService] 📥 getMessages called")
         print("[ConversationService] Conversation ID: \(conversationId)")
         print("[ConversationService] Limit: \(limit)")
-        
+
+        // For local-only conversations, always use local store
+        if conversationId.hasPrefix("local_") {
+            let localMessages = localStore.loadMessages(conversationId: conversationId)
+            print("[ConversationService] ✅ Loaded \(localMessages.count) messages from local store (offline conversation)")
+            self.messages = localMessages
+            return localMessages
+        }
+
         // Get the conversation to check expected message count
         let conversation = conversations.first(where: { $0.id == conversationId })
         let expectedMessageCount = conversation?.messageCount ?? 0
         print("[ConversationService] Expected message count from conversation: \(expectedMessageCount)")
-        
+
         // First, load from Core Data (instant)
         let localMessages = syncManager.loadLocalMessages(conversationId: conversationId)
         print("[ConversationService] Local messages in Core Data: \(localMessages.count)")
@@ -358,7 +450,7 @@ class ConversationService: ObservableObject {
         return settings.useOnDeviceOrchestration ? onDeviceOrchestrator : cloudOrchestrator
     }
 
-    func sendMessage(conversationId: String, content: String, attachments: [MessageAttachment] = [], geminiTools: Bool = false) async throws -> Message {
+    func sendMessage(conversationId: String, content: String, attachments: [MessageAttachment] = [], enabledTools: [String] = []) async throws -> Message {
         // Get API keys from storage
         let apiKeysStorage = APIKeysStorage.shared
         let anthropicKey = try? apiKeysStorage.getAPIKey(for: .anthropic)
@@ -450,7 +542,7 @@ class ConversationService: ObservableObject {
                 conversationId: conversationId,
                 content: content,
                 attachments: attachments,
-                geminiTools: geminiTools,
+                enabledTools: enabledTools,
                 messages: messages, // Pass full history including the new user message
                 config: config
             )

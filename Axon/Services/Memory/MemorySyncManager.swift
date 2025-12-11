@@ -34,10 +34,13 @@ class MemorySyncManager: ObservableObject {
     // MARK: - Public API
 
     /// Load memories from local Core Data (instant)
+    /// Excludes soft-deleted memories (syncStatus == "deleted")
     func loadLocalMemories() -> [Memory] {
         let context = persistence.container.viewContext
         let fetchRequest: NSFetchRequest<MemoryEntity> = MemoryEntity.fetchRequest()
         fetchRequest.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        // CRITICAL: Filter out soft-deleted memories to prevent resurrection
+        fetchRequest.predicate = NSPredicate(format: "syncStatus != %@", "deleted")
 
         do {
             let entities = try context.fetch(fetchRequest)
@@ -175,12 +178,22 @@ class MemorySyncManager: ObservableObject {
         let context = persistence.newBackgroundContext()
 
         try await context.perform {
+            var savedCount = 0
+            var skippedCount = 0
+
             for memory in memories {
                 let fetchRequest: NSFetchRequest<MemoryEntity> = MemoryEntity.fetchRequest()
                 fetchRequest.predicate = NSPredicate(format: "id == %@", memory.id)
 
                 let entity: MemoryEntity
                 if let existing = try context.fetch(fetchRequest).first {
+                    // CRITICAL: Don't overwrite soft-deleted memories
+                    // This prevents resurrection during sync
+                    if existing.syncStatus == "deleted" {
+                        print("[MemorySyncManager] ⚠️ Skipping soft-deleted memory: \(memory.id)")
+                        skippedCount += 1
+                        continue
+                    }
                     // Update existing
                     entity = existing
                 } else {
@@ -201,7 +214,7 @@ class MemorySyncManager: ObservableObject {
                 entity.accessCount = Int32(memory.accessCount)
                 entity.syncStatus = "synced"
                 entity.locallyModified = false
-                
+
                 // Note: 'context' field requires Core Data model update
                 // entity.context = memory.context
 
@@ -228,15 +241,38 @@ class MemorySyncManager: ObservableObject {
                     }
                     entity.metadata = metadataDict as NSDictionary
                 }
+                savedCount += 1
             }
 
             try self.persistence.saveContext(context)
-            print("[MemorySyncManager] Saved \(memories.count) memories to Core Data")
+            if skippedCount > 0 {
+                print("[MemorySyncManager] Saved \(savedCount) memories, skipped \(skippedCount) soft-deleted")
+            } else {
+                print("[MemorySyncManager] Saved \(savedCount) memories to Core Data")
+            }
         }
     }
 
-    /// Delete a memory from Core Data
+    /// Soft-delete a memory from Core Data (prevents resurrection during sync)
     func deleteMemoryFromCoreData(id: String) async throws {
+        let context = persistence.newBackgroundContext()
+
+        try await context.perform {
+            let fetchRequest: NSFetchRequest<MemoryEntity> = MemoryEntity.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@", id)
+
+            if let entity = try context.fetch(fetchRequest).first {
+                // Use soft-delete (tombstone) instead of hard delete
+                entity.syncStatus = "deleted"
+                entity.updatedAt = Date()
+                try self.persistence.saveContext(context)
+                print("[MemorySyncManager] Soft-deleted memory \(id) (tombstone)")
+            }
+        }
+    }
+
+    /// Hard-delete a memory after server confirms deletion
+    func hardDeleteMemoryFromCoreData(id: String) async throws {
         let context = persistence.newBackgroundContext()
 
         try await context.perform {
@@ -246,7 +282,31 @@ class MemorySyncManager: ObservableObject {
             if let entity = try context.fetch(fetchRequest).first {
                 context.delete(entity)
                 try self.persistence.saveContext(context)
-                print("[MemorySyncManager] Deleted memory \(id) from Core Data")
+                print("[MemorySyncManager] Hard-deleted memory \(id) after server confirmation")
+            }
+        }
+    }
+
+    /// Clean up old soft-deleted memories (call periodically)
+    func cleanupOldTombstones(olderThan days: Int = 7) async throws {
+        let context = persistence.newBackgroundContext()
+        let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+
+        try await context.perform {
+            let fetchRequest: NSFetchRequest<MemoryEntity> = MemoryEntity.fetchRequest()
+            fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                NSPredicate(format: "syncStatus == %@", "deleted"),
+                NSPredicate(format: "updatedAt < %@", cutoffDate as NSDate)
+            ])
+
+            let entities = try context.fetch(fetchRequest)
+            for entity in entities {
+                context.delete(entity)
+            }
+
+            if !entities.isEmpty {
+                try self.persistence.saveContext(context)
+                print("[MemorySyncManager] Cleaned up \(entities.count) old memory tombstones")
             }
         }
     }

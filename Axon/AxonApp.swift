@@ -16,10 +16,22 @@ import FirebaseFirestore
 struct AxonApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var authService = AuthenticationService.shared
+    @StateObject private var settingsViewModel = SettingsViewModel.shared
+    @StateObject private var biometricService = BiometricAuthService.shared
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var showLaunchScreen = true
     @State private var launchScreenOpacity: Double = 1.0
     @State private var mainAppOpacity: Double = 0.0
     @State private var blackOverlayOpacity: Double = 0.0
+    @State private var isUnlocked = false
+    @State private var showPrivacyBlur = false
+    @State private var lastBackgroundTime: Date?
+
+    /// Computed property to determine if app lock overlay should show
+    private var showAppLockOverlay: Bool {
+        !showLaunchScreen && settingsViewModel.settings.appLockEnabled && !isUnlocked
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -34,7 +46,7 @@ struct AxonApp: App {
                             .opacity(mainAppOpacity)
                     }
                 }
-                
+
                 // Launch screen (on top during animation)
                 if showLaunchScreen {
                     LaunchScreenView()
@@ -43,13 +55,72 @@ struct AxonApp: App {
                             startLaunchSequence()
                         }
                 }
-                
+
                 // Black overlay for transitions
                 Color.black
                     .ignoresSafeArea()
                     .opacity(blackOverlayOpacity)
                     .allowsHitTesting(false)
+
+                // App Lock overlay (shown after launch if enabled)
+                // Use opacity instead of conditional to prevent view recreation loops
+                AppLockView(isUnlocked: $isUnlocked)
+                    .opacity(showAppLockOverlay ? 1 : 0)
+                    .allowsHitTesting(showAppLockOverlay)
+                    .zIndex(100)
+
+                // Privacy blur for app switcher
+                PrivacyBlurView()
+                    .opacity(showPrivacyBlur && settingsViewModel.settings.hideContentInAppSwitcher ? 1 : 0)
+                    .allowsHitTesting(showPrivacyBlur)
+                    .zIndex(101)
             }
+            .onChange(of: scenePhase) { _, newPhase in
+                handleScenePhaseChange(newPhase)
+            }
+            .onAppear {
+                // If app lock is disabled, mark as unlocked
+                if !settingsViewModel.settings.appLockEnabled {
+                    isUnlocked = true
+                }
+            }
+        }
+    }
+
+    private func handleScenePhaseChange(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            // App became active
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showPrivacyBlur = false
+            }
+
+            // Check if we need to re-lock based on timeout
+            if settingsViewModel.settings.appLockEnabled {
+                if let lastTime = lastBackgroundTime {
+                    let timeout = settingsViewModel.settings.lockTimeout.seconds
+                    let elapsed = Int(Date().timeIntervalSince(lastTime))
+
+                    if elapsed >= timeout && timeout != Int.max {
+                        isUnlocked = false
+                    }
+                }
+            }
+
+        case .inactive:
+            // App going to background (app switcher)
+            if settingsViewModel.settings.hideContentInAppSwitcher {
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    showPrivacyBlur = true
+                }
+            }
+
+        case .background:
+            // App fully in background
+            lastBackgroundTime = Date()
+
+        @unknown default:
+            break
         }
     }
     

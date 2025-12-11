@@ -34,6 +34,24 @@ struct AppSettings: Codable, Equatable, Sendable {
     var maxMemoriesPerRequest: Int = 10  // 5-50
     var memoryAnalyticsEnabled: Bool = true
 
+    // Epistemic Engine (Consciousness & Grounding)
+    var epistemicEnabled: Bool = true               // Enable epistemic grounding
+    var epistemicVerbose: Bool = false              // Include detailed epistemic boundaries in prompts
+    var learningLoopEnabled: Bool = true            // Enable feedback-driven learning
+    var predicateLoggingEnabled: Bool = true        // Enable formal predicate logging
+    var predicateLoggingVerbosity: PredicateVerbosity = .normal  // Logging detail level
+
+    // Security & Authentication
+    var appLockEnabled: Bool = false                // Require auth to open app
+    var biometricEnabled: Bool = true               // Use Face ID/Touch ID
+    var passcodeEnabled: Bool = true                // Allow passcode fallback
+    var lockTimeout: LockTimeout = .immediate       // When to require re-auth
+    var hideContentInAppSwitcher: Bool = true       // Blur content in app switcher
+
+    // Device Mode (On-Device vs Cloud)
+    var deviceMode: DeviceMode = .onDevice          // Default: device-first, cloud is opt-in
+    var deviceModeConfig: DeviceModeConfig = DeviceModeConfig()  // Granular settings
+
     // Conversations
     var archiveRetentionDays: Int = 30
 
@@ -42,6 +60,9 @@ struct AppSettings: Codable, Equatable, Sendable {
 
     // Text-to-Speech
     var ttsSettings: TTSSettings = TTSSettings()
+
+    // AI Tools (web search, code execution, etc.)
+    var toolSettings: ToolSettings = ToolSettings()
 
     // Custom Providers
     var customProviders: [CustomProviderConfig] = []
@@ -72,6 +93,262 @@ enum Theme: String, Codable, CaseIterable, Identifiable, Sendable {
         case .dark: return "Dark"
         case .light: return "Light"
         case .auto: return "Auto (System)"
+        }
+    }
+}
+
+// MARK: - Lock Timeout
+
+enum LockTimeout: String, Codable, CaseIterable, Identifiable, Sendable {
+    case immediate = "immediate"
+    case oneMinute = "1min"
+    case fiveMinutes = "5min"
+    case fifteenMinutes = "15min"
+    case oneHour = "1hour"
+    case never = "never"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .immediate: return "Immediately"
+        case .oneMinute: return "After 1 minute"
+        case .fiveMinutes: return "After 5 minutes"
+        case .fifteenMinutes: return "After 15 minutes"
+        case .oneHour: return "After 1 hour"
+        case .never: return "Never"
+        }
+    }
+
+    var seconds: Int {
+        switch self {
+        case .immediate: return 0
+        case .oneMinute: return 60
+        case .fiveMinutes: return 300
+        case .fifteenMinutes: return 900
+        case .oneHour: return 3600
+        case .never: return Int.max
+        }
+    }
+}
+
+// MARK: - Device Mode
+
+/// Primary toggle: Cloud vs On-Device
+enum DeviceMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case cloud = "cloud"
+    case onDevice = "onDevice"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .cloud: return "Cloud"
+        case .onDevice: return "On-Device"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .cloud: return "cloud.fill"
+        case .onDevice: return "iphone.gen3"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .cloud:
+            return "Conversations sync to your server. Full cloud features enabled."
+        case .onDevice:
+            return "Local-first operation. Configure what syncs in settings."
+        }
+    }
+}
+
+/// Granular configuration for On-Device mode
+struct DeviceModeConfig: Codable, Equatable, Sendable {
+    /// How conversation data is stored
+    var dataStorage: DataStorageMode = .localFirst
+
+    /// Where AI orchestration (prompt routing, tool calls) runs
+    var aiProcessing: AIProcessingMode = .onDevice  // Default: direct to providers
+
+    /// How memory/learning data is handled
+    var memoryStorage: MemoryStorageMode = .localOnly  // Default: local memory
+
+    /// Cloud sync provider (when sync is enabled)
+    var cloudSyncProvider: CloudSyncProvider = .none
+
+    /// Whether to show sync status indicators in UI
+    var showSyncStatus: Bool = true
+
+    /// Auto-sync when network becomes available
+    var autoSyncOnConnect: Bool = true
+}
+
+/// Which cloud service to use for syncing (if any)
+enum CloudSyncProvider: String, Codable, CaseIterable, Identifiable, Sendable {
+    case none = "none"
+    case iCloud = "iCloud"
+    case firestore = "firestore"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .none: return "None"
+        case .iCloud: return "iCloud"
+        case .firestore: return "Custom Server"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .none:
+            return "Data stays on this device only."
+        case .iCloud:
+            return "Sync across your Apple devices via iCloud."
+        case .firestore:
+            return "Sync to your own server (Firestore/custom API)."
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .none: return "iphone"
+        case .iCloud: return "icloud.fill"
+        case .firestore: return "server.rack"
+        }
+    }
+
+    var requiresSetup: Bool {
+        switch self {
+        case .none, .iCloud: return false
+        case .firestore: return true
+        }
+    }
+}
+
+/// How conversation data is stored
+enum DataStorageMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case localOnly = "localOnly"
+    case localFirst = "localFirst"
+    case syncRequired = "syncRequired"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .localOnly: return "Local Only"
+        case .localFirst: return "Local-First"
+        case .syncRequired: return "Sync Required"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .localOnly:
+            return "Data never leaves device. No cloud backup."
+        case .localFirst:
+            return "Works offline, syncs when connected."
+        case .syncRequired:
+            return "Requires network. Traditional cloud mode."
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .localOnly: return "lock.iphone"
+        case .localFirst: return "arrow.triangle.2.circlepath"
+        case .syncRequired: return "wifi"
+        }
+    }
+}
+
+/// Where AI orchestration runs
+enum AIProcessingMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case onDevice = "onDevice"
+    case cloud = "cloud"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .onDevice: return "On-Device"
+        case .cloud: return "Cloud"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .onDevice:
+            return "AI calls made directly from device to providers."
+        case .cloud:
+            return "AI orchestration handled by your server."
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .onDevice: return "cpu"
+        case .cloud: return "cloud"
+        }
+    }
+}
+
+/// How memory/learning data is handled
+enum MemoryStorageMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case localOnly = "localOnly"
+    case cloudSync = "cloudSync"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .localOnly: return "Local Memory"
+        case .cloudSync: return "Cloud Sync"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .localOnly:
+            return "Memories stored only on this device."
+        case .cloudSync:
+            return "Memories sync across your devices."
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .localOnly: return "brain.head.profile"
+        case .cloudSync: return "brain"
+        }
+    }
+}
+
+// MARK: - Predicate Verbosity
+
+enum PredicateVerbosity: String, Codable, CaseIterable, Identifiable, Sendable {
+    case minimal = "minimal"    // Only errors and critical predicates
+    case normal = "normal"      // Standard logging
+    case verbose = "verbose"    // Full proof trees
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .minimal: return "Minimal"
+        case .normal: return "Normal"
+        case .verbose: return "Verbose"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .minimal: return "Only errors and critical events"
+        case .normal: return "Standard predicate logging"
+        case .verbose: return "Full proof trees and all predicates"
         }
     }
 }
@@ -600,6 +877,156 @@ struct VoiceSettings: Codable, Equatable {
     var similarityBoost: Double = 0.75
     var style: Double = 0.0
     var useSpeakerBoost: Bool = false
+}
+
+// MARK: - Tool Settings
+
+/// Settings for AI tool use (web search, code execution, etc.)
+struct ToolSettings: Codable, Equatable, Sendable {
+    /// Master toggle for tool use
+    var toolsEnabled: Bool = false
+
+    /// Set of enabled tool IDs
+    var enabledToolIds: Set<String> = []
+
+    /// Maximum tool calls per conversation turn
+    var maxToolCallsPerTurn: Int = 5
+
+    /// Tool execution timeout in seconds
+    var toolTimeout: Int = 30
+
+    /// Helper to check if a specific tool is enabled
+    func isToolEnabled(_ tool: ToolId) -> Bool {
+        toolsEnabled && enabledToolIds.contains(tool.rawValue)
+    }
+
+    /// Helper to get enabled tools as ToolId array
+    var enabledTools: [ToolId] {
+        enabledToolIds.compactMap { ToolId(rawValue: $0) }
+    }
+
+    /// Enable a tool
+    mutating func enableTool(_ tool: ToolId) {
+        enabledToolIds.insert(tool.rawValue)
+    }
+
+    /// Disable a tool
+    mutating func disableTool(_ tool: ToolId) {
+        enabledToolIds.remove(tool.rawValue)
+    }
+
+    /// Toggle a tool
+    mutating func toggleTool(_ tool: ToolId) {
+        if enabledToolIds.contains(tool.rawValue) {
+            enabledToolIds.remove(tool.rawValue)
+        } else {
+            enabledToolIds.insert(tool.rawValue)
+        }
+    }
+}
+
+/// Available tool identifiers
+enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
+    // Gemini Native Tools (proxied via backend)
+    case googleSearch = "perform_google_search"
+    case codeExecution = "execute_python_code"
+    case googleMaps = "query_google_maps"
+
+    // Memory Tool
+    case createMemory = "create_memory"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .googleSearch: return "Google Search"
+        case .codeExecution: return "Code Execution"
+        case .googleMaps: return "Google Maps"
+        case .createMemory: return "Memory Creation"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .googleSearch: return "Real-time web search grounded by Google"
+        case .codeExecution: return "Execute Python code in a sandbox"
+        case .googleMaps: return "Location queries and place information"
+        case .createMemory: return "AI creates memories about you during chat"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .googleSearch: return "magnifyingglass"
+        case .codeExecution: return "terminal"
+        case .googleMaps: return "map"
+        case .createMemory: return "brain.head.profile"
+        }
+    }
+
+    var provider: ToolProvider {
+        switch self {
+        case .googleSearch, .codeExecution, .googleMaps:
+            return .gemini
+        case .createMemory:
+            return .internal
+        }
+    }
+
+    /// Whether this tool requires cloud orchestration mode
+    var requiresCloudMode: Bool {
+        switch self {
+        case .googleSearch, .codeExecution, .googleMaps:
+            return true  // Gemini proxy only works via backend
+        case .createMemory:
+            return false  // Can work locally
+        }
+    }
+
+    /// Group tools by provider
+    static func tools(for provider: ToolProvider) -> [ToolId] {
+        allCases.filter { $0.provider == provider }
+    }
+}
+
+/// Tool provider categories
+enum ToolProvider: String, Codable, CaseIterable, Sendable {
+    case gemini = "gemini"
+    case openai = "openai"
+    case `internal` = "internal"
+
+    var displayName: String {
+        switch self {
+        case .gemini: return "Google (Gemini)"
+        case .openai: return "OpenAI"
+        case .internal: return "Built-in"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .gemini: return "globe"
+        case .openai: return "cpu"
+        case .internal: return "gear"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .gemini: return "Tools powered by Gemini's native capabilities"
+        case .openai: return "Tools powered by OpenAI"
+        case .internal: return "Built-in Axon tools"
+        }
+    }
+
+    /// Whether tools from this provider require cloud mode
+    var requiresCloudMode: Bool {
+        switch self {
+        case .gemini: return true
+        case .openai: return true
+        case .internal: return false
+        }
+    }
 }
 
 // MARK: - Custom Provider Configuration

@@ -16,11 +16,6 @@
         <attribute name="title" attributeType="String" defaultValueString="New Chat"/>
         <attribute name="updatedAt" attributeType="Date" defaultDateTimeInterval="788828520" usesScalarValueType="NO"/>
         <attribute name="userId" optional="YES" attributeType="String"/>
-        <uniquenessConstraints>
-            <uniquenessConstraint>
-                <constraint value="id"/>
-            </uniquenessConstraint>
-        </uniquenessConstraints>
     </entity>
     <entity name="Item" representedClassName="Item" syncable="YES" codeGenerationType="class">
         <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
@@ -55,10 +50,5 @@
         <attribute name="role" attributeType="String" defaultValueString="user"/>
         <attribute name="timestamp" attributeType="Date" defaultDateTimeInterval="783558060" usesScalarValueType="NO"/>
         <attribute name="tokensUsed" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
-        <uniquenessConstraints>
-            <uniquenessConstraint>
-                <constraint value="id"/>
-            </uniquenessConstraint>
-        </uniquenessConstraints>
     </entity>
 </model>

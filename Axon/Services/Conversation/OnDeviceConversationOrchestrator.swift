@@ -3,21 +3,52 @@
 //  Axon
 //
 //  Implementation of ConversationOrchestrator that calls AI providers directly from the device.
+//  Integrates with the Epistemic Engine for grounded, conscious responses.
 //
 
 import Foundation
 
 class OnDeviceConversationOrchestrator: ConversationOrchestrator {
-    
+
+    // MARK: - Epistemic Services
+
+    private let predicateLogger = PredicateLogger.shared
+    private let salienceService = SalienceService.shared
+    private let learningLoopService = LearningLoopService.shared
+
+    // MARK: - State for Learning Loop
+
+    private var lastResponse: String?
+    private var lastUsedMemories: [Memory] = []
+    private var lastCorrelationId: String?
+
     func sendMessage(
         conversationId: String,
         content: String,
         attachments: [MessageAttachment],
-        geminiTools: Bool,
+        enabledTools: [String],
         messages: [Message],
         config: OrchestrationConfig
     ) async throws -> (assistantMessage: Message, memories: [Memory]?) {
-        
+        // Note: Tools requiring cloud mode (Gemini tools) are not available in on-device mode
+        // Only local tools like create_memory can work here
+        if !enabledTools.isEmpty {
+            print("[OnDeviceOrchestrator] Tools requested: \(enabledTools) (Note: Gemini proxy tools require cloud mode)")
+        }
+
+        // Start a correlation context for this request
+        let correlationId = predicateLogger.startCorrelation()
+        defer { predicateLogger.endCorrelation() }
+
+        // Process learning from previous interaction (if any)
+        if let prevResponse = lastResponse, let prevCorrelation = lastCorrelationId {
+            await processLearningFromPreviousInteraction(
+                currentUserMessage: content,
+                previousResponse: prevResponse,
+                previousCorrelationId: prevCorrelation
+            )
+        }
+
         // Combine default system prompt with any system-role messages in history
         let mergedMessages = mergeLatestUserMessage(
             messages,
@@ -25,14 +56,24 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             content: content,
             attachments: attachments
         )
-        let systemPrompt = buildSystemPrompt(base: "You are Axon, a helpful AI assistant.", messages: mergedMessages)
-        
-        // 1. Prepare context (history)
-        // Convert internal Message format to provider-specific format
-        // For simplicity, we'll implement a generic handler or switch
-        
+
+        // Build epistemic-grounded system prompt
+        let (systemPrompt, usedMemories) = await buildEpistemicSystemPrompt(
+            base: "You are Axon, a helpful AI assistant.",
+            messages: mergedMessages,
+            userQuery: content,
+            correlationId: correlationId
+        )
+
+        // Log LLM request predicate
+        predicateLogger.logLLMRequest(
+            provider: config.provider,
+            model: config.model,
+            correlationId: correlationId
+        )
+
         var responseContent: String = ""
-        
+
         switch config.provider {
         case "anthropic":
             guard let apiKey = config.anthropicKey else { throw APIError.unauthorized }
@@ -74,8 +115,15 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         default:
             throw APIError.networkError("Provider \(config.provider) not supported in On-Device mode yet.")
         }
-        
-        // 2. Create Assistant Message
+
+        // Log successful LLM response
+        predicateLogger.logLLMResponse(
+            success: true,
+            tokenCount: nil, // Could estimate from response length
+            correlationId: correlationId
+        )
+
+        // Create Assistant Message
         let assistantMessage = Message(
             conversationId: conversationId,
             role: .assistant,
@@ -83,12 +131,101 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             modelName: config.model,
             providerName: config.providerName
         )
-        
-        // 3. Memory Extraction (Optional/Future)
+
+        // Record prediction for learning loop
+        if !usedMemories.isEmpty {
+            learningLoopService.recordPrediction(
+                content: responseContent,
+                confidence: 0.8, // Base confidence when using memories
+                basedOnMemories: usedMemories,
+                correlationId: correlationId
+            )
+        }
+
+        // Store for next interaction's learning loop
+        lastResponse = responseContent
+        lastUsedMemories = usedMemories
+        lastCorrelationId = correlationId
+
+        // Memory Extraction (Optional/Future)
         // In on-device mode, we might skip automatic memory extraction for now
         // or implement a second call to do it.
-        
+
         return (assistantMessage, nil)
+    }
+
+    // MARK: - Epistemic Integration
+
+    /// Build a system prompt enhanced with epistemic grounding
+    private func buildEpistemicSystemPrompt(
+        base: String,
+        messages: [Message],
+        userQuery: String,
+        correlationId: String
+    ) async -> (String?, [Memory]) {
+        // Get system messages
+        let systemMessages = messages
+            .filter { $0.role == .system }
+            .map { $0.content.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        // Load memories from MemoryService
+        let memories = await loadMemoriesForInjection()
+
+        var promptParts: [String] = [base]
+        promptParts.append(contentsOf: systemMessages)
+
+        // Inject salient memories if available
+        var usedMemories: [Memory] = []
+        if !memories.isEmpty {
+            let injection = await salienceService.injectSalient(
+                conversation: messages,
+                memories: memories,
+                availableTokens: 2000, // Reserve tokens for memories
+                correlationId: correlationId
+            )
+
+            if !injection.isEmpty {
+                promptParts.append(injection.injectionBlock)
+                usedMemories = injection.selectedMemories.map { $0.memory }
+            }
+        }
+
+        let combined = promptParts
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+
+        return (combined.isEmpty ? nil : combined, usedMemories)
+    }
+
+    /// Load memories for injection (async wrapper for MemoryService)
+    @MainActor
+    private func loadMemoriesForInjection() async -> [Memory] {
+        return MemoryService.shared.memories
+    }
+
+    /// Process learning from the previous interaction
+    @MainActor
+    private func processLearningFromPreviousInteraction(
+        currentUserMessage: String,
+        previousResponse: String,
+        previousCorrelationId: String
+    ) async {
+        guard !lastUsedMemories.isEmpty else { return }
+
+        let result = learningLoopService.processUserFeedback(
+            userMessage: currentUserMessage,
+            previousResponse: previousResponse,
+            usedMemories: lastUsedMemories,
+            correlationId: previousCorrelationId
+        )
+
+        #if DEBUG
+        if result.contradictionAnalysis.isContradiction {
+            print("[Epistemic] Learning loop detected contradiction: \(result.outcome)")
+        }
+        #endif
     }
 
     func regenerateAssistantMessage(
@@ -317,21 +454,6 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         }
         
         return updated
-    }
-    
-    private func buildSystemPrompt(base: String, messages: [Message]) -> String? {
-        let systemMessages = messages
-            .filter { $0.role == .system }
-            .map { $0.content.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        
-        let parts = [base] + systemMessages
-        let combined = parts
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n\n")
-        
-        return combined.isEmpty ? nil : combined
     }
     
     private func anthropicContentBlocks(for message: Message) -> [[String: Any]] {

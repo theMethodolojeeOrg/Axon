@@ -1,0 +1,471 @@
+//
+//  CloudKitSyncService.swift
+//  Axon
+//
+//  iCloud/CloudKit sync service for cross-device synchronization
+//  Provides Apple-native sync without requiring external servers
+//
+
+import Foundation
+import CloudKit
+import CoreData
+import Combine
+
+@MainActor
+class CloudKitSyncService: ObservableObject {
+    static let shared = CloudKitSyncService()
+
+    // CloudKit containers
+    private let container: CKContainer
+    private let privateDatabase: CKDatabase
+
+    // Record types
+    private let conversationRecordType = "Conversation"
+    private let messageRecordType = "Message"
+    private let memoryRecordType = "Memory"
+
+    // Sync state
+    @Published var isSyncing = false
+    @Published var lastSyncTime: Date?
+    @Published var syncError: String?
+    @Published var isCloudKitAvailable = false
+
+    // Zone for private data
+    private let zoneID = CKRecordZone.ID(zoneName: "AxonData", ownerName: CKCurrentUserDefaultName)
+    private var zoneCreated = false
+
+    // Subscription for push notifications
+    private var subscriptionSaved = false
+
+    private init() {
+        // Use the specific container matching entitlements
+        // Container ID must match com.apple.developer.icloud-container-identifiers in Axon.entitlements
+        self.container = CKContainer(identifier: "iCloud.NeurXAxon")
+        self.privateDatabase = container.privateCloudDatabase
+
+        // Check availability on init
+        Task {
+            await checkCloudKitAvailability()
+        }
+    }
+
+    // MARK: - Availability Check
+
+    func checkCloudKitAvailability() async {
+        do {
+            let status = try await container.accountStatus()
+            switch status {
+            case .available:
+                isCloudKitAvailable = true
+                syncError = nil
+                print("[CloudKitSync] iCloud account available")
+            case .noAccount:
+                isCloudKitAvailable = false
+                syncError = "No iCloud account. Sign in to iCloud in Settings."
+                print("[CloudKitSync] No iCloud account configured")
+            case .restricted:
+                isCloudKitAvailable = false
+                syncError = "iCloud access is restricted on this device."
+                print("[CloudKitSync] iCloud access restricted")
+            case .couldNotDetermine:
+                isCloudKitAvailable = false
+                syncError = "Could not determine iCloud status."
+                print("[CloudKitSync] Could not determine iCloud status")
+            case .temporarilyUnavailable:
+                isCloudKitAvailable = false
+                syncError = "iCloud is temporarily unavailable."
+                print("[CloudKitSync] iCloud temporarily unavailable")
+            @unknown default:
+                isCloudKitAvailable = false
+                syncError = "Unknown iCloud status."
+            }
+        } catch let error as CKError {
+            isCloudKitAvailable = false
+            // Handle specific CloudKit errors
+            switch error.code {
+            case .notAuthenticated:
+                syncError = "Not signed in to iCloud. Check Settings > Apple ID > iCloud."
+            case .networkFailure, .networkUnavailable:
+                syncError = "Network unavailable. Check your connection."
+            case .quotaExceeded:
+                syncError = "iCloud storage is full."
+            default:
+                syncError = "CloudKit error: \(error.localizedDescription)"
+            }
+            print("[CloudKitSync] CloudKit error: \(error)")
+        } catch {
+            isCloudKitAvailable = false
+            // Check for entitlement errors
+            let errorString = String(describing: error)
+            if errorString.contains("entitlement") {
+                syncError = "CloudKit entitlements not configured. Please set up iCloud capability in Xcode."
+                print("[CloudKitSync] Entitlement error - CloudKit container needs to be created in Apple Developer Portal")
+            } else {
+                syncError = "Error checking iCloud: \(error.localizedDescription)"
+            }
+            print("[CloudKitSync] Error checking iCloud status: \(error)")
+        }
+    }
+
+    // MARK: - Zone Setup
+
+    private func ensureZoneExists() async throws {
+        guard !zoneCreated else { return }
+
+        let zone = CKRecordZone(zoneID: zoneID)
+
+        do {
+            _ = try await privateDatabase.save(zone)
+            zoneCreated = true
+            print("[CloudKitSync] Created custom zone: \(zoneID.zoneName)")
+        } catch let error as CKError {
+            // Zone might already exist
+            if error.code == .serverRecordChanged || error.code == .zoneNotFound {
+                // Try to fetch existing zone
+                let zones = try await privateDatabase.allRecordZones()
+                if zones.contains(where: { $0.zoneID == zoneID }) {
+                    zoneCreated = true
+                    print("[CloudKitSync] Zone already exists: \(zoneID.zoneName)")
+                } else {
+                    throw error
+                }
+            } else {
+                throw error
+            }
+        }
+    }
+
+    // MARK: - Sync Conversations
+
+    /// Sync all conversations to iCloud
+    func syncConversations(_ conversations: [Conversation]) async throws {
+        guard isCloudKitAvailable else {
+            throw CloudKitSyncError.notAvailable
+        }
+
+        isSyncing = true
+        syncError = nil
+        defer { isSyncing = false }
+
+        try await ensureZoneExists()
+
+        // Convert conversations to CKRecords
+        var records: [CKRecord] = []
+        for conversation in conversations {
+            let record = conversationToRecord(conversation)
+            records.append(record)
+        }
+
+        // Batch save
+        let operation = CKModifyRecordsOperation(recordsToSave: records, recordIDsToDelete: nil)
+        operation.savePolicy = .changedKeys
+        operation.qualityOfService = .userInitiated
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            operation.modifyRecordsResultBlock = { result in
+                switch result {
+                case .success:
+                    print("[CloudKitSync] Synced \(records.count) conversations to iCloud")
+                    continuation.resume()
+                case .failure(let error):
+                    print("[CloudKitSync] Failed to sync conversations: \(error)")
+                    continuation.resume(throwing: error)
+                }
+            }
+            privateDatabase.add(operation)
+        }
+
+        lastSyncTime = Date()
+    }
+
+    /// Fetch conversations from iCloud
+    func fetchConversations() async throws -> [Conversation] {
+        guard isCloudKitAvailable else {
+            throw CloudKitSyncError.notAvailable
+        }
+
+        isSyncing = true
+        syncError = nil
+        defer { isSyncing = false }
+
+        try await ensureZoneExists()
+
+        let query = CKQuery(recordType: conversationRecordType, predicate: NSPredicate(value: true))
+        query.sortDescriptors = [NSSortDescriptor(key: "updatedAt", ascending: false)]
+
+        let results = try await privateDatabase.records(matching: query, inZoneWith: zoneID)
+
+        var conversations: [Conversation] = []
+        for (_, result) in results.matchResults {
+            if case .success(let record) = result {
+                if let conversation = recordToConversation(record) {
+                    conversations.append(conversation)
+                }
+            }
+        }
+
+        lastSyncTime = Date()
+        print("[CloudKitSync] Fetched \(conversations.count) conversations from iCloud")
+        return conversations
+    }
+
+    // MARK: - Sync Messages
+
+    /// Sync messages for a conversation to iCloud
+    func syncMessages(_ messages: [Message], conversationId: String) async throws {
+        guard isCloudKitAvailable else {
+            throw CloudKitSyncError.notAvailable
+        }
+
+        try await ensureZoneExists()
+
+        var records: [CKRecord] = []
+        for message in messages {
+            let record = messageToRecord(message, conversationId: conversationId)
+            records.append(record)
+        }
+
+        let operation = CKModifyRecordsOperation(recordsToSave: records, recordIDsToDelete: nil)
+        operation.savePolicy = .changedKeys
+        operation.qualityOfService = .userInitiated
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            operation.modifyRecordsResultBlock = { result in
+                switch result {
+                case .success:
+                    print("[CloudKitSync] Synced \(records.count) messages to iCloud")
+                    continuation.resume()
+                case .failure(let error):
+                    print("[CloudKitSync] Failed to sync messages: \(error)")
+                    continuation.resume(throwing: error)
+                }
+            }
+            privateDatabase.add(operation)
+        }
+    }
+
+    /// Fetch messages for a conversation from iCloud
+    func fetchMessages(conversationId: String) async throws -> [Message] {
+        guard isCloudKitAvailable else {
+            throw CloudKitSyncError.notAvailable
+        }
+
+        try await ensureZoneExists()
+
+        let predicate = NSPredicate(format: "conversationId == %@", conversationId)
+        let query = CKQuery(recordType: messageRecordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: true)]
+
+        let results = try await privateDatabase.records(matching: query, inZoneWith: zoneID)
+
+        var messages: [Message] = []
+        for (_, result) in results.matchResults {
+            if case .success(let record) = result {
+                if let message = recordToMessage(record) {
+                    messages.append(message)
+                }
+            }
+        }
+
+        print("[CloudKitSync] Fetched \(messages.count) messages from iCloud for conversation \(conversationId)")
+        return messages
+    }
+
+    // MARK: - Delete Operations
+
+    /// Delete a conversation from iCloud
+    func deleteConversation(id: String) async throws {
+        guard isCloudKitAvailable else {
+            throw CloudKitSyncError.notAvailable
+        }
+
+        try await ensureZoneExists()
+
+        let recordID = CKRecord.ID(recordName: "conv_\(id)", zoneID: zoneID)
+
+        try await privateDatabase.deleteRecord(withID: recordID)
+        print("[CloudKitSync] Deleted conversation \(id) from iCloud")
+    }
+
+    // MARK: - Record Conversion
+
+    private func conversationToRecord(_ conversation: Conversation) -> CKRecord {
+        let recordID = CKRecord.ID(recordName: "conv_\(conversation.id)", zoneID: zoneID)
+        let record = CKRecord(recordType: conversationRecordType, recordID: recordID)
+
+        record["id"] = conversation.id
+        record["title"] = conversation.title
+        record["projectId"] = conversation.projectId
+        record["createdAt"] = conversation.createdAt
+        record["updatedAt"] = conversation.updatedAt
+        record["messageCount"] = conversation.messageCount
+        record["archived"] = conversation.archived
+        record["summary"] = conversation.summary
+        record["lastMessage"] = conversation.lastMessage
+
+        if let lastMessageAt = conversation.lastMessageAt {
+            record["lastMessageAt"] = lastMessageAt
+        }
+
+        if let tags = conversation.tags {
+            record["tags"] = tags
+        }
+
+        record["isPinned"] = conversation.isPinned ?? false
+
+        return record
+    }
+
+    private func recordToConversation(_ record: CKRecord) -> Conversation? {
+        guard let id = record["id"] as? String,
+              let title = record["title"] as? String,
+              let projectId = record["projectId"] as? String,
+              let createdAt = record["createdAt"] as? Date,
+              let updatedAt = record["updatedAt"] as? Date,
+              let messageCount = record["messageCount"] as? Int,
+              let archived = record["archived"] as? Bool else {
+            return nil
+        }
+
+        return Conversation(
+            id: id,
+            userId: nil,
+            title: title,
+            projectId: projectId,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            messageCount: messageCount,
+            lastMessageAt: record["lastMessageAt"] as? Date,
+            archived: archived,
+            summary: record["summary"] as? String,
+            lastMessage: record["lastMessage"] as? String,
+            tags: record["tags"] as? [String],
+            isPinned: record["isPinned"] as? Bool
+        )
+    }
+
+    private func messageToRecord(_ message: Message, conversationId: String) -> CKRecord {
+        let recordID = CKRecord.ID(recordName: "msg_\(message.id)", zoneID: zoneID)
+        let record = CKRecord(recordType: messageRecordType, recordID: recordID)
+
+        record["id"] = message.id
+        record["conversationId"] = conversationId
+        record["role"] = message.role.rawValue
+        record["content"] = message.content
+        record["timestamp"] = message.timestamp
+        record["modelName"] = message.modelName
+        record["providerName"] = message.providerName
+
+        return record
+    }
+
+    private func recordToMessage(_ record: CKRecord) -> Message? {
+        guard let id = record["id"] as? String,
+              let conversationId = record["conversationId"] as? String,
+              let roleString = record["role"] as? String,
+              let role = MessageRole(rawValue: roleString),
+              let content = record["content"] as? String,
+              let timestamp = record["timestamp"] as? Date else {
+            return nil
+        }
+
+        return Message(
+            id: id,
+            conversationId: conversationId,
+            role: role,
+            content: content,
+            timestamp: timestamp,
+            tokens: nil,
+            artifacts: nil,
+            toolCalls: nil,
+            isStreaming: nil,
+            modelName: record["modelName"] as? String,
+            providerName: record["providerName"] as? String,
+            attachments: nil
+        )
+    }
+
+    // MARK: - Full Sync
+
+    /// Perform a full bidirectional sync
+    func performFullSync() async throws {
+        guard isCloudKitAvailable else {
+            throw CloudKitSyncError.notAvailable
+        }
+
+        isSyncing = true
+        syncError = nil
+        defer { isSyncing = false }
+
+        print("[CloudKitSync] Starting full iCloud sync...")
+
+        // 1. Fetch remote conversations
+        let remoteConversations = try await fetchConversations()
+
+        // 2. Load local conversations from Core Data
+        let localConversations = ConversationSyncManager.shared.loadLocalConversations()
+
+        // 3. Merge strategy: newer wins
+        var conversationsToSaveLocally: [Conversation] = []
+        var conversationsToSaveRemote: [Conversation] = []
+
+        // Create lookup maps
+        let remoteMap = Dictionary(uniqueKeysWithValues: remoteConversations.map { ($0.id, $0) })
+        let localMap = Dictionary(uniqueKeysWithValues: localConversations.map { ($0.id, $0) })
+
+        // Check all local conversations
+        for local in localConversations {
+            if let remote = remoteMap[local.id] {
+                // Both exist - use newer
+                if local.updatedAt > remote.updatedAt {
+                    conversationsToSaveRemote.append(local)
+                } else if remote.updatedAt > local.updatedAt {
+                    conversationsToSaveLocally.append(remote)
+                }
+            } else {
+                // Only local - push to remote
+                conversationsToSaveRemote.append(local)
+            }
+        }
+
+        // Check remote-only conversations
+        for remote in remoteConversations {
+            if localMap[remote.id] == nil {
+                conversationsToSaveLocally.append(remote)
+            }
+        }
+
+        // 4. Save merged data
+        if !conversationsToSaveLocally.isEmpty {
+            try await ConversationSyncManager.shared.saveConversationsToCoreData(conversationsToSaveLocally)
+            print("[CloudKitSync] Saved \(conversationsToSaveLocally.count) conversations from iCloud to local")
+        }
+
+        if !conversationsToSaveRemote.isEmpty {
+            try await syncConversations(conversationsToSaveRemote)
+            print("[CloudKitSync] Pushed \(conversationsToSaveRemote.count) local conversations to iCloud")
+        }
+
+        lastSyncTime = Date()
+        print("[CloudKitSync] Full sync completed")
+    }
+}
+
+// MARK: - Errors
+
+enum CloudKitSyncError: LocalizedError {
+    case notAvailable
+    case zoneCreationFailed
+    case syncFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .notAvailable:
+            return "iCloud is not available. Please sign in to iCloud in Settings."
+        case .zoneCreationFailed:
+            return "Failed to create iCloud sync zone."
+        case .syncFailed(let message):
+            return "Sync failed: \(message)"
+        }
+    }
+}

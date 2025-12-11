@@ -27,10 +27,15 @@ class SettingsViewModel: ObservableObject {
     @Published var serverLocalURL: String = ""
     @Published var serverNetworkURL: String = ""
 
+    // iCloud Sync status
+    @Published var iCloudSyncEnabled = false
+
     private let storageService = SettingsStorage.shared
     private let apiKeysStorage = APIKeysStorage.shared
     private let authService = AuthenticationService.shared
     private let apiServer = APIServer.shared
+    private let iCloudSync = iCloudKeyValueSync.shared
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Cloud Sync (Manual)
     func pushSettingsToCloud() async {
@@ -61,6 +66,7 @@ class SettingsViewModel: ObservableObject {
 
     init() {
         loadSettings()
+        setupiCloudSync()
     }
 
     // MARK: - Load Settings
@@ -72,6 +78,49 @@ class SettingsViewModel: ObservableObject {
             // Populate available voices from cache
             self.availableVoices = localSettings.ttsSettings.cachedVoices
         }
+
+        // Check iCloud sync availability
+        iCloudSyncEnabled = iCloudSync.isAvailable
+    }
+
+    // MARK: - iCloud Key-Value Sync
+
+    private func setupiCloudSync() {
+        // Listen for settings changes from other devices
+        iCloudSync.settingsChangedFromCloud
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] cloudSettings in
+                guard let self = self else { return }
+
+                // Update local settings with cloud values
+                self.settings = cloudSettings
+                try? self.storageService.saveSettings(cloudSettings)
+
+                // Show notification to user
+                self.showSuccessMessage("Settings synced from another device")
+            }
+            .store(in: &cancellables)
+
+        // Track availability changes
+        iCloudSync.$isAvailable
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$iCloudSyncEnabled)
+    }
+
+    /// Sync current settings to iCloud (called after updates)
+    private func syncToiCloudIfEnabled() {
+        // Only sync if user has iCloud sync enabled in device mode config
+        guard settings.deviceModeConfig.cloudSyncProvider == .iCloud ||
+              settings.deviceMode == .cloud else {
+            return
+        }
+
+        iCloudSync.saveSettingsToCloud(settings)
+    }
+
+    /// Force sync settings to/from iCloud
+    func forceiCloudSync() {
+        iCloudSync.forceSync()
     }
 
     // MARK: - Update Settings
@@ -88,6 +137,9 @@ class SettingsViewModel: ObservableObject {
         // Persist to UserDefaults
         do {
             try storageService.saveSettings(settings)
+
+            // Sync to iCloud if enabled
+            syncToiCloudIfEnabled()
         } catch {
             self.error = "Failed to save settings: \(error.localizedDescription)"
         }

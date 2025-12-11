@@ -2,7 +2,8 @@
 //  APIServer.swift
 //  Axon
 //
-//  Local OpenAI-compatible HTTP server for developer access
+//  Local OpenAI-compatible HTTP server for developer access.
+//  Includes epistemic API endpoints for grounded context access.
 //
 
 import Foundation
@@ -13,6 +14,7 @@ struct ServerStatus: Encodable, Sendable {
     let status: String
     let version: String
     let endpoints: [String]
+    let epistemicEndpoints: [String]
 }
 
 struct ModelsResponse: Encodable, Sendable {
@@ -124,11 +126,21 @@ class APIServer: ObservableObject {
                     "/chat/completions",
                     "/models",
                     "/server/status"
+                ],
+                epistemicEndpoints: [
+                    "/api/memories/ground",
+                    "/api/memories/inject",
+                    "/api/shift-logs",
+                    "/api/learning/stats",
+                    "/api/predicates"
                 ]
             )
 
             return try self.jsonResponse(status)
         }
+
+        // Register epistemic API endpoints
+        await registerEpistemicRoutes(on: server, password: password)
 
         // Models endpoint - OpenAI compatible
         await server.appendRoute("GET /models") { [weak self] request in
@@ -405,4 +417,320 @@ class APIServer: ObservableObject {
         freeifaddrs(ifaddr)
         return address
     }
+
+    // MARK: - Epistemic API Routes
+
+    private func registerEpistemicRoutes(on server: HTTPServer, password: String?) async {
+        let memoryService = MemoryService.shared
+        let epistemicEngine = EpistemicEngine.shared
+        let salienceService = SalienceService.shared
+        let learningLoopService = LearningLoopService.shared
+        let predicateLogger = PredicateLogger.shared
+
+        // GET /api/memories/ground?q={query}
+        // Ground a query against memories and return epistemic context
+        await server.appendRoute("GET /api/memories/ground") { [weak self] request in
+            guard let self = self else {
+                return HTTPResponse(statusCode: .internalServerError)
+            }
+
+            // Authenticate if password is set
+            if let password = password, !password.isEmpty {
+                guard self.authenticate(request: request, password: password) else {
+                    return HTTPResponse(statusCode: .unauthorized)
+                }
+            }
+
+            // Extract query parameter
+            guard let url = URL(string: request.path),
+                  let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  let query = components.queryItems?.first(where: { $0.name == "q" })?.value else {
+                return try self.jsonResponse(
+                    EpistemicErrorResponse(error: "Missing query parameter 'q'"),
+                    statusCode: .badRequest
+                )
+            }
+
+            // Perform grounding
+            let correlationId = await predicateLogger.startCorrelation()
+            defer { Task { await predicateLogger.endCorrelation() } }
+
+            let memories = await memoryService.memories
+            let context = await epistemicEngine.ground(
+                userMessage: query,
+                memories: memories,
+                correlationId: correlationId
+            )
+
+            // Build response
+            let response = EpistemicGroundResponse(
+                query: query,
+                groundedFacts: context.groundedFacts.map { fact in
+                    EpistemicFactResponse(
+                        id: fact.id,
+                        content: fact.content,
+                        confidence: fact.confidence,
+                        source: fact.source,
+                        evidence: fact.evidence
+                    )
+                },
+                compositeConfidence: context.compositeConfidence,
+                shiftLogId: context.shiftLog.id,
+                epistemicBoundaries: EpistemicBoundariesResponse(
+                    grounded: context.shiftLog.epistemicScope.grounded,
+                    unknown: context.shiftLog.epistemicScope.unknown,
+                    assumptions: context.shiftLog.epistemicScope.assumptions
+                )
+            )
+
+            return try self.jsonResponse(response)
+        }
+
+        // POST /api/memories/inject
+        // Get formatted memory injection for a conversation context
+        await server.appendRoute("POST /api/memories/inject") { [weak self] request in
+            guard let self = self else {
+                return HTTPResponse(statusCode: .internalServerError)
+            }
+
+            if let password = password, !password.isEmpty {
+                guard self.authenticate(request: request, password: password) else {
+                    return HTTPResponse(statusCode: .unauthorized)
+                }
+            }
+
+            // Parse request
+            struct InjectRequest: Decodable {
+                let messages: [String]
+                let maxTokens: Int?
+            }
+
+            let injectRequest: InjectRequest
+            do {
+                let bodyData = try await request.bodyData
+                injectRequest = try JSONDecoder().decode(InjectRequest.self, from: bodyData)
+            } catch {
+                return try self.jsonResponse(
+                    EpistemicErrorResponse(error: "Invalid request body"),
+                    statusCode: .badRequest
+                )
+            }
+
+            let correlationId = await predicateLogger.startCorrelation()
+            defer { Task { await predicateLogger.endCorrelation() } }
+
+            // Create mock messages from strings
+            let mockMessages = injectRequest.messages.enumerated().map { index, content in
+                Message(
+                    conversationId: "api-request",
+                    role: index % 2 == 0 ? .user : .assistant,
+                    content: content
+                )
+            }
+
+            let memories = await memoryService.memories
+            let result = await salienceService.injectSalient(
+                conversation: mockMessages,
+                memories: memories,
+                availableTokens: injectRequest.maxTokens ?? 2000,
+                correlationId: correlationId
+            )
+
+            let response = SalienceInjectResponse(
+                injectionBlock: result.injectionBlock,
+                selectedMemoryCount: result.selectedMemories.count,
+                totalCandidates: result.totalCandidates,
+                tokenCount: result.tokenCount,
+                confidence: result.epistemicContext.compositeConfidence
+            )
+
+            return try self.jsonResponse(response)
+        }
+
+        // GET /api/shift-logs
+        // Get recent shift logs for debugging/transparency
+        await server.appendRoute("GET /api/shift-logs") { [weak self] request in
+            guard let self = self else {
+                return HTTPResponse(statusCode: .internalServerError)
+            }
+
+            if let password = password, !password.isEmpty {
+                guard self.authenticate(request: request, password: password) else {
+                    return HTTPResponse(statusCode: .unauthorized)
+                }
+            }
+
+            // For now, return predicate logs as shift log proxies
+            let predicates = await predicateLogger.predicates.suffix(50)
+            let response = PredicateLogsResponse(
+                predicates: predicates.map { pred in
+                    PredicateLogResponse(
+                        id: pred.id,
+                        event: pred.event,
+                        predicate: pred.predicate,
+                        passed: pred.passed,
+                        scope: pred.scope.rawValue,
+                        correlationId: pred.correlationId,
+                        timestamp: pred.timestamp.ISO8601Format()
+                    )
+                }
+            )
+
+            return try self.jsonResponse(response)
+        }
+
+        // GET /api/learning/stats
+        // Get learning loop statistics
+        await server.appendRoute("GET /api/learning/stats") { [weak self] request in
+            guard let self = self else {
+                return HTTPResponse(statusCode: .internalServerError)
+            }
+
+            if let password = password, !password.isEmpty {
+                guard self.authenticate(request: request, password: password) else {
+                    return HTTPResponse(statusCode: .unauthorized)
+                }
+            }
+
+            let stats = await learningLoopService.getLearningStats()
+            let response = LearningStatsResponse(
+                totalPredictions: stats.totalPredictions,
+                confirmedCount: stats.confirmedCount,
+                contradictedCount: stats.contradictedCount,
+                refinedCount: stats.refinedCount,
+                averageReliability: stats.averageReliability,
+                memoriesTracked: stats.memoriesTracked,
+                confirmationRate: stats.confirmationRate,
+                contradictionRate: stats.contradictionRate
+            )
+
+            return try self.jsonResponse(response)
+        }
+
+        // GET /api/predicates?correlationId={id}
+        // Get predicate proof tree for a correlation
+        await server.appendRoute("GET /api/predicates") { [weak self] request in
+            guard let self = self else {
+                return HTTPResponse(statusCode: .internalServerError)
+            }
+
+            if let password = password, !password.isEmpty {
+                guard self.authenticate(request: request, password: password) else {
+                    return HTTPResponse(statusCode: .unauthorized)
+                }
+            }
+
+            // Check for correlationId parameter
+            if let url = URL(string: request.path),
+               let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+               let correlationId = components.queryItems?.first(where: { $0.name == "correlationId" })?.value {
+                // Return predicates for specific correlation
+                let predicates = await predicateLogger.predicates(for: correlationId)
+                let reliability = await predicateLogger.compositeReliability(for: correlationId)
+
+                let response = PredicateTreeResponse(
+                    correlationId: correlationId,
+                    predicateCount: predicates.count,
+                    compositeReliability: reliability,
+                    predicates: predicates.map { pred in
+                        PredicateLogResponse(
+                            id: pred.id,
+                            event: pred.event,
+                            predicate: pred.predicate,
+                            passed: pred.passed,
+                            scope: pred.scope.rawValue,
+                            correlationId: pred.correlationId,
+                            timestamp: pred.timestamp.ISO8601Format()
+                        )
+                    }
+                )
+                return try self.jsonResponse(response)
+            } else {
+                // Return all recent predicates
+                let predicates = await predicateLogger.predicates.suffix(100)
+                let response = PredicateLogsResponse(
+                    predicates: predicates.map { pred in
+                        PredicateLogResponse(
+                            id: pred.id,
+                            event: pred.event,
+                            predicate: pred.predicate,
+                            passed: pred.passed,
+                            scope: pred.scope.rawValue,
+                            correlationId: pred.correlationId,
+                            timestamp: pred.timestamp.ISO8601Format()
+                        )
+                    }
+                )
+                return try self.jsonResponse(response)
+            }
+        }
+    }
+}
+
+// MARK: - Epistemic API Response Types
+
+struct EpistemicErrorResponse: Encodable {
+    let error: String
+}
+
+struct EpistemicGroundResponse: Encodable {
+    let query: String
+    let groundedFacts: [EpistemicFactResponse]
+    let compositeConfidence: Double
+    let shiftLogId: String
+    let epistemicBoundaries: EpistemicBoundariesResponse
+}
+
+struct EpistemicFactResponse: Encodable {
+    let id: String
+    let content: String
+    let confidence: Double
+    let source: String
+    let evidence: String?
+}
+
+struct EpistemicBoundariesResponse: Encodable {
+    let grounded: [String]
+    let unknown: [String]
+    let assumptions: [String]
+}
+
+struct SalienceInjectResponse: Encodable {
+    let injectionBlock: String
+    let selectedMemoryCount: Int
+    let totalCandidates: Int
+    let tokenCount: Int
+    let confidence: Double
+}
+
+struct PredicateLogsResponse: Encodable {
+    let predicates: [PredicateLogResponse]
+}
+
+struct PredicateLogResponse: Encodable {
+    let id: String
+    let event: String
+    let predicate: String
+    let passed: Bool
+    let scope: String
+    let correlationId: String
+    let timestamp: String
+}
+
+struct PredicateTreeResponse: Encodable {
+    let correlationId: String
+    let predicateCount: Int
+    let compositeReliability: Double
+    let predicates: [PredicateLogResponse]
+}
+
+struct LearningStatsResponse: Encodable {
+    let totalPredictions: Int
+    let confirmedCount: Int
+    let contradictedCount: Int
+    let refinedCount: Int
+    let averageReliability: Double
+    let memoriesTracked: Int
+    let confirmationRate: Double
+    let contradictionRate: Double
 }

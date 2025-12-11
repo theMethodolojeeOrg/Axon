@@ -187,18 +187,27 @@ class MemoryService: ObservableObject {
             let success: Bool
         }
 
+        // CRITICAL: Remove from in-memory array FIRST (optimistic update)
+        memories.removeAll { $0.id == id }
+
+        // Soft-delete from Core Data immediately to prevent resurrection
+        try await syncManager.deleteMemoryFromCoreData(id: id)
+        print("[MemoryService] Soft-deleted memory \(id) locally")
+
+        // Then try to delete from server
         do {
             let _: DeleteResponse = try await apiClient.request(
                 endpoint: "/apiDeleteMemory/\(id)",
                 method: .delete
             )
 
-            // Delete from Core Data
-            try await syncManager.deleteMemoryFromCoreData(id: id)
-
-            // Remove from in-memory array
-            memories.removeAll { $0.id == id }
+            // Server confirmed - hard delete the tombstone
+            try await syncManager.hardDeleteMemoryFromCoreData(id: id)
+            print("[MemoryService] ✅ Server confirmed deletion, hard-deleted memory \(id)")
         } catch {
+            // Server delete failed, but keep the soft-delete tombstone
+            // This prevents resurrection on next sync
+            print("[MemoryService] ⚠️ Server delete failed for memory \(id), keeping tombstone: \(error.localizedDescription)")
             self.error = error.localizedDescription
             throw error
         }

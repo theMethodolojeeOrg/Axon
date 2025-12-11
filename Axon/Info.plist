@@ -2,12 +2,30 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.axon.sync.conversations</string>
+		<string>com.axon.sync.memories</string>
+		<string>com.axon.sync.background</string>
+	</array>
 	<key>FIrebaseAPIKey</key>
 	<string>AIzaSyC03ZyhD0AmsfBl8_aI0Y84vO5Kim_BUCc</string>
 	<key>FirebaseAppID</key>
 	<string>1:597673176953:ios:ea4f811ec21a349df889a8</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Axon needs access to your photos to attach images to messages.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_axon-api._tcp</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
@@ -15,26 +33,5 @@
 		<key>UIImageName</key>
 		<string></string>
 	</dict>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Axon provides a local API server to allow developer tools like Cline to access your conversations via OpenAI-compatible endpoints.</string>
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_axon-api._tcp</string>
-	</array>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>processing</string>
-	</array>
-	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array>
-		<string>com.axon.sync.conversations</string>
-		<string>com.axon.sync.memories</string>
-		<string>com.axon.sync.background</string>
-	</array>
 </dict>
 </plist>
