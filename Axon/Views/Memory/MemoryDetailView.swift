@@ -322,8 +322,42 @@ struct MemoryDetailView: View {
                 }
             }
             .navigationTitle("Memory Details")
+            #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(macOS)
+                ToolbarItem {
+                    if isEditing {
+                        Button("Cancel") {
+                            // Reset values
+                            content = memory.content
+                            selectedType = memory.type
+                            confidence = memory.confidence
+                            tags = memory.tags.joined(separator: ", ")
+                            context = memory.context ?? ""
+                            isEditing = false
+                        }
+                        .foregroundColor(AppColors.textSecondary)
+                    } else {
+                        Button("Close") {
+                            dismiss()
+                        }
+                        .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+
+                ToolbarItem {
+                    Button(isEditing ? "Save" : "Edit") {
+                        if isEditing {
+                            saveChanges()
+                        } else {
+                            isEditing = true
+                        }
+                    }
+                    .foregroundColor(AppColors.signalMercury)
+                }
+                #else
                 ToolbarItem(placement: .navigationBarLeading) {
                     if isEditing {
                         Button("Cancel") {
@@ -354,6 +388,7 @@ struct MemoryDetailView: View {
                     }
                     .foregroundColor(AppColors.signalMercury)
                 }
+                #endif
             }
             .alert("Delete Memory?", isPresented: $showingDeleteConfirmation) {
                 Button("Delete", role: .destructive) {
@@ -444,4 +479,3 @@ struct MemoryDetailView: View {
         }
     }
 }
-

@@ -9,349 +9,376 @@ import SwiftUI
 
 struct TTSSettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
-    @State private var elevenLabsExpanded = true
-    @State private var geminiExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            // Provider Selection Header
-            SettingsSection(title: "TTS Provider") {
-                Text("Select your preferred text-to-speech provider. Only one can be active at a time.")
-                    .font(AppTypography.bodySmall())
-                    .foregroundColor(AppColors.textSecondary)
-                    .padding(.bottom, 8)
-            }
+            SettingsInfoBanner(
+                icon: "speaker.wave.2",
+                text: "Configure Text-to-Speech provider, voices, and how messages are read aloud.")
 
-            // ElevenLabs Accordion
-            TTSProviderAccordion(
-                provider: .elevenlabs,
-                isSelected: viewModel.settings.ttsSettings.provider == .elevenlabs,
-                isExpanded: $elevenLabsExpanded,
-                onSelect: {
-                    Task {
-                        await viewModel.updateTTSSetting(\.provider, TTSProvider.elevenlabs)
-                    }
-                    withAnimation { geminiExpanded = false }
-                }
-            ) {
-                ElevenLabsSettingsContent(viewModel: viewModel)
-            }
+            providerSection
 
-            // Gemini Accordion
-            TTSProviderAccordion(
-                provider: .gemini,
-                isSelected: viewModel.settings.ttsSettings.provider == .gemini,
-                isExpanded: $geminiExpanded,
-                onSelect: {
-                    Task {
-                        await viewModel.updateTTSSetting(\.provider, TTSProvider.gemini)
-                    }
-                    withAnimation { elevenLabsExpanded = false }
-                }
-            ) {
-                GeminiTTSSettingsContent(viewModel: viewModel)
+            ttsTextSection
+
+            if viewModel.settings.ttsSettings.provider == .elevenlabs {
+                elevenLabsSection
+            } else {
+                geminiSection
             }
         }
     }
-}
 
-// MARK: - Provider Accordion
+    // MARK: - Provider
 
-struct TTSProviderAccordion<Content: View>: View {
-    let provider: TTSProvider
-    let isSelected: Bool
-    @Binding var isExpanded: Bool
-    let onSelect: () -> Void
-    @ViewBuilder let content: () -> Content
+    private var providerSection: some View {
+        UnifiedSettingsSection(title: "TTS Provider") {
+            SettingsCard(padding: 0) {
+                VStack(spacing: 0) {
+                    ProviderRow(
+                        title: TTSProvider.elevenlabs.displayName,
+                        subtitle: TTSProvider.elevenlabs.description,
+                        icon: TTSProvider.elevenlabs.icon,
+                        isSelected: viewModel.settings.ttsSettings.provider == .elevenlabs,
+                        status: viewModel.isTTSConfigured ? .configured : .notConfigured,
+                        onSelect: {
+                            Task { await viewModel.updateTTSSetting(\.provider, .elevenlabs) }
+                        }
+                    )
 
-    var body: some View {
-        VStack(spacing: 0) {
-            // Header with toggle and expand button
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded.toggle()
+                    Divider().background(AppColors.divider)
+
+                    ProviderRow(
+                        title: TTSProvider.gemini.displayName,
+                        subtitle: TTSProvider.gemini.description,
+                        icon: TTSProvider.gemini.icon,
+                        isSelected: viewModel.settings.ttsSettings.provider == .gemini,
+                        status: viewModel.isGeminiTTSConfigured ? .configured : .notConfigured,
+                        onSelect: {
+                            Task { await viewModel.updateTTSSetting(\.provider, .gemini) }
+                        }
+                    )
                 }
-            }) {
-                HStack(spacing: 12) {
-                    // Provider toggle (radio button style)
-                    Button(action: onSelect) {
-                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 22))
-                            .foregroundColor(isSelected ? AppColors.signalMercury : AppColors.textTertiary)
-                    }
-                    .buttonStyle(PlainButtonStyle())
+            }
+        }
+    }
 
-                    // Provider icon
-                    Image(systemName: provider.icon)
-                        .font(.system(size: 20))
-                        .foregroundColor(isSelected ? AppColors.signalMercury : AppColors.textSecondary)
-                        .frame(width: 28)
+    // MARK: - Text
 
-                    // Provider info
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(provider.displayName)
-                            .font(AppTypography.bodyMedium(.medium))
-                            .foregroundColor(AppColors.textPrimary)
-
-                        Text(provider.description)
-                            .font(AppTypography.labelSmall())
-                            .foregroundColor(AppColors.textSecondary)
-                    }
-
-                    Spacer()
-
-                    // Expand indicator
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(AppColors.textTertiary)
-                }
-                .padding(16)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(isSelected ? AppColors.signalMercury.opacity(0.3) : AppColors.glassBorder, lineWidth: 1)
-                        )
+    private var ttsTextSection: some View {
+        UnifiedSettingsSection(title: "TTS Text") {
+            VStack(spacing: 12) {
+                SettingsToggleRow(
+                    title: "Strip markdown before speech",
+                    icon: "text.badge.checkmark",
+                    isOn: Binding(
+                        get: { viewModel.settings.ttsSettings.stripMarkdownBeforeTTS },
+                        set: { newValue in
+                            Task { await viewModel.updateTTSSetting(\.stripMarkdownBeforeTTS, newValue) }
+                        }
+                    )
                 )
-            }
-            .buttonStyle(PlainButtonStyle())
 
-            // Expandable content
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 16) {
-                    content()
+                SettingsToggleRow(
+                    title: "Spoken-friendly mode",
+                    icon: "waveform.path.ecg",
+                    isOn: Binding(
+                        get: { viewModel.settings.ttsSettings.spokenFriendlyTTS },
+                        set: { newValue in
+                            Task { await viewModel.updateTTSSetting(\.spokenFriendlyTTS, newValue) }
+                        }
+                    )
+                )
+                .disabled(!viewModel.settings.ttsSettings.stripMarkdownBeforeTTS)
+
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                    Text("Markdown stripping prevents reading formatting symbols. Spoken-friendly mode applies light normalization for more natural speech.")
+                        .font(AppTypography.labelSmall())
                 }
-                .padding(16)
-                .background(AppColors.substrateSecondary.opacity(0.5))
-                .cornerRadius(12)
-                .padding(.top, 8)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .foregroundColor(AppColors.textTertiary)
             }
         }
     }
-}
 
-// MARK: - ElevenLabs Settings Content
+    // MARK: - ElevenLabs
 
-struct ElevenLabsSettingsContent: View {
-    @ObservedObject var viewModel: SettingsViewModel
+    private var elevenLabsSection: some View {
+        UnifiedSettingsSection(title: "ElevenLabs") {
+            VStack(alignment: .leading, spacing: 12) {
+                // Status card
+                SettingsCard(padding: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: viewModel.isTTSConfigured ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                            .foregroundColor(viewModel.isTTSConfigured ? AppColors.accentSuccess : AppColors.accentWarning)
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // API Key Status
-            HStack(spacing: 12) {
-                if viewModel.isTTSConfigured {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(AppColors.accentSuccess)
-                    Text("API Key Configured")
-                        .font(AppTypography.bodySmall())
-                        .foregroundColor(AppColors.accentSuccess)
-                } else {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundColor(AppColors.accentWarning)
-                    Text("API Key Required")
-                        .font(AppTypography.bodySmall())
-                        .foregroundColor(AppColors.accentWarning)
-                }
-                Spacer()
-            }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(viewModel.isTTSConfigured ? "API Key Configured" : "API Key Required")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
 
-            // Voice Picker
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Voice")
-                    .font(AppTypography.labelMedium())
-                    .foregroundColor(AppColors.textSecondary)
+                            Text("Voices are cached locally and synced via CloudKit.")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
 
-                Picker(selection: Binding(
-                    get: { viewModel.settings.ttsSettings.selectedVoiceId ?? "" },
-                    set: { newId in
-                        let voice = viewModel.availableVoices.first { $0.id == newId }
-                        Task { await viewModel.updateSelectedVoice(id: voice?.id, name: voice?.name) }
+                        Spacer()
+
+                        Button {
+                            Task { await viewModel.refreshElevenLabsCatalog() }
+                        } label: {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                                .font(AppTypography.labelSmall())
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(AppColors.signalMercury)
+                        .disabled(!viewModel.isTTSConfigured)
                     }
-                )) {
-                    if viewModel.availableVoices.isEmpty {
-                        Text("No voices found").tag("")
-                    } else {
-                        ForEach(viewModel.availableVoices) { voice in
-                            Text(voice.name).tag(voice.id)
+                }
+
+                // Voice picker
+                SettingsCard(padding: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Voice")
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        Picker(selection: Binding(
+                            get: { viewModel.settings.ttsSettings.selectedVoiceId ?? "" },
+                            set: { newId in
+                                let voice = viewModel.availableVoices.first { $0.id == newId }
+                                Task { await viewModel.updateSelectedVoice(id: voice?.id, name: voice?.name) }
+                            }
+                        )) {
+                            if viewModel.availableVoices.isEmpty {
+                                Text("No voices found").tag("")
+                            } else {
+                                ForEach(viewModel.availableVoices) { voice in
+                                    Text(voice.name).tag(voice.id)
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text(viewModel.settings.ttsSettings.selectedVoiceName ?? "Select a voice")
+                                    .font(AppTypography.bodyMedium())
+                                    .foregroundColor(AppColors.textPrimary)
+                                Spacer()
+                            }
+                            .padding(12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(AppColors.substrateSecondary)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(AppColors.glassBorder, lineWidth: 1)
+                                    )
+                            )
+                        }
+                        .pickerStyle(.menu)
+                        .disabled(!viewModel.isTTSConfigured)
+                    }
+                }
+
+                // Model picker
+                SettingsCard(padding: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Model")
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        Picker(selection: Binding(
+                            get: { viewModel.settings.ttsSettings.model },
+                            set: { newModel in
+                                Task { await viewModel.updateTTSSetting(\.model, newModel) }
+                            }
+                        )) {
+                            ForEach(TTSModel.allCases) { model in
+                                Text("\(model.displayName) - \(model.description)").tag(model)
+                            }
+                        } label: {
+                            HStack {
+                                Text(viewModel.settings.ttsSettings.model.displayName)
+                                    .font(AppTypography.bodyMedium())
+                                    .foregroundColor(AppColors.textPrimary)
+                                Spacer()
+                            }
+                            .padding(12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(AppColors.substrateSecondary)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(AppColors.glassBorder, lineWidth: 1)
+                                    )
+                            )
+                        }
+                        .pickerStyle(.menu)
+                        .disabled(!viewModel.isTTSConfigured)
+                    }
+                }
+
+                // Voice settings sliders
+                SettingsCard(padding: 12) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Voice Settings")
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        sliderRow(
+                            title: "Stability",
+                            value: Binding(
+                                get: { viewModel.settings.ttsSettings.voiceSettings.stability },
+                                set: { newValue in
+                                    Task { await viewModel.updateTTSSetting(\.voiceSettings.stability, newValue) }
+                                }
+                            )
+                        )
+
+                        sliderRow(
+                            title: "Similarity",
+                            value: Binding(
+                                get: { viewModel.settings.ttsSettings.voiceSettings.similarityBoost },
+                                set: { newValue in
+                                    Task { await viewModel.updateTTSSetting(\.voiceSettings.similarityBoost, newValue) }
+                                }
+                            )
+                        )
+                    }
+                }
+                .disabled(!viewModel.isTTSConfigured)
+            }
+        }
+    }
+
+    private func sliderRow(title: String, value: Binding<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title)
+                    .font(AppTypography.bodySmall())
+                    .foregroundColor(AppColors.textPrimary)
+                Spacer()
+                Text("\(Int(value.wrappedValue * 100))%")
+                    .font(AppTypography.bodySmall(.medium))
+                    .foregroundColor(AppColors.signalMercury)
+            }
+            Slider(value: value, in: 0...1)
+                .tint(AppColors.signalMercury)
+        }
+    }
+
+    // MARK: - Gemini
+
+    private var geminiSection: some View {
+        UnifiedSettingsSection(title: "Gemini") {
+            VStack(alignment: .leading, spacing: 12) {
+                SettingsCard(padding: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: viewModel.isGeminiTTSConfigured ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                            .foregroundColor(viewModel.isGeminiTTSConfigured ? AppColors.accentSuccess : AppColors.accentWarning)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(viewModel.isGeminiTTSConfigured ? "Gemini API Key Configured" : "Gemini API Key Required")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Text("Gemini TTS outputs 24kHz WAV audio. Uses your Gemini API key.")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+
+                        Spacer()
+                    }
+                }
+
+                SettingsCard(padding: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Voice")
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                            ForEach(GeminiTTSVoice.allCases) { voice in
+                                GeminiVoiceCard(
+                                    voice: voice,
+                                    isSelected: viewModel.settings.ttsSettings.geminiVoice == voice,
+                                    onSelect: {
+                                        Task { await viewModel.updateTTSSetting(\.geminiVoice, voice) }
+                                    }
+                                )
+                                .disabled(!viewModel.isGeminiTTSConfigured)
+                            }
+                        }
+
+                        if !viewModel.isGeminiTTSConfigured {
+                            HStack(spacing: 6) {
+                                Image(systemName: "info.circle")
+                                Text("Add your Gemini API key in Settings → API Keys to enable Gemini TTS.")
+                                    .font(AppTypography.labelSmall())
+                            }
+                            .foregroundColor(AppColors.textTertiary)
                         }
                     }
-                } label: {
-                    HStack {
-                        Text(viewModel.settings.ttsSettings.selectedVoiceName ?? "Select a voice")
-                            .font(AppTypography.bodyMedium())
-                            .foregroundColor(AppColors.textPrimary)
-                        Spacer()
-                    }
-                    .padding(12)
-                    .background(AppColors.substrateTertiary)
-                    .cornerRadius(8)
-                }
-                .pickerStyle(.menu)
-            }
-
-            // Model Picker
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Model")
-                    .font(AppTypography.labelMedium())
-                    .foregroundColor(AppColors.textSecondary)
-
-                Picker(selection: Binding(
-                    get: { viewModel.settings.ttsSettings.model },
-                    set: { newModel in
-                        Task { await viewModel.updateTTSSetting(\.model, newModel) }
-                    }
-                )) {
-                    ForEach(TTSModel.allCases) { model in
-                        Text("\(model.displayName) - \(model.description)").tag(model)
-                    }
-                } label: {
-                    HStack {
-                        Text(viewModel.settings.ttsSettings.model.displayName)
-                            .font(AppTypography.bodyMedium())
-                            .foregroundColor(AppColors.textPrimary)
-                        Spacer()
-                    }
-                    .padding(12)
-                    .background(AppColors.substrateTertiary)
-                    .cornerRadius(8)
-                }
-                .pickerStyle(.menu)
-            }
-
-            // Voice Settings (Stability, Similarity, etc.)
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Voice Settings")
-                    .font(AppTypography.labelMedium())
-                    .foregroundColor(AppColors.textSecondary)
-
-                // Stability Slider
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Stability")
-                            .font(AppTypography.bodySmall())
-                            .foregroundColor(AppColors.textPrimary)
-                        Spacer()
-                        Text("\(Int(viewModel.settings.ttsSettings.voiceSettings.stability * 100))%")
-                            .font(AppTypography.bodySmall(.medium))
-                            .foregroundColor(AppColors.signalMercury)
-                    }
-                    Slider(
-                        value: Binding(
-                            get: { viewModel.settings.ttsSettings.voiceSettings.stability },
-                            set: { newValue in
-                                Task { await viewModel.updateTTSSetting(\.voiceSettings.stability, newValue) }
-                            }
-                        ),
-                        in: 0...1
-                    )
-                    .tint(AppColors.signalMercury)
-                }
-
-                // Similarity Boost Slider
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Similarity")
-                            .font(AppTypography.bodySmall())
-                            .foregroundColor(AppColors.textPrimary)
-                        Spacer()
-                        Text("\(Int(viewModel.settings.ttsSettings.voiceSettings.similarityBoost * 100))%")
-                            .font(AppTypography.bodySmall(.medium))
-                            .foregroundColor(AppColors.signalMercury)
-                    }
-                    Slider(
-                        value: Binding(
-                            get: { viewModel.settings.ttsSettings.voiceSettings.similarityBoost },
-                            set: { newValue in
-                                Task { await viewModel.updateTTSSetting(\.voiceSettings.similarityBoost, newValue) }
-                            }
-                        ),
-                        in: 0...1
-                    )
-                    .tint(AppColors.signalMercury)
                 }
             }
-
-            // Refresh button
-            Button(action: {
-                Task { await viewModel.refreshElevenLabsCatalog() }
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.clockwise")
-                    Text("Refresh Voices")
-                }
-                .font(AppTypography.bodySmall(.medium))
-                .foregroundColor(AppColors.signalMercury)
-            }
-            .disabled(!viewModel.isTTSConfigured)
         }
     }
 }
 
-// MARK: - Gemini TTS Settings Content
+// MARK: - Provider Row
 
-struct GeminiTTSSettingsContent: View {
-    @ObservedObject var viewModel: SettingsViewModel
+private enum ProviderStatus {
+    case configured
+    case notConfigured
+}
 
-    private var hasGeminiKey: Bool {
-        // Reuse existing configuration flag until a dedicated Gemini flag is available
-        return viewModel.isTTSConfigured
-    }
+private struct ProviderRow: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let isSelected: Bool
+    let status: ProviderStatus
+    let onSelect: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // API Key Status
+        Button(action: onSelect) {
             HStack(spacing: 12) {
-                if hasGeminiKey {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundColor(isSelected ? AppColors.signalMercury : AppColors.textSecondary)
+                    .frame(width: 32)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(AppTypography.bodyMedium(.medium))
+                        .foregroundColor(AppColors.textPrimary)
+
+                    Text(subtitle)
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textSecondary)
+                }
+
+                Spacer()
+
+                if status == .configured {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(AppColors.accentSuccess)
-                    Text("Gemini API Key Configured")
-                        .font(AppTypography.bodySmall())
-                        .foregroundColor(AppColors.accentSuccess)
                 } else {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundColor(AppColors.accentWarning)
-                    Text("Gemini API Key Required")
-                        .font(AppTypography.bodySmall())
+                    Image(systemName: "exclamationmark.circle")
                         .foregroundColor(AppColors.accentWarning)
                 }
-                Spacer()
-            }
 
-            // Voice Selection
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Voice")
-                    .font(AppTypography.labelMedium())
-                    .foregroundColor(AppColors.textSecondary)
-
-                // Voice grid
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ForEach(GeminiTTSVoice.allCases) { voice in
-                        GeminiVoiceCard(
-                            voice: voice,
-                            isSelected: viewModel.settings.ttsSettings.geminiVoice == voice,
-                            onSelect: {
-                                Task { await viewModel.updateTTSSetting(\.geminiVoice, voice) }
-                            }
-                        )
-                    }
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(AppColors.signalMercury)
+                        .font(.system(size: 18))
                 }
             }
-
-            // Info about Gemini TTS
-            HStack(spacing: 8) {
-                Image(systemName: "info.circle")
-                    .foregroundColor(AppColors.textTertiary)
-                Text("Gemini TTS outputs 24kHz WAV audio. Uses your Gemini API key.")
-                    .font(AppTypography.labelSmall())
-                    .foregroundColor(AppColors.textTertiary)
-            }
+            .padding(12)
         }
+        .buttonStyle(.plain)
     }
 }
 
-// MARK: - Gemini Voice Card
+// MARK: - Gemini Voice Card (kept, but now lives in-card)
 
 struct GeminiVoiceCard: View {
     let voice: GeminiTTSVoice
@@ -379,18 +406,16 @@ struct GeminiVoiceCard: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateTertiary)
+                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(isSelected ? AppColors.signalMercury : AppColors.glassBorder, lineWidth: 1)
                     )
             )
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
     }
 }
-
-// MARK: - Preview
 
 #Preview {
     ScrollView {

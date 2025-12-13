@@ -111,23 +111,36 @@ struct MessageInputBar: View {
             if !attachments.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(attachments) { attachment in
+                        ForEach($attachments) { $attachment in
                             ZStack(alignment: .topTrailing) {
-                                if attachment.type == .image, let base64 = attachment.base64,
+                                // Preview
+                                if attachment.type == .image,
+                                   let base64 = attachment.base64,
                                    let data = Data(base64Encoded: base64),
-                                   let uiImage = UIImage(data: data) {
-                                    Image(uiImage: uiImage)
+                                   let image = PlatformImageCodec.image(from: data) {
+                                    #if canImport(UIKit)
+                                    Image(uiImage: image)
                                         .resizable()
                                         .scaledToFill()
                                         .frame(width: 60, height: 60)
                                         .cornerRadius(8)
                                         .clipped()
+                                    #elseif canImport(AppKit)
+                                    Image(nsImage: image)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 60, height: 60)
+                                        .cornerRadius(8)
+                                        .clipped()
+                                    #else
+                                    EmptyView()
+                                    #endif
                                 } else {
                                     VStack {
                                         Image(systemName: attachmentIcon(for: attachment.type))
                                             .font(.system(size: 24))
                                             .foregroundColor(attachmentIconColor(for: attachment.type))
-                                        Text(attachment.name ?? "File")
+                                        Text(attachment.name ?? (attachment.type == .image ? "Image" : "File"))
                                             .font(AppTypography.labelSmall())
                                             .lineLimit(1)
                                             .foregroundColor(AppColors.textPrimary)
@@ -247,11 +260,11 @@ struct MessageInputBar: View {
                         print("[MessageInputBar] Failed to load photo data")
                         return
                     }
-                    guard let uiImage = UIImage(data: data) else {
-                        print("[MessageInputBar] Failed to create UIImage from data")
+                    guard let image = PlatformImageCodec.image(from: data) else {
+                        print("[MessageInputBar] Failed to decode image data")
                         return
                     }
-                    guard let compressedData = uiImage.jpegData(compressionQuality: 0.7) else {
+                    guard let compressedData = PlatformImageCodec.jpegData(from: image, compressionQuality: 0.7) else {
                         print("[MessageInputBar] Failed to compress image")
                         return
                     }

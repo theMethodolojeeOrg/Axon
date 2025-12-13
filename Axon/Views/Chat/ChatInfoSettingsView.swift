@@ -242,14 +242,25 @@ struct ChatInfoSettingsView: View {
             }
             .background(AppColors.substratePrimary)
             .navigationTitle("Chat Settings")
+            #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(macOS)
+                ToolbarItem {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(AppColors.signalMercury)
+                }
+                #else
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
                     }
                     .foregroundColor(AppColors.signalMercury)
                 }
+                #endif
             }
         }
         .task {

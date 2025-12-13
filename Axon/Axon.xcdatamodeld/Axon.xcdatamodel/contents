@@ -54,4 +54,17 @@
         <attribute name="tokensUsed" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="toolApprovalRecordJSON" optional="YES" attributeType="String"/>
     </entity>
+
+    <!-- ElevenLabs voice catalog cache (CloudKit syncable) -->
+    <entity name="ElevenLabsVoiceEntity" representedClassName="ElevenLabsVoiceEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="voiceId" attributeType="String" defaultValueString=""/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="language" optional="YES" attributeType="String"/>
+    </entity>
+
+    <entity name="ElevenLabsVoiceCacheMetaEntity" representedClassName="ElevenLabsVoiceCacheMetaEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="String" defaultValueString="singleton"/>
+        <attribute name="lastFetchedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+    </entity>
 </model>

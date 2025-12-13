@@ -19,6 +19,7 @@ struct AppContainerView: View {
     @StateObject private var authService = AuthenticationService.shared
     @StateObject private var costService = CostService.shared
     @StateObject private var taglineManager = TaglineManager.shared
+
     @State private var showSidebar = false
     @State private var selectedConversation: Conversation?
     @State private var currentView: MainView = .chat
@@ -27,93 +28,11 @@ struct AppContainerView: View {
 
     var body: some View {
         ZStack {
-            // Main content area - switches between Chat/Memory/Settings
-            NavigationView {
-                Group {
-                    switch currentView {
-                    case .chat:
-                        ChatContainerView(
-                            conversation: selectedConversation,
-                            onNewChat: startNewChat,
-                            onConversationCreated: { conv in
-                                selectedConversation = conv
-                            }
-                        )
-                    case .memory:
-                        MemoryListView()
-                    case .settings:
-                        SettingsView()
-                    }
-                }
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button(action: { withAnimation { showSidebar.toggle() } }) {
-                            Image(systemName: "sidebar.left")
-                                .foregroundColor(AppColors.textPrimary)
-                        }
-                    }
-
-                    ToolbarItem(placement: .principal) {
-                        HStack(spacing: 10) {
-                            Text(navigationTitle)
-                                .font(AppTypography.titleMedium())
-                                .foregroundColor(AppColors.textPrimary)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-
-                            // Show tools indicator in title area only when a conversation exists
-                            if currentView == .chat, selectedConversation != nil {
-                                ToolsStatusMenu(style: .pill)
-                                    .fixedSize()
-                            }
-                        }
-                    }
-
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        if currentView == .chat {
-                            HStack(spacing: 12) {
-                                // Chat info button (only if conversation exists)
-                                if selectedConversation != nil {
-                                    Button(action: { showChatInfo = true }) {
-                                        Image(systemName: "info.circle")
-                                            .font(.system(size: 20))
-                                            .foregroundColor(AppColors.signalMercury)
-                                    }
-                                }
-
-                                // New chat button
-                                Button(action: startNewChat) {
-                                    Image(systemName: "square.and.pencil")
-                                        .foregroundColor(AppColors.signalMercury)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationViewStyle(.stack)
-
-            // Sidebar overlay
-            if showSidebar {
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation {
-                            showSidebar = false
-                        }
-                    }
-
-                SidebarView(
-                    isPresented: $showSidebar,
-                    selectedConversation: $selectedConversation,
-                    currentView: $currentView,
-                    onSelectConversation: selectConversation,
-                    onNewChat: startNewChat,
-                    onNavigate: navigateToView
-                )
-                .transition(.move(edge: .leading))
-            }
+            #if os(macOS)
+            macBody
+            #else
+            iosBody
+            #endif
 
             // Launch Screen Overlay
             if showLaunchScreen {
@@ -142,7 +61,7 @@ struct AppContainerView: View {
                 .onAppear {
                     // Increment tagline view count
                     taglineManager.incrementViewCount()
-                    
+
                     // Dismiss launch overlay after a brief moment
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                         withAnimation(AppAnimations.standardEasing) {
@@ -161,6 +80,178 @@ struct AppContainerView: View {
         .onAppear {
             // Ensure launch overlay is visible on first appearance
             showLaunchScreen = true
+        }
+    }
+
+    #if os(macOS)
+    private var macBody: some View {
+        NavigationSplitView {
+            MacSidebarContentView(
+                selectedConversation: $selectedConversation,
+                currentView: $currentView,
+                onSelectConversation: selectConversation,
+                onNewChat: startNewChat,
+                onNavigate: navigateToView
+            )
+            .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 420)
+        } detail: {
+            ZStack {
+                AppColors.substratePrimary.ignoresSafeArea()
+
+                switch currentView {
+                case .chat:
+                    if selectedConversation == nil {
+                        MacDetailEmptyStateView(
+                            icon: "bubble.left.and.bubble.right",
+                            title: "No Chat Selected",
+                            message: "Choose a conversation from the sidebar, or start a new one.",
+                            primaryActionTitle: "New Chat",
+                            primaryAction: startNewChat
+                        )
+                    } else {
+                        ChatContainerView(
+                            conversation: selectedConversation,
+                            onNewChat: startNewChat,
+                            onConversationCreated: { conv in
+                                selectedConversation = conv
+                            }
+                        )
+                    }
+
+                case .memory:
+                    MemoryListView()
+
+                case .settings:
+                    SettingsView()
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    Button {
+                        // Standard macOS sidebar toggle in the toolbar.
+                        NSApp.keyWindow?.firstResponder?.tryToPerform(#selector(NSSplitViewController.toggleSidebar(_:)), with: nil)
+                    } label: {
+                        Image(systemName: "sidebar.left")
+                    }
+                }
+
+                if currentView == .chat {
+                    ToolbarItem {
+                        Button(action: startNewChat) {
+                            Label("New Chat", systemImage: "square.and.pencil")
+                        }
+                    }
+
+                    if selectedConversation != nil {
+                        ToolbarItem {
+                            Button(action: { showChatInfo = true }) {
+                                Label("Chat Info", systemImage: "info.circle")
+                            }
+                        }
+
+                        ToolbarItem {
+                            ToolsStatusMenu(style: .pill)
+                                .fixedSize()
+                        }
+                    }
+                }
+            }
+        }
+    }
+    #endif
+
+    private var iosBody: some View {
+        // Main content area - switches between Chat/Memory/Settings
+        NavigationView {
+            Group {
+                switch currentView {
+                case .chat:
+                    ChatContainerView(
+                        conversation: selectedConversation,
+                        onNewChat: startNewChat,
+                        onConversationCreated: { conv in
+                            selectedConversation = conv
+                        }
+                    )
+                case .memory:
+                    MemoryListView()
+                case .settings:
+                    SettingsView()
+                }
+            }
+            #if !os(macOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                // Leading sidebar toggle
+                ToolbarItem {
+                    Button(action: { withAnimation { showSidebar.toggle() } }) {
+                        Image(systemName: "sidebar.left")
+                            .foregroundColor(AppColors.textPrimary)
+                    }
+                }
+
+                // Center title
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 10) {
+                        Text(navigationTitle)
+                            .font(AppTypography.titleMedium())
+                            .foregroundColor(AppColors.textPrimary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+
+                        if currentView == .chat, selectedConversation != nil {
+                            ToolsStatusMenu(style: .pill)
+                                .fixedSize()
+                        }
+                    }
+                }
+
+                // Trailing chat actions
+                ToolbarItem {
+                    if currentView == .chat {
+                        HStack(spacing: 12) {
+                            if selectedConversation != nil {
+                                Button(action: { showChatInfo = true }) {
+                                    Image(systemName: "info.circle")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(AppColors.signalMercury)
+                                }
+                            }
+
+                            Button(action: startNewChat) {
+                                Image(systemName: "square.and.pencil")
+                                    .foregroundColor(AppColors.signalMercury)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        #if !os(macOS)
+        .navigationViewStyle(.stack)
+        #endif
+        // Sidebar overlay
+        .overlay {
+            if showSidebar {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation {
+                            showSidebar = false
+                        }
+                    }
+
+                SidebarView(
+                    isPresented: $showSidebar,
+                    selectedConversation: $selectedConversation,
+                    currentView: $currentView,
+                    onSelectConversation: selectConversation,
+                    onNewChat: startNewChat,
+                    onNavigate: navigateToView
+                )
+                .transition(.move(edge: .leading))
+            }
         }
     }
 
@@ -192,8 +283,19 @@ struct AppContainerView: View {
             }
         }
 
-        selectedConversation = nil
-        conversationService.clearCurrentConversation()
+        // For macOS split view, the UX is much better if “New Chat” actually creates
+        // and selects a conversation immediately (so the detail pane switches to chat UI).
+        // In local-first / device-direct CloudLLM mode this should be a local conversation.
+        do {
+            let conv = try conversationService.createConversationOffline(title: "New Chat")
+            selectedConversation = conv
+            conversationService.currentConversation = conv
+        } catch {
+            // If local creation fails (should be rare), fall back to clearing selection.
+            selectedConversation = nil
+            conversationService.clearCurrentConversation()
+        }
+
         currentView = .chat
         showSidebar = false
     }
@@ -410,13 +512,7 @@ struct ChatContainerView: View {
                                     UserMessageView(
                                         message: message,
                                         onCopy: { msg in
-                                            #if canImport(UIKit)
-                                            UIPasteboard.general.string = msg.content
-                                            #elseif canImport(AppKit)
-                                            let pb = NSPasteboard.general
-                                            pb.clearContents()
-                                            pb.setString(msg.content, forType: .string)
-                                            #endif
+                                            AppClipboard.copy(msg.content)
                                         }
                                     )
                                     .padding(.vertical, 8)
@@ -425,13 +521,7 @@ struct ChatContainerView: View {
                                         message: message,
                                         overrideContent: streamingOverrides[message.id],
                                         onCopy: { msg in
-                                            #if canImport(UIKit)
-                                            UIPasteboard.general.string = msg.content
-                                            #elseif canImport(AppKit)
-                                            let pb = NSPasteboard.general
-                                            pb.clearContents()
-                                            pb.setString(msg.content, forType: .string)
-                                            #endif
+                                            AppClipboard.copy(msg.content)
                                         },
                                         onRegenerate: { msg in
                                             Task {

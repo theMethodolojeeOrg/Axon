@@ -369,7 +369,7 @@ struct ToolApprovalDetailSheet: View {
                                 .cornerRadius(8)
 
                             Button {
-                                UIPasteboard.general.string = record.signature
+                                AppClipboard.copy(record.signature)
                             } label: {
                                 HStack(spacing: 4) {
                                     Image(systemName: "doc.on.doc")
@@ -406,9 +406,11 @@ struct ToolApprovalDetailSheet: View {
             }
             .background(AppColors.substratePrimary)
             .navigationTitle("Approval Details")
+            #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem {
                     Button("Done") {
                         dismiss()
                     }

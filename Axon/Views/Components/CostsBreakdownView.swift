@@ -30,14 +30,27 @@ struct CostsBreakdownView: View {
                     }
                 }
             }
+            #if os(macOS)
+            .listStyle(.inset)
+            #else
             .listStyle(.insetGrouped)
+            #endif
             .navigationTitle("Costs")
+            #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(macOS)
+                ToolbarItem {
+                    Button("Close") { dismiss() }
+                        .foregroundColor(AppColors.signalMercury)
+                }
+                #else
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") { dismiss() }
                         .foregroundColor(AppColors.signalMercury)
                 }
+                #endif
             }
         }
     }

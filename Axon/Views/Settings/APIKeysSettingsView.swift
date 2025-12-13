@@ -46,7 +46,7 @@ struct APIKeysSettingsView: View {
                         },
                         onGetKey: {
                             if let url = APIProvider.neurx.infoURL {
-                                UIApplication.shared.open(url)
+                                AppURLRouter.open(url)
                             }
                         }
                     )
@@ -71,7 +71,7 @@ struct APIKeysSettingsView: View {
                             },
                             onGetKey: {
                                 if let url = provider.infoURL {
-                                    UIApplication.shared.open(url)
+                                    AppURLRouter.open(url)
                                 }
                             }
                         )
@@ -96,7 +96,7 @@ struct APIKeysSettingsView: View {
                         },
                         onGetKey: {
                             if let url = APIProvider.elevenlabs.infoURL {
-                                UIApplication.shared.open(url)
+                                AppURLRouter.open(url)
                             }
                         }
                     )
@@ -280,8 +280,10 @@ struct APIKeyInputSheet: View {
                             HStack {
                                 if isShowingKey {
                                     TextField("Paste your API key", text: $keyValue)
+                                        #if os(iOS)
                                         .textInputAutocapitalization(.never)
                                         .autocorrectionDisabled()
+                                        #endif
                                         .font(.system(.body, design: .monospaced))
                                         .foregroundColor(AppColors.textPrimary)
                                         .disabled(isSaving)
@@ -351,7 +353,9 @@ struct APIKeyInputSheet: View {
                 }
             }
             .navigationTitle(provider.displayName)
+            #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -504,8 +508,10 @@ struct CustomProviderAPIKeyInputSheet: View {
                             HStack {
                                 if isShowingKey {
                                     TextField("Paste your API key", text: $keyValue)
+                                        #if os(iOS)
                                         .textInputAutocapitalization(.never)
                                         .autocorrectionDisabled()
+                                        #endif
                                         .font(.system(.body, design: .monospaced))
                                         .foregroundColor(AppColors.textPrimary)
                                 } else {
@@ -531,7 +537,9 @@ struct CustomProviderAPIKeyInputSheet: View {
                 }
             }
             .navigationTitle(provider.providerName)
+            #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

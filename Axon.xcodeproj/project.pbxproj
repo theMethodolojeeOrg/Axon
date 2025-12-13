@@ -23,6 +23,7 @@
 		E254EDDC2EB222B3000CDD9D /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDDB2EB222B3000CDD9D /* FirebaseAnalytics */; };
 		E254EDDE2EB222B3000CDD9D /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDDD2EB222B3000CDD9D /* FirebaseAnalyticsCore */; };
 		E254EDE02EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDDF2EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport */; };
+		E26F33402EEE017C000E55BD /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E26F333F2EEE017C000E55BD /* AppKit.framework */; platformFilters = (macos, ); };
 		E273631A2EBD237F0031CFF7 /* FlyingFox in Frameworks */ = {isa = PBXBuildFile; productRef = E27363192EBD237F0031CFF7 /* FlyingFox */; };
 		E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */ = {isa = PBXBuildFile; productRef = E273631B2EBD237F0031CFF7 /* FlyingSocks */; };
 		E27FB5ED2ECD5E2F003C52BF /* Clibsodium in Frameworks */ = {isa = PBXBuildFile; productRef = E27FB5EC2ECD5E2F003C52BF /* Clibsodium */; };
@@ -53,9 +54,11 @@
 		E217D4322EEA4BF700D3DAB2 /* CryptoKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CryptoKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.1.sdk/System/Library/Frameworks/CryptoKit.framework; sourceTree = DEVELOPER_DIR; };
 		E217D4342EEA4BFF00D3DAB2 /* CryptoTokenKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CryptoTokenKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.1.sdk/System/Library/Frameworks/CryptoTokenKit.framework; sourceTree = DEVELOPER_DIR; };
 		E217D7B52EEDDD5C00D3DAB2 /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.1.sdk/System/Library/Frameworks/CoreLocation.framework; sourceTree = DEVELOPER_DIR; };
+		E217D7BF2EEDF49800D3DAB2 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.1.sdk/System/Library/Frameworks/UIKit.framework; sourceTree = DEVELOPER_DIR; };
 		E254ED962EB21B76000CDD9D /* Axon.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Axon.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E254EDA82EB21B77000CDD9D /* AxonTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AxonTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E254EDB22EB21B77000CDD9D /* AxonUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AxonUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E26F333F2EEE017C000E55BD /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -119,6 +122,7 @@
 				E23FFFA32EB23493009B116D /* FirebaseMessaging in Frameworks */,
 				E217D4352EEA4BFF00D3DAB2 /* CryptoTokenKit.framework in Frameworks */,
 				E254EDE02EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport in Frameworks */,
+				E26F33402EEE017C000E55BD /* AppKit.framework in Frameworks */,
 				E27FB5EF2ECD5E2F003C52BF /* Sodium in Frameworks */,
 				E27FB5ED2ECD5E2F003C52BF /* Clibsodium in Frameworks */,
 				E23FFFA12EB23493009B116D /* FirebaseFunctions in Frameworks */,
@@ -155,6 +159,8 @@
 		E23FFF992EB23493009B116D /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				E26F333F2EEE017C000E55BD /* AppKit.framework */,
+				E217D7BF2EEDF49800D3DAB2 /* UIKit.framework */,
 				E217D7B52EEDDD5C00D3DAB2 /* CoreLocation.framework */,
 				E217D4342EEA4BFF00D3DAB2 /* CryptoTokenKit.framework */,
 				E217D4322EEA4BF700D3DAB2 /* CryptoKit.framework */,

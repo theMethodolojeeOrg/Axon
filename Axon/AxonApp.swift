@@ -11,7 +11,10 @@ import Combine
 
 @main
 struct AxonApp: App {
+    #if os(iOS)
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    #endif
+
     @StateObject private var settingsViewModel = SettingsViewModel.shared
     @StateObject private var biometricService = BiometricAuthService.shared
     @Environment(\.scenePhase) private var scenePhase
@@ -77,8 +80,12 @@ struct AxonApp: App {
             }
             .onChange(of: scenePhase) { _, newPhase in
                 handleScenePhaseChange(newPhase)
+                AutoSyncOrchestrator.shared.handleScenePhaseChange(newPhase)
             }
             .onAppear {
+                // Start auto-sync orchestrator (iCloud pull on launch/foreground)
+                AutoSyncOrchestrator.shared.start()
+
                 // If app lock is disabled, mark as unlocked
                 if !settingsViewModel.settings.appLockEnabled {
                     isUnlocked = true
@@ -154,6 +161,7 @@ struct AxonApp: App {
 
 // MARK: - App Delegate
 
+#if os(iOS)
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
@@ -189,3 +197,4 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         }
     }
 }
+#endif

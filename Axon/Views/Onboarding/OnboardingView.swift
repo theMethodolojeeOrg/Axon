@@ -55,8 +55,10 @@ struct OnboardingView: View {
                 )
                 .tag(3)
             }
+            #if os(iOS)
             .tabViewStyle(.page(indexDisplayMode: .always))
             .indexViewStyle(.page(backgroundDisplayMode: .always))
+            #endif
 
             // Skip button (top-right)
             VStack {

@@ -164,7 +164,9 @@ struct DeviceModeConfigSheet: View {
                 .padding()
             }
             .background(AppColors.substratePrimary)
+            #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

@@ -184,7 +184,7 @@ struct SecuritySettingsView: View {
                             }
                             Spacer()
                             Button(action: {
-                                UIPasteboard.general.string = deviceInfo.deviceId
+                                AppClipboard.copy(deviceInfo.deviceId)
                                 viewModel.showSuccessMessage("Device ID copied")
                             }) {
                                 Image(systemName: "doc.on.doc")

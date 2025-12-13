@@ -7,6 +7,10 @@
 
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 struct CustomProvidersSettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
     @State private var showingProviderSheet = false
@@ -355,8 +359,10 @@ struct CustomProviderEditSheet: View {
                                 .foregroundColor(AppColors.textSecondary)
                             TextField("https://api.example.com", text: $apiEndpoint)
                                 .textFieldStyle(CustomTextFieldStyle())
-                                .autocapitalization(.none)
+                                #if os(iOS)
+                                .textInputAutocapitalization(.never)
                                 .keyboardType(.URL)
+                                #endif
                             Text("Must be a valid HTTPS URL")
                                 .font(AppTypography.labelSmall())
                                 .foregroundColor(AppColors.textTertiary)
@@ -418,8 +424,23 @@ struct CustomProviderEditSheet: View {
             }
             .background(AppColors.substratePrimary)
             .navigationTitle(isEditing ? "Edit Provider" : "Add Provider")
+            #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(macOS)
+                ToolbarItem {
+                    Button("Cancel") {
+                        onDismiss()
+                    }
+                }
+                ToolbarItem {
+                    Button("Save") {
+                        saveProvider()
+                    }
+                    .disabled(!isValid)
+                }
+                #else
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         onDismiss()
@@ -431,6 +452,7 @@ struct CustomProviderEditSheet: View {
                     }
                     .disabled(!isValid)
                 }
+                #endif
             }
         }
         .onAppear {
@@ -548,7 +570,9 @@ struct ModelEditRow: View {
                     .foregroundColor(AppColors.textSecondary)
                 TextField("e.g., llama-3.1-70b", text: $model.modelCode)
                     .textFieldStyle(CustomTextFieldStyle())
-                    .autocapitalization(.none)
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    #endif
             }
 
             // Friendly Name (Optional)
@@ -627,7 +651,9 @@ struct ModelEditRow: View {
                     .foregroundColor(AppColors.textSecondary)
                 TextField("128000", value: $model.contextWindow, format: .number)
                     .textFieldStyle(CustomTextFieldStyle())
+                    #if os(iOS)
                     .keyboardType(.numberPad)
+                    #endif
             }
 
             // Description (Optional)
@@ -663,7 +689,9 @@ struct ModelEditRow: View {
                                     }
                                 ), format: .number)
                                 .textFieldStyle(CustomTextFieldStyle())
+                                #if os(iOS)
                                 .keyboardType(.decimalPad)
+                                #endif
                             }
 
                             VStack(alignment: .leading, spacing: 6) {
@@ -681,7 +709,9 @@ struct ModelEditRow: View {
                                     }
                                 ), format: .number)
                                 .textFieldStyle(CustomTextFieldStyle())
+                                #if os(iOS)
                                 .keyboardType(.decimalPad)
+                                #endif
                             }
                         }
 
@@ -700,7 +730,9 @@ struct ModelEditRow: View {
                                 }
                             ), format: .number)
                             .textFieldStyle(CustomTextFieldStyle())
+                            #if os(iOS)
                             .keyboardType(.decimalPad)
+                            #endif
                         }
 
                         Text("Prices per 1M tokens in USD")
@@ -776,19 +808,25 @@ struct ModelEditRow: View {
     
     private func colorToHex(_ color: Color) -> String {
         // Convert SwiftUI Color to hex string (RRGGBB format)
+        #if canImport(UIKit)
         let uiColor = UIColor(color)
         var red: CGFloat = 0
         var green: CGFloat = 0
         var blue: CGFloat = 0
         var alpha: CGFloat = 0
-        
+
         uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        
+
         let r = UInt8(max(0, min(255, red * 255)))
         let g = UInt8(max(0, min(255, green * 255)))
         let b = UInt8(max(0, min(255, blue * 255)))
-        
+
         return String(format: "%02X%02X%02X", r, g, b)
+        #else
+        // Fallback (macOS): Color-to-hex conversion is best-effort.
+        // If we can't convert, return a safe default.
+        return "808080"
+        #endif
     }
     
     private func isColorTaken(_ hex: String) -> Bool {

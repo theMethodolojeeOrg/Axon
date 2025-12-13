@@ -215,7 +215,7 @@ struct ServerSettingsView: View {
                             // Copy button
                             if let password = viewModel.settings.serverPassword, !password.isEmpty {
                                 Button(action: {
-                                    UIPasteboard.general.string = password
+                                    AppClipboard.copy(password)
                                     copiedPassword = true
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                                         copiedPassword = false
@@ -349,7 +349,7 @@ struct ConnectionInfoRow: View {
                 Spacer()
 
                 Button(action: {
-                    UIPasteboard.general.string = value
+                    AppClipboard.copy(value)
                     copied = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         copied = false

@@ -154,6 +154,7 @@ struct UserMessageView: View {
     
     @ViewBuilder
     private func attachmentView(for attachment: MessageAttachment) -> some View {
+        #if canImport(UIKit)
         if attachment.type == .image, let base64 = attachment.base64,
            let data = Data(base64Encoded: base64),
            let uiImage = UIImage(data: data) {
@@ -174,6 +175,31 @@ struct UserMessageView: View {
             .background(AppColors.substrateTertiary)
             .cornerRadius(8)
         }
+        #else
+        if attachment.type == .image {
+            HStack(spacing: 8) {
+                Image(systemName: "photo")
+                    .foregroundColor(AppColors.textPrimary)
+                Text(attachment.name ?? "Image")
+                    .font(AppTypography.bodySmall())
+                    .foregroundColor(AppColors.textPrimary)
+            }
+            .padding(8)
+            .background(AppColors.substrateTertiary)
+            .cornerRadius(8)
+        } else if attachment.type == .document {
+            HStack(spacing: 8) {
+                Image(systemName: "doc.fill")
+                    .foregroundColor(AppColors.textPrimary)
+                Text(attachment.name ?? "Document")
+                    .font(AppTypography.bodySmall())
+                    .foregroundColor(AppColors.textPrimary)
+            }
+            .padding(8)
+            .background(AppColors.substrateTertiary)
+            .cornerRadius(8)
+        }
+        #endif
     }
 }
 
@@ -240,6 +266,7 @@ struct AssistantMessageView: View {
     
     @ViewBuilder
     private func attachmentView(for attachment: MessageAttachment) -> some View {
+        #if canImport(UIKit)
         if attachment.type == .image, let base64 = attachment.base64,
            let data = Data(base64Encoded: base64),
            let uiImage = UIImage(data: data) {
@@ -260,6 +287,31 @@ struct AssistantMessageView: View {
             .background(AppColors.substrateSecondary)
             .cornerRadius(8)
         }
+        #else
+        if attachment.type == .image {
+            HStack(spacing: 8) {
+                Image(systemName: "photo")
+                    .foregroundColor(AppColors.textPrimary)
+                Text(attachment.name ?? "Image")
+                    .font(AppTypography.bodySmall())
+                    .foregroundColor(AppColors.textPrimary)
+            }
+            .padding(10)
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(8)
+        } else if attachment.type == .document {
+            HStack(spacing: 8) {
+                Image(systemName: "doc.fill")
+                    .foregroundColor(AppColors.textPrimary)
+                Text(attachment.name ?? "Document")
+                    .font(AppTypography.bodySmall())
+                    .foregroundColor(AppColors.textPrimary)
+            }
+            .padding(10)
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(8)
+        }
+        #endif
     }
 }
 
@@ -332,11 +384,12 @@ struct AssistantToolbar: View {
                 }
 
                 // TTS button
-                if ttsService.hasGeneratedAudio(for: message.id) {
+                let settings = SettingsViewModel.shared.settings
+                if ttsService.hasGeneratedAudio(for: message.id, settings: settings) {
                     Button(action: {
                         Task {
                             do {
-                                try await ttsService.playGenerated(messageId: message.id)
+                                try await ttsService.playGenerated(messageId: message.id, settings: settings)
                             } catch {
                                 print("[TTS] Failed to play generated audio: \(error)")
                             }
@@ -350,7 +403,6 @@ struct AssistantToolbar: View {
                     Button(action: {
                         Task {
                             do {
-                                let settings = SettingsViewModel.shared.settings
                                 try await ttsService.speak(text: message.content, settings: settings, messageId: message.id)
                             } catch {
                                 print("[TTS] Failed to speak: \(error)")
@@ -391,8 +443,7 @@ struct AssistantToolbar: View {
     }
 
     private func quoteFromClipboard() {
-        #if canImport(UIKit)
-        guard let clipboardText = UIPasteboard.general.string, !clipboardText.isEmpty else {
+        guard let clipboardText = AppClipboard.pasteString(), !clipboardText.isEmpty else {
             // Show toast if clipboard is empty
             withAnimation {
                 showQuoteToast = true
@@ -408,7 +459,6 @@ struct AssistantToolbar: View {
         // Format as a quote block
         let formattedQuote = formatAsQuote(clipboardText)
         onQuote?(formattedQuote)
-        #endif
     }
 
     private func formatAsQuote(_ text: String) -> String {
@@ -432,7 +482,9 @@ struct TextSelectorSheet: View {
                 .padding()
                 .background(AppColors.substratePrimary)
                 .navigationTitle("Select Text")
+                #if !os(macOS)
                 .navigationBarTitleDisplayMode(.inline)
+                #endif
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Done") {
@@ -454,8 +506,7 @@ struct TextSelectorSheet: View {
     }
 
     private func quoteFromClipboard() {
-        #if canImport(UIKit)
-        guard let clipboardText = UIPasteboard.general.string, !clipboardText.isEmpty else {
+        guard let clipboardText = AppClipboard.pasteString(), !clipboardText.isEmpty else {
             return
         }
 
@@ -465,7 +516,6 @@ struct TextSelectorSheet: View {
         let formattedQuote = quotedLines.joined(separator: "\n") + "\n\n"
         onQuote?(formattedQuote)
         dismiss()
-        #endif
     }
 }
 

@@ -61,7 +61,9 @@ struct AuthenticationView: View {
 
                                     TextField("Enter your name", text: $displayName)
                                         .textFieldStyle(AppTextFieldStyle())
-                                        .autocapitalization(.words)
+                                        #if os(iOS)
+                                        .textInputAutocapitalization(.words)
+                                        #endif
                                         .disabled(authService.isLoading)
                                 }
                                 .transition(AppAnimations.slideFromTop)
@@ -76,8 +78,10 @@ struct AuthenticationView: View {
                                 TextField("Enter your email", text: $email)
                                     .textFieldStyle(AppTextFieldStyle())
                                     .textContentType(.emailAddress)
-                                    .autocapitalization(.none)
+                                    #if os(iOS)
+                                    .textInputAutocapitalization(.never)
                                     .keyboardType(.emailAddress)
+                                    #endif
                                     .disabled(authService.isLoading)
                             }
 

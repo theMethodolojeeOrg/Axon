@@ -908,6 +908,16 @@ struct TTSSettings: Codable, Equatable {
     /// Active TTS provider
     var provider: TTSProvider = .elevenlabs
 
+    // MARK: - TTS Text Preprocessing
+
+    /// Default behavior: convert Markdown to rendered plaintext before sending to TTS.
+    /// This prevents voices from reading formatting symbols.
+    var stripMarkdownBeforeTTS: Bool = true
+
+    /// Optional second-pass normalization to make text more spoken-friendly.
+    /// Off by default to preserve fidelity to displayed text.
+    var spokenFriendlyTTS: Bool = false
+
     // MARK: - ElevenLabs Settings
     var model: TTSModel = .turboV25
     var outputFormat: TTSOutputFormat = .mp3128

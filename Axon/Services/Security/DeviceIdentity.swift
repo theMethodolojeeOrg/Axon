@@ -9,7 +9,13 @@
 import Foundation
 import Security
 import CryptoKit
+import Combine
+
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// Device information for identity purposes
 struct DeviceInfo: Codable, Equatable {
@@ -100,16 +106,9 @@ class DeviceIdentity {
 
     /// Generate a device fingerprint from hardware characteristics
     func generateFingerprint() -> String {
-        let device = UIDevice.current
-        let components = [
-            device.model,
-            device.systemName,
-            device.systemVersion,
-            getDeviceModelIdentifier(),
-            UIScreen.main.bounds.width.description,
-            UIScreen.main.bounds.height.description,
-            UIScreen.main.scale.description
-        ]
+        let components = DevicePlatformInfo.fingerprintComponents(
+            modelIdentifier: getDeviceModelIdentifier()
+        )
         let combined = components.joined(separator: "|")
         let hash = SHA256.hash(data: Data(combined.utf8))
         return hash.compactMap { String(format: "%02x", $0) }.joined()
@@ -179,10 +178,9 @@ class DeviceIdentity {
     }
 
     private func generateStableDeviceId() -> String {
-        // Try to use vendor identifier if available
-        if let vendorId = UIDevice.current.identifierForVendor {
-            // Hash it to prevent any potential tracking
-            let hash = SHA256.hash(data: Data(vendorId.uuidString.utf8))
+        // Prefer a stable, privacy-preserving vendor identifier when available (iOS).
+        if let vendorId = DevicePlatformInfo.vendorIdentifier {
+            let hash = SHA256.hash(data: Data(vendorId.utf8))
             return hash.compactMap { String(format: "%02x", $0) }.joined()
         }
 
@@ -191,13 +189,12 @@ class DeviceIdentity {
     }
 
     private func createDeviceInfo(id: String) -> DeviceInfo {
-        let device = UIDevice.current
         return DeviceInfo(
             deviceId: id,
             deviceModel: getDeviceModelIdentifier(),
-            systemName: device.systemName,
-            systemVersion: device.systemVersion,
-            deviceName: device.name,
+            systemName: DevicePlatformInfo.systemName,
+            systemVersion: DevicePlatformInfo.systemVersion,
+            deviceName: DevicePlatformInfo.deviceName,
             createdAt: Date(),
             fingerprint: generateFingerprint()
         )
@@ -260,6 +257,65 @@ class DeviceIdentity {
 
         SecItemDelete(query as CFDictionary)
     }
+}
+
+// MARK: - Platform Info
+
+private enum DevicePlatformInfo {
+    #if os(iOS)
+    static var systemName: String { UIDevice.current.systemName }
+    static var systemVersion: String { UIDevice.current.systemVersion }
+    static var deviceName: String { UIDevice.current.name }
+
+    /// A stable identifier tied to the app vendor (iOS only). We hash it before storing.
+    static var vendorIdentifier: String? {
+        UIDevice.current.identifierForVendor?.uuidString
+    }
+
+    static func fingerprintComponents(modelIdentifier: String) -> [String] {
+        let device = UIDevice.current
+        return [
+            device.model,
+            device.systemName,
+            device.systemVersion,
+            modelIdentifier,
+            UIScreen.main.bounds.width.description,
+            UIScreen.main.bounds.height.description,
+            UIScreen.main.scale.description
+        ]
+    }
+    #elseif os(macOS)
+    static var systemName: String { "macOS" }
+    static var systemVersion: String { ProcessInfo.processInfo.operatingSystemVersionString }
+    static var deviceName: String { Host.current().localizedName ?? "Mac" }
+
+    /// No direct equivalent on macOS; return nil so we fall back to Keychain-persisted UUID.
+    static var vendorIdentifier: String? { nil }
+
+    static func fingerprintComponents(modelIdentifier: String) -> [String] {
+        let screen = NSScreen.main
+        let frame = screen?.frame ?? .zero
+        let scale = screen?.backingScaleFactor ?? 1
+        return [
+            "Mac",
+            systemName,
+            systemVersion,
+            modelIdentifier,
+            frame.width.description,
+            frame.height.description,
+            scale.description
+        ]
+    }
+    #else
+    static var systemName: String { "Unknown" }
+    static var systemVersion: String { "Unknown" }
+    static var deviceName: String { "Unknown" }
+    static var vendorIdentifier: String? { nil }
+
+    static func fingerprintComponents(modelIdentifier: String) -> [String] {
+        [systemName, systemVersion, deviceName, modelIdentifier]
+    }
+    #endif
 }
 
 // MARK: - DeviceIdentity Extensions

@@ -74,12 +74,21 @@ struct ConversationListView: View {
             }
             .navigationTitle("Conversations")
             .toolbar {
+                #if os(macOS)
+                ToolbarItem {
+                    Button(action: { showNewConversation = true }) {
+                        Image(systemName: "plus")
+                            .foregroundColor(AppColors.signalMercury)
+                    }
+                }
+                #else
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showNewConversation = true }) {
                         Image(systemName: "plus")
                             .foregroundColor(AppColors.signalMercury)
                     }
                 }
+                #endif
             }
             .sheet(isPresented: $showNewConversation) {
                 NewConversationSheet(
@@ -209,14 +218,25 @@ struct NewConversationSheet: View {
                 .padding()
             }
             .navigationTitle("New Conversation")
+            #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(macOS)
+                ToolbarItem {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(AppColors.textSecondary)
+                }
+                #else
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
                     .foregroundColor(AppColors.textSecondary)
                 }
+                #endif
             }
         }
     }

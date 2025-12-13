@@ -186,6 +186,12 @@ class ConversationService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
+        // If there is no backend configured, always create locally.
+        // This is required for “device-direct CloudLLM” mode.
+        guard apiClient.isBackendConfigured else {
+            return try createConversationOffline(title: title)
+        }
+
         // Try online creation first, fall back to offline if it fails
         do {
             return try await createConversationOnline(title: title, firstMessage: firstMessage)

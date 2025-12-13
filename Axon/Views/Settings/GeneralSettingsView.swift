@@ -217,6 +217,52 @@ struct GeneralSettingsView: View {
                 .background(AppColors.substrateSecondary)
                 .cornerRadius(8)
             }
+
+            // MARK: - iCloud Data Sync
+
+            if viewModel.settings.deviceModeConfig.cloudSyncProvider == .iCloud {
+                GeneralSettingsSection(title: "iCloud Data Sync") {
+                    VStack(spacing: 12) {
+                        HStack(spacing: 10) {
+                            Image(systemName: PersistenceController.shared.isCloudKitEnabled ? "checkmark.icloud" : "icloud.slash")
+                                .foregroundColor(PersistenceController.shared.isCloudKitEnabled ? AppColors.accentSuccess : AppColors.accentWarning)
+
+                            Text(PersistenceController.shared.isCloudKitEnabled
+                                 ? "CloudKit store is enabled"
+                                 : "CloudKit store is disabled (restart required)")
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textSecondary)
+
+                            Spacer()
+                        }
+
+                        Button {
+                            Task {
+                                await AutoSyncOrchestrator.shared.pullNow()
+                                // Force reload of local conversations after a pull
+                                _ = try? await ConversationService.shared.listConversations()
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "arrow.down.circle")
+                                Text("Sync From iCloud")
+                                    .font(AppTypography.bodyMedium(.medium))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(AppColors.signalMercury)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                        }
+                        .disabled(!PersistenceController.shared.isCloudKitEnabled)
+
+                        Text("Tip: If you just switched to iCloud sync, fully quit and relaunch Axon once so the CloudKit-backed store can initialize.")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+            }
         }
     }
 

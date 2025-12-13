@@ -67,8 +67,26 @@ struct SidebarView: View {
                     .padding()
                 }
                 .navigationTitle("Rename Chat")
+                #if !os(macOS)
                 .navigationBarTitleDisplayMode(.inline)
+                #endif
                 .toolbar {
+                    #if os(macOS)
+                    ToolbarItem {
+                        Button("Cancel") { showingRenameSheet = false }
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                    ToolbarItem {
+                        Button("Save") {
+                            if let conv = renamingConversation {
+                                let trimmed = tempRenameTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                                SettingsStorage.shared.setDisplayName(trimmed.isEmpty ? nil : trimmed, for: conv.id)
+                            }
+                            showingRenameSheet = false
+                        }
+                        .foregroundColor(AppColors.signalMercury)
+                    }
+                    #else
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") { showingRenameSheet = false }
                             .foregroundColor(AppColors.textSecondary)
@@ -83,6 +101,7 @@ struct SidebarView: View {
                         }
                         .foregroundColor(AppColors.signalMercury)
                     }
+                    #endif
                 }
             }
         }
@@ -331,6 +350,17 @@ struct SidebarView: View {
 
     private func forceFullSync() async {
         do {
+            let provider = SettingsViewModel.shared.settings.deviceModeConfig.cloudSyncProvider
+
+            if provider == .iCloud {
+                print("[SidebarView] Starting iCloud pull...")
+                await AutoSyncOrchestrator.shared.pullNow()
+                conversationService.conversations = syncManager.loadLocalConversations()
+                print("[SidebarView] ✅ iCloud pull completed. Loaded \(conversationService.conversations.count) conversations")
+                return
+            }
+
+            // Default: backend/API sync
             print("[SidebarView] Starting force full sync...")
             // Force full sync with listAll=true, overwriting everything
             try await syncManager.forceFullSync()
@@ -439,4 +469,3 @@ struct ConversationSidebarRow: View {
         )
     }
 }
-

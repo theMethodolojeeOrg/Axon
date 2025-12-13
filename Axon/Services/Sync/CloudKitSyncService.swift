@@ -24,6 +24,9 @@ class CloudKitSyncService: ObservableObject {
     private let messageRecordType = "Message"
     private let memoryRecordType = "Memory"
 
+    // Local store access
+    private let persistence = PersistenceController.shared
+
     // Sync state
     @Published var isSyncing = false
     @Published var lastSyncTime: Date?
@@ -36,6 +39,9 @@ class CloudKitSyncService: ObservableObject {
 
     // Subscription for push notifications
     private var subscriptionSaved = false
+
+    // Used for lightweight “I pulled something” UI refresh triggers.
+    let didCompletePull = PassthroughSubject<Void, Never>()
 
     private init() {
         // Use the specific container matching entitlements
@@ -381,8 +387,185 @@ class CloudKitSyncService: ObservableObject {
             isStreaming: nil,
             modelName: record["modelName"] as? String,
             providerName: record["providerName"] as? String,
-            attachments: nil
+            attachments: nil,
+            groundingSources: nil,
+            memoryOperations: nil
         )
+    }
+
+    // MARK: - Sync Memories
+
+    func syncMemories(_ memories: [Memory]) async throws {
+        guard isCloudKitAvailable else {
+            throw CloudKitSyncError.notAvailable
+        }
+
+        isSyncing = true
+        syncError = nil
+        defer { isSyncing = false }
+
+        try await ensureZoneExists()
+
+        let records = memories.map { memoryToRecord($0) }
+        let operation = CKModifyRecordsOperation(recordsToSave: records, recordIDsToDelete: nil)
+        operation.savePolicy = .changedKeys
+        operation.qualityOfService = .userInitiated
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            operation.modifyRecordsResultBlock = { result in
+                switch result {
+                case .success:
+                    print("[CloudKitSync] Synced \(records.count) memories to iCloud")
+                    continuation.resume()
+                case .failure(let error):
+                    print("[CloudKitSync] Failed to sync memories: \(error)")
+                    continuation.resume(throwing: error)
+                }
+            }
+            privateDatabase.add(operation)
+        }
+
+        lastSyncTime = Date()
+    }
+
+    func fetchMemories() async throws -> [Memory] {
+        guard isCloudKitAvailable else {
+            throw CloudKitSyncError.notAvailable
+        }
+
+        isSyncing = true
+        syncError = nil
+        defer { isSyncing = false }
+
+        try await ensureZoneExists()
+
+        let query = CKQuery(recordType: memoryRecordType, predicate: NSPredicate(value: true))
+        query.sortDescriptors = [NSSortDescriptor(key: "updatedAt", ascending: false)]
+
+        let results = try await privateDatabase.records(matching: query, inZoneWith: zoneID)
+
+        var memories: [Memory] = []
+        for (_, result) in results.matchResults {
+            if case .success(let record) = result {
+                if let memory = recordToMemory(record) {
+                    memories.append(memory)
+                }
+            }
+        }
+
+        lastSyncTime = Date()
+        print("[CloudKitSync] Fetched \(memories.count) memories from iCloud")
+        return memories
+    }
+
+    private func memoryToRecord(_ memory: Memory) -> CKRecord {
+        let recordID = CKRecord.ID(recordName: "mem_\(memory.id)", zoneID: zoneID)
+        let record = CKRecord(recordType: memoryRecordType, recordID: recordID)
+
+        record["id"] = memory.id
+        record["userId"] = memory.userId
+        record["content"] = memory.content
+        record["type"] = memory.type.rawValue
+        record["confidence"] = memory.confidence
+        record["tags"] = memory.tags
+        record["context"] = memory.context
+        record["createdAt"] = memory.createdAt
+        record["updatedAt"] = memory.updatedAt
+        record["lastAccessedAt"] = memory.lastAccessedAt
+        record["accessCount"] = memory.accessCount
+
+        // Source (optional)
+        if let source = memory.source {
+            record["sourceConversationId"] = source.conversationId
+            record["sourceMessageId"] = source.messageId
+            record["sourceTimestamp"] = source.timestamp
+        }
+
+        // Related memory IDs
+        if let related = memory.relatedMemories {
+            record["relatedMemories"] = related
+        }
+
+        // Metadata: store as JSON string for portability
+        if !memory.metadata.isEmpty,
+           let data = try? JSONEncoder().encode(memory.metadata),
+           let json = String(data: data, encoding: .utf8) {
+            record["metadataJSON"] = json
+        }
+
+        return record
+    }
+
+    private func recordToMemory(_ record: CKRecord) -> Memory? {
+        guard let id = record["id"] as? String,
+              let content = record["content"] as? String,
+              let typeString = record["type"] as? String,
+              let type = MemoryType(rawValue: typeString),
+              let confidence = record["confidence"] as? Double,
+              let tags = record["tags"] as? [String],
+              let createdAt = record["createdAt"] as? Date,
+              let updatedAt = record["updatedAt"] as? Date else {
+            return nil
+        }
+
+        let userId = (record["userId"] as? String) ?? ""
+        let context = record["context"] as? String
+        let lastAccessedAt = record["lastAccessedAt"] as? Date
+        let accessCount = (record["accessCount"] as? Int) ?? 0
+
+        var source: MemorySource? = nil
+        if let ts = record["sourceTimestamp"] as? Date {
+            source = MemorySource(
+                conversationId: record["sourceConversationId"] as? String,
+                messageId: record["sourceMessageId"] as? String,
+                timestamp: ts
+            )
+        }
+
+        let relatedMemories = record["relatedMemories"] as? [String]
+
+        var metadata: [String: AnyCodable] = [:]
+        if let json = record["metadataJSON"] as? String,
+           let data = json.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode([String: AnyCodable].self, from: data) {
+            metadata = decoded
+        }
+
+        return Memory(
+            id: id,
+            userId: userId,
+            content: content,
+            type: type,
+            confidence: confidence,
+            tags: tags,
+            context: context,
+            metadata: metadata,
+            source: source,
+            relatedMemories: relatedMemories,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            lastAccessedAt: lastAccessedAt,
+            accessCount: accessCount
+        )
+    }
+
+    private func loadLocalMemories() -> [Memory] {
+        let context = persistence.container.viewContext
+        let fetchRequest: NSFetchRequest<MemoryEntity> = MemoryEntity.fetchRequest()
+        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "updatedAt", ascending: false)]
+
+        do {
+            let entities = try context.fetch(fetchRequest)
+            return entities.compactMap { $0.toMemory() }
+        } catch {
+            print("[CloudKitSync] Error loading local memories: \(error)")
+            return []
+        }
+    }
+
+    private func saveMemoriesToCoreData(_ memories: [Memory]) async throws {
+        // Reuse existing MemorySyncManager logic to avoid duplicating Core Data mapping.
+        try await MemorySyncManager.shared.saveMemoriesToCoreData(memories)
     }
 
     // MARK: - Full Sync
@@ -399,19 +582,31 @@ class CloudKitSyncService: ObservableObject {
 
         print("[CloudKitSync] Starting full iCloud sync...")
 
-        // 1. Fetch remote conversations
+        // 1. Fetch remote conversations + memories
         let remoteConversations = try await fetchConversations()
+        let remoteMemories = try await fetchMemories()
 
-        // 2. Load local conversations from Core Data
+        if remoteConversations.isEmpty {
+            print("[CloudKitSync] ⚠️  No remote conversations returned. If you just enabled iCloud sync, you may need to run a sync on your source device first to push local chats up to CloudKit.")
+        }
+
+        // 2. Load local conversations + memories from Core Data
         let localConversations = ConversationSyncManager.shared.loadLocalConversations()
+        let localMemories = loadLocalMemories()
 
         // 3. Merge strategy: newer wins
         var conversationsToSaveLocally: [Conversation] = []
         var conversationsToSaveRemote: [Conversation] = []
 
+        var memoriesToSaveLocally: [Memory] = []
+        var memoriesToSaveRemote: [Memory] = []
+
         // Create lookup maps
         let remoteMap = Dictionary(uniqueKeysWithValues: remoteConversations.map { ($0.id, $0) })
         let localMap = Dictionary(uniqueKeysWithValues: localConversations.map { ($0.id, $0) })
+
+        let remoteMemMap = Dictionary(uniqueKeysWithValues: remoteMemories.map { ($0.id, $0) })
+        let localMemMap = Dictionary(uniqueKeysWithValues: localMemories.map { ($0.id, $0) })
 
         // Check all local conversations
         for local in localConversations {
@@ -435,10 +630,34 @@ class CloudKitSyncService: ObservableObject {
             }
         }
 
+        // Merge memories (newer wins)
+        for local in localMemories {
+            if let remote = remoteMemMap[local.id] {
+                if local.updatedAt > remote.updatedAt {
+                    memoriesToSaveRemote.append(local)
+                } else if remote.updatedAt > local.updatedAt {
+                    memoriesToSaveLocally.append(remote)
+                }
+            } else {
+                memoriesToSaveRemote.append(local)
+            }
+        }
+
+        for remote in remoteMemories {
+            if localMemMap[remote.id] == nil {
+                memoriesToSaveLocally.append(remote)
+            }
+        }
+
         // 4. Save merged data
         if !conversationsToSaveLocally.isEmpty {
             try await ConversationSyncManager.shared.saveConversationsToCoreData(conversationsToSaveLocally)
             print("[CloudKitSync] Saved \(conversationsToSaveLocally.count) conversations from iCloud to local")
+        }
+
+        if !memoriesToSaveLocally.isEmpty {
+            try await saveMemoriesToCoreData(memoriesToSaveLocally)
+            print("[CloudKitSync] Saved \(memoriesToSaveLocally.count) memories from iCloud to local")
         }
 
         if !conversationsToSaveRemote.isEmpty {
@@ -446,7 +665,13 @@ class CloudKitSyncService: ObservableObject {
             print("[CloudKitSync] Pushed \(conversationsToSaveRemote.count) local conversations to iCloud")
         }
 
+        if !memoriesToSaveRemote.isEmpty {
+            try await syncMemories(memoriesToSaveRemote)
+            print("[CloudKitSync] Pushed \(memoriesToSaveRemote.count) local memories to iCloud")
+        }
+
         lastSyncTime = Date()
+        didCompletePull.send()
         print("[CloudKitSync] Full sync completed")
     }
 }

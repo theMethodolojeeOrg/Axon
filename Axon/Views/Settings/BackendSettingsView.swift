@@ -68,9 +68,11 @@ struct BackendSettingsView: View {
                             .textFieldStyle(.plain)
                             .font(AppTypography.bodyMedium())
                             .foregroundColor(AppColors.textPrimary)
-                            .autocapitalization(.none)
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never)
                             .disableAutocorrection(true)
                             .keyboardType(.URL)
+                            #endif
                             .padding()
                             .background(AppColors.substrateTertiary)
                             .cornerRadius(6)
@@ -147,8 +149,10 @@ struct BackendSettingsView: View {
                                     .textFieldStyle(.plain)
                                     .font(AppTypography.bodyMedium())
                                     .foregroundColor(AppColors.textPrimary)
-                                    .autocapitalization(.none)
+                                    #if os(iOS)
+                                    .textInputAutocapitalization(.never)
                                     .disableAutocorrection(true)
+                                    #endif
                             } else {
                                 Text(tokenInput.isEmpty ? "No token set" : String(repeating: "•", count: min(tokenInput.count, 20)))
                                     .font(AppTypography.bodyMedium())

@@ -42,6 +42,10 @@ class SettingsViewModel: ObservableObject {
         loadSettings()
         setupiCloudSync()
         SettingsSyncCoordinator.shared.start()
+
+        // Hydrate ElevenLabs voices from Core Data cache ASAP so the user doesn't
+        // need to tap "Refresh Voices" every launch.
+        Task { await hydrateElevenLabsVoicesFromCache() }
     }
 
     // MARK: - Load Settings
@@ -133,22 +137,28 @@ class SettingsViewModel: ObservableObject {
         guard settings.deviceModeConfig.cloudSyncProvider == .iCloud else { return }
 
         // Only attempt if iCloud Keychain is generally available.
-        guard iCloudSyncEnabled else { return }
+        guard iCloudSyncEnabled else {
+            print("[SettingsViewModel] iCloud Keychain not available; skipping API key import")
+            return
+        }
 
         for provider in APIProvider.allCases {
             // Don\'t overwrite existing local key.
             if apiKeysStorage.isConfigured(provider) {
+                print("[SettingsViewModel] API key already configured locally: \(provider.rawValue)")
                 continue
             }
 
-            if let key = (try? iCloudKeychainService.shared.getAPIKey(for: provider)) ?? nil,
-               !key.isEmpty {
-                do {
+            do {
+                let key = try iCloudKeychainService.shared.getAPIKey(for: provider)
+                if let key, !key.isEmpty {
                     try apiKeysStorage.saveAPIKey(key, for: provider)
-                    print("[SettingsViewModel] Imported \(provider.rawValue) API key from iCloud Keychain")
-                } catch {
-                    print("[SettingsViewModel] Failed to import \(provider.rawValue) API key from iCloud Keychain: \(error.localizedDescription)")
+                    print("[SettingsViewModel] ✅ Imported \(provider.rawValue) API key from iCloud Keychain")
+                } else {
+                    print("[SettingsViewModel] No iCloud Keychain key found for: \(provider.rawValue)")
                 }
+            } catch {
+                print("[SettingsViewModel] ❌ Failed to read/import \(provider.rawValue) from iCloud Keychain: \(error.localizedDescription)")
             }
         }
     }
@@ -237,20 +247,16 @@ class SettingsViewModel: ObservableObject {
             let models = try await ElevenLabsService.shared.fetchTTSModels()
             self.availableVoices = voices
             self.availableTTSModels = models
-            
-            // Cache the voices
+
+            // Persist to Core Data cache (CloudKit syncable)
+            await ElevenLabsVoiceCacheService.shared.upsertVoices(voices)
+
+            // Keep legacy settings cache too (cheap + useful fallback)
             settings.ttsSettings.cachedVoices = voices
             try? storageService.saveSettings(settings)
 
-            // If no voice selected yet, pick the first one
-            if settings.ttsSettings.selectedVoiceId == nil, let first = voices.first {
-                print("[SettingsViewModel] No voice selected, defaulting to first voice: \(first.name) (ID: \(first.id))")
-                settings.ttsSettings.selectedVoiceId = first.id
-                settings.ttsSettings.selectedVoiceName = first.name
-                try? storageService.saveSettings(settings)
-            } else {
-                print("[SettingsViewModel] Voice already selected: \(settings.ttsSettings.selectedVoiceName ?? "nil") (ID: \(settings.ttsSettings.selectedVoiceId ?? "nil"))")
-            }
+            // Ensure selection is valid
+            await ensureValidSelectedElevenLabsVoice(voices: voices)
         }
 
         do {
@@ -277,6 +283,41 @@ class SettingsViewModel: ObservableObject {
         print("[SettingsViewModel] Voice selection saved. Current settings - Voice ID: \(settings.ttsSettings.selectedVoiceId ?? "nil"), Voice Name: \(settings.ttsSettings.selectedVoiceName ?? "nil")")
     }
 
+    // MARK: - ElevenLabs Voice Cache
+
+    private func hydrateElevenLabsVoicesFromCache() async {
+        // 1) Load Core Data voice cache
+        let cached = await ElevenLabsVoiceCacheService.shared.loadCachedVoices()
+        if !cached.isEmpty {
+            self.availableVoices = cached
+
+            // Keep legacy settings cache in sync for fallback paths
+            settings.ttsSettings.cachedVoices = cached
+            try? storageService.saveSettings(settings)
+
+            await ensureValidSelectedElevenLabsVoice(voices: cached)
+            print("[SettingsViewModel] Hydrated \(cached.count) ElevenLabs voices from Core Data cache")
+        }
+
+        // 2) If still empty, do nothing (user can tap refresh). We intentionally don't auto-fetch
+        // to avoid surprising network calls. You can add TTL-based auto refresh later.
+    }
+
+    private func ensureValidSelectedElevenLabsVoice(voices: [ElevenLabsService.ELVoice]) async {
+        guard !voices.isEmpty else { return }
+
+        if let selectedId = settings.ttsSettings.selectedVoiceId,
+           voices.contains(where: { $0.id == selectedId }) {
+            // Selection is valid
+            return
+        }
+
+        // Otherwise default to first voice
+        let first = voices[0]
+        print("[SettingsViewModel] Selected voice missing; defaulting to first voice: \(first.name) (ID: \(first.id))")
+        await updateSelectedVoice(id: first.id, name: first.name)
+    }
+
     func saveTTSAPIKey(_ key: String) async {
         await saveAPIKey(key, for: .elevenlabs)
     }
@@ -287,6 +328,10 @@ class SettingsViewModel: ObservableObject {
 
     var isTTSConfigured: Bool {
         isAPIKeyConfigured(.elevenlabs)
+    }
+
+    var isGeminiTTSConfigured: Bool {
+        isAPIKeyConfigured(.gemini)
     }
 
     // MARK: - Current Model

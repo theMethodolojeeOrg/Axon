@@ -7,15 +7,13 @@
 
 import CoreData
 
-struct PersistenceController {
-    // Default to CloudKit disabled - users can enable via Settings once they set up their Apple Developer account
-    // This ensures the app works out of the box without CloudKit entitlements
-    static let shared = PersistenceController(useCloudKit: false)
+@MainActor
+final class PersistenceController {
+    static let shared = PersistenceController()
 
-    @MainActor
     static let preview: PersistenceController = {
-        let result = PersistenceController(inMemory: true, useCloudKit: false)
-        let viewContext = result.container.viewContext
+        let controller = PersistenceController(inMemory: true, useCloudKit: false)
+        let viewContext = controller.container.viewContext
         for _ in 0..<10 {
             let newItem = Item(context: viewContext)
             newItem.timestamp = Date()
@@ -26,57 +24,31 @@ struct PersistenceController {
             let nsError = error as NSError
             fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
         }
-        return result
+        return controller
     }()
 
     let container: NSPersistentCloudKitContainer
 
-    init(inMemory: Bool = false, useCloudKit: Bool = true) {
-        container = NSPersistentCloudKitContainer(name: "Axon")
+    /// True if the container was configured with CloudKit enabled.
+    let isCloudKitEnabled: Bool
 
-        if inMemory {
-            container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
-        }
+    private init() {
+        let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
+        let wantsCloudKit = (settings.deviceModeConfig.cloudSyncProvider == .iCloud)
 
-        // Configure the store description
-        if let storeDescription = container.persistentStoreDescriptions.first {
-            // Enable history tracking for sync
-            storeDescription.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
-            storeDescription.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+        self.isCloudKitEnabled = wantsCloudKit
+        self.container = CoreDataCloudKitStack.makeContainer(inMemory: false, useCloudKit: wantsCloudKit)
 
-            // Disable CloudKit sync if not needed (local-only mode)
-            // This prevents the entitlement error when CloudKit isn't configured
-            if !useCloudKit {
-                storeDescription.cloudKitContainerOptions = nil
-                print("[Persistence] CloudKit sync DISABLED - running in local-only mode")
-            } else {
-                print("[Persistence] CloudKit sync ENABLED")
-            }
-        }
-
-        container.loadPersistentStores(completionHandler: { (storeDescription, error) in
-            if let error = error as NSError? {
-                // Log the error but don't crash - fall back gracefully
-                print("[Persistence] Error loading persistent store: \(error), \(error.userInfo)")
-
-                // Check if it's a CloudKit-related error
-                if error.domain == NSCocoaErrorDomain && error.code == 134060 {
-                    print("[Persistence] CloudKit integration error - this may require entitlements setup")
-                    print("[Persistence] For local-only operation, set useCloudKit: false")
-                }
-
-                // In production, you might want to handle this more gracefully
-                // For now, we'll still crash to surface the issue during development
-                fatalError("Unresolved error \(error), \(error.userInfo)")
-            }
-        })
-
-        // Configure view context
-        container.viewContext.automaticallyMergesChangesFromParent = true
-        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        print("[Persistence] Initialized. CloudKitEnabled=\(wantsCloudKit)")
     }
 
-    /// Create a new background context for sync operations
+    private init(inMemory: Bool, useCloudKit: Bool) {
+        self.isCloudKitEnabled = useCloudKit
+        self.container = CoreDataCloudKitStack.makeContainer(inMemory: inMemory, useCloudKit: useCloudKit)
+        print("[Persistence] Initialized (preview). CloudKitEnabled=\(useCloudKit)")
+    }
+
+    /// Create a new background context for sync operations.
     func newBackgroundContext() -> NSManagedObjectContext {
         let context = container.newBackgroundContext()
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
@@ -84,7 +56,7 @@ struct PersistenceController {
         return context
     }
 
-    /// Save a context if it has changes
+    /// Save a context if it has changes.
     func saveContext(_ context: NSManagedObjectContext) throws {
         guard context.hasChanges else { return }
         try context.save()

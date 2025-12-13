@@ -309,7 +309,7 @@ struct MemoryListView: View {
             }
             .navigationTitle("Memory")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem {
                     if !isSelectionMode {
                         Button(action: { enterSelectionMode() }) {
                             Text("Select")
@@ -319,7 +319,7 @@ struct MemoryListView: View {
                     }
                 }
 
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem {
                     if !isSelectionMode {
                         Button(action: { showNewMemory = true }) {
                             Image(systemName: "plus")
@@ -736,9 +736,11 @@ private struct AllTagsSheet: View {
                 }
             }
             .navigationTitle("All Tags")
+            #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem {
                     Button("Done") { onDismiss() }
                         .foregroundColor(AppColors.signalMercury)
                 }
@@ -1012,9 +1014,11 @@ struct NewMemorySheet: View {
                 .padding()
             }
             .navigationTitle("New Memory")
+            #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem {
                     Button("Cancel") {
                         dismiss()
                     }
