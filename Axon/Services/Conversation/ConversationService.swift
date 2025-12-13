@@ -249,6 +249,17 @@ class ConversationService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
+        // Try local first
+        if let localConversation = conversations.first(where: { $0.id == id }) {
+            self.currentConversation = localConversation
+            return localConversation
+        }
+
+        // If backend not configured, we can only use local data
+        guard apiClient.isBackendConfigured else {
+            throw ConversationError.notFound
+        }
+
         do {
             struct GetConversationResponse: Decodable {
                 let conversation: Conversation
@@ -266,37 +277,72 @@ class ConversationService: ObservableObject {
     }
 
     func updateConversation(id: String, title: String) async throws -> Conversation {
-        struct UpdateRequest: Encodable {
-            let title: String
+        // Find existing conversation
+        guard let existingIndex = conversations.firstIndex(where: { $0.id == id }) else {
+            throw ConversationError.notFound
         }
+        let existing = conversations[existingIndex]
 
-        let request = UpdateRequest(title: title)
-
-        do {
-            struct UpdateConversationResponse: Decodable {
-                let conversation: Conversation
-                let message: String?
+        if apiClient.isBackendConfigured {
+            // Cloud mode: Update via API
+            struct UpdateRequest: Encodable {
+                let title: String
             }
-            let response: UpdateConversationResponse = try await apiClient.request(
-                endpoint: "/apiUpdateConversation/\(id)",
-                method: .patch,
-                body: request
+
+            let request = UpdateRequest(title: title)
+
+            do {
+                struct UpdateConversationResponse: Decodable {
+                    let conversation: Conversation
+                    let message: String?
+                }
+                let response: UpdateConversationResponse = try await apiClient.request(
+                    endpoint: "/apiUpdateConversation/\(id)",
+                    method: .patch,
+                    body: request
+                )
+
+                let conversation = response.conversation
+                conversations[existingIndex] = conversation
+
+                if currentConversation?.id == id {
+                    currentConversation = conversation
+                }
+
+                return conversation
+            } catch {
+                self.error = error.localizedDescription
+                throw error
+            }
+        } else {
+            // Local-first mode: Update locally
+            try localStore.updateLocalConversation(id: id, title: title)
+
+            // Create updated conversation model
+            let updatedConversation = Conversation(
+                id: existing.id,
+                userId: existing.userId,
+                title: title,
+                projectId: existing.projectId,
+                createdAt: existing.createdAt,
+                updatedAt: Date(),
+                messageCount: existing.messageCount,
+                lastMessageAt: existing.lastMessageAt,
+                archived: existing.archived,
+                summary: existing.summary,
+                lastMessage: existing.lastMessage,
+                tags: existing.tags,
+                isPinned: existing.isPinned
             )
 
-            let conversation = response.conversation
-
-            if let index = conversations.firstIndex(where: { $0.id == id }) {
-                conversations[index] = conversation
-            }
+            conversations[existingIndex] = updatedConversation
 
             if currentConversation?.id == id {
-                currentConversation = conversation
+                currentConversation = updatedConversation
             }
 
-            return conversation
-        } catch {
-            self.error = error.localizedDescription
-            throw error
+            print("[ConversationService] Updated local conversation: \(id)")
+            return updatedConversation
         }
     }
 
@@ -311,11 +357,17 @@ class ConversationService: ObservableObject {
             messages = []
         }
 
-        // For local-only conversations, hard delete immediately (no server sync needed)
-        if id.hasPrefix("local_") {
+        // For local-only conversations OR when no backend configured, hard delete immediately
+        if id.hasPrefix("local_") || !apiClient.isBackendConfigured {
             try localStore.deleteLocalConversation(id: id)
+            // For synced conversations without backend, also hard delete
+            if !id.hasPrefix("local_") && !apiClient.isBackendConfigured {
+                try localStore.hardDeleteLocalConversation(id: id)
+            }
             pendingOperationsCount = localStore.pendingOperationCount
-            print("[ConversationService] Deleted local-only conversation: \(id)")
+            print("[ConversationService] Deleted conversation locally: \(id)")
+            recentlyDeletedIds.remove(id)
+            deletedIdsTimestamps.removeValue(forKey: id)
             return
         }
 
@@ -375,6 +427,13 @@ class ConversationService: ObservableObject {
         let localMessages = syncManager.loadLocalMessages(conversationId: conversationId)
         print("[ConversationService] Local messages in Core Data: \(localMessages.count)")
 
+        // If no backend configured, always use local messages
+        if !apiClient.isBackendConfigured {
+            print("[ConversationService] ✅ No backend configured, using \(localMessages.count) local messages")
+            self.messages = localMessages
+            return localMessages
+        }
+
         // Only use local messages if we have ALL of them
         if !localMessages.isEmpty && localMessages.count >= expectedMessageCount {
             print("[ConversationService] ✅ Loaded \(localMessages.count) messages from Core Data (complete)")
@@ -395,8 +454,17 @@ class ConversationService: ObservableObject {
     func refreshMessages(conversationId: String, limit: Int = 50) async throws -> [Message] {
         print("[ConversationService] 🔄 refreshMessages called")
         print("[ConversationService] Conversation ID: \(conversationId)")
+
+        // If no backend configured, just return local messages
+        guard apiClient.isBackendConfigured else {
+            let localMessages = syncManager.loadLocalMessages(conversationId: conversationId)
+            print("[ConversationService] No backend configured, returning \(localMessages.count) local messages")
+            self.messages = localMessages
+            return localMessages
+        }
+
         print("[ConversationService] API Endpoint: /apiGetMessages?conversationId=\(conversationId)&limit=\(limit)")
-        
+
         isLoading = true
         defer { isLoading = false }
 
@@ -410,10 +478,10 @@ class ConversationService: ObservableObject {
                 endpoint: "/apiGetMessages?conversationId=\(conversationId)&limit=\(limit)",
                 method: .get
             )
-            
+
             print("[ConversationService] 📨 API Response received")
             print("[ConversationService] Messages count: \(response.messages.count)")
-            
+
             if response.messages.isEmpty {
                 print("[ConversationService] ⚠️ WARNING: API returned 0 messages!")
                 print("[ConversationService] Pagination info: \(String(describing: response.pagination))")
@@ -423,7 +491,7 @@ class ConversationService: ObservableObject {
                 print("[ConversationService] First message role: \(response.messages.first?.role.rawValue ?? "N/A")")
                 print("[ConversationService] First message preview: \(response.messages.first?.content.prefix(50) ?? "N/A")")
             }
-            
+
             self.messages = response.messages
 
             // Save fetched messages to Core Data, replacing old ones
@@ -570,6 +638,17 @@ class ConversationService: ObservableObject {
             // Save both messages to Core Data immediately
             try await syncManager.saveMessagesToCoreData([userMessage, assistantMessage], conversationId: conversationId)
 
+            // After the assistant completes its response, attempt to generate a concise chat title
+            // using Apple Intelligence (FoundationModels). This does NOT replace the existing
+            // initial-title method; it just upgrades the title post-response.
+            Task { @MainActor in
+                await self.tryAutoRenameConversationAfterFirstReply(
+                    conversationId: conversationId,
+                    userMessage: userMessage,
+                    assistantMessage: assistantMessage
+                )
+            }
+
             // Process and save memories if any were created
             if let memories = memories, !memories.isEmpty {
                 // Save memories to Core Data via MemorySyncManager
@@ -689,10 +768,88 @@ class ConversationService: ObservableObject {
         _ = try await sendMessage(conversationId: conversationId, content: content)
     }
 
+    // MARK: - Auto Title
+
+    /// Attempts to auto-rename a conversation after the assistant completes a reply.
+    ///
+    /// - Important: Will not override user manual renames (displayNameOverride).
+    /// - Important: Uses only the last (user, assistant) messages to keep latency predictable.
+    @MainActor
+    private func tryAutoRenameConversationAfterFirstReply(
+        conversationId: String,
+        userMessage: Message,
+        assistantMessage: Message
+    ) async {
+        // Do not override a manual rename.
+        if SettingsStorage.shared.displayName(for: conversationId) != nil {
+            return
+        }
+
+        // Only attempt when we have a conversation loaded.
+        guard let conv = conversations.first(where: { $0.id == conversationId }) else {
+            return
+        }
+
+        // Heuristic: only auto-rename if the current title looks like the placeholder
+        // (the app currently uses the first user message prefix).
+        let placeholderTitle = String(userMessage.content.prefix(50)).trimmingCharacters(in: .whitespacesAndNewlines)
+        let isPlaceholder = conv.title == "New Chat" || conv.title == placeholderTitle
+        guard isPlaceholder else {
+            return
+        }
+
+        // Availability gate.
+        // NOTE: FoundationModels in the current SDK is gated at iOS 26 / macOS 26.
+        // If/when the SDK exposes it at iOS 18.4/macOS 15.4, we can lower this.
+        guard #available(iOS 26.0, macOS 26.0, *) else {
+            return
+        }
+
+        do {
+            let generated = try await AppleIntelligenceChatTitleService.shared.generateTitle(
+                userMessage: userMessage,
+                assistantMessage: assistantMessage
+            )
+
+            let trimmed = generated.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+
+            // 1) Update UI immediately via local display name override.
+            SettingsStorage.shared.setDisplayName(trimmed, for: conversationId)
+
+            // 2) Persist/sync as the official conversation title.
+            _ = try await updateConversation(id: conversationId, title: trimmed)
+
+            print("[ConversationService] ✅ Auto-renamed conversation \(conversationId) -> '\(trimmed)'")
+        } catch {
+            // Leave the existing title as-is.
+            print("[ConversationService] ⚠️ Auto-title generation failed: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Helpers
 
     func clearCurrentConversation() {
         currentConversation = nil
         messages = []
+    }
+}
+
+// MARK: - Conversation Errors
+
+enum ConversationError: LocalizedError {
+    case notFound
+    case invalidData
+    case backendNotConfigured
+
+    var errorDescription: String? {
+        switch self {
+        case .notFound:
+            return "Conversation not found"
+        case .invalidData:
+            return "Invalid conversation data"
+        case .backendNotConfigured:
+            return "No backend configured"
+        }
     }
 }

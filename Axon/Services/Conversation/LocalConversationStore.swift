@@ -158,6 +158,22 @@ class LocalConversationStore: ObservableObject {
             }
         }
 
+        // Serialize grounding sources to JSON if present
+        if let groundingSources = message.groundingSources, !groundingSources.isEmpty {
+            if let data = try? JSONEncoder().encode(groundingSources),
+               let json = String(data: data, encoding: .utf8) {
+                entity.groundingSourcesJSON = json
+            }
+        }
+
+        // Serialize memory operations to JSON if present
+        if let memoryOperations = message.memoryOperations, !memoryOperations.isEmpty {
+            if let data = try? JSONEncoder().encode(memoryOperations),
+               let json = String(data: data, encoding: .utf8) {
+                entity.memoryOperationsJSON = json
+            }
+        }
+
         // Update conversation message count
         let convFetch: NSFetchRequest<ConversationEntity> = ConversationEntity.fetchRequest()
         convFetch.predicate = NSPredicate(format: "id == %@", conversationId)
@@ -333,6 +349,20 @@ class LocalConversationStore: ObservableObject {
                     attachments = try? JSONDecoder().decode([MessageAttachment].self, from: data)
                 }
 
+                // Deserialize grounding sources from JSON if present
+                var groundingSources: [MessageGroundingSource]? = nil
+                if let json = entity.groundingSourcesJSON,
+                   let data = json.data(using: .utf8) {
+                    groundingSources = try? JSONDecoder().decode([MessageGroundingSource].self, from: data)
+                }
+
+                // Deserialize memory operations from JSON if present
+                var memoryOperations: [MessageMemoryOperation]? = nil
+                if let json = entity.memoryOperationsJSON,
+                   let data = json.data(using: .utf8) {
+                    memoryOperations = try? JSONDecoder().decode([MessageMemoryOperation].self, from: data)
+                }
+
                 return Message(
                     id: id,
                     conversationId: conversationId,
@@ -345,7 +375,9 @@ class LocalConversationStore: ObservableObject {
                     isStreaming: nil,
                     modelName: entity.modelName,
                     providerName: entity.providerName,
-                    attachments: attachments
+                    attachments: attachments,
+                    groundingSources: groundingSources,
+                    memoryOperations: memoryOperations
                 )
             }
         } catch {
@@ -381,6 +413,12 @@ class LocalConversationStore: ObservableObject {
 
     /// Process all pending operations
     func processPendingOperations() async {
+        // Check if backend is configured before attempting to sync pending operations
+        guard apiClient.isBackendConfigured else {
+            print("[LocalConversationStore] No backend configured, keeping \(pendingOperations.count) operations pending")
+            return
+        }
+
         guard !isSyncing else {
             print("[LocalConversationStore] Sync already in progress")
             return

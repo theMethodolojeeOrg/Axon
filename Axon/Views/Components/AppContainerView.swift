@@ -55,11 +55,19 @@ struct AppContainerView: View {
                     }
 
                     ToolbarItem(placement: .principal) {
-                        Text(navigationTitle)
-                            .font(AppTypography.titleMedium())
-                            .foregroundColor(AppColors.textPrimary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                        HStack(spacing: 10) {
+                            Text(navigationTitle)
+                                .font(AppTypography.titleMedium())
+                                .foregroundColor(AppColors.textPrimary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+
+                            // Show tools indicator in title area only when a conversation exists
+                            if currentView == .chat, selectedConversation != nil {
+                                ToolsStatusMenu(style: .pill)
+                                    .fixedSize()
+                            }
+                        }
                     }
 
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -127,6 +135,7 @@ struct AppContainerView: View {
                         Text(taglineManager.currentTagline)
                             .font(AppTypography.bodyLarge())
                             .foregroundColor(AppColors.textSecondary)
+                            .multilineTextAlignment(.center)
                     }
                 }
                 .transition(.opacity)
@@ -318,6 +327,7 @@ struct ChatContainerView: View {
                     Text(taglineManager.currentTagline)
                         .font(AppTypography.bodyLarge())
                         .foregroundColor(AppColors.textSecondary)
+                        .multilineTextAlignment(.center)
                 }
 
                 // Suggested prompts
@@ -469,25 +479,29 @@ struct ChatContainerView: View {
                         Color.clear
                             .frame(height: 1)
                             .id("scroll_bottom")
+                            .background(
+                                GeometryReader { geometry in
+                                    Color.clear
+                                        .preference(
+                                            key: BottomAnchorOffsetPreferenceKey.self,
+                                            value: geometry.frame(in: .named("chat_scroll")).minY
+                                        )
+                                }
+                            )
                     }
                     .padding(.vertical)
-                    .background(
-                        // Geometry reader to detect scroll position
-                        GeometryReader { geometry in
-                            Color.clear
-                                .preference(
-                                    key: ScrollOffsetPreferenceKey.self,
-                                    value: geometry.frame(in: .named("chat_scroll")).minY
-                                )
-                        }
-                    )
                 }
                 .coordinateSpace(name: "chat_scroll")
-                .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
-                    // Show button when scrolled up (offset becomes more positive as you scroll up)
-                    let threshold: CGFloat = -100
+                .onPreferenceChange(BottomAnchorOffsetPreferenceKey.self) { bottomY in
+                    // When the bottom anchor is noticeably below the visible scroll area,
+                    // the user is scrolled up and we should show the jump button.
+                    //
+                    // `bottomY` is in the scroll view's coordinate space.
+                    // When you're at the bottom, it's ~0 (or a small positive/negative).
+                    let threshold: CGFloat = 140
+                    let isAwayFromBottom = bottomY > threshold
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        showScrollToBottom = offset < threshold
+                        showScrollToBottom = isAwayFromBottom
                     }
                 }
                 .refreshable {
@@ -495,21 +509,21 @@ struct ChatContainerView: View {
                     await loadMessages(for: conversation)
                 }
                 .onChange(of: conversationService.messages.count) { oldCount, newCount in
-                    if newCount > oldCount, let lastMessage = conversationService.messages.last {
-                        withAnimation(AppAnimations.standardEasing) {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
-                        // Hide the button since we auto-scrolled
-                        showScrollToBottom = false
+                    guard newCount > oldCount else { return }
+
+                    // If the user is reading older messages (jump button visible),
+                    // do not auto-scroll. Otherwise keep the chat pinned to bottom.
+                    guard !showScrollToBottom else { return }
+
+                    withAnimation(AppAnimations.standardEasing) {
+                        proxy.scrollTo("scroll_bottom", anchor: .bottom)
                     }
                 }
                 .onAppear {
                     scrollProxy = proxy
                     // Auto-scroll to bottom when entering chat
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        if let lastMessage = conversationService.messages.last {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
+                        proxy.scrollTo("scroll_bottom", anchor: .bottom)
                     }
                 }
             }
@@ -518,9 +532,7 @@ struct ChatContainerView: View {
             if showScrollToBottom {
                 ScrollToBottomButton {
                     withAnimation(AppAnimations.standardEasing) {
-                        if let lastMessage = conversationService.messages.last {
-                            scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
+                        scrollProxy?.scrollTo("scroll_bottom", anchor: .bottom)
                         showScrollToBottom = false
                     }
                 }
@@ -701,6 +713,15 @@ struct PromptCard: View {
 // MARK: - Scroll Offset Preference Key
 
 struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+// MARK: - Bottom Anchor Offset Preference Key
+
+struct BottomAnchorOffsetPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()

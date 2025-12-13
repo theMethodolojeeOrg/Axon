@@ -10,6 +10,7 @@
 		E217D4312EEA494A00D3DAB2 /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4302EEA494A00D3DAB2 /* CloudKit.framework */; };
 		E217D4332EEA4BF700D3DAB2 /* CryptoKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4322EEA4BF700D3DAB2 /* CryptoKit.framework */; };
 		E217D4352EEA4BFF00D3DAB2 /* CryptoTokenKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4342EEA4BFF00D3DAB2 /* CryptoTokenKit.framework */; };
+		E217D7B62EEDDD5C00D3DAB2 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D7B52EEDDD5C00D3DAB2 /* CoreLocation.framework */; };
 		E22498CA2ED5D1880053D459 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = E22498C92ED5D1880053D459 /* MarkdownUI */; };
 		E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9A2EB23493009B116D /* FirebaseAuth */; };
 		E23FFF9D2EB23493009B116D /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9C2EB23493009B116D /* FirebaseCore */; };
@@ -51,6 +52,7 @@
 		E217D4302EEA494A00D3DAB2 /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.1.sdk/System/Library/Frameworks/CloudKit.framework; sourceTree = DEVELOPER_DIR; };
 		E217D4322EEA4BF700D3DAB2 /* CryptoKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CryptoKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.1.sdk/System/Library/Frameworks/CryptoKit.framework; sourceTree = DEVELOPER_DIR; };
 		E217D4342EEA4BFF00D3DAB2 /* CryptoTokenKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CryptoTokenKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.1.sdk/System/Library/Frameworks/CryptoTokenKit.framework; sourceTree = DEVELOPER_DIR; };
+		E217D7B52EEDDD5C00D3DAB2 /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.1.sdk/System/Library/Frameworks/CoreLocation.framework; sourceTree = DEVELOPER_DIR; };
 		E254ED962EB21B76000CDD9D /* Axon.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Axon.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E254EDA82EB21B77000CDD9D /* AxonTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AxonTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E254EDB22EB21B77000CDD9D /* AxonUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AxonUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -120,6 +122,7 @@
 				E27FB5EF2ECD5E2F003C52BF /* Sodium in Frameworks */,
 				E27FB5ED2ECD5E2F003C52BF /* Clibsodium in Frameworks */,
 				E23FFFA12EB23493009B116D /* FirebaseFunctions in Frameworks */,
+				E217D7B62EEDDD5C00D3DAB2 /* CoreLocation.framework in Frameworks */,
 				E254EDD82EB222B3000CDD9D /* FirebaseAI in Frameworks */,
 				E217D4332EEA4BF700D3DAB2 /* CryptoKit.framework in Frameworks */,
 				E23FFF9D2EB23493009B116D /* FirebaseCore in Frameworks */,
@@ -152,6 +155,7 @@
 		E23FFF992EB23493009B116D /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				E217D7B52EEDDD5C00D3DAB2 /* CoreLocation.framework */,
 				E217D4342EEA4BFF00D3DAB2 /* CryptoTokenKit.framework */,
 				E217D4322EEA4BF700D3DAB2 /* CryptoKit.framework */,
 				E217D4302EEA494A00D3DAB2 /* CloudKit.framework */,

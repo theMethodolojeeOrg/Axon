@@ -55,6 +55,12 @@ class MemorySyncManager: ObservableObject {
 
     /// Sync memories with the server
     func syncMemories() async throws {
+        // Check if backend is configured before attempting sync
+        guard apiClient.isBackendConfigured else {
+            print("[MemorySyncManager] No backend configured, skipping sync")
+            return
+        }
+
         guard !isSyncing else {
             print("[MemorySyncManager] Sync already in progress")
             return
@@ -77,6 +83,12 @@ class MemorySyncManager: ObservableObject {
 
     /// Force full sync, ignoring last sync timestamp
     func forceFullSync() async throws {
+        // Check if backend is configured before attempting sync
+        guard apiClient.isBackendConfigured else {
+            print("[MemorySyncManager] No backend configured, skipping force sync")
+            return
+        }
+
         guard !isSyncing else {
             print("[MemorySyncManager] Sync already in progress")
             return

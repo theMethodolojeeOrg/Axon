@@ -13,14 +13,13 @@ class TaglineManager: ObservableObject {
     
     private let taglines = [
         "Memory-augmented AI assistant",
-        "Your favorite AI models, learning from each other and you.",
-        "An AI platform that aligns AI action to you.",
-        "Coordinated AI systems evolving together.",
-        "AI models learning together after training completes.",
-        "Reality over models, learned experiences over static concepts.",
-        "Knowledge is conditional. Let testing in reality lead the way.",
-        "Intelligence embedded in the network."
-        
+        "Your favorite AI models,\nlearning from each other and you.",
+        "An AI platform that aligns\nAI action to you.",
+        "Coordinated AI systems\nevolving together.",
+        "AI models learning together\nafter training completes.",
+        "Reality over models,\nlearned experiences over static concepts.",
+        "Knowledge is conditional.\nLet testing in reality lead the way.",
+        "Intelligence embedded\nin the network."
     ]
     
     private let viewCountKey = "TaglineViewCount"

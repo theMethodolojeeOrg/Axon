@@ -21,11 +21,9 @@ struct DynamicToolsSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            // Header
-            headerSection
-
-            Divider()
-                .background(AppColors.divider)
+            SettingsInfoBanner(
+                icon: "arrow.triangle.branch",
+                text: "Create custom tool pipelines that chain models and APIs. Enable/disable tools, view details, and run quick tests.")
 
             // Current Configuration
             currentConfigSection
@@ -43,83 +41,38 @@ struct DynamicToolsSettingsView: View {
 
             // Advanced Actions
             advancedSection
-
-            Spacer()
         }
     }
 
-    // MARK: - Header Section
-
-    private var headerSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Dynamic Tools")
-                    .font(AppTypography.titleLarge())
-                    .foregroundColor(AppColors.textPrimary)
-
-                Text("Create custom tool pipelines that chain models and APIs")
-                    .font(AppTypography.bodySmall())
-                    .foregroundColor(AppColors.textSecondary)
-            }
-
-            Spacer()
-
-            // Status badge
-            if configService.isLoading || executionEngine.isExecuting {
-                HStack(spacing: 6) {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                    Text(executionEngine.isExecuting ? "Executing..." : "Loading...")
-                        .font(AppTypography.labelSmall())
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(AppColors.signalMercury.opacity(0.2))
-                .cornerRadius(8)
-            } else if configService.hasPendingDraft {
-                HStack(spacing: 6) {
-                    Image(systemName: "doc.badge.clock")
-                    Text("Draft Available")
-                        .font(AppTypography.labelSmall())
-                }
-                .foregroundColor(AppColors.accentWarning)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(AppColors.accentWarning.opacity(0.2))
-                .cornerRadius(8)
-            }
-        }
-    }
 
     // MARK: - Current Config Section
 
     private var currentConfigSection: some View {
-        SettingsSection(title: "Active Configuration") {
+        UnifiedSettingsSection(title: "Active Configuration") {
             if let catalog = configService.activeCatalog {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Version \(catalog.version)")
-                                .font(AppTypography.titleSmall())
-                                .foregroundColor(AppColors.textPrimary)
+                    SettingsCard(padding: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Version \(catalog.version)")
+                                    .font(AppTypography.bodyMedium(.medium))
+                                    .foregroundColor(AppColors.textPrimary)
 
-                            Text("Updated \(catalog.lastUpdated.formatted(date: .abbreviated, time: .shortened))")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
-                        }
+                                Text("Updated \(catalog.lastUpdated.formatted(date: .abbreviated, time: .shortened))")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
 
-                        Spacer()
+                            Spacer()
 
-                        VStack(alignment: .trailing, spacing: 4) {
-                            let enabledCount = catalog.tools.filter { $0.enabled }.count
-                            Text("\(enabledCount)/\(catalog.tools.count) Enabled")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
+                            VStack(alignment: .trailing, spacing: 4) {
+                                let enabledCount = catalog.tools.filter { $0.enabled }.count
+                                Text("\(enabledCount)/\(catalog.tools.count) Enabled")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
                         }
                     }
-                    .padding()
-                    .background(AppColors.substrateTertiary)
-                    .cornerRadius(12)
 
                     // Quick stats by category
                     HStack(spacing: 16) {
@@ -138,10 +91,11 @@ struct DynamicToolsSettingsView: View {
                     }
                 }
             } else {
-                Text("No configuration loaded")
-                    .font(AppTypography.bodyMedium())
-                    .foregroundColor(AppColors.textSecondary)
-                    .padding()
+                SettingsCard(padding: 12) {
+                    Text("No configuration loaded")
+                        .font(AppTypography.bodyMedium())
+                        .foregroundColor(AppColors.textSecondary)
+                }
             }
         }
     }
@@ -149,59 +103,53 @@ struct DynamicToolsSettingsView: View {
     // MARK: - Draft Section
 
     private var draftSection: some View {
-        SettingsSection(title: "Pending Draft") {
+        UnifiedSettingsSection(title: "Pending Draft") {
             VStack(alignment: .leading, spacing: 12) {
                 if let draft = configService.draftCatalog {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Version \(draft.version)")
-                                .font(AppTypography.titleSmall())
-                                .foregroundColor(AppColors.textPrimary)
+                    SettingsCard(padding: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Version \(draft.version)")
+                                    .font(AppTypography.bodyMedium(.medium))
+                                    .foregroundColor(AppColors.textPrimary)
 
-                            Text("\(draft.tools.count) tools")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-
-                        Spacer()
-
-                        Button {
-                            showingDraftPreview = true
-                        } label: {
-                            Image(systemName: "eye")
-                                .font(.system(size: 16))
-                        }
-                        .buttonStyle(.borderless)
-                        .foregroundColor(AppColors.signalMercury)
-                    }
-                    .padding()
-                    .background(AppColors.accentWarning.opacity(0.1))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppColors.accentWarning.opacity(0.3), lineWidth: 1)
-                    )
-
-                    // Validation issues
-                    if !configService.draftIssues.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundColor(AppColors.accentWarning)
-                                Text("Validation Issues")
-                                    .font(AppTypography.labelSmall())
-                                    .foregroundColor(AppColors.accentWarning)
-                            }
-
-                            ForEach(configService.draftIssues.prefix(3), id: \.description) { issue in
-                                Text("• \(issue.description)")
+                                Text("\(draft.tools.count) tools")
                                     .font(AppTypography.bodySmall())
                                     .foregroundColor(AppColors.textSecondary)
                             }
+
+                            Spacer()
+
+                            Button {
+                                showingDraftPreview = true
+                            } label: {
+                                Image(systemName: "eye")
+                                    .font(.system(size: 18))
+                            }
+                            .buttonStyle(.borderless)
+                            .foregroundColor(AppColors.signalMercury)
                         }
-                        .padding()
-                        .background(AppColors.accentWarning.opacity(0.05))
-                        .cornerRadius(8)
+                    }
+
+                    // Validation issues
+                    if !configService.draftIssues.isEmpty {
+                        SettingsCard(padding: 12) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(AppColors.accentWarning)
+                                    Text("Validation Issues")
+                                        .font(AppTypography.labelSmall())
+                                        .foregroundColor(AppColors.accentWarning)
+                                }
+
+                                ForEach(configService.draftIssues.prefix(3), id: \.description) { issue in
+                                    Text("• \(issue.description)")
+                                        .font(AppTypography.bodySmall())
+                                        .foregroundColor(AppColors.textSecondary)
+                                }
+                            }
+                        }
                     }
 
                     // Action buttons
@@ -240,31 +188,30 @@ struct DynamicToolsSettingsView: View {
             ForEach(DynamicToolCategory.allCases, id: \.self) { category in
                 let tools = configService.tools(forCategory: category)
                 if !tools.isEmpty {
-                    SettingsSection(title: categoryDisplayName(category)) {
-                        VStack(spacing: 0) {
-                            ForEach(tools) { tool in
-                                DynamicToolRow(
-                                    tool: tool,
-                                    onToggle: { enabled in
-                                        toggleTool(tool.id, enabled: enabled)
-                                    },
-                                    onTap: {
-                                        selectedTool = tool
-                                    },
-                                    onTest: {
-                                        testTool(tool)
-                                    }
-                                )
+                    UnifiedSettingsSection(title: categoryDisplayName(category)) {
+                        SettingsCard(padding: 0) {
+                            VStack(spacing: 0) {
+                                ForEach(tools) { tool in
+                                    DynamicToolRow(
+                                        tool: tool,
+                                        onToggle: { enabled in
+                                            toggleTool(tool.id, enabled: enabled)
+                                        },
+                                        onTap: {
+                                            selectedTool = tool
+                                        },
+                                        onTest: {
+                                            testTool(tool)
+                                        }
+                                    )
 
-                                if tool.id != tools.last?.id {
-                                    Divider()
-                                        .background(AppColors.divider)
+                                    if tool.id != tools.last?.id {
+                                        Divider()
+                                            .background(AppColors.divider)
+                                    }
                                 }
                             }
                         }
-                        .padding()
-                        .background(AppColors.substrateSecondary)
-                        .cornerRadius(12)
                     }
                 }
             }
@@ -300,7 +247,7 @@ struct DynamicToolsSettingsView: View {
     // MARK: - Secrets Section
 
     private var secretsSection: some View {
-        SettingsSection(title: "Tool Secrets") {
+        UnifiedSettingsSection(title: "Tool Secrets") {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Configure API keys for external integrations used by dynamic tools.")
                     .font(AppTypography.bodySmall())
@@ -310,13 +257,16 @@ struct DynamicToolsSettingsView: View {
                 let requiredSecrets = Set(configService.enabledTools().flatMap { $0.requiredSecrets })
 
                 if requiredSecrets.isEmpty {
-                    Text("No secrets required by enabled tools")
-                        .font(AppTypography.bodySmall())
-                        .foregroundColor(AppColors.textTertiary)
-                        .padding()
+                    SettingsCard(padding: 12) {
+                        Text("No secrets required by enabled tools")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textTertiary)
+                    }
                 } else {
-                    ForEach(Array(requiredSecrets).sorted(), id: \.self) { secretKey in
-                        SecretConfigRow(secretKey: secretKey)
+                    VStack(spacing: 12) {
+                        ForEach(Array(requiredSecrets).sorted(), id: \.self) { secretKey in
+                            SecretConfigRow(secretKey: secretKey)
+                        }
                     }
                 }
             }
@@ -326,7 +276,7 @@ struct DynamicToolsSettingsView: View {
     // MARK: - Advanced Section
 
     private var advancedSection: some View {
-        SettingsSection(title: "Advanced") {
+        UnifiedSettingsSection(title: "Advanced") {
             VStack(alignment: .leading, spacing: 12) {
                 Button {
                     showingResetConfirmation = true
@@ -502,7 +452,7 @@ struct DynamicToolRow: View {
             .labelsHidden()
             .tint(AppColors.signalMercury)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 12)
     }
 }
 
@@ -545,8 +495,12 @@ struct SecretConfigRow: View {
             }
         }
         .padding()
-        .background(AppColors.substrateTertiary)
+        .background(AppColors.substrateSecondary)
         .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppColors.glassBorder, lineWidth: 1)
+        )
         .onAppear {
             checkIfConfigured()
         }
@@ -630,9 +584,13 @@ struct DynamicToolsDraftPreviewSheet: View {
                                     .font(AppTypography.labelSmall())
                                     .foregroundColor(AppColors.textTertiary)
                             }
-                            .padding()
-                            .background(AppColors.substrateTertiary)
-                            .cornerRadius(12)
+                            .padding(12)
+                            .background(AppColors.substrateSecondary)
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(AppColors.glassBorder, lineWidth: 1)
+                            )
                         }
                     }
                     .padding()
@@ -712,9 +670,13 @@ struct DynamicToolDetailSheet: View {
                                         .font(AppTypography.labelSmall())
                                         .foregroundColor(AppColors.textTertiary)
                                 }
-                                .padding()
-                                .background(AppColors.substrateTertiary)
+                                .padding(12)
+                                .background(AppColors.substrateSecondary)
                                 .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                                )
                             }
                         }
                     }

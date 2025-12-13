@@ -2,7 +2,7 @@
 //  ElevenLabsService.swift
 //  Axon
 //
-//  Service to talk to NeurX Cloud Function that proxies ElevenLabs API
+//  Direct ElevenLabs client (no NeurX proxy)
 //
 
 import Foundation
@@ -14,9 +14,9 @@ final class ElevenLabsService: ObservableObject {
     static let shared = ElevenLabsService()
     nonisolated let objectWillChange = ObservableObjectPublisher()
 
-    private let auth = AuthenticationService.shared
     private let session: URLSession = .shared
-    private let endpoint = URL(string: "https://us-central1-neurx-8f122.cloudfunctions.net/apiElevenLabs")!
+
+    private let baseURL = URL(string: "https://api.elevenlabs.io/v1")!
 
     struct ELVoice: Identifiable, Codable, Equatable {
         let id: String
@@ -43,15 +43,6 @@ final class ElevenLabsService: ObservableObject {
             case name
         }
     }
-    
-    struct TTSRequest: Codable {
-        let action: String
-        let text: String
-        let voiceId: String
-        let model: String
-        let format: String
-        let voiceSettings: VoiceSettingsPayload
-    }
 
     struct VoiceSettingsPayload: Codable {
         let stability: Double
@@ -67,121 +58,135 @@ final class ElevenLabsService: ObservableObject {
         }
     }
 
-    struct TTSResponse: Codable {
-        let success: Bool
-        let audio: String? // data URL
+    private init() {}
+
+    // MARK: - Errors
+
+    enum ElevenLabsError: LocalizedError {
+        case apiKeyMissing
+        case badResponse
+        case httpError(Int, String)
+
+        var errorDescription: String? {
+            switch self {
+            case .apiKeyMissing:
+                return "ElevenLabs API key not configured. Please add it in Settings > API Keys."
+            case .badResponse:
+                return "Invalid response from ElevenLabs"
+            case .httpError(let code, let message):
+                return "ElevenLabs error (\(code)): \(message)"
+            }
+        }
     }
 
-    private init() {}
+    // MARK: - Key access
+
+    private func requireAPIKey() throws -> String {
+        guard let key = try? APIKeysStorage.shared.getAPIKey(for: .elevenlabs),
+              !key.isEmpty else {
+            throw ElevenLabsError.apiKeyMissing
+        }
+        return key
+    }
+
+    private func makeRequest(url: URL, method: String = "GET", body: Data? = nil) throws -> URLRequest {
+        let apiKey = try requireAPIKey()
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.addValue(apiKey, forHTTPHeaderField: "xi-api-key")
+        request.addValue("application/json", forHTTPHeaderField: "Accept")
+
+        if let body {
+            request.httpBody = body
+            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+
+        return request
+    }
+
+    private func validatedData(for request: URLRequest) async throws -> Data {
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw ElevenLabsError.badResponse
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw ElevenLabsError.httpError(http.statusCode, message)
+        }
+        return data
+    }
 
     // MARK: - Public API
 
     func fetchVoices() async throws -> [ELVoice] {
-        let token = try await auth.getIdToken()
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONEncoder().encode(["action": "voices_list"])
+        let url = baseURL.appendingPathComponent("voices")
+        let request = try makeRequest(url: url)
+        let data = try await validatedData(for: request)
 
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
-        guard (200..<300).contains(http.statusCode) else {
-            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw NSError(domain: "ElevenLabsService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: message])
+        struct VoicesEnvelope: Codable {
+            let voices: [ELVoice]
         }
-
-        struct VoicesEnvelope: Codable { let voices: [ELVoice] }
-        if let env = try? JSONDecoder().decode(VoicesEnvelope.self, from: data) {
-            return env.voices
-        }
-        if let arr = try? JSONDecoder().decode([ELVoice].self, from: data) {
-            return arr
-        }
-        return []
+        let env = try JSONDecoder().decode(VoicesEnvelope.self, from: data)
+        return env.voices
     }
 
     func fetchTTSModels() async throws -> [ELTTSModel] {
-        let token = try await auth.getIdToken()
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONEncoder().encode(["action": "models_list"])
+        let url = baseURL.appendingPathComponent("models")
+        let request = try makeRequest(url: url)
+        let data = try await validatedData(for: request)
 
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
-        guard (200..<300).contains(http.statusCode) else {
-            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw NSError(domain: "ElevenLabsService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: message])
-        }
-
-        struct ModelsEnvelope: Codable { let models: [ELTTSModel] }
-        if let env = try? JSONDecoder().decode(ModelsEnvelope.self, from: data) {
-            return env.models
-        }
-        if let arr = try? JSONDecoder().decode([ELTTSModel].self, from: data) {
-            return arr
-        }
-        return []
+        // ElevenLabs returns an array of models
+        return try JSONDecoder().decode([ELTTSModel].self, from: data)
     }
 
-    func generateTTSBase64(text: String, voiceId: String, model: String, format: String, voiceSettings: VoiceSettingsPayload) async throws -> Data {
-        print("[ElevenLabsService] Starting TTS generation")
-        print("[ElevenLabsService] Text: '\(text.prefix(50))...' (length: \(text.count))")
-        print("[ElevenLabsService] Voice ID: \(voiceId)")
-        print("[ElevenLabsService] Model: \(model)")
-        print("[ElevenLabsService] Format: \(format)")
+    /// Generate audio bytes from ElevenLabs.
+    /// This returns raw audio bytes (mp3) rather than a data URL.
+    func generateTTSBase64(
+        text: String,
+        voiceId: String,
+        model: String,
+        format: String,
+        voiceSettings: VoiceSettingsPayload
+    ) async throws -> Data {
+        // NOTE: despite the legacy name "generateTTSBase64", we now return raw audio bytes.
+        // The call sites treat this as Data and hand it to AVAudioPlayer.
 
-        let token = try await auth.getIdToken()
-        print("[ElevenLabsService] Got Firebase ID token")
+        // ElevenLabs TTS endpoint
+        let url = baseURL
+            .appendingPathComponent("text-to-speech")
+            .appendingPathComponent(voiceId)
 
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        struct Payload: Codable {
+            struct VoiceSettings: Codable {
+                let stability: Double
+                let similarity_boost: Double
+                let style: Double
+                let use_speaker_boost: Bool
+            }
 
-        let payload = TTSRequest(action: "tts_generate_base64", text: text, voiceId: voiceId, model: model, format: format, voiceSettings: voiceSettings)
-        request.httpBody = try JSONEncoder().encode(payload)
-        print("[ElevenLabsService] Sending request to backend...")
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let http = response as? HTTPURLResponse else {
-            print("[ElevenLabsService] Error: Invalid response type")
-            throw URLError(.badServerResponse)
+            let text: String
+            let model_id: String
+            let voice_settings: VoiceSettings
         }
 
-        print("[ElevenLabsService] Response status code: \(http.statusCode)")
+        let payload = Payload(
+            text: text,
+            model_id: model,
+            voice_settings: Payload.VoiceSettings(
+                stability: voiceSettings.stability,
+                similarity_boost: voiceSettings.similarityBoost,
+                style: voiceSettings.style,
+                use_speaker_boost: voiceSettings.useSpeakerBoost
+            )
+        )
 
-        guard (200..<300).contains(http.statusCode) else {
-            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            print("[ElevenLabsService] Error response: \(message)")
-            throw NSError(domain: "ElevenLabsService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: message])
-        }
+        var request = try makeRequest(url: url, method: "POST", body: try JSONEncoder().encode(payload))
 
-        print("[ElevenLabsService] Decoding response...")
-        let decoded = try JSONDecoder().decode(TTSResponse.self, from: data)
+        // Request mp3 output (ElevenLabs supports output_format on some endpoints; if unsupported it will ignore).
+        // Keep this best-effort to avoid coupling to a specific ElevenLabs API revision.
+        request.addValue("audio/mpeg", forHTTPHeaderField: "Accept")
 
-        guard let dataURL = decoded.audio else {
-            print("[ElevenLabsService] Error: No audio in response")
-            throw NSError(domain: "ElevenLabsService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid audio response"])
-        }
-
-        guard let comma = dataURL.firstIndex(of: ",") else {
-            print("[ElevenLabsService] Error: Invalid data URL format (no comma)")
-            throw NSError(domain: "ElevenLabsService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid audio response"])
-        }
-
-        let base64 = String(dataURL[dataURL.index(after: comma)...])
-        print("[ElevenLabsService] Extracted base64 audio (length: \(base64.count))")
-
-        guard let audioData = Data(base64Encoded: base64) else {
-            print("[ElevenLabsService] Error: Failed to decode base64")
-            throw NSError(domain: "ElevenLabsService", code: -3, userInfo: [NSLocalizedDescriptionKey: "Failed to decode base64 audio"])
-        }
-
-        print("[ElevenLabsService] Successfully decoded audio data: \(audioData.count) bytes")
-        return audioData
+        let data = try await validatedData(for: request)
+        return data
     }
 }

@@ -18,28 +18,24 @@ struct ModelSyncSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Model Catalog")
-                        .font(AppTypography.titleLarge())
-                        .foregroundColor(AppColors.textPrimary)
+            // Top banner (consistent with General/API Keys)
+            HStack(spacing: 12) {
+                Image(systemName: "cpu")
+                    .foregroundColor(AppColors.signalMercury)
 
-                    Text("Manage AI model definitions and pricing")
-                        .font(AppTypography.bodySmall())
-                        .foregroundColor(AppColors.textSecondary)
-                }
+                Text("Manage AI model definitions and pricing. Optionally sync model data via Perplexity.")
+                    .font(AppTypography.bodySmall())
+                    .foregroundColor(AppColors.textSecondary)
 
                 Spacer()
 
-                // Status badge
                 configStatusBadge
             }
+            .padding()
+            .background(AppColors.signalMercury.opacity(0.1))
+            .cornerRadius(8)
 
-            Divider()
-                .background(AppColors.divider)
-
-            // Current Configuration
+            // Active config
             currentConfigSection
 
             // Draft Section (if available)
@@ -55,8 +51,6 @@ struct ModelSyncSettingsView: View {
 
             // Advanced Actions
             advancedSection
-
-            Spacer()
         }
     }
 
@@ -103,41 +97,41 @@ struct ModelSyncSettingsView: View {
     // MARK: - Current Config Section
 
     private var currentConfigSection: some View {
-        SettingsSection(title: "Active Configuration") {
+        UnifiedSettingsSection(title: "Active Configuration") {
             VStack(alignment: .leading, spacing: 12) {
                 if let catalog = configService.activeCatalog {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Version \(catalog.version)")
-                                .font(AppTypography.titleSmall())
-                                .foregroundColor(AppColors.textPrimary)
+                    SettingsCard(padding: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Version \(catalog.version)")
+                                    .font(AppTypography.bodyMedium(.medium))
+                                    .foregroundColor(AppColors.textPrimary)
 
-                            Text("Updated \(catalog.lastUpdated.formatted(date: .abbreviated, time: .shortened))")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
-                        }
+                                Text("Updated \(catalog.lastUpdated.formatted(date: .abbreviated, time: .shortened))")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
 
-                        Spacer()
+                            Spacer()
 
-                        VStack(alignment: .trailing, spacing: 4) {
-                            Text("\(catalog.providers.count) Providers")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text("\(catalog.providers.count) Providers")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textSecondary)
 
-                            let totalModels = catalog.providers.reduce(0) { $0 + $1.models.count }
-                            Text("\(totalModels) Models")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
+                                let totalModels = catalog.providers.reduce(0) { $0 + $1.models.count }
+                                Text("\(totalModels) Models")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
                         }
                     }
-                    .padding()
-                    .background(AppColors.substrateTertiary)
-                    .cornerRadius(12)
                 } else {
-                    Text("No configuration loaded")
-                        .font(AppTypography.bodyMedium())
-                        .foregroundColor(AppColors.textSecondary)
-                        .padding()
+                    SettingsCard(padding: 12) {
+                        Text("No configuration loaded")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textSecondary)
+                    }
                 }
 
                 if let lastSync = configService.lastSyncDate {
@@ -156,67 +150,60 @@ struct ModelSyncSettingsView: View {
     // MARK: - Draft Section
 
     private var draftSection: some View {
-        SettingsSection(title: "Pending Draft") {
+        UnifiedSettingsSection(title: "Pending Draft") {
             VStack(alignment: .leading, spacing: 12) {
                 if let draft = configService.draftCatalog {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Version \(draft.version)")
-                                .font(AppTypography.titleSmall())
-                                .foregroundColor(AppColors.textPrimary)
+                    SettingsCard(padding: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Version \(draft.version)")
+                                    .font(AppTypography.bodyMedium(.medium))
+                                    .foregroundColor(AppColors.textPrimary)
 
-                            let totalModels = draft.providers.reduce(0) { $0 + $1.models.count }
-                            Text("\(totalModels) models from \(draft.providers.count) providers")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-
-                        Spacer()
-
-                        // Preview button
-                        Button {
-                            showingDraftPreview = true
-                        } label: {
-                            Image(systemName: "eye")
-                                .font(.system(size: 16))
-                        }
-                        .buttonStyle(.borderless)
-                        .foregroundColor(AppColors.signalMercury)
-                    }
-                    .padding()
-                    .background(AppColors.accentWarning.opacity(0.1))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppColors.accentWarning.opacity(0.3), lineWidth: 1)
-                    )
-
-                    // Validation issues
-                    if !configService.draftIssues.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundColor(AppColors.accentWarning)
-                                Text("Validation Issues")
-                                    .font(AppTypography.labelSmall())
-                                    .foregroundColor(AppColors.accentWarning)
-                            }
-
-                            ForEach(configService.draftIssues.prefix(3), id: \.description) { issue in
-                                Text("• \(issue.description)")
+                                let totalModels = draft.providers.reduce(0) { $0 + $1.models.count }
+                                Text("\(totalModels) models from \(draft.providers.count) providers")
                                     .font(AppTypography.bodySmall())
                                     .foregroundColor(AppColors.textSecondary)
                             }
 
-                            if configService.draftIssues.count > 3 {
-                                Text("... and \(configService.draftIssues.count - 3) more")
-                                    .font(AppTypography.labelSmall())
-                                    .foregroundColor(AppColors.textTertiary)
+                            Spacer()
+
+                            Button {
+                                showingDraftPreview = true
+                            } label: {
+                                Image(systemName: "eye")
+                                    .font(.system(size: 18))
+                            }
+                            .buttonStyle(.borderless)
+                            .foregroundColor(AppColors.signalMercury)
+                        }
+                    }
+
+                    // Validation issues
+                    if !configService.draftIssues.isEmpty {
+                        SettingsCard(padding: 12) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(AppColors.accentWarning)
+                                    Text("Validation Issues")
+                                        .font(AppTypography.labelSmall())
+                                        .foregroundColor(AppColors.accentWarning)
+                                }
+
+                                ForEach(configService.draftIssues.prefix(3), id: \.description) { issue in
+                                    Text("• \(issue.description)")
+                                        .font(AppTypography.bodySmall())
+                                        .foregroundColor(AppColors.textSecondary)
+                                }
+
+                                if configService.draftIssues.count > 3 {
+                                    Text("... and \(configService.draftIssues.count - 3) more")
+                                        .font(AppTypography.labelSmall())
+                                        .foregroundColor(AppColors.textTertiary)
+                                }
                             }
                         }
-                        .padding()
-                        .background(AppColors.accentWarning.opacity(0.05))
-                        .cornerRadius(8)
                     }
 
                     // Action buttons
@@ -250,7 +237,7 @@ struct ModelSyncSettingsView: View {
     // MARK: - Sync Section
 
     private var syncSection: some View {
-        SettingsSection(title: "Sync Models") {
+        UnifiedSettingsSection(title: "Sync Models") {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Use Perplexity to fetch the latest model information and pricing from provider documentation.")
                     .font(AppTypography.bodySmall())
@@ -258,36 +245,34 @@ struct ModelSyncSettingsView: View {
 
                 // Sync progress
                 if case .syncing(let provider, let progress) = syncService.syncProgress {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(provider ?? "Syncing all providers...")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
-                            Spacer()
-                            Text("\(Int(progress * 100))%")
-                                .font(AppTypography.labelSmall())
-                                .foregroundColor(AppColors.textTertiary)
+                    SettingsCard(padding: 12) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text(provider ?? "Syncing all providers...")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                                Spacer()
+                                Text("\(Int(progress * 100))%")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                            }
+                            ProgressView(value: progress)
+                                .tint(AppColors.signalMercury)
                         }
-                        ProgressView(value: progress)
-                            .tint(AppColors.signalMercury)
                     }
-                    .padding()
-                    .background(AppColors.substrateTertiary)
-                    .cornerRadius(8)
                 }
 
                 // Error display
                 if let error = syncService.lastError {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(AppColors.accentError)
-                        Text(error.localizedDescription)
-                            .font(AppTypography.bodySmall())
-                            .foregroundColor(AppColors.accentError)
+                    SettingsCard(padding: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(AppColors.accentError)
+                            Text(error.localizedDescription)
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.accentError)
+                        }
                     }
-                    .padding()
-                    .background(AppColors.accentError.opacity(0.1))
-                    .cornerRadius(8)
                 }
 
                 // Sync buttons
@@ -337,9 +322,9 @@ struct ModelSyncSettingsView: View {
     // MARK: - Provider Details Section
 
     private var providerDetailsSection: some View {
-        SettingsSection(title: "Provider Details") {
+        UnifiedSettingsSection(title: "Provider Details") {
             if let catalog = configService.activeCatalog {
-                VStack(spacing: 8) {
+                VStack(spacing: 12) {
                     ForEach(catalog.providers) { provider in
                         ProviderSummaryRow(provider: provider)
                     }
@@ -351,7 +336,7 @@ struct ModelSyncSettingsView: View {
     // MARK: - Advanced Section
 
     private var advancedSection: some View {
-        SettingsSection(title: "Advanced") {
+        UnifiedSettingsSection(title: "Advanced") {
             VStack(alignment: .leading, spacing: 12) {
                 Button {
                     showingResetConfirmation = true
@@ -438,8 +423,9 @@ struct ProviderSummaryRow: View {
                         .font(.system(size: 12))
                         .foregroundColor(AppColors.textTertiary)
                 }
-                .padding()
-                .background(AppColors.substrateTertiary)
+                .padding(12)
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
             }
             .buttonStyle(.plain)
 
@@ -484,12 +470,13 @@ struct ProviderSummaryRow: View {
                 }
                 .padding(.vertical, 8)
                 .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
             }
         }
-        .cornerRadius(12)
+        .cornerRadius(8)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(AppColors.divider, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppColors.glassBorder, lineWidth: 1)
         )
     }
 

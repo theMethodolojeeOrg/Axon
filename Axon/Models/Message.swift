@@ -21,6 +21,7 @@ struct Message: Codable, Identifiable, Equatable {
     let providerName: String?  // For display purposes (e.g., "OpenAI", "Anthropic")
     let attachments: [MessageAttachment]?
     let groundingSources: [MessageGroundingSource]?  // Sources from tool calls (web search, etc.)
+    let memoryOperations: [MessageMemoryOperation]?  // Memory operations performed by assistant
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -36,6 +37,7 @@ struct Message: Codable, Identifiable, Equatable {
         case providerName
         case attachments
         case groundingSources
+        case memoryOperations
     }
 
     init(
@@ -51,7 +53,8 @@ struct Message: Codable, Identifiable, Equatable {
         modelName: String? = nil,
         providerName: String? = nil,
         attachments: [MessageAttachment]? = nil,
-        groundingSources: [MessageGroundingSource]? = nil
+        groundingSources: [MessageGroundingSource]? = nil,
+        memoryOperations: [MessageMemoryOperation]? = nil
     ) {
         self.id = id
         self.conversationId = conversationId
@@ -66,6 +69,7 @@ struct Message: Codable, Identifiable, Equatable {
         self.providerName = providerName
         self.attachments = attachments
         self.groundingSources = groundingSources
+        self.memoryOperations = memoryOperations
     }
 
     // Custom decoder to handle timestamp conversion from milliseconds
@@ -126,6 +130,7 @@ struct Message: Codable, Identifiable, Equatable {
         modelName = try container.decodeIfPresent(String.self, forKey: .modelName)
         providerName = try container.decodeIfPresent(String.self, forKey: .providerName)
         groundingSources = try container.decodeIfPresent([MessageGroundingSource].self, forKey: .groundingSources)
+        memoryOperations = try container.decodeIfPresent([MessageMemoryOperation].self, forKey: .memoryOperations)
     }
 
     // Custom encoder to convert timestamp back to milliseconds
@@ -148,6 +153,7 @@ struct Message: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(providerName, forKey: .providerName)
         try container.encodeIfPresent(attachments, forKey: .attachments)
         try container.encodeIfPresent(groundingSources, forKey: .groundingSources)
+        try container.encodeIfPresent(memoryOperations, forKey: .memoryOperations)
     }
 }
 
@@ -206,6 +212,46 @@ struct MessageAttachment: Codable, Equatable, Identifiable {
         self.base64 = base64
         self.name = name
         self.mimeType = mimeType
+    }
+}
+
+// MARK: - Memory Operations
+
+/// Represents a memory operation result from the assistant (create, update, etc.)
+struct MessageMemoryOperation: Codable, Equatable, Identifiable {
+    let id: String
+    let operationType: OperationType
+    let success: Bool
+    let memoryType: String  // "allocentric", "egoic", etc.
+    let content: String
+    let tags: [String]
+    let confidence: Double
+    let errorMessage: String?
+
+    enum OperationType: String, Codable {
+        case create
+        case update
+        case delete
+    }
+
+    init(
+        id: String = UUID().uuidString,
+        operationType: OperationType = .create,
+        success: Bool,
+        memoryType: String,
+        content: String,
+        tags: [String] = [],
+        confidence: Double = 0.8,
+        errorMessage: String? = nil
+    ) {
+        self.id = id
+        self.operationType = operationType
+        self.success = success
+        self.memoryType = memoryType
+        self.content = content
+        self.tags = tags
+        self.confidence = confidence
+        self.errorMessage = errorMessage
     }
 }
 

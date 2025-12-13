@@ -34,36 +34,14 @@ class SettingsViewModel: ObservableObject {
     private let iCloudSync = iCloudKeyValueSync.shared
     private var cancellables = Set<AnyCancellable>()
 
-    // MARK: - Cloud Sync (Manual)
-    func pushSettingsToCloud() async {
-        isLoading = true
-        defer { isLoading = false }
-        do {
-            try await SettingsCloudSyncService.shared.pushSettings(settings)
-            showSuccessMessage("Settings pushed to cloud")
-        } catch {
-            self.error = "Failed to push settings: \(error.localizedDescription)"
-        }
-    }
-
-    func pullSettingsFromCloud() async {
-        isLoading = true
-        defer { isLoading = false }
-        do {
-            let cloudSettings = try await SettingsCloudSyncService.shared.pullSettings()
-            // Overwrite local settings with cloud copy
-            self.settings = cloudSettings
-            self.settings.lastUpdated = Date()
-            try storageService.saveSettings(self.settings)
-            showSuccessMessage("Settings pulled from cloud")
-        } catch {
-            self.error = "Failed to pull settings: \(error.localizedDescription)"
-        }
-    }
+    // MARK: - Cloud Sync (Legacy Manual)
+    // Previously used by developer-facing push/pull buttons.
+    // Scheduled/debounced sync is now handled by SettingsSyncCoordinator.
 
     init() {
         loadSettings()
         setupiCloudSync()
+        SettingsSyncCoordinator.shared.start()
     }
 
     // MARK: - Load Settings
@@ -78,6 +56,10 @@ class SettingsViewModel: ObservableObject {
 
         // Check iCloud sync availability
         iCloudSyncEnabled = iCloudSync.isAvailable
+
+        // If iCloud is the selected sync provider, attempt to import any roaming API keys
+        // from iCloud Keychain into local SecureVault (one-way import).
+        importAPIKeysFromiCloudKeychainIfNeeded()
     }
 
     // MARK: - iCloud Key-Value Sync
@@ -137,12 +119,40 @@ class SettingsViewModel: ObservableObject {
 
             // Sync to iCloud if enabled
             syncToiCloudIfEnabled()
+
+            // Unified sync (debounced + scheduled) based on DeviceModeConfig
+            SettingsSyncCoordinator.shared.markDirty()
         } catch {
             self.error = "Failed to save settings: \(error.localizedDescription)"
         }
     }
 
     // MARK: - API Keys
+
+    private func importAPIKeysFromiCloudKeychainIfNeeded() {
+        guard settings.deviceModeConfig.cloudSyncProvider == .iCloud else { return }
+
+        // Only attempt if iCloud Keychain is generally available.
+        guard iCloudSyncEnabled else { return }
+
+        for provider in APIProvider.allCases {
+            // Don\'t overwrite existing local key.
+            if apiKeysStorage.isConfigured(provider) {
+                continue
+            }
+
+            if let key = (try? iCloudKeychainService.shared.getAPIKey(for: provider)) ?? nil,
+               !key.isEmpty {
+                do {
+                    try apiKeysStorage.saveAPIKey(key, for: provider)
+                    print("[SettingsViewModel] Imported \(provider.rawValue) API key from iCloud Keychain")
+                } catch {
+                    print("[SettingsViewModel] Failed to import \(provider.rawValue) API key from iCloud Keychain: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
 
     func isAPIKeyConfigured(_ provider: APIProvider) -> Bool {
         apiKeysStorage.isConfigured(provider)
@@ -157,11 +167,23 @@ class SettingsViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            // 1. Save to local Keychain (always)
+            // 1) Always save locally (SecureVault)
             try apiKeysStorage.saveAPIKey(key, for: provider)
 
-            // 2. If ElevenLabs, also sync to Firestore (encrypted)
-            if provider == .elevenlabs {
+            // 2) If user selected iCloud sync, also save to iCloud Keychain so it roams across devices.
+            if settings.deviceModeConfig.cloudSyncProvider == .iCloud {
+                do {
+                    try iCloudKeychainService.shared.saveAPIKey(key, for: provider)
+                } catch {
+                    // Non-fatal: local save succeeded.
+                    print("[SettingsViewModel] Warning: Key saved locally but failed to sync to iCloud Keychain: \(error.localizedDescription)")
+                }
+            }
+
+            // 3) Firestore sync only when explicitly enabled.
+            if settings.deviceModeConfig.cloudSyncProvider == .firestore,
+               provider == .elevenlabs,
+               BackendConfig.shared.isBackendConfigured {
                 do {
                     try await EncryptionService.shared.encryptAndSyncElevenLabsKey(key)
                     // After successful sync, refresh the catalog to verify it works
@@ -169,7 +191,7 @@ class SettingsViewModel: ObservableObject {
                 } catch {
                     // Log the sync error but don't fail the entire save operation
                     print("[SettingsViewModel] Warning: Key saved locally but sync to Firestore failed: \(error.localizedDescription)")
-                    self.error = "API key saved locally, but cloud sync failed. You may need to re-save it. Error: \(error.localizedDescription)"
+                    self.error = "API key saved locally, but cloud sync failed. Error: \(error.localizedDescription)"
                     return
                 }
             }
@@ -183,6 +205,10 @@ class SettingsViewModel: ObservableObject {
     func clearAPIKey(_ provider: APIProvider) async {
         do {
             try apiKeysStorage.clearAPIKey(for: provider)
+
+            // Best-effort delete from iCloud Keychain too.
+            try? iCloudKeychainService.shared.deleteAPIKey(for: provider)
+
             showSuccessMessage("\(provider.displayName) API key removed")
         } catch {
             self.error = "Failed to clear API key: \(error.localizedDescription)"
@@ -230,29 +256,11 @@ class SettingsViewModel: ObservableObject {
         do {
             try await performFetch()
         } catch {
-            // Check if error is "ElevenLabs API key not configured" (401)
-            let errorMsg = error.localizedDescription
-            let errorCode = (error as NSError).code
-
-            if errorCode == 401 && errorMsg.contains("ElevenLabs API key not configured") {
-                // Attempt to re-sync key if we have it locally - but only once per session
-                if let key = try? apiKeysStorage.getAPIKey(for: .elevenlabs), !key.isEmpty {
-                    do {
-                        try await EncryptionService.shared.encryptAndSyncElevenLabsKey(key)
-                        // Retry fetch once
-                        try await performFetch()
-                        return
-                    } catch let resyncError {
-                        // Silent failure - key sync didn't work, likely server-side issue
-                        // Don't spam logs or show error to user as this may be transient
-                        print("[SettingsViewModel] Failed to re-sync ElevenLabs key (will retry on next catalog refresh): \(resyncError.localizedDescription)")
-                        return // Don't show error to user for auto-retry failures
-                    }
-                } else {
-                    // No local key available, user needs to configure it
-                    self.error = "ElevenLabs API key not configured. Please set it in settings."
-                    return
-                }
+            // Direct-to-ElevenLabs mode uses the local API key, so missing auth should be surfaced
+            // as "key missing" (not Firebase auth errors).
+            if let e = error as? ElevenLabsService.ElevenLabsError, case .apiKeyMissing = e {
+                self.error = e.localizedDescription
+                return
             }
 
             // For other errors, show the actual error

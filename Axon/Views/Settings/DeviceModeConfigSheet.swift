@@ -95,6 +95,51 @@ struct DeviceModeConfigSheet: View {
                     // Sync Options Section
                     ConfigSection(title: "Sync Options", icon: "arrow.triangle.2.circlepath") {
                         VStack(spacing: 12) {
+                            // Settings sync interval
+                            HStack(spacing: 16) {
+                                ZStack {
+                                    Circle()
+                                        .fill(AppColors.substrateSecondary)
+                                        .frame(width: 40, height: 40)
+
+                                    Image(systemName: "timer")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(AppColors.signalMercury)
+                                }
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Settings Sync Interval")
+                                        .font(AppTypography.bodyMedium())
+                                        .foregroundColor(AppColors.textPrimary)
+
+                                    Text("How often Axon syncs settings in the background")
+                                        .font(AppTypography.labelSmall())
+                                        .foregroundColor(AppColors.textSecondary)
+                                }
+
+                                Spacer()
+
+                                Stepper(
+                                    "",
+                                    value: $localConfig.settingsSyncIntervalSeconds,
+                                    in: 15...3600,
+                                    step: 15
+                                )
+                                .labelsHidden()
+                            }
+                            .padding(12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(AppColors.substrateSecondary)
+                            )
+
+                            HStack {
+                                Spacer()
+                                Text(intervalLabel(seconds: localConfig.settingsSyncIntervalSeconds))
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                            }
+
                             ConfigToggleRow(
                                 title: "Show Sync Status",
                                 description: "Display sync indicators in the UI",
@@ -140,10 +185,26 @@ struct DeviceModeConfigSheet: View {
     }
 
     private func saveConfiguration() {
+        // Clamp to a safe range even if UI constraints change
+        localConfig.settingsSyncIntervalSeconds = min(3600, max(15, localConfig.settingsSyncIntervalSeconds))
+
         Task {
             await viewModel.updateSetting(\.deviceModeConfig, localConfig)
             dismiss()
         }
+    }
+
+    private func intervalLabel(seconds: Int) -> String {
+        let s = max(15, seconds)
+        if s < 60 {
+            return "Every \(s)s"
+        }
+        if s % 60 == 0 {
+            return "Every \(s / 60) min"
+        }
+        let minutes = s / 60
+        let remainder = s % 60
+        return "Every \(minutes)m \(remainder)s"
     }
 }
 
@@ -286,15 +347,26 @@ private struct CloudSyncSection: View {
     @Binding var localConfig: DeviceModeConfig
     @StateObject private var cloudKitService = CloudKitSyncService.shared
     @StateObject private var iCloudKVSync = iCloudKeyValueSync.shared
+    @StateObject private var backendConfig = BackendConfig.shared
+
+    private var isFirestoreAvailable: Bool {
+        backendConfig.isBackendConfigured
+    }
 
     var body: some View {
         ConfigSection(title: "Cross-Device Sync", icon: "icloud.fill") {
             VStack(spacing: 12) {
                 ForEach(CloudSyncProvider.allCases) { provider in
+                    let available = switch provider {
+                    case .iCloud: cloudKitService.isCloudKitAvailable
+                    case .firestore: isFirestoreAvailable
+                    case .none: true
+                    }
+
                     CloudSyncProviderCard(
                         provider: provider,
                         isSelected: localConfig.cloudSyncProvider == provider,
-                        isAvailable: provider == .iCloud ? cloudKitService.isCloudKitAvailable : true
+                        isAvailable: available
                     ) {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             localConfig.cloudSyncProvider = provider
@@ -392,7 +464,7 @@ private struct CloudSyncProviderCard: View {
                             .font(AppTypography.bodyMedium(.medium))
                             .foregroundColor(AppColors.textPrimary)
 
-                        if provider == .iCloud && !isAvailable {
+                        if !isAvailable {
                             Text("Unavailable")
                                 .font(AppTypography.labelSmall())
                                 .foregroundColor(AppColors.accentWarning)
@@ -433,10 +505,10 @@ private struct CloudSyncProviderCard: View {
                             .stroke(isSelected ? AppColors.signalMercury.opacity(0.3) : AppColors.glassBorder, lineWidth: 1)
                     )
             )
-            .opacity(provider == .iCloud && !isAvailable ? 0.6 : 1.0)
+            .opacity(!isAvailable ? 0.6 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
-        .disabled(provider == .iCloud && !isAvailable)
+        .disabled(!isAvailable)
     }
 }
 

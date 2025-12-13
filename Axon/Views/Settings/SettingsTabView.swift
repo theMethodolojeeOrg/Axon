@@ -19,8 +19,10 @@ struct SettingsTabView: View {
     enum SettingsTab: String, CaseIterable, Identifiable {
         case general = "General"
         case apiKeys = "API Keys"
+        case models = "Models"
         case custom = "Custom"
         case tools = "Tools"
+        case dynamicTools = "Pipelines"
         case memory = "Memory"
         case security = "Security"
         case server = "API Server"
@@ -35,8 +37,10 @@ struct SettingsTabView: View {
             switch self {
             case .general: return "gearshape.fill"
             case .apiKeys: return "key.fill"
+            case .models: return "cpu"
             case .custom: return "slider.horizontal.3"
             case .tools: return "wrench.and.screwdriver.fill"
+            case .dynamicTools: return "arrow.triangle.branch"
             case .memory: return "AxonLogoTemplate"
             case .security: return "lock.shield.fill"
             case .server: return "network"
@@ -80,10 +84,14 @@ struct SettingsTabView: View {
                         GeneralSettingsView(viewModel: viewModel)
                     case .apiKeys:
                         APIKeysSettingsView(viewModel: viewModel)
+                    case .models:
+                        ModelSyncSettingsView(viewModel: viewModel)
                     case .custom:
                         CustomProvidersSettingsView(viewModel: viewModel)
                     case .tools:
                         ToolSettingsView(viewModel: viewModel)
+                    case .dynamicTools:
+                        DynamicToolsSettingsView(viewModel: viewModel)
                     case .memory:
                         MemorySettingsView(viewModel: viewModel)
                     case .security:

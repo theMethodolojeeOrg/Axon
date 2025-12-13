@@ -186,6 +186,10 @@ struct DeviceModeConfig: Codable, Equatable, Sendable {
     /// Cloud sync provider (when sync is enabled)
     var cloudSyncProvider: CloudSyncProvider = .none
 
+    /// Settings sync interval (seconds). Used for scheduled sync when a provider is selected.
+    /// Default: 60s
+    var settingsSyncIntervalSeconds: Int = 60
+
     /// Whether to show sync status indicators in UI
     var showSyncStatus: Bool = true
 
@@ -384,6 +388,14 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
         case .anthropic:
             return [
                 AIModel(
+                    id: "claude-opus-4-5-20251022",
+                    name: "Claude Opus 4.5",
+                    provider: .anthropic,
+                    contextWindow: 200_000,
+                    modalities: ["text", "image"],
+                    description: "Most capable Claude model for deep reasoning, agents, and long-horizon coding"
+                ),
+                AIModel(
                     id: "claude-sonnet-4-5-20250929",
                     name: "Claude Sonnet 4.5",
                     provider: .anthropic,
@@ -426,6 +438,14 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
             ]
         case .openai:
             return [
+                AIModel(
+                    id: "gpt-5.2",
+                    name: "GPT-5.2",
+                    provider: .openai,
+                    contextWindow: 400_000,
+                    modalities: ["text", "image"],
+                    description: "Latest frontier model with stronger reasoning and long-context performance"
+                ),
                 AIModel(
                     id: "gpt-5.1",
                     name: "GPT-5.1",
@@ -772,6 +792,7 @@ enum APIProvider: String, CaseIterable, Identifiable {
     case gemini = "gemini"
     case xai = "xai"
     case elevenlabs = "elevenlabs"
+    case perplexity = "perplexity"
 
     var id: String { rawValue }
 
@@ -783,6 +804,7 @@ enum APIProvider: String, CaseIterable, Identifiable {
         case .gemini: return "Google Gemini"
         case .xai: return "xAI"
         case .elevenlabs: return "ElevenLabs"
+        case .perplexity: return "Perplexity"
         }
     }
 
@@ -794,6 +816,7 @@ enum APIProvider: String, CaseIterable, Identifiable {
         case .gemini: return "AIza..."
         case .xai: return "xai-..."
         case .elevenlabs: return "sk_..."
+        case .perplexity: return "pplx-..."
         }
     }
 
@@ -805,6 +828,7 @@ enum APIProvider: String, CaseIterable, Identifiable {
         case .gemini: return URL(string: "https://aistudio.google.com/app/apikey")
         case .xai: return URL(string: "https://console.x.ai")
         case .elevenlabs: return URL(string: "https://elevenlabs.io/app/settings/api-keys")
+        case .perplexity: return URL(string: "https://www.perplexity.ai/settings/api")
         }
     }
 
@@ -816,6 +840,7 @@ enum APIProvider: String, CaseIterable, Identifiable {
         case .gemini: return "Required for Gemini models"
         case .xai: return "Required for Grok models"
         case .elevenlabs: return "Required for text-to-speech"
+        case .perplexity: return "Used for AI model sync (updates model catalog)"
         }
     }
 }

@@ -194,37 +194,28 @@ struct GeneralSettingsView: View {
 
             DeviceModeSection(viewModel: viewModel)
 
-            // MARK: - Cloud Sync
+            // MARK: - Settings Sync
 
-            GeneralSettingsSection(title: "Cloud Sync") {
+            GeneralSettingsSection(title: "Settings Sync") {
                 HStack(spacing: 12) {
-                    Button(action: { Task { await viewModel.pushSettingsToCloud() } }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.up.circle.fill")
-                            Text("Push to Cloud")
-                                .font(AppTypography.bodyMedium(.medium))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.signalMercury))
-                    }
+                    Image(systemName: viewModel.settings.deviceModeConfig.cloudSyncProvider.icon)
+                        .foregroundColor(AppColors.signalMercury)
 
-                    Button(action: { Task { await viewModel.pullSettingsFromCloud() } }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.down.circle")
-                                .foregroundColor(AppColors.signalMercury)
-                            Text("Pull from Cloud")
-                                .font(AppTypography.bodyMedium(.medium))
-                                .foregroundColor(AppColors.textPrimary)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.substrateSecondary))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Provider: \(viewModel.settings.deviceModeConfig.cloudSyncProvider.displayName)")
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Text("Auto-sync: \(intervalLabel(seconds: viewModel.settings.deviceModeConfig.settingsSyncIntervalSeconds))")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textSecondary)
                     }
 
                     Spacer()
                 }
+                .padding()
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
             }
         }
     }
@@ -235,6 +226,19 @@ struct GeneralSettingsView: View {
         case .light: return "sun.max.fill"
         case .auto: return "circle.lefthalf.filled"
         }
+    }
+
+    private func intervalLabel(seconds: Int) -> String {
+        let s = max(15, seconds)
+        if s < 60 {
+            return "every \(s)s"
+        }
+        if s % 60 == 0 {
+            return "every \(s / 60) min"
+        }
+        let minutes = s / 60
+        let remainder = s % 60
+        return "every \(minutes)m \(remainder)s"
     }
 
     private var supportedProviders: [AIProvider] {
@@ -800,4 +804,3 @@ private struct SyncStatusIndicator: View {
     }
     .background(AppColors.substratePrimary)
 }
-

@@ -44,11 +44,14 @@
         <attribute name="attachmentsJSON" optional="YES" attributeType="String"/>
         <attribute name="content" attributeType="String" defaultValueString=""/>
         <attribute name="conversationId" attributeType="String" defaultValueString=""/>
+        <attribute name="groundingSourcesJSON" optional="YES" attributeType="String"/>
         <attribute name="id" attributeType="String" defaultValueString=""/>
+        <attribute name="memoryOperationsJSON" optional="YES" attributeType="String"/>
         <attribute name="modelName" optional="YES" attributeType="String"/>
         <attribute name="providerName" optional="YES" attributeType="String"/>
         <attribute name="role" attributeType="String" defaultValueString="user"/>
         <attribute name="timestamp" attributeType="Date" defaultDateTimeInterval="783558060" usesScalarValueType="NO"/>
         <attribute name="tokensUsed" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="toolApprovalRecordJSON" optional="YES" attributeType="String"/>
     </entity>
 </model>

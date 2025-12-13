@@ -222,6 +222,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var responseContent: String = ""
         var usedToolProxy = false
         var groundingSources: [MessageGroundingSource] = []
+        var memoryOperations: [MessageMemoryOperation] = []
         lastToolResponse = nil
 
         // Route based on provider and tool configuration
@@ -254,7 +255,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
             // If tool proxy mode, check for tool requests and execute them
             if useToolProxy, let geminiKey = config.geminiKey {
-                let (finalResponse, toolUsed, sources) = try await handleToolProxyLoop(
+                let (finalResponse, toolUsed, sources, memOps) = try await handleToolProxyLoop(
                     initialResponse: responseContent,
                     conversationId: conversationId,
                     config: config,
@@ -265,6 +266,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 responseContent = finalResponse
                 usedToolProxy = toolUsed
                 groundingSources = sources
+                memoryOperations = memOps
             }
         }
 
@@ -298,7 +300,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             content: responseContent,
             modelName: modelName,
             providerName: config.providerName,
-            groundingSources: groundingSources.isEmpty ? nil : groundingSources
+            groundingSources: groundingSources.isEmpty ? nil : groundingSources,
+            memoryOperations: memoryOperations.isEmpty ? nil : memoryOperations
         )
 
         // Record prediction for learning loop
@@ -330,10 +333,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         messages: [Message],
         geminiKey: String,
         maxIterations: Int = 3
-    ) async throws -> (response: String, toolUsed: Bool, sources: [MessageGroundingSource]) {
+    ) async throws -> (response: String, toolUsed: Bool, sources: [MessageGroundingSource], memoryOperations: [MessageMemoryOperation]) {
         var currentResponse = initialResponse
         var toolUsed = false
         var collectedSources: [MessageGroundingSource] = []
+        var collectedMemoryOperations: [MessageMemoryOperation] = []
         var iteration = 0
 
         while iteration < maxIterations {
@@ -362,6 +366,18 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     )
                     collectedSources.append(groundingSource)
                 }
+            }
+
+            // Collect memory operations from tool result
+            // If a successful operation has similar content to a previous failed one, replace it
+            if let memoryOp = toolResult.memoryOperation {
+                if memoryOp.success {
+                    // Remove any previous failed attempts with similar content (retry succeeded)
+                    collectedMemoryOperations.removeAll { existing in
+                        !existing.success && isSimilarMemoryContent(existing.content, memoryOp.content)
+                    }
+                }
+                collectedMemoryOperations.append(memoryOp)
             }
 
             // Format tool result
@@ -411,7 +427,46 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             print("[OnDeviceOrchestrator] Tool proxy loop reached max iterations")
         }
 
-        return (currentResponse, toolUsed, collectedSources)
+        return (currentResponse, toolUsed, collectedSources, collectedMemoryOperations)
+    }
+
+    /// Check if two memory contents are similar enough to be considered retries of the same memory
+    /// This handles cases where the assistant retries after a format error
+    private func isSimilarMemoryContent(_ content1: String, _ content2: String) -> Bool {
+        // If either is empty or just the raw query (failed parse), consider them related
+        if content1.isEmpty || content2.isEmpty {
+            return true
+        }
+
+        // Normalize: lowercase, trim whitespace
+        let normalized1 = content1.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized2 = content2.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Exact match
+        if normalized1 == normalized2 {
+            return true
+        }
+
+        // Check if one contains significant portion of the other (handles slight variations)
+        let shorter = normalized1.count < normalized2.count ? normalized1 : normalized2
+        let longer = normalized1.count < normalized2.count ? normalized2 : normalized1
+
+        // If the shorter content is contained in the longer, or they share 70%+ of words
+        if longer.contains(shorter) {
+            return true
+        }
+
+        // Word overlap check for retry scenarios
+        let words1 = Set(normalized1.components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 2 })
+        let words2 = Set(normalized2.components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 2 })
+
+        guard !words1.isEmpty && !words2.isEmpty else { return false }
+
+        let intersection = words1.intersection(words2)
+        let smallerSet = min(words1.count, words2.count)
+        let overlapRatio = Double(intersection.count) / Double(smallerSet)
+
+        return overlapRatio >= 0.6  // 60% word overlap suggests same memory retry
     }
 
     // MARK: - Provider Routing

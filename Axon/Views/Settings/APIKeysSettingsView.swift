@@ -10,10 +10,8 @@ import SwiftUI
 struct APIKeysSettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
     @State private var selectedProvider: APIProvider? = nil
-    @State private var selectedCustomProviderId: UUID? = nil
+    @State private var selectedCustomProvider: CustomProviderConfig? = nil
     @State private var editingKeyValue = ""
-    @State private var showingKeyInput = false
-    @State private var showingCustomKeyInput = false
     @State private var isSavingKey = false
 
     var body: some View {
@@ -38,12 +36,8 @@ struct APIKeysSettingsView: View {
                         isConfigured: viewModel.isAPIKeyConfigured(.neurx),
                         isAdminKey: false,
                         onEdit: {
-                            // Set state atomically before showing sheet to prevent race condition
-                            selectedProvider = .neurx
                             editingKeyValue = viewModel.getAPIKey(.neurx) ?? ""
-                            DispatchQueue.main.async {
-                                showingKeyInput = true
-                            }
+                            selectedProvider = .neurx
                         },
                         onClear: {
                             Task {
@@ -67,12 +61,8 @@ struct APIKeysSettingsView: View {
                             provider: provider,
                             isConfigured: viewModel.isAPIKeyConfigured(provider),
                             onEdit: {
-                                // Set state atomically before showing sheet to prevent race condition
-                                selectedProvider = provider
                                 editingKeyValue = viewModel.getAPIKey(provider) ?? ""
-                                DispatchQueue.main.async {
-                                    showingKeyInput = true
-                                }
+                                selectedProvider = provider
                             },
                             onClear: {
                                 Task {
@@ -96,12 +86,8 @@ struct APIKeysSettingsView: View {
                         provider: .elevenlabs,
                         isConfigured: viewModel.isAPIKeyConfigured(.elevenlabs),
                         onEdit: {
-                            // Set state atomically before showing sheet to prevent race condition
-                            selectedProvider = .elevenlabs
                             editingKeyValue = viewModel.getAPIKey(.elevenlabs) ?? ""
-                            DispatchQueue.main.async {
-                                showingKeyInput = true
-                            }
+                            selectedProvider = .elevenlabs
                         },
                         onClear: {
                             Task {
@@ -126,12 +112,8 @@ struct APIKeysSettingsView: View {
                                 provider: provider,
                                 isConfigured: viewModel.isCustomProviderConfigured(provider.id),
                                 onEdit: {
-                                    // Set state atomically before showing sheet to prevent race condition
-                                    selectedCustomProviderId = provider.id
                                     editingKeyValue = viewModel.getCustomProviderAPIKey(providerId: provider.id) ?? ""
-                                    DispatchQueue.main.async {
-                                        showingCustomKeyInput = true
-                                    }
+                                    selectedCustomProvider = provider
                                 },
                                 onClear: {
                                     Task {
@@ -144,43 +126,38 @@ struct APIKeysSettingsView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingKeyInput) {
-            if let provider = selectedProvider {
-                APIKeyInputSheet(
-                    provider: provider,
-                    keyValue: $editingKeyValue,
-                    isSaving: isSavingKey,
-                    onSave: {
-                        isSavingKey = true
-                        Task {
-                            await viewModel.saveAPIKey(editingKeyValue, for: provider)
-                            isSavingKey = false
-                            showingKeyInput = false
-                        }
-                    },
-                    onCancel: {
-                        showingKeyInput = false
+        .sheet(item: $selectedProvider) { provider in
+            APIKeyInputSheet(
+                provider: provider,
+                keyValue: $editingKeyValue,
+                isSaving: isSavingKey,
+                onSave: {
+                    isSavingKey = true
+                    Task {
+                        await viewModel.saveAPIKey(editingKeyValue, for: provider)
+                        isSavingKey = false
+                        selectedProvider = nil
                     }
-                )
-            }
+                },
+                onCancel: {
+                    selectedProvider = nil
+                }
+            )
         }
-        .sheet(isPresented: $showingCustomKeyInput) {
-            if let providerId = selectedCustomProviderId,
-               let customProvider = viewModel.settings.customProviders.first(where: { $0.id == providerId }) {
-                CustomProviderAPIKeyInputSheet(
-                    provider: customProvider,
-                    keyValue: $editingKeyValue,
-                    onSave: {
-                        Task {
-                            await viewModel.saveCustomProviderAPIKey(editingKeyValue, providerId: providerId, providerName: customProvider.providerName)
-                            showingCustomKeyInput = false
-                        }
-                    },
-                    onCancel: {
-                        showingCustomKeyInput = false
+        .sheet(item: $selectedCustomProvider) { customProvider in
+            CustomProviderAPIKeyInputSheet(
+                provider: customProvider,
+                keyValue: $editingKeyValue,
+                onSave: {
+                    Task {
+                        await viewModel.saveCustomProviderAPIKey(editingKeyValue, providerId: customProvider.id, providerName: customProvider.providerName)
+                        selectedCustomProvider = nil
                     }
-                )
-            }
+                },
+                onCancel: {
+                    selectedCustomProvider = nil
+                }
+            )
         }
     }
 }
@@ -331,12 +308,21 @@ struct APIKeyInputSheet: View {
                                 .foregroundColor(AppColors.textTertiary)
                         }
 
-                        // Saving indicator for ElevenLabs (requires cloud sync)
-                        if isSaving && provider == .elevenlabs {
+                        // Saving indicator (sync destination depends on settings)
+                        if isSaving {
+                            let syncProvider = SettingsViewModel.shared.settings.deviceModeConfig.cloudSyncProvider
+                            let destination: String = {
+                                switch syncProvider {
+                                case .iCloud: return "iCloud Keychain"
+                                case .firestore: return "Custom Server"
+                                case .none: return "device"
+                                }
+                            }()
+
                             HStack(spacing: 12) {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: AppColors.signalMercury))
-                                Text("Syncing key to cloud...")
+                                Text("Saving key to \(destination)...")
                                     .font(AppTypography.bodySmall())
                                     .foregroundColor(AppColors.textSecondary)
                             }

@@ -219,6 +219,12 @@ struct AssistantMessageView: View {
                     .padding(.top, 12)
             }
 
+            // Memory operations (from create_memory tool calls)
+            if let memOps = message.memoryOperations, !memOps.isEmpty {
+                MemoryOperationsView(operations: memOps)
+                    .padding(.top, 12)
+            }
+
             // Footer toolbar
             AssistantToolbar(
                 message: message,

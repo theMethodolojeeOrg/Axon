@@ -60,6 +60,12 @@ class ConversationSyncManager: ObservableObject {
 
     /// Sync conversations with the server (full or delta based on last sync)
     func syncConversations() async throws {
+        // Check if backend is configured before attempting sync
+        guard apiClient.isBackendConfigured else {
+            print("[ConversationSyncManager] No backend configured, skipping sync")
+            return
+        }
+
         guard !isSyncing else {
             print("[ConversationSyncManager] Sync already in progress")
             return
@@ -82,6 +88,12 @@ class ConversationSyncManager: ObservableObject {
 
     /// Force full sync, ignoring last sync timestamp (for pull-to-refresh)
     func forceFullSync() async throws {
+        // Check if backend is configured before attempting sync
+        guard apiClient.isBackendConfigured else {
+            print("[ConversationSyncManager] No backend configured, skipping force sync")
+            return
+        }
+
         guard !isSyncing else {
             print("[ConversationSyncManager] Sync already in progress")
             return
@@ -94,11 +106,11 @@ class ConversationSyncManager: ObservableObject {
 
         // Clear Core Data to ensure fresh sync
         try await clearAllLocalData()
-        
+
         // Reset sync timestamp to force full sync
         userDefaults.removeObject(forKey: lastSyncTimestampKey)
         lastSyncTime = nil
-        
+
         try await performFullSync()
     }
     
@@ -440,6 +452,26 @@ class ConversationSyncManager: ObservableObject {
                 } else {
                     entity.attachmentsJSON = nil
                 }
+
+                // Serialize grounding sources to JSON if present
+                if let groundingSources = message.groundingSources, !groundingSources.isEmpty {
+                    if let data = try? JSONEncoder().encode(groundingSources),
+                       let json = String(data: data, encoding: .utf8) {
+                        entity.groundingSourcesJSON = json
+                    }
+                } else {
+                    entity.groundingSourcesJSON = nil
+                }
+
+                // Serialize memory operations to JSON if present
+                if let memoryOperations = message.memoryOperations, !memoryOperations.isEmpty {
+                    if let data = try? JSONEncoder().encode(memoryOperations),
+                       let json = String(data: data, encoding: .utf8) {
+                        entity.memoryOperationsJSON = json
+                    }
+                } else {
+                    entity.memoryOperationsJSON = nil
+                }
             }
 
             try self.persistence.saveContext(context)
@@ -472,6 +504,20 @@ class ConversationSyncManager: ObservableObject {
                     attachments = try? JSONDecoder().decode([MessageAttachment].self, from: attachmentsData)
                 }
 
+                // Deserialize grounding sources from JSON if present
+                var groundingSources: [MessageGroundingSource]? = nil
+                if let json = entity.groundingSourcesJSON,
+                   let data = json.data(using: .utf8) {
+                    groundingSources = try? JSONDecoder().decode([MessageGroundingSource].self, from: data)
+                }
+
+                // Deserialize memory operations from JSON if present
+                var memoryOperations: [MessageMemoryOperation]? = nil
+                if let json = entity.memoryOperationsJSON,
+                   let data = json.data(using: .utf8) {
+                    memoryOperations = try? JSONDecoder().decode([MessageMemoryOperation].self, from: data)
+                }
+
                 return Message(
                     id: id,
                     conversationId: conversationId,
@@ -484,7 +530,9 @@ class ConversationSyncManager: ObservableObject {
                     isStreaming: nil,
                     modelName: entity.modelName,
                     providerName: entity.providerName,
-                    attachments: attachments
+                    attachments: attachments,
+                    groundingSources: groundingSources,
+                    memoryOperations: memoryOperations
                 )
             }
         } catch {

@@ -31,9 +31,15 @@ final class CostService: ObservableObject {
     // MARK: - Public API
 
     func recordUsage(provider: AIProvider, modelId: String, inputTokens: Int, outputTokens: Int, cachedInputTokens: Int = 0, usedContextTokens: Int? = nil, inputIsAudio: Bool = false) {
-        // Estimate cost based on basic pricing registry
-        let canonical = PricingKeyResolver.canonicalKey(for: modelId) ?? PricingKeyResolver.defaultKey(for: provider)
-        let pricing = PricingRegistry.price(for: canonical, usedContextTokens: usedContextTokens, inputIsAudio: inputIsAudio)
+        // First try to get pricing from ModelConfigurationService (JSON-based, dynamic)
+        let pricing: ModelPricing
+        if let jsonPricing = ModelConfigurationService.shared.pricing(for: modelId) {
+            pricing = jsonPricing
+        } else {
+            // Fall back to static registry for backward compatibility
+            let canonical = PricingKeyResolver.canonicalKey(for: modelId) ?? PricingKeyResolver.defaultKey(for: provider)
+            pricing = PricingRegistry.price(for: canonical, usedContextTokens: usedContextTokens, inputIsAudio: inputIsAudio)
+        }
 
         let inputCost = (Double(inputTokens) / 1_000_000.0) * pricing.inputPerMTokUSD
         let outputCost = (Double(outputTokens) / 1_000_000.0) * pricing.outputPerMTokUSD
@@ -67,6 +73,7 @@ struct ModelPricing: Codable, Equatable {
 
 enum CanonicalModelKey: String, CaseIterable, Hashable, Codable {
     // Anthropic
+    case claudeOpus45 = "claude-opus-4.5"
     case claudeSonnet45 = "claude-sonnet-4.5"
     case claudeHaiku45 = "claude-haiku-4.5"
     case claudeOpus41 = "claude-opus-4.1"
@@ -74,6 +81,7 @@ enum CanonicalModelKey: String, CaseIterable, Hashable, Codable {
     case claudeOpus4 = "claude-opus-4"
 
     // OpenAI
+    case gpt52 = "gpt-5.2"
     case gpt51 = "gpt-5.1"
     case gpt51ChatLatest = "gpt-5.1-chat-latest"
     case gpt5 = "gpt-5"
@@ -109,6 +117,7 @@ enum CanonicalModelKey: String, CaseIterable, Hashable, Codable {
 struct PricingRegistry {
     static let base: [CanonicalModelKey: ModelPricing] = [
         // Anthropic
+        .claudeOpus45: .init(inputPerMTokUSD: 15.00, outputPerMTokUSD: 75.00, cachedInputPerMTokUSD: nil, notes: nil),
         .claudeSonnet45: .init(inputPerMTokUSD: 3.00, outputPerMTokUSD: 15.00, cachedInputPerMTokUSD: nil, notes: nil),
         .claudeHaiku45: .init(inputPerMTokUSD: 1.00, outputPerMTokUSD: 5.00, cachedInputPerMTokUSD: nil, notes: nil),
         .claudeOpus41: .init(inputPerMTokUSD: 15.00, outputPerMTokUSD: 75.00, cachedInputPerMTokUSD: nil, notes: nil),
@@ -116,6 +125,7 @@ struct PricingRegistry {
         .claudeOpus4: .init(inputPerMTokUSD: 15.00, outputPerMTokUSD: 75.00, cachedInputPerMTokUSD: nil, notes: nil),
 
         // OpenAI
+        .gpt52: .init(inputPerMTokUSD: 1.50, outputPerMTokUSD: 12.00, cachedInputPerMTokUSD: 0.15, notes: nil),
         .gpt51: .init(inputPerMTokUSD: 1.25, outputPerMTokUSD: 10.00, cachedInputPerMTokUSD: 0.13, notes: nil),
         .gpt51ChatLatest: .init(inputPerMTokUSD: 1.25, outputPerMTokUSD: 10.00, cachedInputPerMTokUSD: 0.13, notes: nil),
         .gpt5: .init(inputPerMTokUSD: 1.25, outputPerMTokUSD: 10.00, cachedInputPerMTokUSD: 0.125, notes: nil),
@@ -190,12 +200,14 @@ struct PricingKeyResolver {
     static func canonicalKey(for modelId: String) -> CanonicalModelKey? {
         let lower = modelId.lowercased()
         // Anthropic
+        if lower.contains("claude-opus-4-5") { return .claudeOpus45 }
         if lower.contains("claude-sonnet-4-5") { return .claudeSonnet45 }
         if lower.contains("claude-haiku-4-5") { return .claudeHaiku45 }
         if lower.contains("claude-opus-4-1") { return .claudeOpus41 }
         if lower.contains("claude-sonnet-4") { return .claudeSonnet4 }
         if lower.contains("claude-opus-4") { return .claudeOpus4 }
         // OpenAI
+        if lower.contains("gpt-5.2") { return .gpt52 }
         if lower.contains("gpt-5.1-chat-latest") { return .gpt51ChatLatest }
         if lower.contains("gpt-5.1") { return .gpt51 }
         if lower.contains("gpt-5-mini") { return .gpt5Mini }

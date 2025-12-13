@@ -10,12 +10,17 @@ import Security
 import CryptoKit
 import FirebaseAuth
 import FirebaseFirestore
+import FirebaseCore
 
 class EncryptionService {
     static let shared = EncryptionService()
     
     private let appSalt = "NeurXAxonChat_Encryption_V1"
-    private let db = Firestore.firestore()
+
+    /// Access Firestore lazily to avoid crashing in local-first mode when Firebase isn't configured.
+    private var db: Firestore {
+        Firestore.firestore()
+    }
     
     private let chachaNonceSize = 12 // ChaChaPoly.Nonce size in bytes
 
@@ -68,6 +73,12 @@ class EncryptionService {
     
     /// Encrypts the ElevenLabs API key payload and syncs it to Firestore
     func encryptAndSyncElevenLabsKey(_ apiKey: String) async throws {
+        // In local-first mode Firebase may not be configured.
+        guard FirebaseApp.app() != nil else {
+            print("[EncryptionService] Firebase not configured - skipping Firestore sync")
+            throw EncryptionError.firebaseNotConfigured
+        }
+
         guard let userId = Auth.auth().currentUser?.uid else {
             print("[EncryptionService] Error: User not authenticated")
             throw EncryptionError.notAuthenticated
@@ -226,6 +237,7 @@ class EncryptionService {
 }
 
 enum EncryptionError: LocalizedError {
+    case firebaseNotConfigured
     case notAuthenticated
     case invalidKeyFormat
     case decryptionFailed
@@ -233,6 +245,7 @@ enum EncryptionError: LocalizedError {
     
     var errorDescription: String? {
         switch self {
+        case .firebaseNotConfigured: return "Firebase is not configured"
         case .notAuthenticated: return "User not authenticated"
         case .invalidKeyFormat: return "Invalid encryption key format"
         case .decryptionFailed: return "Failed to decrypt data key"
@@ -240,4 +253,3 @@ enum EncryptionError: LocalizedError {
         }
     }
 }
-

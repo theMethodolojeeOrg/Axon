@@ -27,7 +27,6 @@ struct MessageInputBar: View {
     @State private var showPhotoPicker = false
     @State private var showVideoImporter = false
     @State private var showAudioImporter = false
-    @ObservedObject private var settingsViewModel = SettingsViewModel.shared
 
     private let conversationId: String?
 
@@ -37,17 +36,6 @@ struct MessageInputBar: View {
         let video: Bool
         let audio: Bool
         let description: String
-    }
-
-    /// Whether tools are enabled based on settings
-    private var hasToolsEnabled: Bool {
-        settingsViewModel.settings.toolSettings.toolsEnabled &&
-        !settingsViewModel.settings.toolSettings.enabledToolIds.isEmpty
-    }
-
-    /// Count of enabled tools for display
-    private var enabledToolCount: Int {
-        settingsViewModel.settings.toolSettings.enabledToolIds.count
     }
 
     init(
@@ -168,8 +156,8 @@ struct MessageInputBar: View {
                 }
             }
 
-            GlassCard(padding: 12) {
-                HStack(spacing: 12) {
+            GlassCard(padding: 10, cornerRadius: 26) {
+                HStack(spacing: 10) {
                     let capability = attachmentCapability
 
                     // Attachment Button
@@ -213,33 +201,6 @@ struct MessageInputBar: View {
                             }
                             .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
                         }
-                    }
-
-                    // Tools Status Indicator
-                    // Shows if tools are enabled in Settings > Tools
-                    // Tapping shows info tooltip
-                    Menu {
-                        if hasToolsEnabled {
-                            Text("\(enabledToolCount) tool\(enabledToolCount == 1 ? "" : "s") enabled")
-                            ForEach(settingsViewModel.settings.toolSettings.enabledTools, id: \.id) { tool in
-                                Label(tool.displayName, systemImage: tool.icon)
-                            }
-                            Divider()
-                            Text("Configure in Settings > Tools")
-                                .font(.caption)
-                        } else {
-                            Text("No tools enabled")
-                            Divider()
-                            Text("Enable tools in Settings > Tools")
-                                .font(.caption)
-                        }
-                    } label: {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 20))
-                            .foregroundColor(hasToolsEnabled ? AppColors.signalMercury : AppColors.textTertiary)
-                            .frame(width: 32, height: 32)
-                            .background(hasToolsEnabled ? AppColors.signalMercury.opacity(0.1) : Color.clear)
-                            .clipShape(Circle())
                     }
 
                     // Text field
