@@ -49,10 +49,11 @@ enum BridgeToolId: String, CaseIterable {
     }
 
     /// Whether this tool requires biometric approval
+    /// All VS Code bridge tools require approval since they access external workspace
     var requiresApproval: Bool {
         switch self {
         case .readFile, .listFiles:
-            return false  // Read-only operations are safe
+            return true  // Even read-only needs approval for VS Code access
         case .writeFile, .runTerminal:
             return true   // Mutations require approval
         }
@@ -175,12 +176,54 @@ class BridgeToolExecutor {
 
         // Check approval if needed
         if toolId.requiresApproval {
-            let approved = await requestApproval(for: toolId, query: request.query)
-            if !approved {
+            let approvalResult = await requestApproval(for: toolId, query: request.query)
+
+            switch approvalResult {
+            case .approved, .approvedForSession:
+                // Continue with execution
+                break
+
+            case .denied:
                 return ToolResult(
                     tool: request.tool,
                     success: false,
-                    result: "Operation was not approved by the user.",
+                    result: "⛔ Operation was not authorized by the user.",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+
+            case .cancelled:
+                return ToolResult(
+                    tool: request.tool,
+                    success: false,
+                    result: "Operation was cancelled.",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+
+            case .timeout:
+                return ToolResult(
+                    tool: request.tool,
+                    success: false,
+                    result: "⏱️ Approval request timed out. Please try again.",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+
+            case .stop:
+                return ToolResult(
+                    tool: request.tool,
+                    success: false,
+                    result: "🛑 Tool execution was stopped by the user.",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+
+            case .error(let message):
+                return ToolResult(
+                    tool: request.tool,
+                    success: false,
+                    result: "Approval error: \(message)",
                     sources: nil,
                     memoryOperation: nil
                 )
@@ -193,7 +236,7 @@ class BridgeToolExecutor {
             case .readFile:
                 return try await executeReadFile(query: request.query)
             case .writeFile:
-                return try await executeWriteFile(query: request.query)
+                return try await executeWriteFile(query: request.query, separateContent: request.separateContent)
             case .listFiles:
                 return try await executeListFiles(query: request.query)
             case .runTerminal:
@@ -203,7 +246,42 @@ class BridgeToolExecutor {
             return ToolResult(
                 tool: request.tool,
                 success: false,
-                result: "Bridge error: \(error.message)",
+                result: """
+                **Bridge Error** (code: \(error.code))
+                \(error.message)
+                """,
+                sources: nil,
+                memoryOperation: nil
+            )
+        } catch let bridgeDecoding as BridgeDecodingError {
+            // Include the raw JSON in the error for debugging
+            let underlyingDetails = describeDecodingError(bridgeDecoding.underlying)
+            return ToolResult(
+                tool: request.tool,
+                success: false,
+                result: """
+                **Decoding Error**
+                \(underlyingDetails)
+
+                **Raw JSON from VS Code:**
+                ```json
+                \(bridgeDecoding.rawJSON)
+                ```
+                """,
+                sources: nil,
+                memoryOperation: nil
+            )
+        } catch let decodingError as DecodingError {
+            // Provide detailed decoding error info
+            return ToolResult(
+                tool: request.tool,
+                success: false,
+                result: """
+                **Decoding Error**
+                \(describeDecodingError(decodingError))
+
+                This usually means the VS Code extension returned data in an unexpected format.
+                """,
                 sources: nil,
                 memoryOperation: nil
             )
@@ -211,7 +289,12 @@ class BridgeToolExecutor {
             return ToolResult(
                 tool: request.tool,
                 success: false,
-                result: "Error: \(error.localizedDescription)",
+                result: """
+                **Error**
+                \(error.localizedDescription)
+
+                Debug: \(String(describing: error))
+                """,
                 sources: nil,
                 memoryOperation: nil
             )
@@ -241,31 +324,91 @@ class BridgeToolExecutor {
         )
     }
 
-    private func executeWriteFile(query: String) async throws -> ToolResult {
-        // Parse path|content format
-        let parts = query.components(separatedBy: "|")
-        guard parts.count >= 2 else {
-            return ToolResult(
-                tool: BridgeToolId.writeFile.rawValue,
-                success: false,
-                result: """
-                Invalid format. Use: `path|content`
+    private func executeWriteFile(query: String, separateContent: String? = nil) async throws -> ToolResult {
+        let path: String
+        let content: String
 
-                Example:
-                ```tool_request
-                {"tool": "vscode_write_file", "query": "src/hello.ts|export const greeting = 'Hello!';"}
-                ```
-                """,
-                sources: nil,
-                memoryOperation: nil
-            )
+        // Check if content was provided separately (AI sent query + content as separate fields)
+        if let separateContent = separateContent {
+            path = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            content = separateContent
+                .replacingOccurrences(of: "\\n", with: "\n")
+                .replacingOccurrences(of: "\\t", with: "\t")
+        } else {
+            // Parse path|content format from query
+            let parts = query.components(separatedBy: "|")
+            guard parts.count >= 2 else {
+                // Generate helpful corrective feedback
+                let truncatedQuery = query.count > 60 ? String(query.prefix(60)) + "..." : query
+                let looksLikePath = query.contains("/") || query.contains(".")
+                let suggestedPath = looksLikePath ? query : "src/example.ts"
+                let suggestedContent = looksLikePath ? "// Your code here" : query
+
+                return ToolResult(
+                    tool: BridgeToolId.writeFile.rawValue,
+                    success: false,
+                    result: """
+                    🤔 **HOLD UP THERE PARTNER!** You tried to write a file but forgot the content (or the path, hard to tell).
+
+                    **You sent:** `\(truncatedQuery)`
+
+                    **The write_file tool needs BOTH a path AND content.**
+
+                    **Option 1 - Pipe format** (path|content in query):
+                    ```tool_request
+                    {"tool": "vscode_write_file", "query": "\(suggestedPath)|export const greeting = 'Hello!';"}
+                    ```
+
+                    **Option 2 - Separate fields** (cleaner for multi-line content):
+                    ```tool_request
+                    {"tool": "vscode_write_file", "query": "\(suggestedPath)", "content": "\(suggestedContent)"}
+                    ```
+
+                    **Pro tip:** For multi-line content, Option 2 is your friend. Use `\\n` for newlines in the content field.
+
+                    Give it another shot! 🎯
+                    """,
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+
+            path = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // Check if content is empty after the pipe
+            let rawContent = parts.dropFirst().joined(separator: "|")
+            guard !rawContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return ToolResult(
+                    tool: BridgeToolId.writeFile.rawValue,
+                    success: false,
+                    result: """
+                    😅 **SO CLOSE!** You got the pipe in there, but the content after it is empty.
+
+                    **You sent:** `\(path)|` (nothing after the pipe)
+
+                    **What I needed:** `\(path)|<your actual content here>`
+
+                    **Example:**
+                    ```tool_request
+                    {"tool": "vscode_write_file", "query": "\(path)|console.log('Hello, world!');"}
+                    ```
+
+                    Or use the separate content field:
+                    ```tool_request
+                    {"tool": "vscode_write_file", "query": "\(path)", "content": "console.log('Hello, world!');"}
+                    ```
+
+                    Can't write an empty file (well, I *could*, but that's probably not what you want). Try again! 📝
+                    """,
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+
+            content = rawContent
+                .replacingOccurrences(of: "\\n", with: "\n")
+                .replacingOccurrences(of: "\\t", with: "\t")
         }
-
-        let path = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
-        // Rejoin remaining parts in case content contains |
-        let content = parts.dropFirst().joined(separator: "|")
-            .replacingOccurrences(of: "\\n", with: "\n")
-            .replacingOccurrences(of: "\\t", with: "\t")
 
         let result = try await bridgeServer.writeFile(path: path, content: content)
 
@@ -365,7 +508,7 @@ class BridgeToolExecutor {
 
     // MARK: - Helpers
 
-    private func requestApproval(for tool: BridgeToolId, query: String) async -> Bool {
+    private func requestApproval(for tool: BridgeToolId, query: String) async -> ToolApprovalResult {
         // Build a dynamic tool config for approval
         let toolConfig = DynamicToolConfig(
             id: tool.rawValue,
@@ -382,14 +525,7 @@ class BridgeToolExecutor {
             approvalScopes: [formatApprovalScope(tool: tool, query: query)]
         )
 
-        let result = await toolApprovalService.requestApproval(tool: toolConfig, inputs: ["query": query])
-
-        switch result {
-        case .approved:
-            return true
-        case .denied, .cancelled, .timeout, .error:
-            return false
-        }
+        return await toolApprovalService.requestApproval(tool: toolConfig, inputs: ["query": query])
     }
 
     private func formatApprovalScope(tool: BridgeToolId, query: String) -> String {
@@ -412,6 +548,29 @@ class BridgeToolExecutor {
             return String(format: "%.1f KB", Double(bytes) / 1024)
         } else {
             return String(format: "%.1f MB", Double(bytes) / (1024 * 1024))
+        }
+    }
+
+    private func describeDecodingError(_ error: Error) -> String {
+        guard let decodingError = error as? DecodingError else {
+            return error.localizedDescription
+        }
+
+        switch decodingError {
+        case .typeMismatch(let type, let context):
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            return "Type mismatch: expected `\(type)` at path `\(path.isEmpty ? "(root)" : path)`"
+        case .valueNotFound(let type, let context):
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            return "Value not found: `\(type)` at path `\(path.isEmpty ? "(root)" : path)`"
+        case .keyNotFound(let key, let context):
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            return "Key not found: `\(key.stringValue)` at path `\(path.isEmpty ? "(root)" : path)`"
+        case .dataCorrupted(let context):
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            return "Data corrupted at `\(path.isEmpty ? "(root)" : path)`: \(context.debugDescription)"
+        @unknown default:
+            return decodingError.localizedDescription
         }
     }
 }

@@ -15,7 +15,9 @@ import Combine
 struct ToolApprovalRequestView: View {
     let approval: PendingToolApproval
     let onApprove: () async -> Void
-    let onCancel: () -> Void
+    let onApproveForSession: () async -> Void
+    let onDeny: () -> Void
+    let onStop: () -> Void
 
     @State private var isAuthenticating = false
     @State private var isExpanded = true
@@ -122,48 +124,95 @@ struct ToolApprovalRequestView: View {
                     Divider()
                         .background(AppColors.divider)
 
-                    // Action buttons
-                    HStack(spacing: 12) {
-                        // Cancel button
-                        Button(action: onCancel) {
-                            Text("Cancel")
-                                .font(AppTypography.bodyMedium(.medium))
+                    // Claude Code-style action buttons
+                    VStack(spacing: 8) {
+                        // Primary row: Allow Once / Allow for Session
+                        HStack(spacing: 8) {
+                            // Allow Once button
+                            Button {
+                                Task {
+                                    isAuthenticating = true
+                                    await onApprove()
+                                    isAuthenticating = false
+                                }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    if isAuthenticating {
+                                        ProgressView()
+                                            .scaleEffect(0.7)
+                                            .tint(.white)
+                                    } else {
+                                        Image(systemName: biometricService.biometricType.icon)
+                                            .font(.system(size: 14))
+                                    }
+                                    Text("Allow Once")
+                                        .font(AppTypography.bodySmall(.medium))
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(AppColors.signalMercury)
+                                .cornerRadius(8)
+                            }
+                            .disabled(isAuthenticating)
+
+                            // Allow for Session button
+                            Button {
+                                Task {
+                                    isAuthenticating = true
+                                    await onApproveForSession()
+                                    isAuthenticating = false
+                                }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 14))
+                                    Text("Allow for Session")
+                                        .font(AppTypography.bodySmall(.medium))
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(AppColors.signalLichen)
+                                .cornerRadius(8)
+                            }
+                            .disabled(isAuthenticating)
+                        }
+
+                        // Secondary row: Deny / Stop
+                        HStack(spacing: 8) {
+                            // Deny button
+                            Button(action: onDeny) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 12, weight: .medium))
+                                    Text("Deny")
+                                        .font(AppTypography.bodySmall(.medium))
+                                }
                                 .foregroundColor(AppColors.textSecondary)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
+                                .padding(.vertical, 10)
                                 .background(AppColors.substrateTertiary)
-                                .cornerRadius(10)
-                        }
-                        .disabled(isAuthenticating)
-
-                        // Approve button
-                        Button {
-                            Task {
-                                isAuthenticating = true
-                                await onApprove()
-                                isAuthenticating = false
+                                .cornerRadius(8)
                             }
-                        } label: {
-                            HStack(spacing: 8) {
-                                if isAuthenticating {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                        .tint(.white)
-                                } else {
-                                    Image(systemName: biometricService.biometricType.icon)
-                                        .font(.system(size: 16))
+                            .disabled(isAuthenticating)
+
+                            // Stop button (stops all tool execution)
+                            Button(action: onStop) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "stop.fill")
+                                        .font(.system(size: 10))
+                                    Text("Stop")
+                                        .font(AppTypography.bodySmall(.medium))
                                 }
-
-                                Text(isAuthenticating ? "Authenticating..." : "Approve")
-                                    .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.signalHematite)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(AppColors.signalHematite.opacity(0.1))
+                                .cornerRadius(8)
                             }
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(AppColors.signalMercury)
-                            .cornerRadius(10)
+                            .disabled(isAuthenticating)
                         }
-                        .disabled(isAuthenticating)
                     }
 
                     // Timeout indicator
@@ -501,6 +550,57 @@ struct ToolApprovalDeniedView: View {
     }
 }
 
+// MARK: - Stopped View
+
+/// Shown when the user stopped all tool execution
+struct ToolApprovalStoppedView: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "stop.fill")
+                .font(.system(size: 12))
+                .foregroundColor(AppColors.signalHematite)
+
+            Text("Tool execution stopped")
+                .font(AppTypography.bodySmall())
+                .foregroundColor(AppColors.textSecondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(AppColors.signalHematite.opacity(0.1))
+        .cornerRadius(8)
+    }
+}
+
+// MARK: - Session Approval Badge
+
+/// Compact badge shown when a tool was auto-approved via session
+struct ToolSessionApprovalBadge: View {
+    let record: ToolApprovalRecord
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 12))
+                .foregroundColor(AppColors.signalLichen)
+
+            Text("Session Approved")
+                .font(AppTypography.labelSmall())
+                .foregroundColor(AppColors.signalLichen)
+
+            Text("•")
+                .foregroundColor(AppColors.textTertiary)
+
+            Text(record.formattedTime)
+                .font(AppTypography.labelSmall())
+                .foregroundColor(AppColors.textTertiary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(AppColors.signalLichen.opacity(0.1))
+        .cornerRadius(8)
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
@@ -528,7 +628,9 @@ struct ToolApprovalDeniedView: View {
                 timeoutSeconds: 300
             ),
             onApprove: {},
-            onCancel: {}
+            onApproveForSession: {},
+            onDeny: {},
+            onStop: {}
         )
         .environmentObject(BiometricAuthService.shared)
 

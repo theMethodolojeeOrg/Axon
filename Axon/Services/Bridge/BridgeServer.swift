@@ -223,7 +223,16 @@ class BridgeServer: ObservableObject {
         let result = try await executeMethod(method: .fileList, params: paramsAny)
 
         let resultData = try JSONEncoder().encode(result)
-        return try JSONDecoder().decode(FileListResult.self, from: resultData)
+        let jsonString = String(data: resultData, encoding: .utf8) ?? "(unable to decode)"
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        do {
+            return try decoder.decode(FileListResult.self, from: resultData)
+        } catch {
+            // Wrap the error with the raw JSON for debugging
+            throw BridgeDecodingError(underlying: error, rawJSON: String(jsonString.prefix(1000)))
+        }
     }
 
     /// Run a terminal command in VS Code
@@ -306,6 +315,8 @@ class BridgeServer: ObservableObject {
     }
 
     private func disconnectClient() {
+        let wasConnected = isConnected
+
         connection = nil
         connectedSession = nil
         isConnected = false
@@ -316,6 +327,15 @@ class BridgeServer: ObservableObject {
             pending.continuation.resume(throwing: BridgeError(code: .notConnected, message: "Connection lost"))
         }
         pendingRequests.removeAll()
+
+        // Notify observers that VS Code disconnected
+        if wasConnected {
+            NotificationCenter.default.post(
+                name: .bridgeConnectionDidChange,
+                object: self,
+                userInfo: ["connected": false]
+            )
+        }
     }
 
     // MARK: - WebSocket Message Handling
@@ -436,6 +456,13 @@ class BridgeServer: ObservableObject {
 
             print("[BridgeServer] VS Code connected: \(session.displayName) (\(session.workspaceRoot))")
 
+            // Notify observers that VS Code connected
+            NotificationCenter.default.post(
+                name: .bridgeConnectionDidChange,
+                object: self,
+                userInfo: ["connected": true, "session": session]
+            )
+
             // Send welcome response
             let welcome = BridgeWelcome(
                 sessionId: session.id.uuidString,
@@ -453,5 +480,30 @@ class BridgeServer: ObservableObject {
             let bridgeError = BridgeError(code: .invalidParams, message: "Invalid hello parameters")
             sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
         }
+    }
+}
+
+// MARK: - Notifications
+
+extension Notification.Name {
+    /// Posted when VS Code bridge connection state changes
+    /// userInfo: ["connected": Bool, "session": BridgeSession?]
+    static let bridgeConnectionDidChange = Notification.Name("BridgeConnectionDidChange")
+}
+
+// MARK: - Decoding Error with Raw JSON
+
+/// Error that wraps a decoding error with the raw JSON for debugging
+struct BridgeDecodingError: Error, LocalizedError {
+    let underlying: Error
+    let rawJSON: String
+
+    var errorDescription: String? {
+        """
+        Failed to decode response: \(underlying.localizedDescription)
+
+        Raw JSON (truncated):
+        \(rawJSON)
+        """
     }
 }

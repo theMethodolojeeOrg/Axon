@@ -334,6 +334,10 @@ struct ChatContainerView: View {
     @StateObject private var taglineManager = TaglineManager.shared
     @StateObject private var promptManager = PromptManager.shared
     @ObservedObject private var ttsService = TTSPlaybackService.shared
+    @ObservedObject private var toolApprovalService = ToolApprovalService.shared
+    #if os(macOS)
+    @ObservedObject private var bridgeServer = BridgeServer.shared
+    #endif
     @State private var messageText = ""
     @State private var selectedAttachments: [MessageAttachment] = []
     // Tools are now controlled via Settings > Tools tab
@@ -347,6 +351,12 @@ struct ChatContainerView: View {
     // Scroll tracking for scroll-to-bottom button
     @State private var showScrollToBottom = false
     @State private var scrollProxy: ScrollViewProxy?
+
+    // VS Code bridge connection banner
+    #if os(macOS)
+    @State private var showBridgeConnectedBanner = false
+    @State private var bridgeWorkspaceName: String?
+    #endif
 
     var body: some View {
         ZStack {
@@ -387,13 +397,55 @@ struct ChatContainerView: View {
                     .padding(.top, 8)
                 }
             }
+            #if os(macOS)
+            .overlay(alignment: .top) {
+                if showBridgeConnectedBanner, let workspace = bridgeWorkspaceName {
+                    VSCodeBridgeBanner(workspaceName: workspace, isConnected: true)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .padding(.top, 8)
+                }
+            }
+            .animation(AppAnimations.standardEasing, value: showBridgeConnectedBanner)
+            .onReceive(NotificationCenter.default.publisher(for: .bridgeConnectionDidChange)) { notification in
+                handleBridgeConnectionChange(notification)
+            }
+            #endif
 
             // Audio player overlay
             AudioPlayerView(ttsService: ttsService)
+
+            // Tool approval overlay (Claude Code style)
+            if let pendingApproval = toolApprovalService.pendingApproval {
+                VStack {
+                    Spacer()
+                    ToolApprovalRequestView(
+                        approval: pendingApproval,
+                        onApprove: {
+                            await toolApprovalService.approve()
+                        },
+                        onApproveForSession: {
+                            await toolApprovalService.approveForSession()
+                        },
+                        onDeny: {
+                            toolApprovalService.deny()
+                        },
+                        onStop: {
+                            toolApprovalService.stop()
+                        }
+                    )
+                    .environmentObject(BiometricAuthService.shared)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 120) // Above the input bar
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                .animation(AppAnimations.standardEasing, value: toolApprovalService.pendingApproval != nil)
+            }
         }
         .task(id: conversation?.id) {
             if let conversation = conversation {
                 isInputFocused = false
+                // Set conversation for session-based approvals
+                toolApprovalService.setCurrentConversation(UUID(uuidString: conversation.id) ?? UUID())
                 await loadMessages(for: conversation)
             } else {
                 conversationService.clearCurrentConversation()
@@ -401,6 +453,31 @@ struct ChatContainerView: View {
             }
         }
     }
+
+    #if os(macOS)
+    private func handleBridgeConnectionChange(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let connected = userInfo["connected"] as? Bool else { return }
+
+        if connected, let session = userInfo["session"] as? BridgeSession {
+            bridgeWorkspaceName = session.workspaceName
+            withAnimation {
+                showBridgeConnectedBanner = true
+            }
+            // Auto-hide after 5 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                withAnimation {
+                    showBridgeConnectedBanner = false
+                }
+            }
+        } else {
+            // Disconnected - could show a disconnect banner briefly if desired
+            withAnimation {
+                showBridgeConnectedBanner = false
+            }
+        }
+    }
+    #endif
 
     // MARK: - Welcome View
 
@@ -849,6 +926,47 @@ struct ScrollToBottomButton: View {
 }
 
 // MARK: - Preview
+
+// MARK: - VS Code Bridge Banner
+
+#if os(macOS)
+struct VSCodeBridgeBanner: View {
+    let workspaceName: String
+    let isConnected: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "personalhotspot")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(AppColors.signalLichen)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("VS Code Connected")
+                    .font(AppTypography.bodySmall(.medium))
+                    .foregroundColor(AppColors.textPrimary)
+
+                Text("Workspace: \(workspaceName)")
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(AppColors.textSecondary)
+            }
+
+            Spacer()
+
+            Text("AI tools available")
+                .font(AppTypography.labelSmall())
+                .foregroundColor(AppColors.signalMercury)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(AppColors.substrateSecondary)
+                .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
+        )
+        .padding(.horizontal, 16)
+    }
+}
+#endif
 
 #Preview {
     AppContainerView()

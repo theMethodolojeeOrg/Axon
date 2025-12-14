@@ -6,9 +6,14 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import AppKit
+import UniformTypeIdentifiers
+#endif
 
 struct ToolSettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
+    @ObservedObject private var bridgeServer = BridgeServer.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -110,6 +115,11 @@ struct ToolSettingsView: View {
                     .background(AppColors.substrateSecondary)
                     .cornerRadius(8)
                 }
+
+                #if os(macOS)
+                // VS Code Bridge Section
+                VSCodeBridgeSection(bridgeServer: bridgeServer)
+                #endif
 
                 // Configuration Section
                 SettingsSection(title: "Configuration") {
@@ -367,6 +377,225 @@ struct ToolInfoRow: View {
         .cornerRadius(8)
     }
 }
+
+// MARK: - VS Code Bridge Section
+
+#if os(macOS)
+struct VSCodeBridgeSection: View {
+    @ObservedObject var bridgeServer: BridgeServer
+    @State private var showingExportSuccess = false
+    @State private var exportError: String?
+
+    var body: some View {
+        SettingsSection(title: "VS Code Bridge") {
+            VStack(spacing: 16) {
+                // Status Row
+                HStack(spacing: 12) {
+                    Image(systemName: bridgeServer.isConnected ? "personalhotspot" : "personalhotspot.slash")
+                        .font(.system(size: 24))
+                        .foregroundColor(bridgeServer.isConnected ? AppColors.signalLichen : AppColors.textTertiary)
+                        .frame(width: 32)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(statusTitle)
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Text(statusDescription)
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+
+                    Spacer()
+
+                    // Start/Stop Button
+                    Button {
+                        Task {
+                            if bridgeServer.isRunning {
+                                await bridgeServer.stop()
+                            } else {
+                                await bridgeServer.start()
+                            }
+                        }
+                    } label: {
+                        Text(bridgeServer.isRunning ? "Stop" : "Start")
+                            .font(AppTypography.bodySmall(.medium))
+                            .foregroundColor(bridgeServer.isRunning ? AppColors.accentWarning : AppColors.signalMercury)
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Divider()
+                    .background(AppColors.divider)
+
+                // Download Extension Button
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "arrow.down.circle")
+                            .font(.system(size: 20))
+                            .foregroundColor(AppColors.signalMercury)
+                            .frame(width: 32)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("VS Code Extension")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Text("Download and install in VS Code to connect")
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+
+                        Spacer()
+
+                        Button {
+                            exportVSIX()
+                        } label: {
+                            Text("Download")
+                                .font(AppTypography.bodySmall(.medium))
+                                .foregroundColor(AppColors.signalMercury)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    if showingExportSuccess {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(AppColors.signalLichen)
+                            Text("Extension saved! Install via VS Code → Extensions → Install from VSIX")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.signalLichen)
+                        }
+                        .transition(.opacity)
+                    }
+
+                    if let error = exportError {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(AppColors.accentWarning)
+                            Text(error)
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.accentWarning)
+                        }
+                        .transition(.opacity)
+                    }
+                }
+
+                Divider()
+                    .background(AppColors.divider)
+
+                // Setup Instructions
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Setup Instructions")
+                        .font(AppTypography.bodySmall(.medium))
+                        .foregroundColor(AppColors.textSecondary)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        instructionRow(number: "1", text: "Download the extension above")
+                        instructionRow(number: "2", text: "In VS Code: Cmd+Shift+P → \"Install from VSIX\"")
+                        instructionRow(number: "3", text: "Click \"Start\" above to begin the bridge server")
+                        instructionRow(number: "4", text: "VS Code will auto-connect when the extension loads")
+                    }
+                }
+            }
+            .padding()
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(8)
+        }
+    }
+
+    private var statusTitle: String {
+        if bridgeServer.isConnected, let session = bridgeServer.connectedSession {
+            return "Connected to \(session.workspaceName)"
+        } else if bridgeServer.isRunning {
+            return "Waiting for VS Code..."
+        } else {
+            return "Bridge Disabled"
+        }
+    }
+
+    private var statusDescription: String {
+        if bridgeServer.isConnected {
+            return "AI can read/write files and run commands"
+        } else if bridgeServer.isRunning {
+            return "Listening on port 8081"
+        } else {
+            return "Start the bridge to enable VS Code integration"
+        }
+    }
+
+    @ViewBuilder
+    private func instructionRow(number: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(number)
+                .font(AppTypography.labelSmall())
+                .foregroundColor(AppColors.signalMercury)
+                .frame(width: 16)
+
+            Text(text)
+                .font(AppTypography.labelSmall())
+                .foregroundColor(AppColors.textTertiary)
+        }
+    }
+
+    private func exportVSIX() {
+        // Reset states
+        showingExportSuccess = false
+        exportError = nil
+
+        // Find the bundled VSIX
+        guard let vsixURL = Bundle.main.url(forResource: "axon-bridge-0.1.0", withExtension: "vsix") else {
+            exportError = "Extension not found in app bundle"
+            return
+        }
+
+        // Create save panel
+        let savePanel = NSSavePanel()
+        savePanel.title = "Save VS Code Extension"
+        savePanel.nameFieldStringValue = "axon-bridge-0.1.0.vsix"
+        savePanel.allowedContentTypes = [.item]
+        savePanel.canCreateDirectories = true
+
+        // Default to Downloads folder
+        if let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first {
+            savePanel.directoryURL = downloads
+        }
+
+        savePanel.begin { response in
+            guard response == .OK, let destinationURL = savePanel.url else {
+                return
+            }
+
+            do {
+                // Remove existing file if present
+                if FileManager.default.fileExists(atPath: destinationURL.path) {
+                    try FileManager.default.removeItem(at: destinationURL)
+                }
+
+                // Copy the VSIX
+                try FileManager.default.copyItem(at: vsixURL, to: destinationURL)
+
+                DispatchQueue.main.async {
+                    withAnimation {
+                        showingExportSuccess = true
+                    }
+
+                    // Hide success message after 5 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                        withAnimation {
+                            showingExportSuccess = false
+                        }
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    exportError = "Failed to save: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+}
+#endif
 
 // MARK: - Preview
 
