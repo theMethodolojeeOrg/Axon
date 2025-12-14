@@ -61,6 +61,21 @@ struct CodeArtifact: Identifiable, Equatable {
 // MARK: - Presenter (Environment)
 
 #if os(macOS)
+/// Available inspector tabs
+enum InspectorTab: String, CaseIterable, Identifiable {
+    case code = "Code"
+    case bridgeLogs = "Bridge Logs"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .code: return "chevron.left.forwardslash.chevron.right"
+        case .bridgeLogs: return "network"
+        }
+    }
+}
+
 /// Shared presenter so the inspector can live at the window/detail root level.
 final class CodeArtifactPresenter: NSObject, ObservableObject {
     /// Currently selected artifact (explicitly clicked).
@@ -75,6 +90,9 @@ final class CodeArtifactPresenter: NSObject, ObservableObject {
     /// Width of the inspector (resizable).
     @Published var inspectorWidth: CGFloat = 480
 
+    /// Currently active inspector tab.
+    @Published var activeTab: InspectorTab = .code
+
     /// Minimum and maximum widths for resizing.
     static let minWidth: CGFloat = 320
     static let maxWidth: CGFloat = 800
@@ -82,6 +100,14 @@ final class CodeArtifactPresenter: NSObject, ObservableObject {
     func present(_ artifact: CodeArtifact) {
         lastSeen = artifact
         selected = artifact
+        activeTab = .code
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            isOpen = true
+        }
+    }
+
+    func showBridgeLogs() {
+        activeTab = .bridgeLogs
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
             isOpen = true
         }
@@ -441,10 +467,16 @@ struct CodeArtifactInspectorColumn: View {
                 Divider()
                     .overlay(AppColors.glassBorder.opacity(0.6))
 
-                if let artifact = artifactToShow {
-                    inspectorArtifactView(artifact: artifact)
-                } else {
-                    emptyState
+                // Tab content
+                switch presenter.activeTab {
+                case .code:
+                    if let artifact = artifactToShow {
+                        inspectorArtifactView(artifact: artifact)
+                    } else {
+                        emptyState
+                    }
+                case .bridgeLogs:
+                    BridgeLogInspectorView()
                 }
             }
         }
@@ -454,39 +486,54 @@ struct CodeArtifactInspectorColumn: View {
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
-            // Close button
-            Button {
-                presenter.close()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppColors.textSecondary)
-                    .padding(6)
-                    .background(
-                        Circle().fill(AppColors.substrateSecondary)
-                    )
-            }
-            .buttonStyle(.plain)
-            .help("Close Inspector")
-
-            Text("Inspector")
-                .font(AppTypography.titleSmall())
-                .foregroundColor(AppColors.textPrimary)
-
-            Spacer()
-
-            if presenter.selected != nil {
-                Button("Clear") {
-                    presenter.clearSelection()
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                // Close button
+                Button {
+                    presenter.close()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(AppColors.textSecondary)
+                        .padding(6)
+                        .background(
+                            Circle().fill(AppColors.substrateSecondary)
+                        )
                 }
                 .buttonStyle(.plain)
-                .font(AppTypography.labelSmall())
-                .foregroundColor(AppColors.textSecondary)
+                .help("Close Inspector")
+
+                Text("Inspector")
+                    .font(AppTypography.titleSmall())
+                    .foregroundColor(AppColors.textPrimary)
+
+                Spacer()
+
+                if presenter.activeTab == .code && presenter.selected != nil {
+                    Button("Clear") {
+                        presenter.clearSelection()
+                    }
+                    .buttonStyle(.plain)
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(AppColors.textSecondary)
+                }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            // Tab bar
+            HStack(spacing: 0) {
+                ForEach(InspectorTab.allCases) { tab in
+                    InspectorTabButton(
+                        tab: tab,
+                        isSelected: presenter.activeTab == tab,
+                        action: { presenter.activeTab = tab }
+                    )
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
         .background(AppColors.substratePrimary)
     }
 
@@ -647,6 +694,31 @@ private struct InspectorDownloadButton: View {
         }
         .buttonStyle(.plain)
         .help("Save As…")
+    }
+}
+
+private struct InspectorTabButton: View {
+    let tab: InspectorTab
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 12))
+                Text(tab.rawValue)
+                    .font(AppTypography.labelSmall())
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? AppColors.signalMercury.opacity(0.2) : Color.clear)
+            )
+            .foregroundColor(isSelected ? AppColors.signalMercury : AppColors.textSecondary)
+        }
+        .buttonStyle(.plain)
     }
 }
 #endif

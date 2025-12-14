@@ -13,11 +13,17 @@ struct ChatInfoSettingsView: View {
     @StateObject private var settingsViewModel = SettingsViewModel()
     @StateObject private var conversationService = ConversationService.shared
     @StateObject private var costService = CostService.shared
+    #if os(macOS)
+    @ObservedObject private var bridgeServer = BridgeServer.shared
+    #endif
 
     // Per-conversation overrides (stored locally)
     @State private var selectedProvider: UnifiedProvider?
     @State private var selectedModel: UnifiedModel?
     @State private var estimatedTokens: Int = 0
+
+    // Track enabled tools locally for immediate UI update
+    @State private var localEnabledTools: Set<String> = []
 
     var body: some View {
         #if os(macOS)
@@ -55,6 +61,7 @@ struct ChatInfoSettingsView: View {
         .frame(minWidth: 480, idealWidth: 520, minHeight: 500, idealHeight: 600)
         .task {
             loadConversationOverrides()
+            loadEnabledTools()
             await estimateTokenCount()
         }
     }
@@ -83,6 +90,7 @@ struct ChatInfoSettingsView: View {
         }
         .task {
             loadConversationOverrides()
+            loadEnabledTools()
             await estimateTokenCount()
         }
     }
@@ -297,6 +305,66 @@ struct ChatInfoSettingsView: View {
             }
         }
 
+        // MARK: - Tools Section
+        ChatInfoSection(title: "Tools") {
+            VStack(spacing: 8) {
+                // Built-in tools
+                ForEach(ToolId.allCases) { tool in
+                    ChatInfoToolToggleRow(
+                        tool: tool,
+                        isEnabled: localEnabledTools.contains(tool.rawValue),
+                        onToggle: { enabled in
+                            toggleTool(tool, enabled: enabled)
+                        }
+                    )
+                }
+
+                #if os(macOS)
+                // VS Code Bridge status (macOS only)
+                Divider()
+                    .padding(.vertical, 4)
+
+                HStack(spacing: 12) {
+                    Image(systemName: bridgeServer.isConnected ? "personalhotspot" : "personalhotspot.slash")
+                        .font(.system(size: 16))
+                        .foregroundColor(bridgeServer.isConnected ? AppColors.signalLichen : AppColors.textTertiary)
+                        .frame(width: 24)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("VS Code Bridge")
+                            .font(AppTypography.bodySmall(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        if let session = bridgeServer.connectedSession {
+                            Text(session.workspaceName)
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.signalLichen)
+                        } else if bridgeServer.isRunning {
+                            Text("Waiting for connection...")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textTertiary)
+                        } else {
+                            Text("Not running")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textTertiary)
+                        }
+                    }
+
+                    Spacer()
+
+                    // Connection status indicator
+                    Circle()
+                        .fill(bridgeServer.isConnected ? AppColors.signalLichen : (bridgeServer.isRunning ? AppColors.accentWarning : AppColors.textTertiary))
+                        .frame(width: 8, height: 8)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
+                #endif
+            }
+        }
+
         // MARK: - Info Note
         HStack(spacing: 12) {
             Image(systemName: "info.circle")
@@ -373,6 +441,22 @@ struct ChatInfoSettingsView: View {
         let messages = conversationService.messages
         let totalCharacters = messages.reduce(0) { $0 + $1.content.count }
         estimatedTokens = max(1, totalCharacters / 4)
+    }
+
+    private func loadEnabledTools() {
+        localEnabledTools = settingsViewModel.settings.toolSettings.enabledToolIds
+    }
+
+    private func toggleTool(_ tool: ToolId, enabled: Bool) {
+        if enabled {
+            localEnabledTools.insert(tool.rawValue)
+            settingsViewModel.settings.toolSettings.enableTool(tool)
+        } else {
+            localEnabledTools.remove(tool.rawValue)
+            settingsViewModel.settings.toolSettings.disableTool(tool)
+        }
+        // Persist the updated settings
+        try? SettingsStorage.shared.saveSettings(settingsViewModel.settings)
     }
 
     private func loadConversationOverrides() {
@@ -487,6 +571,48 @@ struct ChatInfoSection<Content: View>: View {
 
             content
         }
+    }
+}
+
+// MARK: - Chat Info Tool Toggle Row (compact variant)
+
+struct ChatInfoToolToggleRow: View {
+    let tool: ToolId
+    let isEnabled: Bool
+    let onToggle: (Bool) -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: tool.icon)
+                .font(.system(size: 16))
+                .foregroundColor(isEnabled ? AppColors.signalMercury : AppColors.textTertiary)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tool.displayName)
+                    .font(AppTypography.bodySmall(.medium))
+                    .foregroundColor(AppColors.textPrimary)
+
+                Text(tool.description)
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(AppColors.textTertiary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Toggle("", isOn: Binding(
+                get: { isEnabled },
+                set: { onToggle($0) }
+            ))
+            .toggleStyle(.switch)
+            .labelsHidden()
+            .tint(AppColors.signalMercury)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(AppColors.substrateSecondary)
+        .cornerRadius(8)
     }
 }
 

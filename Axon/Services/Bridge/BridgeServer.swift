@@ -341,6 +341,11 @@ class BridgeServer: ObservableObject {
     // MARK: - WebSocket Message Handling
 
     private func sendWebSocketMessage(_ data: Data, on connection: NWConnection) {
+        // Log outgoing message
+        Task { @MainActor in
+            BridgeLogService.shared.logOutgoing(data)
+        }
+
         let metadata = NWProtocolWebSocket.Metadata(opcode: .text)
         let context = NWConnection.ContentContext(identifier: "websocket", metadata: [metadata])
 
@@ -365,6 +370,8 @@ class BridgeServer: ObservableObject {
 
             if let content = content, !content.isEmpty {
                 Task { @MainActor in
+                    // Log incoming message
+                    BridgeLogService.shared.logIncoming(content)
                     await self.handleReceivedData(content)
                 }
             }
