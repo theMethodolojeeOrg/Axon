@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Axon/Assets.xcassets/AxonDark.imageset/AxonDark512.png" alt="Axon Logo" width="200"/>
+  <img src="Axon/Assets.xcassets/AxonLichen.imageset/AxonLichen512.png" alt="Axon Logo" width="200"/>
 </p>
 
 <h1 align="center">Axon</h1>
@@ -56,7 +56,7 @@ After enough interaction, the composition becomes something new: **your model**.
 
 ## Features
 
-### 🧠 Dual Memory System
+### 🜔 Dual Memory System
 
 **Allocentric Memories** (About You)
 ```
@@ -72,7 +72,7 @@ Confidence: 92% | Success: 23/25 attempts | Discovered by: Claude Opus
 
 Together: An AI that knows you AND knows what works.
 
-### 🔄 Provider-Agnostic Intelligence
+### 🝆 Provider-Agnostic Intelligence
 
 Switch models mid-conversation without losing context.
 
@@ -84,7 +84,7 @@ All contribute to shared learning
 No re-explaining basics
 ```
 
-### 📊 Confidence-Based Learning
+### 🜹 Confidence-Based Learning
 
 Memories don't replace each other—they **scope** themselves.
 
@@ -98,7 +98,7 @@ Memory v3: "This works under Y, NOT under Z"
 Failure becomes data, not wasted time
 ```
 
-### 🔒 Device-First Privacy
+### 🝥 Device-First Privacy
 
 - All data stored locally on YOUR device
 - API keys in secure Keychain (we never see them)
@@ -106,7 +106,7 @@ Failure becomes data, not wasted time
 - No telemetry, no analytics, no cloud dependency
 - Works fully offline (except AI calls themselves)
 
-### 🌐 Local Proxy Server
+### 🝪 Local Proxy Server
 
 Turn your device into a context hub for your entire AI toolkit.
 
@@ -115,6 +115,101 @@ Cline, Kilocode, Continue → Your Local Server → Your Memories
                                    ↓
         All external tools inherit your learned patterns
 ```
+
+---
+
+## Supported Models
+
+Axon supports **46 models across 9 providers**, with full support for custom providers.
+
+### Anthropic (Claude)
+| Model | Tier | Context |
+|-------|------|---------|
+| Claude Opus 4.5 | Frontier | 200K |
+| Claude Sonnet 4.5 | Frontier | 200K |
+| Claude Haiku 4.5 | Fast | 200K |
+| Claude Opus 4.1 | Frontier | 200K |
+| Claude Sonnet 4 | Legacy | 200K |
+| Claude Opus 4 | Legacy | 200K |
+
+### OpenAI (GPT)
+| Model | Tier | Context |
+|-------|------|---------|
+| GPT-5.2 | Frontier | 400K |
+| GPT-5.1 | Frontier | 400K |
+| GPT-5 | Frontier | 400K |
+| GPT-5 Mini | Fast | 400K |
+| GPT-5 Nano | Fast | 400K |
+| o3 | Reasoning | 200K |
+| o4-mini | Reasoning | 200K |
+| o3-mini | Reasoning | 200K |
+| GPT-4.1 | Frontier | 1M |
+| GPT-4.1 Mini | Fast | 1M |
+| GPT-4.1 Nano | Fast | 1M |
+| o1 | Reasoning | 200K |
+| o1-mini | Reasoning | 128K |
+| GPT-4o | Legacy | 128K |
+| GPT-4o Mini | Legacy | 128K |
+
+### Google (Gemini)
+| Model | Tier | Context |
+|-------|------|---------|
+| Gemini 3 Pro Preview | Frontier | 1M |
+| Gemini 2.5 Pro | Frontier | 1M |
+| Gemini 2.5 Flash | Fast | 1M |
+| Gemini 2.5 Flash Lite | Fast | 1M |
+
+### xAI (Grok)
+| Model | Tier | Context |
+|-------|------|---------|
+| Grok 4 Fast Reasoning | Reasoning | 2M |
+| Grok 4 Fast Non-Reasoning | Fast | 2M |
+| Grok Code Fast 1 | Fast | 256K |
+| Grok 4 | Frontier | 256K |
+| Grok 3 Mini | Fast | 131K |
+| Grok 3 | Legacy | 131K |
+
+### Perplexity (Sonar)
+| Model | Tier | Context |
+|-------|------|---------|
+| Sonar Reasoning Pro | Reasoning | 128K |
+| Sonar Reasoning | Reasoning | 128K |
+| Sonar Pro | Frontier | 200K |
+| Sonar | Fast | 128K |
+
+### DeepSeek
+| Model | Tier | Context |
+|-------|------|---------|
+| DeepSeek Reasoner (R1) | Reasoning | 128K |
+| DeepSeek Chat (V3) | Fast | 128K |
+
+### Z.ai (GLM/Zhipu)
+| Model | Tier | Context |
+|-------|------|---------|
+| GLM-4.6 | Frontier | 200K |
+| GLM-4.6V | Frontier | 128K |
+| GLM-4.6V Flash | Fast | 128K |
+| GLM-4.5 | Frontier | 128K |
+| GLM-4.5 Air | Fast | 128K |
+| GLM-4.5V | Frontier | 128K |
+
+### MiniMax
+| Model | Tier | Context |
+|-------|------|---------|
+| MiniMax M2 | Frontier | 1M |
+| MiniMax M2 Stable | Frontier | 1M |
+
+### Mistral AI
+| Model | Tier | Context |
+|-------|------|---------|
+| Mistral Large | Frontier | 128K |
+| Pixtral Large | Frontier | 128K |
+| Pixtral 12B | Fast | 128K |
+| Codestral | Fast | 32K |
+
+### Custom Providers
+
+Add any OpenAI-compatible API endpoint with your own model definitions.
 
 ---
 
@@ -188,7 +283,8 @@ Model obsolescence becomes irrelevant. If Anthropic disappears tomorrow:
 ┌─────────────────────────────────────────────────────────┐
 │           FOUNDATION MODELS (Interchangeable)            │
 ├─────────────────────────────────────────────────────────┤
-│  OpenAI • Anthropic • Google • xAI • OpenRouter • Local │
+│  Anthropic • OpenAI • Google • xAI • Perplexity         │
+│  DeepSeek • Z.ai • MiniMax • Mistral • Custom           │
 │                                                          │
 │  All see the same memories. All contribute learning.    │
 └─────────────────────────────────────────────────────────┘
@@ -203,11 +299,15 @@ Model obsolescence becomes irrelevant. If Anthropic disappears tomorrow:
 - iOS 17.0+
 - Xcode 15.0+
 - API key from at least one provider:
-  - [OpenAI](https://platform.openai.com/api-keys)
   - [Anthropic](https://console.anthropic.com/)
-  - [Google AI](https://makersuite.google.com/app/apikey)
+  - [OpenAI](https://platform.openai.com/api-keys)
+  - [Google AI](https://aistudio.google.com/apikey)
   - [xAI](https://console.x.ai/)
-  - [OpenRouter](https://openrouter.ai/keys)
+  - [Perplexity](https://www.perplexity.ai/settings/api)
+  - [DeepSeek](https://platform.deepseek.com/)
+  - [Z.ai (Zhipu)](https://open.bigmodel.cn/)
+  - [MiniMax](https://www.minimax.io/)
+  - [Mistral AI](https://console.mistral.ai/)
 
 ### Build from Source
 
@@ -237,8 +337,8 @@ Memories are created automatically as you interact. You can also create them man
 ## Screenshots
 
 <p align="center">
-  <img src="assets/screenshots/02-1.jpg" alt="Chat Interface" width="250"/>
-  <img src="assets/screenshots/03-1.jpg" alt="Memory System" width="250"/>
+  <img src="assets/screenshots/01-03.png" alt="Chat Interface" width="250"/>
+  <img src="assets/screenshots/03-07.png" alt="Memory System" width="250"/>
 </p>
 
 ---
@@ -264,11 +364,11 @@ Axon is MIT licensed. Fork it, modify it, ship it, sell it—do whatever you wan
 
 ### Ways to Contribute
 
-- 🐛 Report bugs
-- 💡 Suggest features
-- 📖 Improve documentation
-- 🔧 Submit pull requests
-- 🧪 Test and provide feedback
+- 🜍 Report bugs
+- 🜚 Suggest features
+- 🝇 Improve documentation
+- 🜲 Submit pull requests
+- 🝈 Test and provide feedback
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
@@ -299,10 +399,10 @@ I like humans. I want them to have good tools. Tools that don't lock them in. To
 **Thomas Oury / methodolojee**
 - Email: tom@methodolojee.org
 - Web: [methodolojee.org](https://methodolojee.org)
-- GitHub: [@methodolojee](https://github.com/methodolojee)
+- GitHub: [@theMethodolojeeOrg](https://github.com/theMethodolojeeOrg)
 
 ---
 
 <p align="center">
-  <sub>Built with 🧠 in Colorado</sub>
+  <sub>Solve et coagula; the process is the product.</sub>
 </p>

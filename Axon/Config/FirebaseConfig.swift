@@ -17,8 +17,8 @@ enum FirebaseEnvironment {
 
     var projectID: String {
         switch self {
-        case .development, .staging: return "neurx-8f122"
-        case .production: return "neurx-8f122"
+        case .development, .staging: return "your-project-id"
+        case .production: return "your-project-id"
         }
     }
 
@@ -26,15 +26,15 @@ enum FirebaseEnvironment {
         switch self {
         case .development:
             // Local emulator URL (matches Firebase Functions emulator)
-            return URL(string: "http://localhost:5001/neurx-8f122/us-central1")!
+            return URL(string: "http://localhost:5001/your-project-id/us-central1")!
         case .staging, .production:
-            // Production Cloud Functions URL
-            return URL(string: "https://us-central1-neurx-8f122.cloudfunctions.net")!
+            // Production Cloud Functions URL - configure via Backend Settings
+            return URL(string: "https://us-central1-your-project.cloudfunctions.net")!
         }
     }
 
     var storageBucket: String {
-        return "neurx-8f122.appspot.com"
+        return "your-project-id.appspot.com"
     }
 
     var firestoreEmulatorHost: String? {

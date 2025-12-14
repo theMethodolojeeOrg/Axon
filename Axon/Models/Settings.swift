@@ -958,7 +958,6 @@ enum UnifiedModel: Identifiable, Hashable, Sendable {
 // MARK: - API Provider
 
 enum APIProvider: String, CaseIterable, Identifiable {
-    case neurx = "neurx"
     case openai = "openai"
     case anthropic = "anthropic"
     case gemini = "gemini"
@@ -974,7 +973,6 @@ enum APIProvider: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .neurx: return "NeurX"
         case .openai: return "OpenAI"
         case .anthropic: return "Anthropic"
         case .gemini: return "Google Gemini"
@@ -990,7 +988,6 @@ enum APIProvider: String, CaseIterable, Identifiable {
 
     var apiKeyPlaceholder: String {
         switch self {
-        case .neurx: return "nrx_..."
         case .openai: return "sk-..."
         case .anthropic: return "sk-ant-..."
         case .gemini: return "AIza..."
@@ -1006,7 +1003,6 @@ enum APIProvider: String, CaseIterable, Identifiable {
 
     var infoURL: URL? {
         switch self {
-        case .neurx: return URL(string: "https://neurx.org/api-keys")
         case .openai: return URL(string: "https://platform.openai.com/account/api-keys")
         case .anthropic: return URL(string: "https://console.anthropic.com/account/keys")
         case .gemini: return URL(string: "https://aistudio.google.com/app/apikey")
@@ -1022,7 +1018,6 @@ enum APIProvider: String, CaseIterable, Identifiable {
 
     var description: String {
         switch self {
-        case .neurx: return "Admin API key for NeurX backend services"
         case .openai: return "Required for GPT models"
         case .anthropic: return "Required for Claude models"
         case .gemini: return "Required for Gemini models"

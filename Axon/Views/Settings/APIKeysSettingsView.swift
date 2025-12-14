@@ -28,35 +28,10 @@ struct APIKeysSettingsView: View {
             .background(AppColors.signalMercury.opacity(0.1))
             .cornerRadius(8)
 
-            // NeurX Admin Key Section (Optional)
-            SettingsSection(title: "NeurX Admin Key") {
-                VStack(spacing: 12) {
-                    APIKeyRow(
-                        provider: .neurx,
-                        isConfigured: viewModel.isAPIKeyConfigured(.neurx),
-                        isAdminKey: false,
-                        onEdit: {
-                            editingKeyValue = viewModel.getAPIKey(.neurx) ?? ""
-                            selectedProvider = .neurx
-                        },
-                        onClear: {
-                            Task {
-                                await viewModel.clearAPIKey(.neurx)
-                            }
-                        },
-                        onGetKey: {
-                            if let url = APIProvider.neurx.infoURL {
-                                AppURLRouter.open(url)
-                            }
-                        }
-                    )
-                }
-            }
-
-            // Other API Keys Section
+            // AI Provider Keys Section
             SettingsSection(title: "AI Provider Keys") {
                 VStack(spacing: 12) {
-                    ForEach(APIProvider.allCases.filter { $0 != APIProvider.neurx && $0 != APIProvider.elevenlabs }) { provider in
+                    ForEach(APIProvider.allCases.filter { $0 != APIProvider.elevenlabs }) { provider in
                         APIKeyRow(
                             provider: provider,
                             isConfigured: viewModel.isAPIKeyConfigured(provider),

@@ -490,6 +490,9 @@ Desktop.ini
 # Project specific
 # Add any project-specific ignores below this line
 
+# Documentation (contains internal notes and backend code samples)
+Docs/
+
 # Local configuration files
 Config/Local/
 *.local

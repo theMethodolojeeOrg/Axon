@@ -82,23 +82,12 @@ class APIClient: ObservableObject {
                 }
             }
         }
-        if let neurxApiKey = try? apiKeysStorage.getAPIKey(for: .neurx) {
-            queryItems.append(URLQueryItem(name: "apiKey", value: neurxApiKey))
+        // Backend API key from token storage (if backend is configured)
+        if let apiKey = try? tokenStorage.getApiKey() {
+            queryItems.append(URLQueryItem(name: "apiKey", value: apiKey))
             #if DEBUG
-            print("[APIClient] Using NeurX API key: \(neurxApiKey.prefix(10))...")
+            print("[APIClient] Using backend API key: \(apiKey.prefix(10))...")
             #endif
-        } else {
-            // Fallback to old token storage for backward compatibility
-            if let apiKey = try? tokenStorage.getApiKey() {
-                queryItems.append(URLQueryItem(name: "apiKey", value: apiKey))
-                #if DEBUG
-                print("[APIClient] Using legacy API key: \(apiKey.prefix(10))...")
-                #endif
-            } else {
-                #if DEBUG
-                print("[APIClient] WARNING: No API key found!")
-                #endif
-            }
         }
         urlComponents.queryItems = queryItems
 
