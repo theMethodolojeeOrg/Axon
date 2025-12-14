@@ -1243,6 +1243,7 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
     // Built-in Tools
     case createMemory = "create_memory"
     case conversationSearch = "conversation_search"  // Search recent conversations for context
+    case reflectOnConversation = "reflect_on_conversation"  // Meta-analysis of current conversation
 
     var id: String { rawValue }
 
@@ -1255,6 +1256,7 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .fileSearch: return "File Search"
         case .createMemory: return "Memory Creation"
         case .conversationSearch: return "Conversation History"
+        case .reflectOnConversation: return "Conversation Reflection"
         }
     }
 
@@ -1267,6 +1269,7 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .fileSearch: return "Search uploaded documents using semantic RAG"
         case .createMemory: return "AI creates memories about you during chat"
         case .conversationSearch: return "Search recent conversations for context"
+        case .reflectOnConversation: return "Analyze model usage, memories, and topic shifts"
         }
     }
 
@@ -1279,6 +1282,7 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .fileSearch: return "doc.text.magnifyingglass"
         case .createMemory: return "brain.head.profile"
         case .conversationSearch: return "clock.arrow.circlepath"
+        case .reflectOnConversation: return "waveform.path.ecg"
         }
     }
 
@@ -1286,7 +1290,7 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
             return .gemini
-        case .createMemory, .conversationSearch:
+        case .createMemory, .conversationSearch, .reflectOnConversation:
             return .internal
         }
     }
@@ -1296,7 +1300,7 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
             return true
-        case .createMemory, .conversationSearch:
+        case .createMemory, .conversationSearch, .reflectOnConversation:
             return false
         }
     }

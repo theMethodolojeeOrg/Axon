@@ -451,9 +451,15 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             toolUsed = true
 
             // Execute the tool via Gemini
+            // Provide conversation context for tools that need it (like reflect_on_conversation)
+            let conversationContext = ToolConversationContext(
+                conversationId: conversationId,
+                messages: messages
+            )
             let toolResult = try await ToolProxyService.shared.executeToolRequest(
                 toolRequest,
-                geminiApiKey: geminiKey
+                geminiApiKey: geminiKey,
+                conversationContext: conversationContext
             )
 
             // Collect grounding sources from tool result
