@@ -64,6 +64,9 @@ struct AppSettings: Codable, Equatable, Sendable {
     // AI Tools (web search, code execution, etc.)
     var toolSettings: ToolSettings = ToolSettings()
 
+    // VS Code Bridge
+    var bridgeSettings: BridgeSettings = BridgeSettings()
+
     // Custom Providers
     var customProviders: [CustomProviderConfig] = []
 

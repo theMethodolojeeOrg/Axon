@@ -213,7 +213,7 @@ Model obsolescence becomes irrelevant. If Anthropic disappears tomorrow:
 
 ```bash
 # Clone the repository
-git clone https://github.com/methodolojee/Axon.git
+git clone https://github.com/theMethodolojeeOrg/Axon.git
 cd Axon
 
 # Open in Xcode

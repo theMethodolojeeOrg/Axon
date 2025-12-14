@@ -1,0 +1,75 @@
+{
+  "name": "axon-bridge",
+  "displayName": "Axon Bridge",
+  "description": "Connect VS Code to Axon AI assistant for AI-powered coding assistance",
+  "version": "0.1.0",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "axon-bridge.connect",
+        "title": "Axon: Connect to Bridge"
+      },
+      {
+        "command": "axon-bridge.disconnect",
+        "title": "Axon: Disconnect from Bridge"
+      },
+      {
+        "command": "axon-bridge.status",
+        "title": "Axon: Show Bridge Status"
+      }
+    ],
+    "configuration": {
+      "title": "Axon Bridge",
+      "properties": {
+        "axonBridge.host": {
+          "type": "string",
+          "default": "localhost",
+          "description": "Host where Axon is running"
+        },
+        "axonBridge.port": {
+          "type": "number",
+          "default": 8081,
+          "description": "Port for WebSocket connection"
+        },
+        "axonBridge.autoConnect": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically connect when VS Code starts"
+        },
+        "axonBridge.reconnectInterval": {
+          "type": "number",
+          "default": 5000,
+          "description": "Reconnection interval in milliseconds"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.18.1",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "ws": "^8.14.0"
+  }
+}

@@ -18,17 +18,20 @@ import AppKit
 // MARK: - Custom Text Editor with Enter/Shift+Enter handling
 
 #if canImport(AppKit)
-/// macOS: NSTextView wrapper that handles Enter to send, Shift+Enter for newline
+/// macOS: NSTextView wrapper that handles Enter to send, Shift+Enter for newline.
+/// Also supports auto-growing up to `maxHeight`, then scrolling.
 struct ChatTextEditor: NSViewRepresentable {
     @Binding var text: String
     let placeholder: String
     let isDisabled: Bool
+    let maxHeight: CGFloat
+    @Binding var dynamicHeight: CGFloat
     let onSubmit: () -> Void
-    
+
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
         let textView = ChatNSTextView()
-        
+
         textView.delegate = context.coordinator
         textView.isRichText = false
         textView.allowsUndo = true
@@ -38,58 +41,88 @@ struct ChatTextEditor: NSViewRepresentable {
         textView.drawsBackground = false
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
-        textView.textContainerInset = NSSize(width: 0, height: 4)
+        textView.textContainerInset = NSSize(width: 0, height: 3)
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.onSubmit = onSubmit
-        
+
         scrollView.documentView = textView
         scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = false
         scrollView.drawsBackground = false
         scrollView.borderType = .noBorder
-        
+
         context.coordinator.textView = textView
-        
+
+        // initial size calc
+        DispatchQueue.main.async {
+            context.coordinator.recalculateHeight()
+        }
+
         return scrollView
     }
-    
+
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? ChatNSTextView else { return }
-        
+
         if textView.string != text {
             textView.string = text
         }
         textView.isEditable = !isDisabled
         textView.onSubmit = onSubmit
-        
-        // Update placeholder
+
+        context.coordinator.maxHeight = maxHeight
+        context.coordinator.dynamicHeight = $dynamicHeight
+        context.coordinator.recalculateHeight()
+
+        // Update placeholder (handled via overlay)
         context.coordinator.placeholder = placeholder
         context.coordinator.updatePlaceholder()
     }
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-    
+
     class Coordinator: NSObject, NSTextViewDelegate {
         var parent: ChatTextEditor
         weak var textView: ChatNSTextView?
         var placeholder: String = ""
-        
+        var maxHeight: CGFloat
+        var dynamicHeight: Binding<CGFloat>
+
         init(_ parent: ChatTextEditor) {
             self.parent = parent
             self.placeholder = parent.placeholder
+            self.maxHeight = parent.maxHeight
+            self.dynamicHeight = parent.$dynamicHeight
         }
-        
+
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
+            recalculateHeight()
             updatePlaceholder()
         }
-        
+
         func updatePlaceholder() {
             // Placeholder is handled via the overlay in SwiftUI
+        }
+
+        func recalculateHeight() {
+            guard let textView else { return }
+
+            // Force layout so usedRect is accurate
+            textView.layoutManager?.ensureLayout(for: textView.textContainer!)
+            let used = textView.layoutManager?.usedRect(for: textView.textContainer!).height ?? 0
+            let insets = textView.textContainerInset.height * 2
+            let target = min(maxHeight, max(20, used + insets))
+
+            if abs(dynamicHeight.wrappedValue - target) > 0.5 {
+                DispatchQueue.main.async {
+                    self.dynamicHeight.wrappedValue = target
+                }
+            }
         }
     }
 }
@@ -111,54 +144,90 @@ class ChatNSTextView: NSTextView {
 }
 
 #elseif canImport(UIKit)
-/// iOS: UITextView wrapper that handles Enter to send, Shift+Enter for newline
+/// iOS: UITextView wrapper that handles Enter to send, Shift+Enter for newline.
+/// Also supports auto-growing up to `maxHeight`, then scrolling.
 struct ChatTextEditor: UIViewRepresentable {
     @Binding var text: String
     let placeholder: String
     let isDisabled: Bool
+    let maxHeight: CGFloat
+    @Binding var dynamicHeight: CGFloat
     let onSubmit: () -> Void
-    
+
     func makeUIView(context: Context) -> UITextView {
         let textView = UITextView()
         textView.delegate = context.coordinator
         textView.font = UIFont.systemFont(ofSize: 17)
         textView.textColor = UIColor.label
         textView.backgroundColor = .clear
-        textView.isScrollEnabled = true
-        textView.textContainerInset = UIEdgeInsets(top: 8, left: 0, bottom: 8, right: 0)
+        textView.isScrollEnabled = false
+        textView.textContainerInset = UIEdgeInsets(top: 6, left: 0, bottom: 6, right: 0)
         textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        
+
         context.coordinator.textView = textView
-        
+
+        // initial size calc
+        DispatchQueue.main.async {
+            context.coordinator.recalculateHeight()
+        }
+
         return textView
     }
-    
+
     func updateUIView(_ textView: UITextView, context: Context) {
         if textView.text != text {
             textView.text = text
         }
         textView.isEditable = !isDisabled
+
         context.coordinator.onSubmit = onSubmit
+        context.coordinator.maxHeight = maxHeight
+        context.coordinator.dynamicHeight = $dynamicHeight
+        context.coordinator.recalculateHeight()
+
+        // Toggle internal scrolling only once we hit the cap
+        textView.isScrollEnabled = dynamicHeight >= maxHeight
     }
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-    
+
     class Coordinator: NSObject, UITextViewDelegate {
         var parent: ChatTextEditor
         weak var textView: UITextView?
         var onSubmit: (() -> Void)?
-        
+        var maxHeight: CGFloat
+        var dynamicHeight: Binding<CGFloat>
+
         init(_ parent: ChatTextEditor) {
             self.parent = parent
             self.onSubmit = parent.onSubmit
+            self.maxHeight = parent.maxHeight
+            self.dynamicHeight = parent.$dynamicHeight
         }
-        
+
         func textViewDidChange(_ textView: UITextView) {
             parent.text = textView.text
+            recalculateHeight()
         }
-        
+
+        func recalculateHeight() {
+            guard let textView else { return }
+            let targetSize = CGSize(width: textView.bounds.width, height: .greatestFiniteMagnitude)
+            let fitted = textView.sizeThatFits(targetSize)
+
+            // Ensure a comfortable single-line height baseline
+            let minHeight: CGFloat = 20
+            let target = min(maxHeight, max(minHeight, fitted.height))
+
+            if abs(dynamicHeight.wrappedValue - target) > 0.5 {
+                DispatchQueue.main.async {
+                    self.dynamicHeight.wrappedValue = target
+                }
+            }
+        }
+
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
             // Check if Enter was pressed (newline character)
             if text == "\n" {
@@ -170,13 +239,13 @@ struct ChatTextEditor: UIViewRepresentable {
                     // Shift is held - allow newline
                     return true
                 }
-                
+
                 // For software keyboard, we'll use a simple heuristic:
                 // If the text already has content and user presses enter, submit
                 // This matches common chat app behavior
                 let currentText = (textView.text as NSString).replacingCharacters(in: range, with: text)
                 let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
-                
+
                 // Submit if there's content
                 if !trimmed.isEmpty {
                     // Check if this is a "quick enter" (no shift held on hardware keyboard)
@@ -206,12 +275,18 @@ struct MessageInputBar: View {
     let onSend: () -> Void
     let focus: FocusState<Bool>.Binding?
 
+    private let inputMaxHeight: CGFloat = 120
+    @State private var inputHeight: CGFloat = 20
+
     @State private var selectedItem: PhotosPickerItem?
     @State private var showFileImporter = false
     @State private var showPhotoPicker = false
     @State private var showVideoImporter = false
     @State private var showAudioImporter = false
     @State private var showAnyFileImporter = false
+
+    // VS Code Bridge
+    @ObservedObject private var bridgeServer = BridgeServer.shared
 
     private let conversationId: String?
 
@@ -296,6 +371,11 @@ struct MessageInputBar: View {
             HStack(alignment: .center, spacing: 8) {
                 let capability = attachmentCapability
 
+                // VS Code Bridge Toggle (macOS only)
+                #if os(macOS)
+                bridgeButton
+                #endif
+
                 // Attachment Button
                 if capability.images || capability.documents || capability.video || capability.audio {
                     attachmentMenu(capability: capability)
@@ -303,12 +383,12 @@ struct MessageInputBar: View {
 
                 // Text input area
                 textInputArea
-                
+
                 // Send button
                 sendButton
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 22)
                     .fill(AppColors.substrateSecondary.opacity(0.85))
@@ -500,12 +580,14 @@ struct MessageInputBar: View {
                 text: $text,
                 placeholder: "Type a message...",
                 isDisabled: isLoading,
+                maxHeight: inputMaxHeight,
+                dynamicHeight: $inputHeight,
                 onSubmit: handleSend
             )
-            .frame(minHeight: 20, maxHeight: 120)
+            .frame(height: inputHeight)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 2)
+        .padding(.vertical, 1)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(AppColors.substrateTertiary.opacity(0.4))
@@ -523,7 +605,7 @@ struct MessageInputBar: View {
                 } else {
                     Image(systemName: "arrow.up")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(canSend && !isLoading ? AppColors.signalLichen : .white)
                 }
             }
             .frame(width: 28, height: 28)
@@ -539,6 +621,59 @@ struct MessageInputBar: View {
         .scaleEffect(canSend ? 1.0 : 0.95)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: canSend)
     }
+
+    #if os(macOS)
+    @ViewBuilder
+    private var bridgeButton: some View {
+        Button {
+            Task {
+                if bridgeServer.isRunning {
+                    await bridgeServer.stop()
+                } else {
+                    await bridgeServer.start()
+                }
+            }
+        } label: {
+            Image(systemName: bridgeIconName)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(bridgeIconColor)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(bridgeTooltip)
+    }
+
+    private var bridgeIconName: String {
+        if bridgeServer.isConnected {
+            return "personalhotspot"
+        } else if bridgeServer.isRunning {
+            return "personalhotspot"
+        } else {
+            return "personalhotspot.slash"
+        }
+    }
+
+    private var bridgeIconColor: Color {
+        if bridgeServer.isConnected {
+            return AppColors.signalLichen
+        } else if bridgeServer.isRunning {
+            return AppColors.textSecondary.opacity(0.8)
+        } else {
+            return AppColors.textSecondary.opacity(0.5)
+        }
+    }
+
+    private var bridgeTooltip: String {
+        if bridgeServer.isConnected, let session = bridgeServer.connectedSession {
+            return "Connected to \(session.displayName)"
+        } else if bridgeServer.isRunning {
+            return "Waiting for VS Code connection..."
+        } else {
+            return "Start VS Code Bridge"
+        }
+    }
+    #endif
     
     // MARK: - Helper Methods
     
