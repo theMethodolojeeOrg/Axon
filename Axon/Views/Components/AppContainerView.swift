@@ -415,30 +415,46 @@ struct ChatContainerView: View {
             AudioPlayerView(ttsService: ttsService)
 
             // Tool approval overlay (Claude Code style)
+            // Uses a full-screen overlay with semi-transparent background to ensure visibility
             if let pendingApproval = toolApprovalService.pendingApproval {
-                VStack {
-                    Spacer()
-                    ToolApprovalRequestView(
-                        approval: pendingApproval,
-                        onApprove: {
-                            await toolApprovalService.approve()
-                        },
-                        onApproveForSession: {
-                            await toolApprovalService.approveForSession()
-                        },
-                        onDeny: {
-                            toolApprovalService.deny()
-                        },
-                        onStop: {
-                            toolApprovalService.stop()
+                ZStack {
+                    // Semi-transparent backdrop to draw attention
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            // Dismiss keyboard if open, but don't dismiss the approval
+                            isInputFocused = false
                         }
-                    )
-                    .environmentObject(BiometricAuthService.shared)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 120) // Above the input bar
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+
+                    VStack {
+                        Spacer()
+                        ToolApprovalRequestView(
+                            approval: pendingApproval,
+                            onApprove: {
+                                await toolApprovalService.approve()
+                            },
+                            onApproveForSession: {
+                                await toolApprovalService.approveForSession()
+                            },
+                            onDeny: {
+                                toolApprovalService.deny()
+                            },
+                            onStop: {
+                                toolApprovalService.stop()
+                            }
+                        )
+                        .environmentObject(BiometricAuthService.shared)
+                        .padding(.horizontal, 16)
+                        #if os(iOS)
+                        .padding(.bottom, 32) // Smaller padding on iOS - sits above safe area
+                        #else
+                        .padding(.bottom, 120) // Above the input bar on macOS
+                        #endif
+                    }
                 }
+                .transition(.opacity)
                 .animation(AppAnimations.standardEasing, value: toolApprovalService.pendingApproval != nil)
+                .zIndex(999) // Ensure it's always on top
             }
         }
         .task(id: conversation?.id) {
