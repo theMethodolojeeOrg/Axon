@@ -112,6 +112,34 @@ enum CanonicalModelKey: String, CaseIterable, Hashable, Codable {
     case grok40709 = "grok-4-0709"
     case grok3Mini = "grok-3-mini"
     case grok3 = "grok-3"
+
+    // Perplexity
+    case sonarReasoningPro = "sonar-reasoning-pro"
+    case sonarReasoning = "sonar-reasoning"
+    case sonarPro = "sonar-pro"
+    case sonar = "sonar"
+
+    // DeepSeek
+    case deepseekReasoner = "deepseek-reasoner"
+    case deepseekChat = "deepseek-chat"
+
+    // Z.ai (Zhipu AI)
+    case glm46 = "glm-4.6"
+    case glm46v = "glm-4.6v"
+    case glm46vFlash = "glm-4.6v-flash"
+    case glm45 = "glm-4.5"
+    case glm45Air = "glm-4.5-air"
+    case glm45v = "glm-4.5v"
+
+    // MiniMax
+    case minimaxM2 = "minimax-m2"
+    case minimaxM2Stable = "minimax-m2-stable"
+
+    // Mistral
+    case mistralLarge = "mistral-large"
+    case pixtralLarge = "pixtral-large"
+    case pixtral12b = "pixtral-12b"
+    case codestral = "codestral"
 }
 
 struct PricingRegistry {
@@ -155,7 +183,35 @@ struct PricingRegistry {
         .grokCodeFast1: .init(inputPerMTokUSD: 0.20, outputPerMTokUSD: 1.50, cachedInputPerMTokUSD: 0.05, notes: nil),
         .grok40709: .init(inputPerMTokUSD: 3.00, outputPerMTokUSD: 15.00, cachedInputPerMTokUSD: 0.75, notes: nil),
         .grok3Mini: .init(inputPerMTokUSD: 0.30, outputPerMTokUSD: 0.50, cachedInputPerMTokUSD: nil, notes: nil),
-        .grok3: .init(inputPerMTokUSD: 3.00, outputPerMTokUSD: 15.00, cachedInputPerMTokUSD: nil, notes: nil)
+        .grok3: .init(inputPerMTokUSD: 3.00, outputPerMTokUSD: 15.00, cachedInputPerMTokUSD: nil, notes: nil),
+
+        // Perplexity (note: also charges per-request for search, not tracked here)
+        .sonarReasoningPro: .init(inputPerMTokUSD: 2.00, outputPerMTokUSD: 8.00, cachedInputPerMTokUSD: nil, notes: "Online search + reasoning"),
+        .sonarReasoning: .init(inputPerMTokUSD: 1.00, outputPerMTokUSD: 5.00, cachedInputPerMTokUSD: nil, notes: "Online search + reasoning"),
+        .sonarPro: .init(inputPerMTokUSD: 3.00, outputPerMTokUSD: 15.00, cachedInputPerMTokUSD: nil, notes: "Online search"),
+        .sonar: .init(inputPerMTokUSD: 1.00, outputPerMTokUSD: 1.00, cachedInputPerMTokUSD: nil, notes: "Online search"),
+
+        // DeepSeek (cache hit pricing significantly lower)
+        .deepseekReasoner: .init(inputPerMTokUSD: 0.55, outputPerMTokUSD: 2.19, cachedInputPerMTokUSD: 0.14, notes: "R1 reasoning model"),
+        .deepseekChat: .init(inputPerMTokUSD: 0.27, outputPerMTokUSD: 1.10, cachedInputPerMTokUSD: 0.07, notes: "V3 chat model"),
+
+        // Z.ai (Zhipu AI)
+        .glm46: .init(inputPerMTokUSD: 0.60, outputPerMTokUSD: 2.20, cachedInputPerMTokUSD: nil, notes: "Flagship text"),
+        .glm46v: .init(inputPerMTokUSD: 0.30, outputPerMTokUSD: 0.90, cachedInputPerMTokUSD: nil, notes: "Flagship vision + thinking"),
+        .glm46vFlash: .init(inputPerMTokUSD: 0.15, outputPerMTokUSD: 0.45, cachedInputPerMTokUSD: nil, notes: "Fast vision"),
+        .glm45: .init(inputPerMTokUSD: 0.60, outputPerMTokUSD: 2.20, cachedInputPerMTokUSD: nil, notes: nil),
+        .glm45Air: .init(inputPerMTokUSD: 0.30, outputPerMTokUSD: 0.90, cachedInputPerMTokUSD: nil, notes: "Balanced tier"),
+        .glm45v: .init(inputPerMTokUSD: 0.60, outputPerMTokUSD: 1.80, cachedInputPerMTokUSD: nil, notes: "Multimodal"),
+
+        // MiniMax (extremely low pricing)
+        .minimaxM2: .init(inputPerMTokUSD: 0.15, outputPerMTokUSD: 0.60, cachedInputPerMTokUSD: nil, notes: "1M context, agentic"),
+        .minimaxM2Stable: .init(inputPerMTokUSD: 0.15, outputPerMTokUSD: 0.60, cachedInputPerMTokUSD: nil, notes: "1M context, stable"),
+
+        // Mistral
+        .mistralLarge: .init(inputPerMTokUSD: 2.00, outputPerMTokUSD: 6.00, cachedInputPerMTokUSD: nil, notes: "Flagship"),
+        .pixtralLarge: .init(inputPerMTokUSD: 2.00, outputPerMTokUSD: 6.00, cachedInputPerMTokUSD: nil, notes: "Flagship vision"),
+        .pixtral12b: .init(inputPerMTokUSD: 0.10, outputPerMTokUSD: 0.10, cachedInputPerMTokUSD: nil, notes: "Edge vision"),
+        .codestral: .init(inputPerMTokUSD: 0.20, outputPerMTokUSD: 0.60, cachedInputPerMTokUSD: nil, notes: "Code optimized")
     ]
 
     static func price(for key: CanonicalModelKey, usedContextTokens: Int? = nil, inputIsAudio: Bool = false) -> ModelPricing {
@@ -236,6 +292,29 @@ struct PricingKeyResolver {
         if lower.contains("grok-4-0709") { return .grok40709 }
         if lower.contains("grok-3-mini") { return .grok3Mini }
         if lower.contains("grok-3") { return .grok3 }
+        // Perplexity
+        if lower.contains("sonar-reasoning-pro") { return .sonarReasoningPro }
+        if lower.contains("sonar-reasoning") { return .sonarReasoning }
+        if lower.contains("sonar-pro") { return .sonarPro }
+        if lower == "sonar" || lower.hasPrefix("sonar-") { return .sonar }
+        // DeepSeek
+        if lower.contains("deepseek-reasoner") || lower.contains("deepseek-r1") { return .deepseekReasoner }
+        if lower.contains("deepseek-chat") || lower.contains("deepseek-v3") { return .deepseekChat }
+        // Z.ai (Zhipu AI)
+        if lower.contains("glm-4.6v-flash") { return .glm46vFlash }
+        if lower.contains("glm-4.6v") { return .glm46v }
+        if lower.contains("glm-4.6") { return .glm46 }
+        if lower.contains("glm-4.5-air") { return .glm45Air }
+        if lower.contains("glm-4.5v") { return .glm45v }
+        if lower.contains("glm-4.5") { return .glm45 }
+        // MiniMax
+        if lower.contains("minimax-m2-stable") { return .minimaxM2Stable }
+        if lower.contains("minimax-m2") { return .minimaxM2 }
+        // Mistral
+        if lower.contains("mistral-large") { return .mistralLarge }
+        if lower.contains("pixtral-large") { return .pixtralLarge }
+        if lower.contains("pixtral-12b") { return .pixtral12b }
+        if lower.contains("codestral") { return .codestral }
         return nil
     }
 
@@ -245,6 +324,11 @@ struct PricingKeyResolver {
         case .openai: return .gpt5Mini
         case .gemini: return .gemini25Flash
         case .xai: return .grok3Mini
+        case .perplexity: return .sonar
+        case .deepseek: return .deepseekChat
+        case .zai: return .glm45Air
+        case .minimax: return .minimaxM2
+        case .mistral: return .codestral
         }
     }
 }

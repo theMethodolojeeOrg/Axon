@@ -20,247 +20,65 @@ struct ChatInfoSettingsView: View {
     @State private var estimatedTokens: Int = 0
 
     var body: some View {
+        #if os(macOS)
+        macOSBody
+        #else
+        iOSBody
+        #endif
+    }
+
+    #if os(macOS)
+    private var macOSBody: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                // Header
+                HStack {
+                    Text("Chat Settings")
+                        .font(AppTypography.titleLarge())
+                        .foregroundColor(AppColors.textPrimary)
+
+                    Spacer()
+
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(AppColors.signalMercury)
+                }
+                .padding(.bottom, 8)
+
+                mainContent
+            }
+            .padding(24)
+        }
+        .background(AppColors.substratePrimary)
+        .frame(minWidth: 480, idealWidth: 520, minHeight: 500, idealHeight: 600)
+        .task {
+            loadConversationOverrides()
+            await estimateTokenCount()
+        }
+    }
+    #endif
+
+    #if !os(macOS)
+    private var iOSBody: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    // MARK: - Provider Selection
-
-                    ChatInfoSection(title: "AI Provider") {
-                        let allProviders = settingsViewModel.allUnifiedProviders()
-                        let currentProvider = selectedProvider ?? settingsViewModel.currentUnifiedProvider()
-
-                        Picker(selection: Binding(
-                            get: { currentProvider?.id ?? "builtin_anthropic" },
-                            set: { newProviderId in
-                                if let provider = allProviders.first(where: { $0.id == newProviderId }) {
-                                    selectedProvider = provider
-                                    // Auto-select first model from new provider
-                                    let providerIndex = settingsViewModel.settings.customProviders.firstIndex(where: {
-                                        if case .custom(let config) = provider {
-                                            return $0.id == config.id
-                                        }
-                                        return false
-                                    }) ?? 0
-                                    let models = provider.availableModels(customProviderIndex: providerIndex + 1)
-                                    selectedModel = models.first
-
-                                    // Save override for this conversation
-                                    saveConversationOverrides()
-                                }
-                            }
-                        )) {
-                            Section("Built-in Providers") {
-                                ForEach(AIProvider.allCases) { provider in
-                                    Text(provider.displayName).tag("builtin_\(provider.rawValue)")
-                                }
-                            }
-
-                            if !settingsViewModel.settings.customProviders.isEmpty {
-                                Section("Custom Providers") {
-                                    ForEach(settingsViewModel.settings.customProviders) { provider in
-                                        Text(provider.providerName).tag("custom_\(provider.id.uuidString)")
-                                    }
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: currentProvider?.isCustom == true ? "server.rack" : "cpu.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(AppColors.signalMercury)
-                                    .frame(width: 32)
-
-                                Text(currentProvider?.displayName ?? "Select Provider")
-                                    .font(AppTypography.bodyMedium())
-                                    .foregroundColor(AppColors.textPrimary)
-
-                                Spacer()
-                            }
-                            .padding()
-                            .background(AppColors.substrateSecondary)
-                            .cornerRadius(8)
-                        }
-                        .pickerStyle(.menu)
-                    }
-
-                    // MARK: - Model Selection
-
-                    ChatInfoSection(title: "Model") {
-                        if let provider = selectedProvider ?? settingsViewModel.currentUnifiedProvider() {
-                            let providerIndex = settingsViewModel.settings.customProviders.firstIndex(where: {
-                                if case .custom(let config) = provider {
-                                    return $0.id == config.id
-                                }
-                                return false
-                            }) ?? 0
-                            let availableModels = provider.availableModels(customProviderIndex: providerIndex + 1)
-                            let currentModel = selectedModel ?? availableModels.first
-
-                            // Filter models by context window if we have token estimate
-                            let validModels = availableModels.filter { model in
-                                estimatedTokens == 0 || model.contextWindow >= estimatedTokens
-                            }
-
-                            Picker(selection: Binding(
-                                get: { currentModel?.id ?? "" },
-                                set: { newModelId in
-                                    if let model = availableModels.first(where: { $0.id == newModelId }) {
-                                        selectedModel = model
-                                        saveConversationOverrides()
-                                    }
-                                }
-                            )) {
-                                ForEach(validModels) { model in
-                                    Text(model.name).tag(model.id)
-                                }
-
-                                if !validModels.isEmpty && validModels.count < availableModels.count {
-                                    Section("Insufficient Context") {
-                                        ForEach(availableModels.filter { !validModels.contains($0) }) { model in
-                                            Text("\(model.name) (needs \(model.contextWindow / 1000)K)")
-                                                .tag(model.id)
-                                                .foregroundColor(AppColors.textDisabled)
-                                        }
-                                    }
-                                }
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "brain.head.profile")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(AppColors.signalMercury)
-                                        .frame(width: 32)
-
-                                    Text(currentModel?.name ?? "Select Model")
-                                        .font(AppTypography.bodyMedium())
-                                        .foregroundColor(AppColors.textPrimary)
-
-                                    Spacer()
-                                }
-                                .padding()
-                                .background(AppColors.substrateSecondary)
-                                .cornerRadius(8)
-                            }
-                            .pickerStyle(.menu)
-                        }
-                    }
-
-                    // MARK: - Context Window Progress
-
-                    ChatInfoSection(title: "Context Usage") {
-                        if let model = selectedModel ?? settingsViewModel.currentUnifiedModel() {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Text("This Conversation")
-                                        .font(AppTypography.bodySmall())
-                                        .foregroundColor(AppColors.textSecondary)
-
-                                    Spacer()
-
-                                    Text("\(formatNumber(estimatedTokens)) / \(formatNumber(model.contextWindow))")
-                                        .font(AppTypography.bodySmall(.medium))
-                                        .foregroundColor(AppColors.textPrimary)
-                                }
-
-                                // Progress bar
-                                GeometryReader { geometry in
-                                    ZStack(alignment: .leading) {
-                                        // Background
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(AppColors.substrateTertiary)
-                                            .frame(height: 12)
-
-                                        // Fill
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(progressColor)
-                                            .frame(width: geometry.size.width * progressPercentage, height: 12)
-                                    }
-                                }
-                                .frame(height: 12)
-
-                                Text("\(Int(progressPercentage * 100))% of context window used")
-                                    .font(AppTypography.labelSmall())
-                                    .foregroundColor(AppColors.textTertiary)
-                            }
-                            .padding()
-                            .background(AppColors.substrateSecondary)
-                            .cornerRadius(8)
-                        }
-                    }
-
-                    // MARK: - Cost Information
-
-                    ChatInfoSection(title: "Costs") {
-                        VStack(spacing: 12) {
-                            // Total this month
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("This Month")
-                                        .font(AppTypography.bodySmall())
-                                        .foregroundColor(AppColors.textSecondary)
-                                    Text(costService.totalThisMonthUSDFriendly)
-                                        .font(AppTypography.titleMedium())
-                                        .foregroundColor(AppColors.textPrimary)
-                                }
-
-                                Spacer()
-
-                                NavigationLink(destination: CostsBreakdownView()) {
-                                    HStack(spacing: 6) {
-                                        Text("View Details")
-                                            .font(AppTypography.bodySmall())
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 12))
-                                    }
-                                    .foregroundColor(AppColors.signalMercury)
-                                }
-                            }
-                            .padding()
-                            .background(AppColors.substrateSecondary)
-                            .cornerRadius(8)
-                        }
-                    }
-
-                    // MARK: - Info Note
-
-                    HStack(spacing: 12) {
-                        Image(systemName: "info.circle")
-                            .foregroundColor(AppColors.signalMercury)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Model Switching")
-                                .font(AppTypography.bodySmall(.medium))
-                                .foregroundColor(AppColors.textPrimary)
-                            Text("Changing the model sends the entire conversation history to the new model for continuity. Costs are tracked globally across all conversations and providers.")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .padding()
-                    .background(AppColors.signalMercury.opacity(0.1))
-                    .cornerRadius(8)
+                    mainContent
                 }
                 .padding()
             }
             .background(AppColors.substratePrimary)
             .navigationTitle("Chat Settings")
-            #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
             .toolbar {
-                #if os(macOS)
-                ToolbarItem {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundColor(AppColors.signalMercury)
-                }
-                #else
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
                     }
                     .foregroundColor(AppColors.signalMercury)
                 }
-                #endif
             }
         }
         .task {
@@ -268,8 +86,259 @@ struct ChatInfoSettingsView: View {
             await estimateTokenCount()
         }
     }
+    #endif
+
+    @ViewBuilder
+    private var mainContent: some View {
+        // MARK: - Provider Selection
+        ChatInfoSection(title: "AI Provider") {
+            let allProviders = settingsViewModel.allUnifiedProviders()
+            let currentProvider = selectedProvider ?? settingsViewModel.currentUnifiedProvider()
+
+            StyledMenuPicker(
+                icon: currentProvider?.isCustom == true ? "server.rack" : "cpu.fill",
+                title: currentProvider?.displayName ?? "Select Provider",
+                selection: Binding(
+                    get: { currentProvider?.id ?? "builtin_anthropic" },
+                    set: { newProviderId in
+                        selectProvider(allProviders.first(where: { $0.id == newProviderId }))
+                    }
+                )
+            ) {
+                #if os(macOS)
+                Section("Built-in Providers") {
+                    ForEach(AIProvider.allCases) { provider in
+                        MenuButtonItem(
+                            id: "builtin_\(provider.rawValue)",
+                            label: provider.displayName,
+                            isSelected: currentProvider?.id == "builtin_\(provider.rawValue)"
+                        ) {
+                            selectProvider(allProviders.first(where: { $0.id == "builtin_\(provider.rawValue)" }))
+                        }
+                    }
+                }
+
+                if !settingsViewModel.settings.customProviders.isEmpty {
+                    Section("Custom Providers") {
+                        ForEach(settingsViewModel.settings.customProviders) { provider in
+                            MenuButtonItem(
+                                id: "custom_\(provider.id.uuidString)",
+                                label: provider.providerName,
+                                isSelected: currentProvider?.id == "custom_\(provider.id.uuidString)"
+                            ) {
+                                selectProvider(allProviders.first(where: { $0.id == "custom_\(provider.id.uuidString)" }))
+                            }
+                        }
+                    }
+                }
+                #else
+                Section("Built-in Providers") {
+                    ForEach(AIProvider.allCases) { provider in
+                        Text(provider.displayName).tag("builtin_\(provider.rawValue)")
+                    }
+                }
+
+                if !settingsViewModel.settings.customProviders.isEmpty {
+                    Section("Custom Providers") {
+                        ForEach(settingsViewModel.settings.customProviders) { provider in
+                            Text(provider.providerName).tag("custom_\(provider.id.uuidString)")
+                        }
+                    }
+                }
+                #endif
+            }
+        }
+
+        // MARK: - Model Selection
+        ChatInfoSection(title: "Model") {
+            if let provider = selectedProvider ?? settingsViewModel.currentUnifiedProvider() {
+                let providerIndex = settingsViewModel.settings.customProviders.firstIndex(where: {
+                    if case .custom(let config) = provider {
+                        return $0.id == config.id
+                    }
+                    return false
+                }) ?? 0
+                let availableModels = provider.availableModels(customProviderIndex: providerIndex + 1)
+                let currentModel = selectedModel ?? availableModels.first
+
+                // Filter models by context window if we have token estimate
+                let validModels = availableModels.filter { model in
+                    estimatedTokens == 0 || model.contextWindow >= estimatedTokens
+                }
+                let insufficientModels = availableModels.filter { !validModels.contains($0) }
+
+                StyledMenuPicker(
+                    icon: "brain.head.profile",
+                    title: currentModel?.name ?? "Select Model",
+                    selection: Binding(
+                        get: { currentModel?.id ?? "" },
+                        set: { newModelId in
+                            if let model = availableModels.first(where: { $0.id == newModelId }) {
+                                selectModel(model)
+                            }
+                        }
+                    )
+                ) {
+                    #if os(macOS)
+                    ForEach(validModels) { model in
+                        MenuButtonItem(
+                            id: model.id,
+                            label: model.name,
+                            isSelected: currentModel?.id == model.id
+                        ) {
+                            selectModel(model)
+                        }
+                    }
+
+                    if !validModels.isEmpty && !insufficientModels.isEmpty {
+                        Section("Insufficient Context") {
+                            ForEach(insufficientModels) { model in
+                                Button {
+                                    selectModel(model)
+                                } label: {
+                                    Text("\(model.name) (needs \(model.contextWindow / 1000)K)")
+                                }
+                                .disabled(true)
+                            }
+                        }
+                    }
+                    #else
+                    ForEach(validModels) { model in
+                        Text(model.name).tag(model.id)
+                    }
+
+                    if !validModels.isEmpty && !insufficientModels.isEmpty {
+                        Section("Insufficient Context") {
+                            ForEach(insufficientModels) { model in
+                                Text("\(model.name) (needs \(model.contextWindow / 1000)K)")
+                                    .tag(model.id)
+                                    .foregroundColor(AppColors.textDisabled)
+                            }
+                        }
+                    }
+                    #endif
+                }
+            }
+        }
+
+        // MARK: - Context Window Progress
+        ChatInfoSection(title: "Context Usage") {
+            if let model = selectedModel ?? settingsViewModel.currentUnifiedModel() {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("This Conversation")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        Spacer()
+
+                        Text("\(formatNumber(estimatedTokens)) / \(formatNumber(model.contextWindow))")
+                            .font(AppTypography.bodySmall(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+                    }
+
+                    // Progress bar
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            // Background
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(AppColors.substrateTertiary)
+                                .frame(height: 12)
+
+                            // Fill
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(progressColor)
+                                .frame(width: geometry.size.width * progressPercentage, height: 12)
+                        }
+                    }
+                    .frame(height: 12)
+
+                    Text("\(Int(progressPercentage * 100))% of context window used")
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                }
+                .padding()
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
+            }
+        }
+
+        // MARK: - Cost Information
+        ChatInfoSection(title: "Costs") {
+            VStack(spacing: 12) {
+                // Total this month
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("This Month")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textSecondary)
+                        Text(costService.totalThisMonthUSDFriendly)
+                            .font(AppTypography.titleMedium())
+                            .foregroundColor(AppColors.textPrimary)
+                    }
+
+                    Spacer()
+
+                    #if !os(macOS)
+                    NavigationLink(destination: CostsBreakdownView()) {
+                        HStack(spacing: 6) {
+                            Text("View Details")
+                                .font(AppTypography.bodySmall())
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                        }
+                        .foregroundColor(AppColors.signalMercury)
+                    }
+                    #endif
+                }
+                .padding()
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
+            }
+        }
+
+        // MARK: - Info Note
+        HStack(spacing: 12) {
+            Image(systemName: "info.circle")
+                .foregroundColor(AppColors.signalMercury)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Model Switching")
+                    .font(AppTypography.bodySmall(.medium))
+                    .foregroundColor(AppColors.textPrimary)
+                Text("Changing the model sends the entire conversation history to the new model for continuity. Costs are tracked globally across all conversations and providers.")
+                    .font(AppTypography.bodySmall())
+                    .foregroundColor(AppColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding()
+        .background(AppColors.signalMercury.opacity(0.1))
+        .cornerRadius(8)
+    }
 
     // MARK: - Helpers
+
+    private func selectProvider(_ provider: UnifiedProvider?) {
+        guard let provider = provider else { return }
+        selectedProvider = provider
+
+        // Auto-select first model from new provider
+        let providerIndex = settingsViewModel.settings.customProviders.firstIndex(where: {
+            if case .custom(let config) = provider {
+                return $0.id == config.id
+            }
+            return false
+        }) ?? 0
+        let models = provider.availableModels(customProviderIndex: providerIndex + 1)
+        selectedModel = models.first
+
+        saveConversationOverrides()
+    }
+
+    private func selectModel(_ model: UnifiedModel) {
+        selectedModel = model
+        saveConversationOverrides()
+    }
 
     private var progressPercentage: Double {
         guard let model = selectedModel ?? settingsViewModel.currentUnifiedModel() else { return 0 }

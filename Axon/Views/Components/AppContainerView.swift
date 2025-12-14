@@ -26,6 +26,10 @@ struct AppContainerView: View {
     @State private var showChatInfo = false
     @State private var showLaunchScreen: Bool = true
 
+    #if os(macOS)
+    @StateObject private var artifactPresenter = CodeArtifactPresenter()
+    #endif
+
     var body: some View {
         ZStack {
             #if os(macOS)
@@ -95,36 +99,15 @@ struct AppContainerView: View {
             )
             .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 420)
         } detail: {
-            ZStack {
-                AppColors.substratePrimary.ignoresSafeArea()
-
-                switch currentView {
-                case .chat:
-                    if selectedConversation == nil {
-                        MacDetailEmptyStateView(
-                            icon: "bubble.left.and.bubble.right",
-                            title: "No Chat Selected",
-                            message: "Choose a conversation from the sidebar, or start a new one.",
-                            primaryActionTitle: "New Chat",
-                            primaryAction: startNewChat
-                        )
-                    } else {
-                        ChatContainerView(
-                            conversation: selectedConversation,
-                            onNewChat: startNewChat,
-                            onConversationCreated: { conv in
-                                selectedConversation = conv
-                            }
-                        )
-                    }
-
-                case .memory:
-                    MemoryListView()
-
-                case .settings:
-                    SettingsView()
-                }
-            }
+            MacDetailWithInspector(
+                currentView: currentView,
+                selectedConversation: selectedConversation,
+                startNewChat: startNewChat,
+                onConversationCreated: { conv in
+                    selectedConversation = conv
+                },
+                presenter: artifactPresenter
+            )
             .toolbar {
                 ToolbarItem(placement: .navigation) {
                     Button {
@@ -153,6 +136,19 @@ struct AppContainerView: View {
                             ToolsStatusMenu(style: .pill)
                                 .fixedSize()
                         }
+                    }
+
+                    // Inspector toggle button
+                    ToolbarItem {
+                        Button {
+                            artifactPresenter.toggle()
+                        } label: {
+                            Label(
+                                artifactPresenter.isOpen ? "Hide Inspector" : "Show Inspector",
+                                systemImage: "apple.terminal.on.rectangle"
+                            )
+                        }
+                        .help(artifactPresenter.isOpen ? "Hide Code Inspector" : "Show Code Inspector")
                     }
                 }
             }
@@ -583,13 +579,17 @@ struct ChatContainerView: View {
                 }
                 .coordinateSpace(name: "chat_scroll")
                 .onPreferenceChange(BottomAnchorOffsetPreferenceKey.self) { bottomY in
-                    // When the bottom anchor is noticeably below the visible scroll area,
-                    // the user is scrolled up and we should show the jump button.
+                    // `bottomY` is the bottom anchor's minY in the scroll view's coordinate space.
+                    // As you scroll UP (reading older messages), the bottom anchor moves DOWN
+                    // relative to the viewport, so its Y value in the coordinate space DECREASES
+                    // (becomes smaller or negative as it goes below the visible area).
                     //
-                    // `bottomY` is in the scroll view's coordinate space.
-                    // When you're at the bottom, it's ~0 (or a small positive/negative).
-                    let threshold: CGFloat = 140
-                    let isAwayFromBottom = bottomY > threshold
+                    // When at the bottom (most recent messages), bottomY is near the viewport height.
+                    // When scrolled up, bottomY decreases toward 0 or negative.
+                    //
+                    // Show the jump button when NOT at the bottom (bottomY is small/negative).
+                    let threshold: CGFloat = 100
+                    let isAwayFromBottom = bottomY < threshold
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showScrollToBottom = isAwayFromBottom
                     }

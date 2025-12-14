@@ -50,16 +50,51 @@ struct GeneralSettingsView: View {
                 let allProviders = viewModel.allUnifiedProviders()
                 let currentProvider = viewModel.currentUnifiedProvider()
 
-                Picker(selection: Binding(
-                    get: { currentProvider?.id ?? "builtin_anthropic" },
-                    set: { newProviderId in
-                        if let selectedProvider = allProviders.first(where: { $0.id == newProviderId }) {
-                            Task {
-                                await viewModel.selectUnifiedProvider(selectedProvider)
+                StyledMenuPicker(
+                    icon: currentProvider?.isCustom == true ? "server.rack" : "cpu.fill",
+                    title: currentProvider?.displayName ?? "Select Provider",
+                    selection: Binding(
+                        get: { currentProvider?.id ?? "builtin_anthropic" },
+                        set: { newProviderId in
+                            if let selectedProvider = allProviders.first(where: { $0.id == newProviderId }) {
+                                Task {
+                                    await viewModel.selectUnifiedProvider(selectedProvider)
+                                }
+                            }
+                        }
+                    )
+                ) {
+                    #if os(macOS)
+                    Section("Built-in Providers") {
+                        ForEach(AIProvider.allCases) { provider in
+                            MenuButtonItem(
+                                id: "builtin_\(provider.rawValue)",
+                                label: provider.displayName,
+                                isSelected: currentProvider?.id == "builtin_\(provider.rawValue)"
+                            ) {
+                                if let selected = allProviders.first(where: { $0.id == "builtin_\(provider.rawValue)" }) {
+                                    Task { await viewModel.selectUnifiedProvider(selected) }
+                                }
                             }
                         }
                     }
-                )) {
+
+                    if !viewModel.settings.customProviders.isEmpty {
+                        Section("Custom Providers") {
+                            ForEach(viewModel.settings.customProviders) { provider in
+                                MenuButtonItem(
+                                    id: "custom_\(provider.id.uuidString)",
+                                    label: provider.providerName,
+                                    isSelected: currentProvider?.id == "custom_\(provider.id.uuidString)"
+                                ) {
+                                    if let selected = allProviders.first(where: { $0.id == "custom_\(provider.id.uuidString)" }) {
+                                        Task { await viewModel.selectUnifiedProvider(selected) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    #else
                     Section("Built-in Providers") {
                         ForEach(AIProvider.allCases) { provider in
                             Text(provider.displayName).tag("builtin_\(provider.rawValue)")
@@ -73,30 +108,8 @@ struct GeneralSettingsView: View {
                             }
                         }
                     }
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: currentProvider?.isCustom == true ? "server.rack" : "cpu.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(AppColors.signalMercury)
-                            .frame(width: 32)
-
-                        Text(currentProvider?.displayName ?? "Select Provider")
-                            .font(AppTypography.bodyMedium())
-                            .foregroundColor(AppColors.textPrimary)
-
-                        Spacer()
-                    }
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(AppColors.substrateSecondary)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(AppColors.glassBorder, lineWidth: 1)
-                            )
-                    )
+                    #endif
                 }
-                .pickerStyle(.menu)
             }
 
             // MARK: - Model Selection
@@ -109,43 +122,36 @@ struct GeneralSettingsView: View {
                 if let provider = currentProvider {
                     let availableModels = provider.availableModels(customProviderIndex: providerIndex + 1)
 
-                    Picker(selection: Binding(
-                        get: { currentModel?.id ?? "" },
-                        set: { newModelId in
-                            if let selectedModel = availableModels.first(where: { $0.id == newModelId }) {
-                                Task {
-                                    await viewModel.selectUnifiedModel(selectedModel)
+                    StyledMenuPicker(
+                        icon: "brain.head.profile",
+                        title: currentModel?.name ?? "Select a model",
+                        selection: Binding(
+                            get: { currentModel?.id ?? "" },
+                            set: { newModelId in
+                                if let selectedModel = availableModels.first(where: { $0.id == newModelId }) {
+                                    Task {
+                                        await viewModel.selectUnifiedModel(selectedModel)
+                                    }
                                 }
                             }
+                        )
+                    ) {
+                        #if os(macOS)
+                        ForEach(availableModels) { model in
+                            MenuButtonItem(
+                                id: model.id,
+                                label: model.name,
+                                isSelected: currentModel?.id == model.id
+                            ) {
+                                Task { await viewModel.selectUnifiedModel(model) }
+                            }
                         }
-                    )) {
+                        #else
                         ForEach(availableModels) { model in
                             Text(model.name).tag(model.id)
                         }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "brain.head.profile")
-                                .font(.system(size: 20))
-                                .foregroundColor(AppColors.signalMercury)
-                                .frame(width: 32)
-
-                            Text(currentModel?.name ?? "Select a model")
-                                .font(AppTypography.bodyMedium())
-                                .foregroundColor(AppColors.textPrimary)
-
-                            Spacer()
-                        }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(AppColors.substrateSecondary)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(AppColors.glassBorder, lineWidth: 1)
-                                )
-                        )
+                        #endif
                     }
-                    .pickerStyle(.menu)
 
                     if let selectedModel = currentModel {
                         // Selected Model Card (read-only)
@@ -329,6 +335,26 @@ struct GeneralSettingsView: View {
             // Prefer Grok 4 Fast Reasoning as default
             let candidates = models.filter { containsCaseInsensitive($0.name, "fast") || containsCaseInsensitive($0.id, "fast") }
             return candidates.max(by: { versionScore($0) < versionScore($1) })?.id
+        case .perplexity:
+            // Prefer Sonar (cheapest) as default
+            let candidates = models.filter { $0.id == "sonar" }
+            return candidates.first?.id ?? models.first?.id
+        case .deepseek:
+            // Prefer DeepSeek Chat (cheaper) as default
+            let candidates = models.filter { containsCaseInsensitive($0.id, "chat") }
+            return candidates.first?.id ?? models.first?.id
+        case .zai:
+            // Prefer GLM-4.5-Air (balanced) as default
+            let candidates = models.filter { containsCaseInsensitive($0.id, "air") }
+            return candidates.first?.id ?? models.first?.id
+        case .minimax:
+            // Prefer MiniMax-M2 as default
+            let candidates = models.filter { $0.id == "MiniMax-M2" }
+            return candidates.first?.id ?? models.first?.id
+        case .mistral:
+            // Prefer Codestral (cheapest) as default
+            let candidates = models.filter { containsCaseInsensitive($0.id, "codestral") }
+            return candidates.first?.id ?? models.first?.id
         }
     }
 
@@ -414,6 +440,24 @@ struct GeneralSettingsView: View {
             if id.contains("grok-4") { return "Grok 4" }
             if id.contains("grok-3") { return "Grok 3" }
             return "Grok Other"
+        case .perplexity:
+            if name.contains("reasoning") || id.contains("reasoning") { return "Reasoning" }
+            if name.contains("pro") || id.contains("pro") { return "Pro" }
+            return "Sonar"
+        case .deepseek:
+            if name.contains("reasoner") || id.contains("reasoner") { return "Reasoner" }
+            return "Chat"
+        case .zai:
+            if name.contains("4.6") || id.contains("4.6") { return "GLM-4.6" }
+            if name.contains("4.5") || id.contains("4.5") { return "GLM-4.5" }
+            return "GLM"
+        case .minimax:
+            if name.contains("stable") || id.contains("stable") { return "Stable" }
+            return "M2"
+        case .mistral:
+            if name.contains("pixtral") || id.contains("pixtral") { return "Pixtral" }
+            if name.contains("codestral") || id.contains("codestral") { return "Codestral" }
+            return "Large"
         }
     }
 
@@ -440,6 +484,20 @@ struct GeneralSettingsView: View {
             if id.contains("grok-4") || name.contains("grok-4") || name.contains("grok 4") { return "Grok 4 Series" }
             if id.contains("grok-3") || name.contains("grok-3") || name.contains("grok 3") { return "Grok 3 Series" }
             return "Other Grok"
+        case .perplexity:
+            if name.contains("reasoning") || id.contains("reasoning") { return "Reasoning Series" }
+            return "Sonar Series"
+        case .deepseek:
+            return "DeepSeek Series"
+        case .zai:
+            if name.contains("4.6") || id.contains("4.6") { return "GLM-4.6 Series" }
+            return "GLM-4.5 Series"
+        case .minimax:
+            return "MiniMax M2 Series"
+        case .mistral:
+            if name.contains("pixtral") || id.contains("pixtral") { return "Pixtral Series" }
+            if name.contains("codestral") || id.contains("codestral") { return "Codestral Series" }
+            return "Mistral Large Series"
         }
     }
 

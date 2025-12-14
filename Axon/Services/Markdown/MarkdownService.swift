@@ -78,7 +78,13 @@ extension MarkdownTheme {
             configuration.label
                 .markdownMargin(top: 2)
         }
-        // Styled code blocks
+        // Styled code blocks (minimal here)
+        //
+        // Note: We now render fenced code blocks at the message layer (see
+        // `AssistantMessageView`) so we can support:
+        // - accurate language label
+        // - perfect copy/download
+        // - artifact expansion
         .codeBlock { configuration in
             configuration.label
                 .markdownTextStyle {

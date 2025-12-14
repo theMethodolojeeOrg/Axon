@@ -15,6 +15,190 @@ import UIKit
 import AppKit
 #endif
 
+// MARK: - Custom Text Editor with Enter/Shift+Enter handling
+
+#if canImport(AppKit)
+/// macOS: NSTextView wrapper that handles Enter to send, Shift+Enter for newline
+struct ChatTextEditor: NSViewRepresentable {
+    @Binding var text: String
+    let placeholder: String
+    let isDisabled: Bool
+    let onSubmit: () -> Void
+    
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        let textView = ChatNSTextView()
+        
+        textView.delegate = context.coordinator
+        textView.isRichText = false
+        textView.allowsUndo = true
+        textView.font = NSFont.systemFont(ofSize: 15)
+        textView.textColor = NSColor.labelColor
+        textView.backgroundColor = .clear
+        textView.drawsBackground = false
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.textContainerInset = NSSize(width: 0, height: 4)
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.onSubmit = onSubmit
+        
+        scrollView.documentView = textView
+        scrollView.hasVerticalScroller = false
+        scrollView.hasHorizontalScroller = false
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        
+        context.coordinator.textView = textView
+        
+        return scrollView
+    }
+    
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? ChatNSTextView else { return }
+        
+        if textView.string != text {
+            textView.string = text
+        }
+        textView.isEditable = !isDisabled
+        textView.onSubmit = onSubmit
+        
+        // Update placeholder
+        context.coordinator.placeholder = placeholder
+        context.coordinator.updatePlaceholder()
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: ChatTextEditor
+        weak var textView: ChatNSTextView?
+        var placeholder: String = ""
+        
+        init(_ parent: ChatTextEditor) {
+            self.parent = parent
+            self.placeholder = parent.placeholder
+        }
+        
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            parent.text = textView.string
+            updatePlaceholder()
+        }
+        
+        func updatePlaceholder() {
+            // Placeholder is handled via the overlay in SwiftUI
+        }
+    }
+}
+
+/// Custom NSTextView that intercepts Enter key
+class ChatNSTextView: NSTextView {
+    var onSubmit: (() -> Void)?
+    
+    override func keyDown(with event: NSEvent) {
+        // Check for Enter key (keyCode 36) without Shift
+        if event.keyCode == 36 && !event.modifierFlags.contains(.shift) {
+            // Enter without shift - submit
+            onSubmit?()
+            return
+        }
+        // Otherwise, handle normally (Shift+Enter will insert newline)
+        super.keyDown(with: event)
+    }
+}
+
+#elseif canImport(UIKit)
+/// iOS: UITextView wrapper that handles Enter to send, Shift+Enter for newline
+struct ChatTextEditor: UIViewRepresentable {
+    @Binding var text: String
+    let placeholder: String
+    let isDisabled: Bool
+    let onSubmit: () -> Void
+    
+    func makeUIView(context: Context) -> UITextView {
+        let textView = UITextView()
+        textView.delegate = context.coordinator
+        textView.font = UIFont.systemFont(ofSize: 17)
+        textView.textColor = UIColor.label
+        textView.backgroundColor = .clear
+        textView.isScrollEnabled = true
+        textView.textContainerInset = UIEdgeInsets(top: 8, left: 0, bottom: 8, right: 0)
+        textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        
+        context.coordinator.textView = textView
+        
+        return textView
+    }
+    
+    func updateUIView(_ textView: UITextView, context: Context) {
+        if textView.text != text {
+            textView.text = text
+        }
+        textView.isEditable = !isDisabled
+        context.coordinator.onSubmit = onSubmit
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UITextViewDelegate {
+        var parent: ChatTextEditor
+        weak var textView: UITextView?
+        var onSubmit: (() -> Void)?
+        
+        init(_ parent: ChatTextEditor) {
+            self.parent = parent
+            self.onSubmit = parent.onSubmit
+        }
+        
+        func textViewDidChange(_ textView: UITextView) {
+            parent.text = textView.text
+        }
+        
+        func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+            // Check if Enter was pressed (newline character)
+            if text == "\n" {
+                // Check if hardware keyboard with shift is pressed
+                // On iOS, we check if there's a hardware keyboard event
+                if let window = textView.window,
+                   let keyCommands = window.keyCommands,
+                   keyCommands.contains(where: { $0.modifierFlags.contains(.shift) }) {
+                    // Shift is held - allow newline
+                    return true
+                }
+                
+                // For software keyboard, we'll use a simple heuristic:
+                // If the text already has content and user presses enter, submit
+                // This matches common chat app behavior
+                let currentText = (textView.text as NSString).replacingCharacters(in: range, with: text)
+                let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                // Submit if there's content
+                if !trimmed.isEmpty {
+                    // Check if this is a "quick enter" (no shift held on hardware keyboard)
+                    // We'll submit on enter for hardware keyboards
+                    #if targetEnvironment(macCatalyst)
+                    onSubmit?()
+                    return false
+                    #else
+                    // On iOS with software keyboard, allow newlines normally
+                    // Users can use the send button to submit
+                    return true
+                    #endif
+                }
+            }
+            return true
+        }
+    }
+}
+#endif
+
+// MARK: - Message Input Bar
+
 struct MessageInputBar: View {
     @Binding var text: String
     @Binding var attachments: [MessageAttachment]
@@ -27,6 +211,7 @@ struct MessageInputBar: View {
     @State private var showPhotoPicker = false
     @State private var showVideoImporter = false
     @State private var showAudioImporter = false
+    @State private var showAnyFileImporter = false
 
     private let conversationId: String?
 
@@ -77,16 +262,12 @@ struct MessageInputBar: View {
 
         switch providerString {
         case "anthropic":
-            // Claude: images and PDFs only
             return AttachmentCapability(images: true, documents: true, video: false, audio: false, description: "Claude supports images and PDFs.")
         case "gemini":
-            // Gemini: full multimodal support including video and audio
             return AttachmentCapability(images: true, documents: true, video: true, audio: true, description: "Gemini supports images, documents, video, and audio.")
         case "openai":
-            // GPT-4o: images only (audio input requires special handling)
             return AttachmentCapability(images: true, documents: false, video: false, audio: false, description: "GPT supports images.")
         case "grok":
-            // Grok: images only (JPEG, PNG)
             return AttachmentCapability(images: true, documents: false, video: false, audio: false, description: "Grok supports images only.")
         case "openai-compatible":
             return AttachmentCapability(images: true, documents: false, video: false, audio: false, description: "Images supported; other formats depend on the provider.")
@@ -94,310 +275,387 @@ struct MessageInputBar: View {
             return AttachmentCapability(images: true, documents: false, video: false, audio: false, description: "Images supported.")
         }
     }
-
-    @ViewBuilder
-    private var textFieldView: some View {
-        if let focus = focus {
-            TextField("Type a message...", text: $text, axis: .vertical)
-                .focused(focus)
-        } else {
-            TextField("Type a message...", text: $text, axis: .vertical)
-        }
+    
+    private var canSend: Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty
+    }
+    
+    private func handleSend() {
+        guard canSend && !isLoading else { return }
+        onSend()
     }
 
     var body: some View {
         VStack(spacing: 0) {
             // Attachments Preview
             if !attachments.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach($attachments) { $attachment in
-                            ZStack(alignment: .topTrailing) {
-                                // Preview
-                                if attachment.type == .image,
-                                   let base64 = attachment.base64,
-                                   let data = Data(base64Encoded: base64),
-                                   let image = PlatformImageCodec.image(from: data) {
-                                    #if canImport(UIKit)
-                                    Image(uiImage: image)
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: 60, height: 60)
-                                        .cornerRadius(8)
-                                        .clipped()
-                                    #elseif canImport(AppKit)
-                                    Image(nsImage: image)
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: 60, height: 60)
-                                        .cornerRadius(8)
-                                        .clipped()
-                                    #else
-                                    EmptyView()
-                                    #endif
-                                } else {
-                                    VStack {
-                                        Image(systemName: attachmentIcon(for: attachment.type))
-                                            .font(.system(size: 24))
-                                            .foregroundColor(attachmentIconColor(for: attachment.type))
-                                        Text(attachment.name ?? (attachment.type == .image ? "Image" : "File"))
-                                            .font(AppTypography.labelSmall())
-                                            .lineLimit(1)
-                                            .foregroundColor(AppColors.textPrimary)
-                                    }
-                                    .frame(width: 60, height: 60)
-                                    .background(AppColors.substrateTertiary)
-                                    .cornerRadius(8)
-                                }
-
-                                // Remove button
-                                Button(action: {
-                                    if let index = attachments.firstIndex(where: { $0.id == attachment.id }) {
-                                        attachments.remove(at: index)
-                                    }
-                                }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.red)
-                                        .background(Color.white.clipShape(Circle()))
-                                }
-                                .offset(x: 4, y: -4)
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
-                }
+                attachmentsPreview
             }
 
-            GlassCard(padding: 10, cornerRadius: 26) {
-                HStack(spacing: 10) {
-                    let capability = attachmentCapability
+            // Main input bar
+            HStack(alignment: .center, spacing: 8) {
+                let capability = attachmentCapability
 
-                    // Attachment Button
-                    Group {
-                        if capability.images || capability.documents || capability.video || capability.audio {
-                            Menu {
-                                if capability.images {
-                                    Button(action: { showPhotoPicker = true }) {
-                                        Label("Photo Library", systemImage: "photo")
-                                    }
-                                }
-
-                                if capability.video {
-                                    Button(action: { showVideoImporter = true }) {
-                                        Label("Video", systemImage: "video")
-                                    }
-                                }
-
-                                if capability.audio {
-                                    Button(action: { showAudioImporter = true }) {
-                                        Label("Audio", systemImage: "waveform")
-                                    }
-                                }
-
-                                if capability.documents {
-                                    Button(action: { showFileImporter = true }) {
-                                        Label("Document", systemImage: "doc")
-                                    }
-                                }
-
-                                Divider()
-
-                                Text(capability.description)
-                                    .font(AppTypography.labelSmall())
-                                    .foregroundColor(AppColors.textSecondary)
-                            } label: {
-                                Image(systemName: "paperclip")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(AppColors.textSecondary)
-                                    .frame(width: 32, height: 32)
-                            }
-                            .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
-                        }
-                    }
-
-                    // Text field
-                    textFieldView
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .font(AppTypography.bodyMedium())
-                        .foregroundColor(AppColors.textPrimary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(AppColors.substrateTertiary)
-                        .cornerRadius(20)
-                        .disabled(isLoading)
-                        .lineLimit(1...5)
-
-                    // Send button
-                    Button(action: onSend) {
-                        if isLoading {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .frame(width: 40, height: 40)
-                        } else {
-                            Image(systemName: "arrow.up.circle.fill")
-                                .font(.system(size: 40))
-                                .foregroundColor((text.trimmingCharacters(in: .whitespaces).isEmpty && attachments.isEmpty)
-                                    ? AppColors.textDisabled
-                                    : AppColors.signalMercury
-                                )
-                        }
-                    }
-                    .disabled(isLoading || (text.trimmingCharacters(in: .whitespaces).isEmpty && attachments.isEmpty))
+                // Attachment Button
+                if capability.images || capability.documents || capability.video || capability.audio {
+                    attachmentMenu(capability: capability)
                 }
+
+                // Text input area
+                textInputArea
+                
+                // Send button
+                sendButton
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(AppColors.substrateSecondary.opacity(0.85))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22)
+                            .stroke(AppColors.glassBorder, lineWidth: 0.5)
+                    )
+            )
+            .background(.ultraThinMaterial.opacity(0.4))
+            .clipShape(RoundedRectangle(cornerRadius: 22))
             .padding(.horizontal)
             .padding(.bottom, 8)
         }
         .onChange(of: selectedItem) { newItem in
-            guard let newItem = newItem else { return }
-            Task {
-                // Always reset selectedItem to allow re-selecting the same photo
-                defer { selectedItem = nil }
-
-                do {
-                    guard let data = try await newItem.loadTransferable(type: Data.self) else {
-                        print("[MessageInputBar] Failed to load photo data")
-                        return
-                    }
-                    guard let image = PlatformImageCodec.image(from: data) else {
-                        print("[MessageInputBar] Failed to decode image data")
-                        return
-                    }
-                    guard let compressedData = PlatformImageCodec.jpegData(from: image, compressionQuality: 0.7) else {
-                        print("[MessageInputBar] Failed to compress image")
-                        return
-                    }
-
-                    let base64 = compressedData.base64EncodedString()
-                    let attachment = MessageAttachment(
-                        type: .image,
-                        base64: base64,
-                        name: "image.jpg",
-                        mimeType: "image/jpeg"
-                    )
-                    attachments.append(attachment)
-                    print("[MessageInputBar] Successfully added image attachment (\(compressedData.count) bytes)")
-                } catch {
-                    print("[MessageInputBar] Photo loading error: \(error.localizedDescription)")
-                }
-            }
+            handlePhotoSelection(newItem)
         }
         .fileImporter(
             isPresented: $showFileImporter,
             allowedContentTypes: attachmentCapability.documents ? [.pdf, .text, .image, .item] : [.item],
             allowsMultipleSelection: false
         ) { result in
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else {
-                    print("[MessageInputBar] File import: No URL returned")
-                    return
-                }
-                guard url.startAccessingSecurityScopedResource() else {
-                    print("[MessageInputBar] Failed to access security-scoped resource: \(url.lastPathComponent)")
-                    return
-                }
-                defer { url.stopAccessingSecurityScopedResource() }
-
-                do {
-                    let data = try Data(contentsOf: url)
-                    let base64 = data.base64EncodedString()
-                    let mimeType = getMimeType(for: url)
-                    let attachment = MessageAttachment(
-                        type: .document,
-                        base64: base64,
-                        name: url.lastPathComponent,
-                        mimeType: mimeType
-                    )
-                    attachments.append(attachment)
-                    print("[MessageInputBar] Successfully added document: \(url.lastPathComponent) (\(data.count) bytes)")
-                } catch {
-                    print("[MessageInputBar] Failed to read file data: \(error.localizedDescription)")
-                }
-            case .failure(let error):
-                print("[MessageInputBar] File import failed: \(error.localizedDescription)")
-            }
+            handleFileImport(result, type: .document)
         }
-        // Video file importer
         .fileImporter(
             isPresented: $showVideoImporter,
             allowedContentTypes: [.movie, .video, .mpeg4Movie, .quickTimeMovie, .avi],
             allowsMultipleSelection: false
         ) { result in
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else {
-                    print("[MessageInputBar] Video import: No URL returned")
-                    return
-                }
-                guard url.startAccessingSecurityScopedResource() else {
-                    print("[MessageInputBar] Failed to access security-scoped resource for video: \(url.lastPathComponent)")
-                    return
-                }
-                defer { url.stopAccessingSecurityScopedResource() }
-
-                do {
-                    let data = try Data(contentsOf: url)
-                    // Check file size - warn if >20MB (Gemini inline limit)
-                    let fileSizeMB = Double(data.count) / (1024 * 1024)
-                    if fileSizeMB > 20 {
-                        print("[MessageInputBar] Warning: Video file is \(String(format: "%.1f", fileSizeMB))MB. Files >20MB should use File API upload.")
-                    }
-
-                    let base64 = data.base64EncodedString()
-                    let mimeType = getMimeType(for: url)
-                    let attachment = MessageAttachment(
-                        type: .video,
-                        base64: base64,
-                        name: url.lastPathComponent,
-                        mimeType: mimeType
-                    )
-                    attachments.append(attachment)
-                    print("[MessageInputBar] Successfully added video: \(url.lastPathComponent) (\(String(format: "%.1f", fileSizeMB))MB)")
-                } catch {
-                    print("[MessageInputBar] Failed to read video data: \(error.localizedDescription)")
-                }
-            case .failure(let error):
-                print("[MessageInputBar] Video import failed: \(error.localizedDescription)")
-            }
+            handleFileImport(result, type: .video)
         }
-        // Audio file importer
         .fileImporter(
             isPresented: $showAudioImporter,
             allowedContentTypes: [.audio, .mp3, .wav, .aiff, .mpeg4Audio],
             allowsMultipleSelection: false
         ) { result in
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else {
-                    print("[MessageInputBar] Audio import: No URL returned")
-                    return
+            handleFileImport(result, type: .audio)
+        }
+        // Mac: Any file picker
+        .fileImporter(
+            isPresented: $showAnyFileImporter,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: false
+        ) { result in
+            handleAnyFileImport(result)
+        }
+    }
+    
+    // MARK: - Subviews
+    
+    @ViewBuilder
+    private var attachmentsPreview: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach($attachments) { $attachment in
+                    attachmentPreviewItem(attachment: $attachment)
                 }
-                guard url.startAccessingSecurityScopedResource() else {
-                    print("[MessageInputBar] Failed to access security-scoped resource for audio: \(url.lastPathComponent)")
-                    return
-                }
-                defer { url.stopAccessingSecurityScopedResource() }
-
-                do {
-                    let data = try Data(contentsOf: url)
-                    let base64 = data.base64EncodedString()
-                    let mimeType = getMimeType(for: url)
-                    let attachment = MessageAttachment(
-                        type: .audio,
-                        base64: base64,
-                        name: url.lastPathComponent,
-                        mimeType: mimeType
-                    )
-                    attachments.append(attachment)
-                    print("[MessageInputBar] Successfully added audio: \(url.lastPathComponent) (\(data.count) bytes)")
-                } catch {
-                    print("[MessageInputBar] Failed to read audio data: \(error.localizedDescription)")
-                }
-            case .failure(let error):
-                print("[MessageInputBar] Audio import failed: \(error.localizedDescription)")
             }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+        }
+    }
+    
+    @ViewBuilder
+    private func attachmentPreviewItem(attachment: Binding<MessageAttachment>) -> some View {
+        ZStack(alignment: .topTrailing) {
+            // Preview
+            if attachment.wrappedValue.type == .image,
+               let base64 = attachment.wrappedValue.base64,
+               let data = Data(base64Encoded: base64),
+               let image = PlatformImageCodec.image(from: data) {
+                #if canImport(UIKit)
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 56, height: 56)
+                    .cornerRadius(10)
+                    .clipped()
+                #elseif canImport(AppKit)
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 56, height: 56)
+                    .cornerRadius(10)
+                    .clipped()
+                #else
+                EmptyView()
+                #endif
+            } else {
+                VStack(spacing: 4) {
+                    Image(systemName: attachmentIcon(for: attachment.wrappedValue.type))
+                        .font(.system(size: 20))
+                        .foregroundColor(attachmentIconColor(for: attachment.wrappedValue.type))
+                    Text(attachment.wrappedValue.name ?? (attachment.wrappedValue.type == .image ? "Image" : "File"))
+                        .font(.system(size: 9))
+                        .lineLimit(1)
+                        .foregroundColor(AppColors.textSecondary)
+                }
+                .frame(width: 56, height: 56)
+                .background(AppColors.substrateTertiary)
+                .cornerRadius(10)
+            }
+
+            // Remove button
+            Button(action: {
+                if let index = attachments.firstIndex(where: { $0.id == attachment.wrappedValue.id }) {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        attachments.remove(at: index)
+                    }
+                }
+            }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.white, .red)
+            }
+            .offset(x: 6, y: -6)
+        }
+    }
+    
+    @ViewBuilder
+    private func attachmentMenu(capability: AttachmentCapability) -> some View {
+        Menu {
+            #if os(macOS)
+            // Mac: Show "Choose File..." option first for any file
+            Button(action: { showAnyFileImporter = true }) {
+                Label("Choose File...", systemImage: "folder")
+            }
+            
+            Divider()
+            #endif
+            
+            if capability.images {
+                Button(action: { showPhotoPicker = true }) {
+                    Label("Photo Library", systemImage: "photo.on.rectangle")
+                }
+            }
+
+            if capability.video {
+                Button(action: { showVideoImporter = true }) {
+                    Label("Video", systemImage: "video")
+                }
+            }
+
+            if capability.audio {
+                Button(action: { showAudioImporter = true }) {
+                    Label("Audio", systemImage: "waveform")
+                }
+            }
+
+            if capability.documents {
+                Button(action: { showFileImporter = true }) {
+                    Label("Document", systemImage: "doc")
+                }
+            }
+
+            Divider()
+
+            Text(capability.description)
+                .font(.caption)
+                .foregroundColor(AppColors.textSecondary)
+        } label: {
+            HStack(spacing: 2) {
+                Image(systemName: "paperclip")
+                    .font(.system(size: 18, weight: .medium))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundColor(AppColors.textSecondary)
+            .frame(width: 36, height: 32)
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
+    }
+    
+    @ViewBuilder
+    private var textInputArea: some View {
+        ZStack(alignment: .leading) {
+            // Placeholder
+            if text.isEmpty {
+                Text("Type a message...")
+                    .font(.system(size: 15))
+                    .foregroundColor(AppColors.textSecondary.opacity(0.6))
+                    .padding(.leading, 4)
+                    .allowsHitTesting(false)
+            }
+            
+            // Custom text editor with Enter handling
+            ChatTextEditor(
+                text: $text,
+                placeholder: "Type a message...",
+                isDisabled: isLoading,
+                onSubmit: handleSend
+            )
+            .frame(minHeight: 20, maxHeight: 120)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(AppColors.substrateTertiary.opacity(0.4))
+        )
+    }
+    
+    @ViewBuilder
+    private var sendButton: some View {
+        Button(action: handleSend) {
+            Group {
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+            }
+            .frame(width: 28, height: 28)
+            .background(
+                Circle()
+                    .fill(canSend && !isLoading ? AppColors.signalLichen : AppColors.textDisabled.opacity(0.3))
+                    .shadow(color: canSend ? AppColors.signalLichen.opacity(0.3) : .clear, radius: 4, x: 0, y: 2)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isLoading || !canSend)
+        .animation(.easeInOut(duration: 0.15), value: canSend)
+        .scaleEffect(canSend ? 1.0 : 0.95)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: canSend)
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func handlePhotoSelection(_ newItem: PhotosPickerItem?) {
+        guard let newItem = newItem else { return }
+        Task {
+            defer { selectedItem = nil }
+
+            do {
+                guard let data = try await newItem.loadTransferable(type: Data.self) else {
+                    print("[MessageInputBar] Failed to load photo data")
+                    return
+                }
+                guard let image = PlatformImageCodec.image(from: data) else {
+                    print("[MessageInputBar] Failed to decode image data")
+                    return
+                }
+                guard let compressedData = PlatformImageCodec.jpegData(from: image, compressionQuality: 0.7) else {
+                    print("[MessageInputBar] Failed to compress image")
+                    return
+                }
+
+                let base64 = compressedData.base64EncodedString()
+                let attachment = MessageAttachment(
+                    type: .image,
+                    base64: base64,
+                    name: "image.jpg",
+                    mimeType: "image/jpeg"
+                )
+                withAnimation(.easeOut(duration: 0.2)) {
+                    attachments.append(attachment)
+                }
+                print("[MessageInputBar] Successfully added image attachment (\(compressedData.count) bytes)")
+            } catch {
+                print("[MessageInputBar] Photo loading error: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func handleFileImport(_ result: Result<[URL], Error>, type: MessageAttachment.AttachmentType) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else {
+                print("[MessageInputBar] File import: No URL returned")
+                return
+            }
+            guard url.startAccessingSecurityScopedResource() else {
+                print("[MessageInputBar] Failed to access security-scoped resource: \(url.lastPathComponent)")
+                return
+            }
+            defer { url.stopAccessingSecurityScopedResource() }
+
+            do {
+                let data = try Data(contentsOf: url)
+                let base64 = data.base64EncodedString()
+                let mimeType = getMimeType(for: url)
+                
+                // Check file size for video
+                if type == .video {
+                    let fileSizeMB = Double(data.count) / (1024 * 1024)
+                    if fileSizeMB > 20 {
+                        print("[MessageInputBar] Warning: Video file is \(String(format: "%.1f", fileSizeMB))MB. Files >20MB should use File API upload.")
+                    }
+                }
+                
+                let attachment = MessageAttachment(
+                    type: type,
+                    base64: base64,
+                    name: url.lastPathComponent,
+                    mimeType: mimeType
+                )
+                withAnimation(.easeOut(duration: 0.2)) {
+                    attachments.append(attachment)
+                }
+                print("[MessageInputBar] Successfully added \(type): \(url.lastPathComponent) (\(data.count) bytes)")
+            } catch {
+                print("[MessageInputBar] Failed to read file data: \(error.localizedDescription)")
+            }
+        case .failure(let error):
+            print("[MessageInputBar] File import failed: \(error.localizedDescription)")
+        }
+    }
+    
+    private func handleAnyFileImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else {
+                print("[MessageInputBar] File import: No URL returned")
+                return
+            }
+            guard url.startAccessingSecurityScopedResource() else {
+                print("[MessageInputBar] Failed to access security-scoped resource: \(url.lastPathComponent)")
+                return
+            }
+            defer { url.stopAccessingSecurityScopedResource() }
+
+            do {
+                let data = try Data(contentsOf: url)
+                let base64 = data.base64EncodedString()
+                let mimeType = getMimeType(for: url)
+                let type = attachmentType(for: url)
+                
+                let attachment = MessageAttachment(
+                    type: type,
+                    base64: base64,
+                    name: url.lastPathComponent,
+                    mimeType: mimeType
+                )
+                withAnimation(.easeOut(duration: 0.2)) {
+                    attachments.append(attachment)
+                }
+                print("[MessageInputBar] Successfully added file: \(url.lastPathComponent) (\(data.count) bytes, type: \(type))")
+            } catch {
+                print("[MessageInputBar] Failed to read file data: \(error.localizedDescription)")
+            }
+        case .failure(let error):
+            print("[MessageInputBar] File import failed: \(error.localizedDescription)")
         }
     }
 
@@ -430,7 +688,7 @@ struct MessageInputBar: View {
         case "webp":
             return "image/webp"
 
-        // Video formats (Gemini supported)
+        // Video formats
         case "mp4", "m4v":
             return "video/mp4"
         case "mpeg", "mpg":
@@ -448,7 +706,7 @@ struct MessageInputBar: View {
         case "3gp", "3gpp":
             return "video/3gpp"
 
-        // Audio formats (Gemini supported)
+        // Audio formats
         case "wav":
             return "audio/wav"
         case "mp3":
@@ -493,7 +751,6 @@ struct MessageInputBar: View {
         }
     }
 
-    /// Determine attachment type from URL extension
     private func attachmentType(for url: URL) -> MessageAttachment.AttachmentType {
         let ext = url.pathExtension.lowercased()
 

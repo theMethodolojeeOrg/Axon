@@ -22,6 +22,7 @@ struct Message: Codable, Identifiable, Equatable {
     let attachments: [MessageAttachment]?
     let groundingSources: [MessageGroundingSource]?  // Sources from tool calls (web search, etc.)
     let memoryOperations: [MessageMemoryOperation]?  // Memory operations performed by assistant
+    let reasoning: String?  // Chain-of-thought / thinking tokens from reasoning models
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -38,6 +39,7 @@ struct Message: Codable, Identifiable, Equatable {
         case attachments
         case groundingSources
         case memoryOperations
+        case reasoning
     }
 
     init(
@@ -54,7 +56,8 @@ struct Message: Codable, Identifiable, Equatable {
         providerName: String? = nil,
         attachments: [MessageAttachment]? = nil,
         groundingSources: [MessageGroundingSource]? = nil,
-        memoryOperations: [MessageMemoryOperation]? = nil
+        memoryOperations: [MessageMemoryOperation]? = nil,
+        reasoning: String? = nil
     ) {
         self.id = id
         self.conversationId = conversationId
@@ -70,6 +73,7 @@ struct Message: Codable, Identifiable, Equatable {
         self.attachments = attachments
         self.groundingSources = groundingSources
         self.memoryOperations = memoryOperations
+        self.reasoning = reasoning
     }
 
     // Custom decoder to handle timestamp conversion from milliseconds
@@ -131,6 +135,7 @@ struct Message: Codable, Identifiable, Equatable {
         providerName = try container.decodeIfPresent(String.self, forKey: .providerName)
         groundingSources = try container.decodeIfPresent([MessageGroundingSource].self, forKey: .groundingSources)
         memoryOperations = try container.decodeIfPresent([MessageMemoryOperation].self, forKey: .memoryOperations)
+        reasoning = try container.decodeIfPresent(String.self, forKey: .reasoning)
     }
 
     // Custom encoder to convert timestamp back to milliseconds
@@ -154,6 +159,7 @@ struct Message: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(attachments, forKey: .attachments)
         try container.encodeIfPresent(groundingSources, forKey: .groundingSources)
         try container.encodeIfPresent(memoryOperations, forKey: .memoryOperations)
+        try container.encodeIfPresent(reasoning, forKey: .reasoning)
     }
 }
 

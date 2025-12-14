@@ -34,6 +34,11 @@ struct OrchestrationConfig {
     let openaiKey: String?
     let geminiKey: String?
     let grokKey: String?
+    let perplexityKey: String?
+    let deepseekKey: String?
+    let zaiKey: String?
+    let minimaxKey: String?
+    let mistralKey: String?
     // Custom Provider
     let customBaseUrl: String?
     let customApiKey: String?

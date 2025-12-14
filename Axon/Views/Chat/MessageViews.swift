@@ -21,6 +21,11 @@ fileprivate enum ModelProvider {
     case openAI
     case google
     case xai
+    case perplexity
+    case deepseek
+    case zai
+    case minimax
+    case mistral
     case custom
 }
 
@@ -30,6 +35,11 @@ fileprivate func provider(for modelName: String?, providerName: String? = nil) -
         if provider == "openai" || provider == "openai-compatible" { return .openAI }
         if provider == "gemini" || provider == "google" { return .google }
         if provider == "xai" || provider == "grok" { return .xai }
+        if provider == "perplexity" { return .perplexity }
+        if provider == "deepseek" { return .deepseek }
+        if provider == "zai" || provider == "z.ai" || provider == "zhipu" { return .zai }
+        if provider == "minimax" { return .minimax }
+        if provider == "mistral" { return .mistral }
     }
 
     guard let name = modelName?.lowercased() else { return .custom }
@@ -37,6 +47,11 @@ fileprivate func provider(for modelName: String?, providerName: String? = nil) -
     if name.contains("gpt") || name.contains("openai") { return .openAI }
     if name.contains("gemini") || name.contains("google") { return .google }
     if name.contains("grok") || name.contains("xai") { return .xai }
+    if name.contains("sonar") || name.contains("perplexity") { return .perplexity }
+    if name.contains("deepseek") { return .deepseek }
+    if name.contains("glm") || name.contains("zhipu") { return .zai }
+    if name.contains("minimax") || name.contains("m2") { return .minimax }
+    if name.contains("mistral") || name.contains("pixtral") || name.contains("codestral") { return .mistral }
     return .custom
 }
 
@@ -70,6 +85,16 @@ fileprivate func iconStyle(for provider: ModelProvider, modelName: String?) -> A
         return AnyShapeStyle(AngularGradient(gradient: Gradient(colors: colors), center: .center))
     case .xai:
         return AnyShapeStyle(Color.white)
+    case .perplexity:
+        return AnyShapeStyle(colorFromHex("#20B2AA"))  // Teal/cyan color
+    case .deepseek:
+        return AnyShapeStyle(colorFromHex("#4169E1"))  // Royal blue
+    case .zai:
+        return AnyShapeStyle(colorFromHex("#6366F1"))  // Indigo (Zhipu brand)
+    case .minimax:
+        return AnyShapeStyle(colorFromHex("#FF6B35"))  // Orange (MiniMax brand)
+    case .mistral:
+        return AnyShapeStyle(colorFromHex("#FF7000"))  // Orange (Mistral brand)
     case .custom:
         let key = (modelName ?? "custom-unknown").lowercased()
         let hex = ModelColorRegistry.shared.hex(forKey: key)
@@ -87,6 +112,16 @@ fileprivate func providerColor(for provider: ModelProvider, modelName: String?) 
         return colorFromHex("#4285F4")
     case .xai:
         return .white
+    case .perplexity:
+        return colorFromHex("#20B2AA")  // Teal/cyan color
+    case .deepseek:
+        return colorFromHex("#4169E1")  // Royal blue
+    case .zai:
+        return colorFromHex("#6366F1")  // Indigo (Zhipu brand)
+    case .minimax:
+        return colorFromHex("#FF6B35")  // Orange (MiniMax brand)
+    case .mistral:
+        return colorFromHex("#FF7000")  // Orange (Mistral brand)
     case .custom:
         let key = (modelName ?? "custom-unknown").lowercased()
         let hex = ModelColorRegistry.shared.hex(forKey: key)
@@ -99,11 +134,17 @@ fileprivate func providerColor(for provider: ModelProvider, modelName: String?) 
 struct UserMessageView: View {
     let message: Message
     let onCopy: (Message) -> Void
-    
+
+    /// Maximum lines shown before truncating with "Show more".
+    private let collapsedLineLimit = 12
+
+    @State private var isExpanded = false
+    @State private var isTruncated = false
+
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
             Spacer(minLength: 60)
-            
+
             VStack(alignment: .trailing, spacing: 4) {
                 // Attachments
                 if let attachments = message.attachments, !attachments.isEmpty {
@@ -111,34 +152,75 @@ struct UserMessageView: View {
                         attachmentView(for: attachment)
                     }
                 }
-                
-                // Message content (text selection enabled for partial copy)
-                Text(message.content)
-                    .font(AppTypography.bodyMedium())
-                    .foregroundColor(AppColors.textPrimary)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18)
-                            .fill(AppColors.signalLichen.opacity(0.2))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 18)
-                                    .stroke(AppColors.signalLichen.opacity(0.3), lineWidth: 1)
-                            )
-                    )
-                    .contextMenu {
-                        Button(action: { onCopy(message) }) {
-                            Label("Copy All", systemImage: "doc.on.doc")
+
+                // Message bubble
+                VStack(alignment: .trailing, spacing: 6) {
+                    // Message content (text selection enabled for partial copy)
+                    Text(message.content)
+                        .font(AppTypography.bodyMedium())
+                        .foregroundColor(AppColors.textPrimary)
+                        .textSelection(.enabled)
+                        .lineLimit(isExpanded ? nil : collapsedLineLimit)
+                        .background(
+                            // Invisible geometry reader to detect truncation
+                            GeometryReader { visibleGeometry in
+                                Text(message.content)
+                                    .font(AppTypography.bodyMedium())
+                                    .lineLimit(nil)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .background(
+                                        GeometryReader { fullGeometry in
+                                            Color.clear.preference(
+                                                key: TruncationPreferenceKey.self,
+                                                value: fullGeometry.size.height > visibleGeometry.size.height + 1
+                                            )
+                                        }
+                                    )
+                                    .hidden()
+                            }
+                        )
+                        .onPreferenceChange(TruncationPreferenceKey.self) { truncated in
+                            if !isExpanded {
+                                isTruncated = truncated
+                            }
                         }
+
+                    // Show more / Show less button
+                    if isTruncated || isExpanded {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isExpanded.toggle()
+                            }
+                        } label: {
+                            Text(isExpanded ? "Show less" : "Show more")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.signalLichen)
+                        }
+                        .buttonStyle(.plain)
                     }
-                
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(AppColors.signalLichen.opacity(0.2))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18)
+                                .stroke(AppColors.signalLichen.opacity(0.3), lineWidth: 1)
+                        )
+                )
+                .contextMenu {
+                    Button(action: { onCopy(message) }) {
+                        Label("Copy All", systemImage: "doc.on.doc")
+                    }
+                }
+
                 // Timestamp
                 Text(message.timestamp, style: .time)
                     .font(AppTypography.labelSmall())
                     .foregroundColor(AppColors.textTertiary)
             }
-            
+
             // User avatar
             Circle()
                 .fill(AppColors.signalLichen)
@@ -224,6 +306,15 @@ struct AssistantMessageView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Reasoning tokens (from reasoning models like DeepSeek R1, Perplexity Sonar Reasoning, etc.)
+            if let reasoning = message.reasoning, !reasoning.isEmpty {
+                ReasoningView(
+                    reasoning: reasoning,
+                    providerColor: providerColor(for: modelProvider, modelName: message.modelName)
+                )
+                .padding(.bottom, 12)
+            }
+
             // Attachments (if any from assistant - rare but possible)
             if let attachments = message.attachments, !attachments.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
@@ -233,11 +324,10 @@ struct AssistantMessageView: View {
                 }
                 .padding(.bottom, 12)
             }
-            
-            // Main content - free flowing markdown (text selection enabled for partial copy)
-            Markdown(textToRender)
-                .markdownTheme(MarkdownTheme.axon)
-                .textSelection(.enabled)
+
+            // Main content - markdown with fenced code blocks rendered as rich code boxes.
+            AssistantMarkdownView(content: textToRender)
+                .codeArtifactHost()
 
             // Grounding sources (from tool calls like web search, maps)
             if let sources = message.groundingSources, !sources.isEmpty {
@@ -561,6 +651,15 @@ struct MessageSeparator: View {
             .fill(AppColors.glassBorder.opacity(0.5))
             .frame(height: 1)
             .padding(.horizontal)
+    }
+}
+
+// MARK: - Truncation Detection
+
+private struct TruncationPreferenceKey: PreferenceKey {
+    static var defaultValue: Bool = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) {
+        value = value || nextValue()
     }
 }
 

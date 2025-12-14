@@ -142,13 +142,32 @@ struct TTSSettingsView: View {
                             .font(AppTypography.labelMedium())
                             .foregroundColor(AppColors.textSecondary)
 
-                        Picker(selection: Binding(
-                            get: { viewModel.settings.ttsSettings.selectedVoiceId ?? "" },
-                            set: { newId in
-                                let voice = viewModel.availableVoices.first { $0.id == newId }
-                                Task { await viewModel.updateSelectedVoice(id: voice?.id, name: voice?.name) }
+                        StyledMenuPicker(
+                            icon: "waveform",
+                            title: viewModel.settings.ttsSettings.selectedVoiceName ?? "Select a voice",
+                            selection: Binding(
+                                get: { viewModel.settings.ttsSettings.selectedVoiceId ?? "" },
+                                set: { newId in
+                                    let voice = viewModel.availableVoices.first { $0.id == newId }
+                                    Task { await viewModel.updateSelectedVoice(id: voice?.id, name: voice?.name) }
+                                }
+                            )
+                        ) {
+                            #if os(macOS)
+                            if viewModel.availableVoices.isEmpty {
+                                Text("No voices found")
+                            } else {
+                                ForEach(viewModel.availableVoices) { voice in
+                                    MenuButtonItem(
+                                        id: voice.id,
+                                        label: voice.name,
+                                        isSelected: viewModel.settings.ttsSettings.selectedVoiceId == voice.id
+                                    ) {
+                                        Task { await viewModel.updateSelectedVoice(id: voice.id, name: voice.name) }
+                                    }
+                                }
                             }
-                        )) {
+                            #else
                             if viewModel.availableVoices.isEmpty {
                                 Text("No voices found").tag("")
                             } else {
@@ -156,24 +175,8 @@ struct TTSSettingsView: View {
                                     Text(voice.name).tag(voice.id)
                                 }
                             }
-                        } label: {
-                            HStack {
-                                Text(viewModel.settings.ttsSettings.selectedVoiceName ?? "Select a voice")
-                                    .font(AppTypography.bodyMedium())
-                                    .foregroundColor(AppColors.textPrimary)
-                                Spacer()
-                            }
-                            .padding(12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(AppColors.substrateSecondary)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(AppColors.glassBorder, lineWidth: 1)
-                                    )
-                            )
+                            #endif
                         }
-                        .pickerStyle(.menu)
                         .disabled(!viewModel.isTTSConfigured)
                     }
                 }
@@ -185,33 +188,34 @@ struct TTSSettingsView: View {
                             .font(AppTypography.labelMedium())
                             .foregroundColor(AppColors.textSecondary)
 
-                        Picker(selection: Binding(
-                            get: { viewModel.settings.ttsSettings.model },
-                            set: { newModel in
-                                Task { await viewModel.updateTTSSetting(\.model, newModel) }
-                            }
-                        )) {
-                            ForEach(TTSModel.allCases) { model in
-                                Text("\(model.displayName) - \(model.description)").tag(model)
-                            }
-                        } label: {
-                            HStack {
-                                Text(viewModel.settings.ttsSettings.model.displayName)
-                                    .font(AppTypography.bodyMedium())
-                                    .foregroundColor(AppColors.textPrimary)
-                                Spacer()
-                            }
-                            .padding(12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(AppColors.substrateSecondary)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(AppColors.glassBorder, lineWidth: 1)
-                                    )
+                        StyledMenuPicker(
+                            icon: "cpu",
+                            title: viewModel.settings.ttsSettings.model.displayName,
+                            selection: Binding(
+                                get: { viewModel.settings.ttsSettings.model.rawValue },
+                                set: { newValue in
+                                    if let model = TTSModel(rawValue: newValue) {
+                                        Task { await viewModel.updateTTSSetting(\.model, model) }
+                                    }
+                                }
                             )
+                        ) {
+                            #if os(macOS)
+                            ForEach(TTSModel.allCases) { model in
+                                MenuButtonItem(
+                                    id: model.rawValue,
+                                    label: "\(model.displayName) - \(model.description)",
+                                    isSelected: viewModel.settings.ttsSettings.model == model
+                                ) {
+                                    Task { await viewModel.updateTTSSetting(\.model, model) }
+                                }
+                            }
+                            #else
+                            ForEach(TTSModel.allCases) { model in
+                                Text("\(model.displayName) - \(model.description)").tag(model.rawValue)
+                            }
+                            #endif
                         }
-                        .pickerStyle(.menu)
                         .disabled(!viewModel.isTTSConfigured)
                     }
                 }

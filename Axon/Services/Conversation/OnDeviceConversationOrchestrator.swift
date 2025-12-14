@@ -10,6 +10,17 @@
 import Foundation
 import CoreLocation
 
+/// Result from provider API calls including content and optional reasoning
+struct ProviderResponse {
+    let content: String
+    let reasoning: String?
+
+    init(content: String, reasoning: String? = nil) {
+        self.content = content
+        self.reasoning = reasoning
+    }
+}
+
 class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
     // MARK: - Services
@@ -220,6 +231,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         )
 
         var responseContent: String = ""
+        var responseReasoning: String? = nil
         var usedToolProxy = false
         var groundingSources: [MessageGroundingSource] = []
         var memoryOperations: [MessageMemoryOperation] = []
@@ -246,12 +258,14 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             }
         } else {
             // Non-Gemini provider (or Gemini without tools): standard routing
-            responseContent = try await callProvider(
+            let providerResult = try await callProvider(
                 provider: config.provider,
                 config: config,
                 system: systemPrompt,
                 messages: finalMessages
             )
+            responseContent = providerResult.content
+            responseReasoning = providerResult.reasoning
 
             // If tool proxy mode, check for tool requests and execute them
             if useToolProxy, let geminiKey = config.geminiKey {
@@ -301,7 +315,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             modelName: modelName,
             providerName: config.providerName,
             groundingSources: groundingSources.isEmpty ? nil : groundingSources,
-            memoryOperations: memoryOperations.isEmpty ? nil : memoryOperations
+            memoryOperations: memoryOperations.isEmpty ? nil : memoryOperations,
+            reasoning: responseReasoning
         )
 
         // Record prediction for learning loop
@@ -343,6 +358,91 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         while iteration < maxIterations {
             // Check for tool request in response
             guard let toolRequest = await ToolProxyService.shared.parseToolRequest(from: currentResponse) else {
+                // No proper tool request found - check for malformed memory attempts
+
+                // Check 1: Naked pipe-delimited format (allocentric|0.9|tags|content)
+                if let nakedMemory = await ToolProxyService.shared.detectNakedMemoryFormat(in: currentResponse) {
+                    print("[OnDeviceOrchestrator] Detected naked pipe-delimited memory format, sending corrective feedback")
+                    toolUsed = true
+
+                    let feedback = await ToolProxyService.shared.generateNakedMemoryFeedback(rawMemory: nakedMemory)
+                    let formattedFeedback = """
+
+                        ---
+                        **Tool Result** (create_memory):
+
+                        \(feedback)
+                        ---
+
+                        """
+
+                    collectedMemoryOperations.append(MessageMemoryOperation(
+                        success: false,
+                        memoryType: "unknown",
+                        content: nakedMemory,
+                        errorMessage: "Naked format - missing tool_request wrapper"
+                    ))
+
+                    var updatedMessages = messages
+                    updatedMessages.append(Message(conversationId: conversationId, role: .assistant, content: currentResponse))
+                    updatedMessages.append(Message(conversationId: conversationId, role: .user, content: formattedFeedback))
+
+                    currentResponse = try await callProvider(
+                        provider: config.provider,
+                        config: config,
+                        system: systemPrompt,
+                        messages: updatedMessages
+                    ).content
+
+                    iteration += 1
+                    continue
+                }
+
+                // Check 2: JSON-structured memory object ({"type":"allocentric","confidence":0.9,...})
+                if let jsonMemory = await ToolProxyService.shared.detectJSONMemoryFormat(in: currentResponse) {
+                    print("[OnDeviceOrchestrator] Detected JSON memory format, sending corrective feedback")
+                    toolUsed = true
+
+                    let feedback = await ToolProxyService.shared.generateJSONMemoryFeedback(
+                        type: jsonMemory.type,
+                        confidence: jsonMemory.confidence,
+                        tags: jsonMemory.tags,
+                        content: jsonMemory.content
+                    )
+                    let formattedFeedback = """
+
+                        ---
+                        **Tool Result** (create_memory):
+
+                        \(feedback)
+                        ---
+
+                        """
+
+                    collectedMemoryOperations.append(MessageMemoryOperation(
+                        success: false,
+                        memoryType: jsonMemory.type,
+                        content: jsonMemory.content,
+                        tags: jsonMemory.tags,
+                        confidence: jsonMemory.confidence,
+                        errorMessage: "JSON format - should be pipe-delimited string"
+                    ))
+
+                    var updatedMessages = messages
+                    updatedMessages.append(Message(conversationId: conversationId, role: .assistant, content: currentResponse))
+                    updatedMessages.append(Message(conversationId: conversationId, role: .user, content: formattedFeedback))
+
+                    currentResponse = try await callProvider(
+                        provider: config.provider,
+                        config: config,
+                        system: systemPrompt,
+                        messages: updatedMessages
+                    ).content
+
+                    iteration += 1
+                    continue
+                }
+
                 // No tool request found, we're done
                 break
             }
@@ -413,7 +513,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 config: config,
                 system: systemPrompt,
                 messages: updatedMessages
-            )
+            ).content
 
             // If we got a clean response with tool result incorporated, prepend the original context
             if !cleanedResponse.isEmpty && !currentResponse.contains(formattedResult) {
@@ -477,53 +577,112 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         config: OrchestrationConfig,
         system: String?,
         messages: [Message]
-    ) async throws -> String {
+    ) async throws -> ProviderResponse {
         switch provider {
         case "anthropic":
             guard let apiKey = config.anthropicKey else { throw APIError.unauthorized }
-            return try await callAnthropic(
+            let content = try await callAnthropic(
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
                 messages: messages
             )
+            return ProviderResponse(content: content)
 
         case "openai":
             guard let apiKey = config.openaiKey else { throw APIError.unauthorized }
-            return try await callOpenAI(
+            let content = try await callOpenAI(
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
                 messages: messages
             )
+            return ProviderResponse(content: content)
 
         case "gemini":
             guard let apiKey = config.geminiKey else { throw APIError.unauthorized }
-            return try await callGemini(
+            let content = try await callGemini(
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
                 messages: messages
             )
+            return ProviderResponse(content: content)
 
         case "grok":
             guard let apiKey = config.grokKey else { throw APIError.unauthorized }
-            return try await callGrok(
+            let content = try await callGrok(
+                apiKey: apiKey,
+                model: config.model,
+                system: system,
+                messages: messages
+            )
+            return ProviderResponse(content: content)
+
+        case "perplexity":
+            guard let apiKey = config.perplexityKey else { throw APIError.unauthorized }
+            // Perplexity Sonar Reasoning models use <think> tags
+            let rawContent = try await callPerplexity(
+                apiKey: apiKey,
+                model: config.model,
+                system: system,
+                messages: messages
+            )
+            let result = ReasoningExtractor.extract(from: rawContent, provider: provider, model: config.model)
+            return ProviderResponse(content: result.content, reasoning: result.reasoning)
+
+        case "deepseek":
+            guard let apiKey = config.deepseekKey else { throw APIError.unauthorized }
+            // DeepSeek returns reasoning via dedicated field - callDeepSeek returns ProviderResponse
+            return try await callDeepSeek(
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
                 messages: messages
             )
 
+        case "zai":
+            guard let apiKey = config.zaiKey else { throw APIError.unauthorized }
+            // Z.ai GLM-4.6 models use <think> tags
+            let rawContent = try await callZai(
+                apiKey: apiKey,
+                model: config.model,
+                system: system,
+                messages: messages
+            )
+            let result = ReasoningExtractor.extract(from: rawContent, provider: provider, model: config.model)
+            return ProviderResponse(content: result.content, reasoning: result.reasoning)
+
+        case "minimax":
+            guard let apiKey = config.minimaxKey else { throw APIError.unauthorized }
+            let content = try await callMiniMax(
+                apiKey: apiKey,
+                model: config.model,
+                system: system,
+                messages: messages
+            )
+            return ProviderResponse(content: content)
+
+        case "mistral":
+            guard let apiKey = config.mistralKey else { throw APIError.unauthorized }
+            let content = try await callMistral(
+                apiKey: apiKey,
+                model: config.model,
+                system: system,
+                messages: messages
+            )
+            return ProviderResponse(content: content)
+
         case "openai-compatible":
             guard let apiKey = config.customApiKey, let baseUrl = config.customBaseUrl else { throw APIError.unauthorized }
-            return try await callOpenAICompatible(
+            let content = try await callOpenAICompatible(
                 apiKey: apiKey,
                 baseUrl: baseUrl,
                 model: config.model,
                 system: system,
                 messages: messages
             )
+            return ProviderResponse(content: content)
 
         default:
             throw APIError.networkError("Provider \(provider) not supported in On-Device mode yet.")
@@ -882,6 +1041,359 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
         let decoded = try JSONDecoder().decode(GrokResponse.self, from: data)
         return decoded.choices.first?.message.content ?? ""
+    }
+
+    private func callPerplexity(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
+        // Perplexity uses OpenAI-compatible API
+        // Base URL: https://api.perplexity.ai
+        // Supports: text only (no image/audio/video)
+        // Features: All models have built-in web search, returns citations
+        let url = URL(string: "https://api.perplexity.ai/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var apiMessages: [[String: Any]] = []
+        if let system = system, !system.isEmpty {
+            apiMessages.append(["role": "system", "content": system])
+        }
+        for msg in messages where msg.role != .system {
+            // Perplexity only supports text
+            apiMessages.append(["role": msg.role.rawValue, "content": msg.content])
+        }
+
+        let body: [String: Any] = [
+            "model": model,
+            "messages": apiMessages
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            if let errorText = String(data: data, encoding: .utf8) {
+                print("Perplexity Error: \(errorText)")
+            }
+            throw APIError.serverError((response as? HTTPURLResponse)?.statusCode ?? 500)
+        }
+
+        struct PerplexityResponse: Decodable {
+            struct Choice: Decodable {
+                struct Message: Decodable {
+                    let content: String
+                }
+                let message: Message
+            }
+            let choices: [Choice]
+            let citations: [String]?  // Perplexity includes citations
+        }
+
+        let decoded = try JSONDecoder().decode(PerplexityResponse.self, from: data)
+        var responseText = decoded.choices.first?.message.content ?? ""
+
+        // Append citations if available
+        if let citations = decoded.citations, !citations.isEmpty {
+            responseText += "\n\n**Sources:**\n"
+            for (index, citation) in citations.enumerated() {
+                responseText += "\(index + 1). \(citation)\n"
+            }
+        }
+
+        return responseText
+    }
+
+    private func callDeepSeek(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> ProviderResponse {
+        // DeepSeek uses OpenAI-compatible API
+        // Base URL: https://api.deepseek.com
+        // Supports: text only (no image/audio/video)
+        // Features: Context caching (automatic), reasoning_content field for R1 model
+        let url = URL(string: "https://api.deepseek.com/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var apiMessages: [[String: Any]] = []
+        if let system = system, !system.isEmpty {
+            apiMessages.append(["role": "system", "content": system])
+        }
+        for msg in messages where msg.role != .system {
+            // DeepSeek only supports text
+            apiMessages.append(["role": msg.role.rawValue, "content": msg.content])
+        }
+
+        let body: [String: Any] = [
+            "model": model,
+            "messages": apiMessages
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            if let errorText = String(data: data, encoding: .utf8) {
+                print("DeepSeek Error: \(errorText)")
+            }
+            throw APIError.serverError((response as? HTTPURLResponse)?.statusCode ?? 500)
+        }
+
+        struct DeepSeekResponse: Decodable {
+            struct Choice: Decodable {
+                struct Message: Decodable {
+                    let content: String
+                    let reasoningContent: String?  // For deepseek-reasoner (R1) model
+
+                    enum CodingKeys: String, CodingKey {
+                        case content
+                        case reasoningContent = "reasoning_content"
+                    }
+                }
+                let message: Message
+            }
+            let choices: [Choice]
+        }
+
+        let decoded = try JSONDecoder().decode(DeepSeekResponse.self, from: data)
+        let message = decoded.choices.first?.message
+        let content = message?.content ?? ""
+        let reasoning = message?.reasoningContent?.isEmpty == false ? message?.reasoningContent : nil
+
+        return ProviderResponse(content: content, reasoning: reasoning)
+    }
+
+    private func callZai(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
+        // Z.ai (Zhipu AI) uses OpenAI-compatible API
+        // Base URL: https://api.z.ai/api/paas/v4
+        // Supports: text, and vision for V models
+        // Features: Thinking mode for enhanced reasoning
+        let url = URL(string: "https://api.z.ai/api/paas/v4/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var apiMessages: [[String: Any]] = []
+        if let system = system, !system.isEmpty {
+            apiMessages.append(["role": "system", "content": system])
+        }
+        for msg in messages where msg.role != .system {
+            // Z.ai supports images for V models
+            if model.contains("v") || model.contains("V") {
+                let content = zaiContent(for: msg)
+                apiMessages.append(["role": msg.role.rawValue, "content": content])
+            } else {
+                apiMessages.append(["role": msg.role.rawValue, "content": msg.content])
+            }
+        }
+
+        var body: [String: Any] = [
+            "model": model,
+            "messages": apiMessages
+        ]
+
+        // Enable thinking mode for enhanced reasoning on flagship models
+        if model.contains("4.6") {
+            body["thinking"] = ["type": "enabled"]
+        }
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            if let errorText = String(data: data, encoding: .utf8) {
+                print("Z.ai Error: \(errorText)")
+            }
+            throw APIError.serverError((response as? HTTPURLResponse)?.statusCode ?? 500)
+        }
+
+        struct ZaiResponse: Decodable {
+            struct Choice: Decodable {
+                struct Message: Decodable {
+                    let content: String
+                }
+                let message: Message
+            }
+            let choices: [Choice]
+        }
+
+        let decoded = try JSONDecoder().decode(ZaiResponse.self, from: data)
+        return decoded.choices.first?.message.content ?? ""
+    }
+
+    /// Build Z.ai multimodal content array for vision models
+    private func zaiContent(for msg: Message) -> Any {
+        var parts: [[String: Any]] = []
+
+        // Add text content
+        if !msg.content.isEmpty {
+            parts.append(["type": "text", "text": msg.content])
+        }
+
+        // Add image attachments
+        for attachment in msg.attachments ?? [] where attachment.type == .image {
+            if let urlStr = attachment.url, let url = URL(string: urlStr) {
+                parts.append([
+                    "type": "image_url",
+                    "image_url": ["url": url.absoluteString]
+                ])
+            } else if let base64 = attachment.base64 {
+                let mimeType = attachment.mimeType ?? "image/jpeg"
+                parts.append([
+                    "type": "image_url",
+                    "image_url": ["url": "data:\(mimeType);base64,\(base64)"]
+                ])
+            }
+        }
+
+        return parts.isEmpty ? msg.content : parts
+    }
+
+    private func callMiniMax(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
+        // MiniMax uses a custom API format
+        // Base URL: https://api.minimax.io/v1
+        // Supports: text only
+        // Features: 1M context, agentic workflows
+        let url = URL(string: "https://api.minimax.io/v1/text/chatcompletion_v2")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // MiniMax uses a different message format: sender_type, sender_name, text
+        var apiMessages: [[String: Any]] = []
+        if let system = system, !system.isEmpty {
+            apiMessages.append([
+                "sender_type": "BOT",
+                "sender_name": "System",
+                "text": system
+            ])
+        }
+        for msg in messages where msg.role != .system {
+            let senderType = msg.role == .user ? "USER" : "BOT"
+            let senderName = msg.role == .user ? "User" : "Assistant"
+            apiMessages.append([
+                "sender_type": senderType,
+                "sender_name": senderName,
+                "text": msg.content
+            ])
+        }
+
+        let body: [String: Any] = [
+            "model": model,
+            "messages": apiMessages,
+            "temperature": 0.7
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            if let errorText = String(data: data, encoding: .utf8) {
+                print("MiniMax Error: \(errorText)")
+            }
+            throw APIError.serverError((response as? HTTPURLResponse)?.statusCode ?? 500)
+        }
+
+        struct MiniMaxResponse: Decodable {
+            struct Choices: Decodable {
+                struct Message: Decodable {
+                    let text: String
+                }
+                let messages: [Message]
+            }
+            let choices: Choices?
+            let reply: String?  // Some responses use reply directly
+        }
+
+        let decoded = try JSONDecoder().decode(MiniMaxResponse.self, from: data)
+        return decoded.reply ?? decoded.choices?.messages.first?.text ?? ""
+    }
+
+    private func callMistral(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
+        // Mistral uses OpenAI-compatible API
+        // Base URL: https://api.mistral.ai/v1
+        // Supports: text, and vision for pixtral models
+        let url = URL(string: "https://api.mistral.ai/v1/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var apiMessages: [[String: Any]] = []
+        if let system = system, !system.isEmpty {
+            apiMessages.append(["role": "system", "content": system])
+        }
+        for msg in messages where msg.role != .system {
+            // Pixtral models support images
+            if model.contains("pixtral") {
+                let content = mistralContent(for: msg)
+                apiMessages.append(["role": msg.role.rawValue, "content": content])
+            } else {
+                apiMessages.append(["role": msg.role.rawValue, "content": msg.content])
+            }
+        }
+
+        let body: [String: Any] = [
+            "model": model,
+            "messages": apiMessages
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            if let errorText = String(data: data, encoding: .utf8) {
+                print("Mistral Error: \(errorText)")
+            }
+            throw APIError.serverError((response as? HTTPURLResponse)?.statusCode ?? 500)
+        }
+
+        struct MistralResponse: Decodable {
+            struct Choice: Decodable {
+                struct Message: Decodable {
+                    let content: String
+                }
+                let message: Message
+            }
+            let choices: [Choice]
+        }
+
+        let decoded = try JSONDecoder().decode(MistralResponse.self, from: data)
+        return decoded.choices.first?.message.content ?? ""
+    }
+
+    /// Build Mistral multimodal content array for Pixtral models
+    private func mistralContent(for msg: Message) -> Any {
+        var parts: [[String: Any]] = []
+
+        // Add text content
+        if !msg.content.isEmpty {
+            parts.append(["type": "text", "text": msg.content])
+        }
+
+        // Add image attachments
+        for attachment in msg.attachments ?? [] where attachment.type == .image {
+            if let urlStr = attachment.url, let url = URL(string: urlStr) {
+                parts.append([
+                    "type": "image_url",
+                    "image_url": ["url": url.absoluteString]
+                ])
+            } else if let base64 = attachment.base64 {
+                let mimeType = attachment.mimeType ?? "image/jpeg"
+                parts.append([
+                    "type": "image_url",
+                    "image_url": ["url": "data:\(mimeType);base64,\(base64)"]
+                ])
+            }
+        }
+
+        return parts.isEmpty ? msg.content : parts
     }
 
     private func callGemini(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {

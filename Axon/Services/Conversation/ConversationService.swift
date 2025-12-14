@@ -540,6 +540,11 @@ class ConversationService: ObservableObject {
         let openaiKey = try? apiKeysStorage.getAPIKey(for: .openai)
         let geminiKey = try? apiKeysStorage.getAPIKey(for: .gemini)
         let grokKey = try? apiKeysStorage.getAPIKey(for: .xai)
+        let perplexityKey = try? apiKeysStorage.getAPIKey(for: .perplexity)
+        let deepseekKey = try? apiKeysStorage.getAPIKey(for: .deepseek)
+        let zaiKey = try? apiKeysStorage.getAPIKey(for: .zai)
+        let minimaxKey = try? apiKeysStorage.getAPIKey(for: .minimax)
+        let mistralKey = try? apiKeysStorage.getAPIKey(for: .mistral)
 
         // Load provider/model from settings with conversation overrides
         // modelId is the API identifier (e.g., "claude-haiku-4-5-20251001")
@@ -603,6 +608,11 @@ class ConversationService: ObservableObject {
             openaiKey: openaiKey,
             geminiKey: geminiKey,
             grokKey: grokKey,
+            perplexityKey: perplexityKey,
+            deepseekKey: deepseekKey,
+            zaiKey: zaiKey,
+            minimaxKey: minimaxKey,
+            mistralKey: mistralKey,
             customBaseUrl: customBaseUrl,
             customApiKey: customApiKey
         )
@@ -698,6 +708,11 @@ class ConversationService: ObservableObject {
         let openaiKey = try? apiKeysStorage.getAPIKey(for: .openai)
         let geminiKey = try? apiKeysStorage.getAPIKey(for: .gemini)
         let grokKey = try? apiKeysStorage.getAPIKey(for: .xai)
+        let perplexityKey = try? apiKeysStorage.getAPIKey(for: .perplexity)
+        let deepseekKey = try? apiKeysStorage.getAPIKey(for: .deepseek)
+        let zaiKey = try? apiKeysStorage.getAPIKey(for: .zai)
+        let minimaxKey = try? apiKeysStorage.getAPIKey(for: .minimax)
+        let mistralKey = try? apiKeysStorage.getAPIKey(for: .mistral)
 
         // Handle custom provider (simplified for regen, assuming same logic as sendMessage)
         var customBaseUrl: String? = nil
@@ -733,13 +748,18 @@ class ConversationService: ObservableObject {
             openaiKey: openaiKey,
             geminiKey: geminiKey,
             grokKey: grokKey,
+            perplexityKey: perplexityKey,
+            deepseekKey: deepseekKey,
+            zaiKey: zaiKey,
+            minimaxKey: minimaxKey,
+            mistralKey: mistralKey,
             customBaseUrl: customBaseUrl,
             customApiKey: customApiKey
         )
 
         do {
             let orchestrator = getOrchestrator(settings: settings)
-            
+
             let newAssistant = try await orchestrator.regenerateAssistantMessage(
                 conversationId: conversationId,
                 messageId: messageId,

@@ -371,6 +371,11 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
     case openai = "openai"
     case gemini = "gemini"
     case xai = "xai"
+    case perplexity = "perplexity"
+    case deepseek = "deepseek"
+    case zai = "zai"
+    case minimax = "minimax"
+    case mistral = "mistral"
 
     var id: String { rawValue }
 
@@ -380,6 +385,11 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
         case .openai: return "OpenAI (GPT)"
         case .gemini: return "Google Gemini"
         case .xai: return "xAI (Grok)"
+        case .perplexity: return "Perplexity (Sonar)"
+        case .deepseek: return "DeepSeek"
+        case .zai: return "Z.ai (GLM)"
+        case .minimax: return "MiniMax"
+        case .mistral: return "Mistral AI"
         }
     }
 
@@ -653,6 +663,165 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     description: "Previous generation flagship model"
                 )
             ]
+        case .perplexity:
+            return [
+                AIModel(
+                    id: "sonar-reasoning-pro",
+                    name: "Sonar Reasoning Pro",
+                    provider: .perplexity,
+                    contextWindow: 128_000,
+                    modalities: ["text"],
+                    description: "Best for complex queries. Advanced reasoning + real-time web search"
+                ),
+                AIModel(
+                    id: "sonar-reasoning",
+                    name: "Sonar Reasoning",
+                    provider: .perplexity,
+                    contextWindow: 128_000,
+                    modalities: ["text"],
+                    description: "Lighter reasoning model with web search. Good balance of speed/intelligence"
+                ),
+                AIModel(
+                    id: "sonar-pro",
+                    name: "Sonar Pro",
+                    provider: .perplexity,
+                    contextWindow: 200_000,
+                    modalities: ["text"],
+                    description: "High-capacity standard search model (no reasoning tokens)"
+                ),
+                AIModel(
+                    id: "sonar",
+                    name: "Sonar",
+                    provider: .perplexity,
+                    contextWindow: 128_000,
+                    modalities: ["text"],
+                    description: "Cheapest standard search model. Good for simple lookups"
+                )
+            ]
+        case .deepseek:
+            return [
+                AIModel(
+                    id: "deepseek-reasoner",
+                    name: "DeepSeek Reasoner (R1)",
+                    provider: .deepseek,
+                    contextWindow: 128_000,
+                    modalities: ["text"],
+                    description: "Flagship reasoning model with Chain-of-Thought. Best for math/code"
+                ),
+                AIModel(
+                    id: "deepseek-chat",
+                    name: "DeepSeek Chat (V3)",
+                    provider: .deepseek,
+                    contextWindow: 128_000,
+                    modalities: ["text"],
+                    description: "Standard frontier model. Extremely cost-effective and fast"
+                )
+            ]
+        case .zai:
+            return [
+                AIModel(
+                    id: "glm-4.6",
+                    name: "GLM-4.6",
+                    provider: .zai,
+                    contextWindow: 200_000,
+                    modalities: ["text"],
+                    description: "Flagship model. Best reasoning, coding, and agentic capability"
+                ),
+                AIModel(
+                    id: "glm-4.6v",
+                    name: "GLM-4.6V",
+                    provider: .zai,
+                    contextWindow: 128_000,
+                    modalities: ["text", "image"],
+                    description: "Flagship vision. Native multimodal with thinking support"
+                ),
+                AIModel(
+                    id: "glm-4.6v-flash",
+                    name: "GLM-4.6V Flash",
+                    provider: .zai,
+                    contextWindow: 128_000,
+                    modalities: ["text", "image"],
+                    description: "Fast vision. Lower latency and cost"
+                ),
+                AIModel(
+                    id: "glm-4.5",
+                    name: "GLM-4.5",
+                    provider: .zai,
+                    contextWindow: 128_000,
+                    modalities: ["text"],
+                    description: "Previous flagship. Strong generalist"
+                ),
+                AIModel(
+                    id: "glm-4.5-air",
+                    name: "GLM-4.5 Air",
+                    provider: .zai,
+                    contextWindow: 128_000,
+                    modalities: ["text"],
+                    description: "Balanced Air tier. Speed/performance mix"
+                ),
+                AIModel(
+                    id: "glm-4.5v",
+                    name: "GLM-4.5V",
+                    provider: .zai,
+                    contextWindow: 128_000,
+                    modalities: ["text", "image"],
+                    description: "Multimodal variant of GLM-4.5"
+                )
+            ]
+        case .minimax:
+            return [
+                AIModel(
+                    id: "MiniMax-M2",
+                    name: "MiniMax M2",
+                    provider: .minimax,
+                    contextWindow: 1_000_000,
+                    modalities: ["text"],
+                    description: "Flagship agentic model. 1M context, 92% cheaper than Claude Sonnet"
+                ),
+                AIModel(
+                    id: "MiniMax-M2-Stable",
+                    name: "MiniMax M2 Stable",
+                    provider: .minimax,
+                    contextWindow: 1_000_000,
+                    modalities: ["text"],
+                    description: "Stable version with higher rate limits"
+                )
+            ]
+        case .mistral:
+            return [
+                AIModel(
+                    id: "mistral-large-latest",
+                    name: "Mistral Large",
+                    provider: .mistral,
+                    contextWindow: 128_000,
+                    modalities: ["text"],
+                    description: "Flagship reasoning model. Top-tier performance"
+                ),
+                AIModel(
+                    id: "pixtral-large-2411",
+                    name: "Pixtral Large",
+                    provider: .mistral,
+                    contextWindow: 128_000,
+                    modalities: ["text", "image"],
+                    description: "Flagship vision. Multimodal version of Mistral Large"
+                ),
+                AIModel(
+                    id: "pixtral-12b-2409",
+                    name: "Pixtral 12B",
+                    provider: .mistral,
+                    contextWindow: 128_000,
+                    modalities: ["text", "image"],
+                    description: "Edge vision. Efficient multimodal model"
+                ),
+                AIModel(
+                    id: "codestral-latest",
+                    name: "Codestral",
+                    provider: .mistral,
+                    contextWindow: 32_000,
+                    modalities: ["text"],
+                    description: "Coding optimized. Best for FIM and code generation"
+                )
+            ]
         }
     }
 
@@ -793,6 +962,10 @@ enum APIProvider: String, CaseIterable, Identifiable {
     case xai = "xai"
     case elevenlabs = "elevenlabs"
     case perplexity = "perplexity"
+    case deepseek = "deepseek"
+    case zai = "zai"
+    case minimax = "minimax"
+    case mistral = "mistral"
 
     var id: String { rawValue }
 
@@ -805,6 +978,10 @@ enum APIProvider: String, CaseIterable, Identifiable {
         case .xai: return "xAI"
         case .elevenlabs: return "ElevenLabs"
         case .perplexity: return "Perplexity"
+        case .deepseek: return "DeepSeek"
+        case .zai: return "Z.ai (Zhipu)"
+        case .minimax: return "MiniMax"
+        case .mistral: return "Mistral AI"
         }
     }
 
@@ -817,6 +994,10 @@ enum APIProvider: String, CaseIterable, Identifiable {
         case .xai: return "xai-..."
         case .elevenlabs: return "sk_..."
         case .perplexity: return "pplx-..."
+        case .deepseek: return "sk-..."
+        case .zai: return "..."
+        case .minimax: return "..."
+        case .mistral: return "..."
         }
     }
 
@@ -829,6 +1010,10 @@ enum APIProvider: String, CaseIterable, Identifiable {
         case .xai: return URL(string: "https://console.x.ai")
         case .elevenlabs: return URL(string: "https://elevenlabs.io/app/settings/api-keys")
         case .perplexity: return URL(string: "https://www.perplexity.ai/settings/api")
+        case .deepseek: return URL(string: "https://platform.deepseek.com/api_keys")
+        case .zai: return URL(string: "https://bigmodel.cn/usercenter/apikeys")
+        case .minimax: return URL(string: "https://platform.minimax.io/user-center/basic-information/interface-key")
+        case .mistral: return URL(string: "https://console.mistral.ai/api-keys")
         }
     }
 
@@ -840,7 +1025,11 @@ enum APIProvider: String, CaseIterable, Identifiable {
         case .gemini: return "Required for Gemini models"
         case .xai: return "Required for Grok models"
         case .elevenlabs: return "Required for text-to-speech"
-        case .perplexity: return "Used for AI model sync (updates model catalog)"
+        case .perplexity: return "Required for Sonar models (online search)"
+        case .deepseek: return "Required for DeepSeek models"
+        case .zai: return "Required for GLM models"
+        case .minimax: return "Required for MiniMax M2 models"
+        case .mistral: return "Required for Mistral and Pixtral models"
         }
     }
 }
