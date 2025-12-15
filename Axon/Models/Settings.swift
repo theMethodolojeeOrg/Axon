@@ -11,7 +11,7 @@ import Foundation
 
 struct AppSettings: Codable, Equatable, Sendable {
     // General
-    var theme: Theme = .dark
+    var theme: Theme = .auto
     var defaultProvider: AIProvider = .anthropic
     var defaultModel: String = "claude-haiku-4-5-20251001"
 

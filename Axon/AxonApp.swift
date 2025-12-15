@@ -32,6 +32,14 @@ struct AxonApp: App {
         !showLaunchScreen && settingsViewModel.settings.appLockEnabled && !isUnlocked
     }
 
+    private var preferredColorSchemeOverride: ColorScheme? {
+        switch settingsViewModel.settings.theme {
+        case .dark: return .dark
+        case .light: return .light
+        case .auto: return nil
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             ZStack {
@@ -91,6 +99,7 @@ struct AxonApp: App {
                     isUnlocked = true
                 }
             }
+            .preferredColorScheme(preferredColorSchemeOverride)
         }
     }
 
