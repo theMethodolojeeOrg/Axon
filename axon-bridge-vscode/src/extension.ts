@@ -9,6 +9,8 @@
 import * as vscode from 'vscode';
 import { BridgeClient } from './BridgeClient';
 import { StatusBar } from './ui/StatusBar';
+import { BridgeLogsPanel } from './ui/BridgeLogsPanel';
+import { BridgeLogService } from './BridgeLogService';
 
 let client: BridgeClient;
 let statusBar: StatusBar;
@@ -41,6 +43,19 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('axon-bridge.status', () => {
             const status = client.getStatus();
             vscode.window.showInformationMessage(`Axon Bridge: ${status}`);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('axon-bridge.logs', () => {
+            BridgeLogsPanel.show(context.extensionUri);
+            BridgeLogService.shared.showOutput();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('axon-bridge.logs.clear', () => {
+            BridgeLogService.shared.clear();
         })
     );
 

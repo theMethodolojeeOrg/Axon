@@ -335,6 +335,7 @@ struct ChatContainerView: View {
     @StateObject private var promptManager = PromptManager.shared
     @ObservedObject private var ttsService = TTSPlaybackService.shared
     @ObservedObject private var toolApprovalService = ToolApprovalService.shared
+    @ObservedObject private var mlxService = MLXModelService.shared
     #if os(macOS)
     @ObservedObject private var bridgeServer = BridgeServer.shared
     #endif
@@ -397,6 +398,32 @@ struct ChatContainerView: View {
                     .padding(.top, 8)
                 }
             }
+            .overlay(alignment: .center) {
+                // MLX model download progress overlay
+                if mlxService.isLoading {
+                    VStack(spacing: 16) {
+                        ProgressView(value: mlxService.downloadProgress) {
+                            Text(mlxService.loadingStatus)
+                                .font(AppTypography.labelMedium())
+                                .foregroundColor(AppColors.textPrimary)
+                        }
+                        .progressViewStyle(LinearProgressViewStyle(tint: AppColors.signalLichen))
+                        .frame(maxWidth: 280)
+
+                        Text("First-time download from HuggingFace")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                    .padding(24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(AppColors.substrateSecondary)
+                            .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+            }
+            .animation(AppAnimations.standardEasing, value: mlxService.isLoading)
             #if os(macOS)
             .overlay(alignment: .top) {
                 if showBridgeConnectedBanner, let workspace = bridgeWorkspaceName {

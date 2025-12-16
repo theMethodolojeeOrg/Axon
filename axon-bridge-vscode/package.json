@@ -27,6 +27,14 @@
       {
         "command": "axon-bridge.status",
         "title": "Axon: Show Bridge Status"
+      },
+      {
+        "command": "axon-bridge.logs",
+        "title": "Axon: Show Bridge Logs"
+      },
+      {
+        "command": "axon-bridge.logs.clear",
+        "title": "Axon: Clear Bridge Logs"
       }
     ],
     "configuration": {

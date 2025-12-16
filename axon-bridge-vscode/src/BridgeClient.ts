@@ -23,6 +23,8 @@ import { FileHandler } from './handlers/FileHandler';
 import { TerminalHandler } from './handlers/TerminalHandler';
 import { WorkspaceHandler } from './handlers/WorkspaceHandler';
 import { StatusBar, ConnectionState } from './ui/StatusBar';
+import { BridgeLogService } from './BridgeLogService';
+import { BridgeLogsPanel } from './ui/BridgeLogsPanel';
 
 const EXTENSION_VERSION = '0.1.0';
 
@@ -95,7 +97,13 @@ export class BridgeClient {
             });
 
             this.ws.on('message', (data: WebSocket.Data) => {
-                this.handleMessage(data.toString());
+                const text = data.toString();
+
+                // Mirror incoming traffic to extension logs
+                BridgeLogService.shared.logIncoming(text);
+                BridgeLogsPanel.currentPanel?.notifyNewEntry();
+
+                this.handleMessage(text);
             });
 
             this.ws.on('close', (code: number, reason: Buffer) => {
@@ -284,6 +292,11 @@ export class BridgeClient {
         }
 
         const data = JSON.stringify(message);
+
+        // Mirror outgoing traffic to extension logs
+        BridgeLogService.shared.logOutgoing(data);
+        BridgeLogsPanel.currentPanel?.notifyNewEntry();
+
         this.ws.send(data);
     }
 
