@@ -45,7 +45,7 @@ struct MacDetailWithInspector: View {
                     }
 
                 case .memory:
-                    MemoryListView()
+                    MemoryView()
 
                 case .settings:
                     SettingsView()

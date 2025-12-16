@@ -455,6 +455,9 @@ struct CustomProviderEditSheet: View {
                 #endif
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 500, idealWidth: 550, minHeight: 550, idealHeight: 650)
+        #endif
         .onAppear {
             if let provider = existingProvider {
                 providerName = provider.providerName

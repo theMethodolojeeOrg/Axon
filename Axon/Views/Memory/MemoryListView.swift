@@ -2,363 +2,242 @@
 //  MemoryListView.swift
 //  Axon
 //
-//  List of memories with filtering, multi-selection, and bulk actions
+//  Memory content view with filtering, multi-selection, and bulk actions
+//  Note: MemorySortOption and TagInfo are defined in MemoryViewModel.swift
 //
 
 import SwiftUI
 
-// MARK: - Sort Options
+// MARK: - Memory Content View
 
-enum MemorySortOption: String, CaseIterable {
-    case dateNewest = "Newest"
-    case dateOldest = "Oldest"
-    case confidenceHigh = "Confidence ↓"
-    case confidenceLow = "Confidence ↑"
-    case mostAccessed = "Most Accessed"
-
-    var icon: String {
-        switch self {
-        case .dateNewest: return "arrow.down.circle"
-        case .dateOldest: return "arrow.up.circle"
-        case .confidenceHigh: return "chart.bar.fill"
-        case .confidenceLow: return "chart.bar"
-        case .mostAccessed: return "eye.fill"
-        }
-    }
-}
-
-// MARK: - Tag Info
-
-struct TagInfo: Identifiable, Hashable {
-    let tag: String
-    let count: Int
-
-    var id: String { tag }
-}
-
-// MARK: - Memory List View
-
-struct MemoryListView: View {
-    @StateObject private var memoryService = MemoryService.shared
-    @State private var selectedType: MemoryType?
-    @State private var searchText = ""
-    @State private var showNewMemory = false
-    @State private var selectedMemory: Memory?
-
-    // Multi-selection
-    @State private var isSelectionMode = false
-    @State private var selectedIds: Set<String> = []
-
-    // Sorting
-    @State private var sortOption: MemorySortOption = .dateNewest
-
-    // Archive filter
-    @State private var showArchived = false
-
-    // Tag filtering
-    @State private var selectedTag: String?
-    @State private var showAllTags = false
-
-    // Confirmation dialogs
-    @State private var showDeleteConfirmation = false
-    @State private var showArchiveConfirmation = false
-
-    // Computed: All unique tags with counts
-    var tagInfos: [TagInfo] {
-        var tagCounts: [String: Int] = [:]
-        for memory in memoryService.memories {
-            // Filter by archive status when counting
-            if showArchived != memory.isArchived { continue }
-            for tag in memory.tags {
-                tagCounts[tag, default: 0] += 1
-            }
-        }
-        return tagCounts.map { TagInfo(tag: $0.key, count: $0.value) }
-            .sorted { $0.count > $1.count }
-    }
-
-    // Top tags for quick access (max 8)
-    var topTags: [TagInfo] {
-        Array(tagInfos.prefix(8))
-    }
-
-    var filteredMemories: [Memory] {
-        var memories = memoryService.memories
-
-        // Archive filter
-        memories = memories.filter { $0.isArchived == showArchived }
-
-        // Type filter
-        if let type = selectedType {
-            memories = memories.filter { $0.type == type }
-        }
-
-        // Tag filter
-        if let tag = selectedTag {
-            memories = memories.filter { $0.tags.contains(tag) }
-        }
-
-        // Search filter
-        if !searchText.isEmpty {
-            memories = memories.filter {
-                $0.content.localizedCaseInsensitiveContains(searchText) ||
-                $0.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
-            }
-        }
-
-        // Sorting
-        switch sortOption {
-        case .dateNewest:
-            memories.sort { $0.createdAt > $1.createdAt }
-        case .dateOldest:
-            memories.sort { $0.createdAt < $1.createdAt }
-        case .confidenceHigh:
-            memories.sort { $0.confidence > $1.confidence }
-        case .confidenceLow:
-            memories.sort { $0.confidence < $1.confidence }
-        case .mostAccessed:
-            memories.sort { $0.accessCount > $1.accessCount }
-        }
-
-        return memories
-    }
-
-    var selectedCount: Int {
-        selectedIds.count
-    }
+struct MemoryContentView: View {
+    @EnvironmentObject var viewModel: MemoryViewModel
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                AppColors.substratePrimary
-                    .ignoresSafeArea()
+        VStack(spacing: 0) {
+            // Search bar with sort button
+            HStack(spacing: 12) {
+                MemorySearchBar(text: $viewModel.searchText)
 
-                VStack(spacing: 0) {
-                    // Search bar with sort button
-                    HStack(spacing: 12) {
-                        SearchBar(text: $searchText)
+                // Sort button
+                Menu {
+                    ForEach(MemorySortOption.allCases, id: \.self) { option in
+                        Button(action: { viewModel.sortOption = option }) {
+                            Label(option.rawValue, systemImage: option.icon)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down.circle")
+                        .font(.system(size: 20))
+                        .foregroundColor(AppColors.signalMercury)
+                        .frame(width: 44, height: 44)
+                        .background(AppColors.substrateSecondary)
+                        .cornerRadius(12)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top)
 
-                        // Sort button
-                        Menu {
-                            ForEach(MemorySortOption.allCases, id: \.self) { option in
-                                Button(action: { sortOption = option }) {
-                                    Label(option.rawValue, systemImage: option.icon)
-                                }
+            // Archive toggle + Type filter
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    // Archive toggle
+                    MemoryFilterChip(
+                        title: viewModel.showArchived ? "Archived" : "Active",
+                        icon: viewModel.showArchived ? "archivebox.fill" : "tray.full",
+                        isSelected: true,
+                        action: {
+                            withAnimation { viewModel.showArchived.toggle() }
+                            viewModel.selectedTag = nil // Reset tag filter when switching
+                        }
+                    )
+
+                    Divider()
+                        .frame(height: 24)
+
+                    // Type filters
+                    MemoryFilterChip(
+                        title: "All",
+                        isSelected: viewModel.selectedType == nil,
+                        action: { viewModel.selectedType = nil }
+                    )
+
+                    ForEach(MemoryType.selectableCases, id: \.self) { type in
+                        MemoryFilterChip(
+                            title: type.displayName,
+                            icon: type.icon,
+                            isSelected: viewModel.selectedType == type,
+                            action: { viewModel.selectedType = type }
+                        )
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .padding(.vertical, 8)
+
+            // Tag filter section (if we have tags)
+            if !viewModel.topTags.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("TAGS")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
+
+                        Spacer()
+
+                        if viewModel.tagInfos.count > 8 {
+                            Button(action: { viewModel.showAllTags = true }) {
+                                Text("See All (\(viewModel.tagInfos.count))")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.signalMercury)
                             }
-                        } label: {
-                            Image(systemName: "arrow.up.arrow.down.circle")
-                                .font(.system(size: 20))
-                                .foregroundColor(AppColors.signalMercury)
-                                .frame(width: 44, height: 44)
-                                .background(AppColors.substrateSecondary)
-                                .cornerRadius(12)
                         }
                     }
                     .padding(.horizontal)
-                    .padding(.top)
 
-                    // Archive toggle + Type filter
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            // Archive toggle
-                            FilterChip(
-                                title: showArchived ? "Archived" : "Active",
-                                icon: showArchived ? "archivebox.fill" : "tray.full",
-                                isSelected: true,
-                                action: {
-                                    withAnimation { showArchived.toggle() }
-                                    selectedTag = nil // Reset tag filter when switching
+                        HStack(spacing: 8) {
+                            // Clear tag filter
+                            if viewModel.selectedTag != nil {
+                                Button(action: { viewModel.selectedTag = nil }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.system(size: 12))
+                                        Text("Clear")
+                                            .font(AppTypography.labelSmall())
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(AppColors.signalHematite.opacity(0.2))
+                                    .foregroundColor(AppColors.signalHematite)
+                                    .cornerRadius(14)
                                 }
-                            )
+                            }
 
-                            Divider()
-                                .frame(height: 24)
-
-                            // Type filters
-                            FilterChip(
-                                title: "All",
-                                isSelected: selectedType == nil,
-                                action: { selectedType = nil }
-                            )
-
-                            ForEach(MemoryType.selectableCases, id: \.self) { type in
-                                FilterChip(
-                                    title: type.displayName,
-                                    icon: type.icon,
-                                    isSelected: selectedType == type,
-                                    action: { selectedType = type }
+                            ForEach(viewModel.topTags) { tagInfo in
+                                MemoryTagChip(
+                                    tagInfo: tagInfo,
+                                    isSelected: viewModel.selectedTag == tagInfo.tag,
+                                    action: {
+                                        if viewModel.selectedTag == tagInfo.tag {
+                                            viewModel.selectedTag = nil
+                                        } else {
+                                            viewModel.selectedTag = tagInfo.tag
+                                        }
+                                    }
                                 )
                             }
                         }
                         .padding(.horizontal)
                     }
-                    .padding(.vertical, 8)
-
-                    // Tag filter section (if we have tags)
-                    if !topTags.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("TAGS")
-                                    .font(AppTypography.labelSmall())
-                                    .foregroundColor(AppColors.textTertiary)
-
-                                Spacer()
-
-                                if tagInfos.count > 8 {
-                                    Button(action: { showAllTags = true }) {
-                                        Text("See All (\(tagInfos.count))")
-                                            .font(AppTypography.labelSmall())
-                                            .foregroundColor(AppColors.signalMercury)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal)
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    // Clear tag filter
-                                    if selectedTag != nil {
-                                        Button(action: { selectedTag = nil }) {
-                                            HStack(spacing: 4) {
-                                                Image(systemName: "xmark.circle.fill")
-                                                    .font(.system(size: 12))
-                                                Text("Clear")
-                                                    .font(AppTypography.labelSmall())
-                                            }
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 6)
-                                            .background(AppColors.signalHematite.opacity(0.2))
-                                            .foregroundColor(AppColors.signalHematite)
-                                            .cornerRadius(14)
-                                        }
-                                    }
-
-                                    ForEach(topTags) { tagInfo in
-                                        TagChip(
-                                            tagInfo: tagInfo,
-                                            isSelected: selectedTag == tagInfo.tag,
-                                            action: {
-                                                if selectedTag == tagInfo.tag {
-                                                    selectedTag = nil
-                                                } else {
-                                                    selectedTag = tagInfo.tag
-                                                }
-                                            }
-                                        )
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
-                        .padding(.bottom, 8)
-                    }
-
-                    // Selection mode bar
-                    if isSelectionMode {
-                        SelectionBar(
-                            selectedCount: selectedCount,
-                            totalCount: filteredMemories.count,
-                            showArchived: showArchived,
-                            onSelectAll: { selectAll() },
-                            onDeselectAll: { selectedIds.removeAll() },
-                            onDelete: { showDeleteConfirmation = true },
-                            onArchive: { showArchiveConfirmation = true },
-                            onCancel: { exitSelectionMode() }
-                        )
-                    }
-
-                    // Memories list
-                    if filteredMemories.isEmpty && !memoryService.isLoading {
-                        emptyStateView
-                    } else {
-                        List {
-                            ForEach(filteredMemories) { memory in
-                                MemoryRow(
-                                    memory: memory,
-                                    isSelectionMode: isSelectionMode,
-                                    isSelected: selectedIds.contains(memory.id),
-                                    onTap: {
-                                        if isSelectionMode {
-                                            toggleSelection(memory.id)
-                                        } else {
-                                            selectedMemory = memory
-                                        }
-                                    },
-                                    onLongPress: {
-                                        if !isSelectionMode {
-                                            enterSelectionMode(with: memory.id)
-                                        }
-                                    },
-                                    onDelete: { deleteMemory(memory) },
-                                    onArchive: { toggleArchive(memory) },
-                                    onPin: { togglePin(memory) }
-                                )
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Color.clear)
-                                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                            }
-                        }
-                        .listStyle(.plain)
-                    }
-
-                    if memoryService.isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: AppColors.signalMercury))
-                    }
                 }
+                .padding(.bottom, 8)
             }
-            .navigationTitle("Memory")
-            .toolbar {
-                ToolbarItem {
-                    if !isSelectionMode {
-                        Button(action: { enterSelectionMode() }) {
-                            Text("Select")
-                                .font(AppTypography.bodyMedium())
-                                .foregroundColor(AppColors.signalMercury)
-                        }
-                    }
-                }
 
-                ToolbarItem {
-                    if !isSelectionMode {
-                        Button(action: { showNewMemory = true }) {
-                            Image(systemName: "plus")
-                                .foregroundColor(AppColors.signalMercury)
-                        }
-                    }
-                }
-            }
-            .sheet(isPresented: $showNewMemory) {
-                NewMemorySheet()
-            }
-            .sheet(item: $selectedMemory) { memory in
-                MemoryDetailView(memory: memory)
-            }
-            .sheet(isPresented: $showAllTags) {
-                AllTagsSheet(
-                    tagInfos: tagInfos,
-                    selectedTag: $selectedTag,
-                    onDismiss: { showAllTags = false }
+            // Selection mode bar
+            if viewModel.isSelectionMode {
+                MemorySelectionBar(
+                    selectedCount: viewModel.selectedCount,
+                    totalCount: viewModel.filteredMemories.count,
+                    showArchived: viewModel.showArchived,
+                    onSelectAll: { viewModel.selectAll() },
+                    onDeselectAll: { viewModel.deselectAll() },
+                    onDelete: { viewModel.showDeleteConfirmation = true },
+                    onArchive: { viewModel.showArchiveConfirmation = true },
+                    onCancel: { viewModel.exitSelectionMode() }
                 )
             }
-            .alert("Delete \(selectedCount) Memories?", isPresented: $showDeleteConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) { deleteSelected() }
-            } message: {
-                Text("This action cannot be undone.")
+
+            // Toolbar area for Select/Add buttons
+            if !viewModel.isSelectionMode {
+                HStack {
+                    Spacer()
+                    
+                    Button(action: { viewModel.enterSelectionMode() }) {
+                        Text("Select")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.signalMercury)
+                    }
+                    .padding(.trailing, 8)
+                    
+                    Button(action: { viewModel.showNewMemory = true }) {
+                        Image(systemName: "plus")
+                            .foregroundColor(AppColors.signalMercury)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
             }
-            .alert(showArchived ? "Restore \(selectedCount) Memories?" : "Archive \(selectedCount) Memories?", isPresented: $showArchiveConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button(showArchived ? "Restore" : "Archive") { archiveSelected() }
-            } message: {
-                Text(showArchived ? "These memories will be moved back to active." : "Archived memories can be restored later.")
+
+            // Memories list
+            if viewModel.filteredMemories.isEmpty && !viewModel.isLoading {
+                emptyStateView
+            } else {
+                List {
+                    ForEach(viewModel.filteredMemories) { memory in
+                        MemoryRow(
+                            memory: memory,
+                            isSelectionMode: viewModel.isSelectionMode,
+                            isSelected: viewModel.selectedIds.contains(memory.id),
+                            onTap: {
+                                if viewModel.isSelectionMode {
+                                    viewModel.toggleSelection(memory.id)
+                                } else {
+                                    viewModel.selectedMemory = memory
+                                }
+                            },
+                            onLongPress: {
+                                if !viewModel.isSelectionMode {
+                                    viewModel.enterSelectionMode(with: memory.id)
+                                }
+                            },
+                            onDelete: { viewModel.deleteMemory(memory) },
+                            onArchive: { viewModel.toggleArchive(memory) },
+                            onPin: { viewModel.togglePin(memory) }
+                        )
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                    }
+                }
+                .listStyle(.plain)
             }
-            .task {
-                await loadMemories()
+
+            if viewModel.isLoading {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: AppColors.signalMercury))
             }
-            .refreshable {
-                await loadMemories()
-            }
+        }
+        .sheet(isPresented: $viewModel.showNewMemory) {
+            NewMemorySheet()
+        }
+        .sheet(item: $viewModel.selectedMemory) { memory in
+            MemoryDetailView(memory: memory)
+        }
+        .sheet(isPresented: $viewModel.showAllTags) {
+            AllTagsSheet(
+                tagInfos: viewModel.tagInfos,
+                selectedTag: $viewModel.selectedTag,
+                onDismiss: { viewModel.showAllTags = false }
+            )
+        }
+        .alert("Delete \(viewModel.selectedCount) Memories?", isPresented: $viewModel.showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) { viewModel.deleteSelected() }
+        } message: {
+            Text("This action cannot be undone.")
+        }
+        .alert(viewModel.showArchived ? "Restore \(viewModel.selectedCount) Memories?" : "Archive \(viewModel.selectedCount) Memories?", isPresented: $viewModel.showArchiveConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button(viewModel.showArchived ? "Restore" : "Archive") { viewModel.archiveSelected() }
+        } message: {
+            Text(viewModel.showArchived ? "These memories will be moved back to active." : "Archived memories can be restored later.")
+        }
+        .task {
+            await viewModel.loadMemories()
+        }
+        .refreshable {
+            await viewModel.loadMemories()
         }
     }
 
@@ -366,162 +245,27 @@ struct MemoryListView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: 20) {
+            Spacer()
+            
             Image("AxonLogoTemplate")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 60, height: 60)
                 .foregroundColor(AppColors.signalMercury.opacity(0.5))
 
-            Text(emptyStateTitle)
+            Text(viewModel.emptyStateTitle)
                 .font(AppTypography.headlineSmall())
                 .foregroundColor(AppColors.textPrimary)
 
-            Text(emptyStateMessage)
+            Text(viewModel.emptyStateMessage)
                 .font(AppTypography.bodyMedium())
                 .foregroundColor(AppColors.textSecondary)
                 .multilineTextAlignment(.center)
+            
+            Spacer()
         }
         .padding()
-    }
-
-    private var emptyStateTitle: String {
-        if showArchived {
-            return "No Archived Memories"
-        } else if selectedTag != nil {
-            return "No Memories with Tag"
-        } else if selectedType != nil {
-            return "No \(selectedType!.displayName) Memories"
-        } else if !searchText.isEmpty {
-            return "No Matches Found"
-        } else {
-            return "No Memories Yet"
-        }
-    }
-
-    private var emptyStateMessage: String {
-        if showArchived {
-            return "Archived memories will appear here"
-        } else if selectedTag != nil {
-            return "No memories tagged with #\(selectedTag!)"
-        } else if selectedType != nil || !searchText.isEmpty {
-            return "Try adjusting your filters"
-        } else {
-            return "Memories will be created automatically as you chat"
-        }
-    }
-
-    // MARK: - Selection Mode
-
-    private func enterSelectionMode(with id: String? = nil) {
-        isSelectionMode = true
-        selectedIds.removeAll()
-        if let id = id {
-            selectedIds.insert(id)
-        }
-    }
-
-    private func exitSelectionMode() {
-        isSelectionMode = false
-        selectedIds.removeAll()
-    }
-
-    private func toggleSelection(_ id: String) {
-        if selectedIds.contains(id) {
-            selectedIds.remove(id)
-        } else {
-            selectedIds.insert(id)
-        }
-    }
-
-    private func selectAll() {
-        selectedIds = Set(filteredMemories.map { $0.id })
-    }
-
-    // MARK: - Actions
-
-    private func loadMemories() async {
-        do {
-            try await memoryService.getMemories(limit: 100, type: selectedType)
-        } catch {
-            print("Error loading memories: \(error.localizedDescription)")
-        }
-    }
-
-    private func deleteMemory(_ memory: Memory) {
-        Task {
-            do {
-                try await memoryService.deleteMemory(id: memory.id)
-            } catch {
-                print("Error deleting memory: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    private func deleteSelected() {
-        Task {
-            for id in selectedIds {
-                do {
-                    try await memoryService.deleteMemory(id: id)
-                } catch {
-                    print("Error deleting memory \(id): \(error.localizedDescription)")
-                }
-            }
-            exitSelectionMode()
-        }
-    }
-
-    private func toggleArchive(_ memory: Memory) {
-        Task {
-            do {
-                var newMetadata = memory.metadata
-                newMetadata["isArchived"] = .bool(!memory.isArchived)
-
-                _ = try await memoryService.updateMemory(
-                    id: memory.id,
-                    metadata: newMetadata
-                )
-            } catch {
-                print("Error toggling archive: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    private func archiveSelected() {
-        let newArchiveState = !showArchived // If viewing archived, we're restoring
-        Task {
-            for id in selectedIds {
-                if let memory = memoryService.memories.first(where: { $0.id == id }) {
-                    do {
-                        var newMetadata = memory.metadata
-                        newMetadata["isArchived"] = .bool(newArchiveState)
-
-                        _ = try await memoryService.updateMemory(
-                            id: id,
-                            metadata: newMetadata
-                        )
-                    } catch {
-                        print("Error archiving memory \(id): \(error.localizedDescription)")
-                    }
-                }
-            }
-            exitSelectionMode()
-        }
-    }
-
-    private func togglePin(_ memory: Memory) {
-        Task {
-            do {
-                var newMetadata = memory.metadata
-                newMetadata["isPinned"] = .bool(!memory.isPinned)
-
-                _ = try await memoryService.updateMemory(
-                    id: memory.id,
-                    metadata: newMetadata
-                )
-            } catch {
-                print("Error toggling pin: \(error.localizedDescription)")
-            }
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -577,7 +321,7 @@ private struct MemoryRow: View {
 
 // MARK: - Selection Bar
 
-private struct SelectionBar: View {
+private struct MemorySelectionBar: View {
     let selectedCount: Int
     let totalCount: Int
     let showArchived: Bool
@@ -650,7 +394,7 @@ private struct SelectionBar: View {
 
 // MARK: - Tag Chip
 
-private struct TagChip: View {
+private struct MemoryTagChip: View {
     let tagInfo: TagInfo
     let isSelected: Bool
     let action: () -> Void
@@ -702,7 +446,7 @@ private struct AllTagsSheet: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    SearchBar(text: $searchText)
+                    MemorySearchBar(text: $searchText)
                         .padding()
 
                     List {
@@ -746,6 +490,9 @@ private struct AllTagsSheet: View {
                 }
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 400, idealWidth: 450, minHeight: 400, idealHeight: 500)
+        #endif
     }
 }
 
@@ -754,10 +501,17 @@ private struct AllTagsSheet: View {
 struct MemoryCard: View {
     let memory: Memory
     @StateObject private var learningService = LearningLoopService.shared
+    @State private var showResetConfirmation = false
 
     /// Get learning data for this memory (if tracked)
     private var learningData: MemoryLearningData? {
         learningService.learningData[memory.id]
+    }
+
+    /// Check if memory is suspicious (low reliability after multiple uses)
+    private var isSuspicious: Bool {
+        guard let learning = learningData else { return false }
+        return learning.reliability < 0.5 && (learning.successCount + learning.failureCount) >= 3
     }
 
     /// Confidence color based on value
@@ -774,6 +528,39 @@ struct MemoryCard: View {
     var body: some View {
         GlassCard(padding: 16) {
             VStack(alignment: .leading, spacing: 12) {
+                // Suspicious memory banner
+                if isSuspicious {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(AppColors.signalCopper)
+
+                        Text("Suspicious - frequently contradicted")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.signalCopper)
+
+                        Spacer()
+
+                        Button(action: { showResetConfirmation = true }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.system(size: 12))
+                                Text("Reset")
+                                    .font(AppTypography.labelSmall())
+                            }
+                            .foregroundColor(AppColors.signalMercury)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(AppColors.signalMercury.opacity(0.2))
+                            .cornerRadius(6)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    .padding(10)
+                    .background(AppColors.signalCopper.opacity(0.15))
+                    .cornerRadius(8)
+                }
+
                 // Header
                 HStack {
                     // Pin indicator
@@ -846,6 +633,14 @@ struct MemoryCard: View {
                 }
             }
         }
+        .alert("Reset Learning Data?", isPresented: $showResetConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Reset", role: .destructive) {
+                learningService.resetLearningData(for: memory.id)
+            }
+        } message: {
+            Text("This will clear all learning history for this memory, giving it a fresh start. The memory content will not be changed.")
+        }
     }
 
     private func colorForType(_ type: MemoryType) -> Color {
@@ -866,7 +661,7 @@ struct MemoryCard: View {
 
 // MARK: - Search Bar
 
-struct SearchBar: View {
+struct MemorySearchBar: View {
     @Binding var text: String
 
     var body: some View {
@@ -894,7 +689,7 @@ struct SearchBar: View {
 
 // MARK: - Filter Chip
 
-struct FilterChip: View {
+struct MemoryFilterChip: View {
     let title: String
     var icon: String? = nil
     let isSelected: Bool
@@ -1026,6 +821,9 @@ struct NewMemorySheet: View {
                 }
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 400, idealWidth: 450, minHeight: 450, idealHeight: 550)
+        #endif
     }
 
     private func createMemory() {
@@ -1050,8 +848,18 @@ struct NewMemorySheet: View {
     }
 }
 
+// MARK: - Legacy MemoryListView (for backwards compatibility)
+// This maintains the old API for any code still referencing MemoryListView directly
+
+struct MemoryListView: View {
+    var body: some View {
+        MemoryView()
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
-    MemoryListView()
+    MemoryContentView()
+        .environmentObject(MemoryViewModel.shared)
 }

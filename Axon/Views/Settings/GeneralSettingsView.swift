@@ -120,47 +120,54 @@ struct GeneralSettingsView: View {
                 let providerIndex = viewModel.settings.customProviders.firstIndex(where: { $0.id == viewModel.settings.selectedCustomProviderId }) ?? 0
 
                 if let provider = currentProvider {
-                    let availableModels = provider.availableModels(customProviderIndex: providerIndex + 1)
+                    // Check if this is the MLX provider
+                    if provider.id == "builtin_localMLX" {
+                        // Show comprehensive MLX management UI
+                        MLXModelManagementView()
+                    } else {
+                        // Show standard model picker for other providers
+                        let availableModels = provider.availableModels(customProviderIndex: providerIndex + 1)
 
-                    StyledMenuPicker(
-                        icon: "brain.head.profile",
-                        title: currentModel?.name ?? "Select a model",
-                        selection: Binding(
-                            get: { currentModel?.id ?? "" },
-                            set: { newModelId in
-                                if let selectedModel = availableModels.first(where: { $0.id == newModelId }) {
-                                    Task {
-                                        await viewModel.selectUnifiedModel(selectedModel)
+                        StyledMenuPicker(
+                            icon: "brain.head.profile",
+                            title: currentModel?.name ?? "Select a model",
+                            selection: Binding(
+                                get: { currentModel?.id ?? "" },
+                                set: { newModelId in
+                                    if let selectedModel = availableModels.first(where: { $0.id == newModelId }) {
+                                        Task {
+                                            await viewModel.selectUnifiedModel(selectedModel)
+                                        }
                                     }
                                 }
+                            )
+                        ) {
+                            #if os(macOS)
+                            ForEach(availableModels) { model in
+                                MenuButtonItem(
+                                    id: model.id,
+                                    label: model.name,
+                                    isSelected: currentModel?.id == model.id
+                                ) {
+                                    Task { await viewModel.selectUnifiedModel(model) }
+                                }
                             }
-                        )
-                    ) {
-                        #if os(macOS)
-                        ForEach(availableModels) { model in
-                            MenuButtonItem(
-                                id: model.id,
-                                label: model.name,
-                                isSelected: currentModel?.id == model.id
-                            ) {
-                                Task { await viewModel.selectUnifiedModel(model) }
+                            #else
+                            ForEach(availableModels) { model in
+                                Text(model.name).tag(model.id)
                             }
+                            #endif
                         }
-                        #else
-                        ForEach(availableModels) { model in
-                            Text(model.name).tag(model.id)
-                        }
-                        #endif
-                    }
 
-                    if let selectedModel = currentModel {
-                        // Selected Model Card (read-only)
-                        UnifiedModelRow(
-                            model: selectedModel,
-                            isSelected: true,
-                            action: {}
-                        )
-                        .disabled(true)
+                        if let selectedModel = currentModel {
+                            // Selected Model Card (read-only)
+                            UnifiedModelRow(
+                                model: selectedModel,
+                                isSelected: true,
+                                action: {}
+                            )
+                            .disabled(true)
+                        }
                     }
                 }
             }

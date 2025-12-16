@@ -53,6 +53,9 @@ struct CostsBreakdownView: View {
                 #endif
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 400, idealWidth: 450, minHeight: 350, idealHeight: 450)
+        #endif
     }
 }
 

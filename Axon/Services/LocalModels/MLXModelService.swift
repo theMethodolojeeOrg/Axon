@@ -92,8 +92,15 @@ final class MLXModelService: ObservableObject {
     @Published var isLoading = false
     @Published var downloadProgress: Double = 0
     @Published var loadingStatus: String = ""
+    
+    /// Model management state
+    @Published var downloadedModels: Set<String> = []
+    @Published var modelInMemory: String? = nil
+    @Published var downloadingModel: String? = nil
 
     private init() {
+        // Scan for already downloaded models
+        updateDownloadedModels()
         // Set up memory management for iOS
         #if canImport(MLX)
         // Limit Metal buffer cache to 20MB to help with memory pressure
@@ -141,6 +148,7 @@ final class MLXModelService: ObservableObject {
         #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
         modelContainer = nil
         currentModelId = nil
+        modelInMemory = nil
         print("[MLXModelService] Model unloaded")
         #endif
     }
@@ -152,6 +160,121 @@ final class MLXModelService: ObservableObject {
         #else
         return false
         #endif
+    }
+    
+    // MARK: - Model Management
+    
+    /// Update the list of downloaded models by scanning the cache directory
+    func updateDownloadedModels() {
+        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
+        Task { @MainActor in
+            var downloaded = Set<String>()
+            
+            // Check each model to see if it's downloaded
+            for model in LocalMLXModel.allCases {
+                if isModelDownloaded(modelId: model.rawValue) {
+                    downloaded.insert(model.rawValue)
+                }
+            }
+            
+            self.downloadedModels = downloaded
+            print("[MLXModelService] Found \(downloaded.count) downloaded models")
+        }
+        #endif
+    }
+    
+    /// Check if a model is downloaded locally
+    func isModelDownloaded(modelId: String) -> Bool {
+        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
+        // MLX models are cached in ~/Library/Caches/models/
+        let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("models")
+        
+        guard let cacheDir = cacheDir else { return false }
+        
+        // Model directory uses the full model ID path (e.g., "mlx-community/SmolLM2-1.7B-Instruct-4bit")
+        let modelDir = cacheDir.appendingPathComponent(modelId)
+        
+        // Check if directory exists and has required files (config.json is essential)
+        let configPath = modelDir.appendingPathComponent("config.json")
+        if FileManager.default.fileExists(atPath: configPath.path) {
+            return true
+        }
+        
+        return false
+        #else
+        return false
+        #endif
+    }
+    
+    /// Get the size of a downloaded model in bytes
+    func getModelSize(modelId: String) -> Int64? {
+        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
+        let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("models")
+        
+        guard let cacheDir = cacheDir else { return nil }
+        
+        // Model directory uses the full model ID path
+        let modelDir = cacheDir.appendingPathComponent(modelId)
+        
+        guard FileManager.default.fileExists(atPath: modelDir.path) else { return nil }
+        
+        do {
+            let size = try FileManager.default.allocatedSizeOfDirectory(at: modelDir)
+            return size
+        } catch {
+            print("[MLXModelService] Error getting model size: \(error)")
+            return nil
+        }
+        #else
+        return nil
+        #endif
+    }
+    
+    /// Delete a downloaded model to free up space
+    func deleteModel(modelId: String) async throws {
+        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
+        // Unload if this is the current model
+        if currentModelId == modelId {
+            unloadModel()
+        }
+        
+        let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("models")
+        
+        guard let cacheDir = cacheDir else {
+            throw MLXModelError.modelNotFound("Cache directory not found")
+        }
+        
+        // Model directory uses the full model ID path
+        let modelDir = cacheDir.appendingPathComponent(modelId)
+        
+        guard FileManager.default.fileExists(atPath: modelDir.path) else {
+            throw MLXModelError.modelNotFound("Model directory not found")
+        }
+        
+        try FileManager.default.removeItem(at: modelDir)
+        
+        await MainActor.run {
+            downloadedModels.remove(modelId)
+        }
+        
+        print("[MLXModelService] Deleted model: \(modelId)")
+        #else
+        throw MLXModelError.notAvailable
+        #endif
+    }
+    
+    /// Get total size of all downloaded models
+    func getTotalModelsSize() -> Int64 {
+        var totalSize: Int64 = 0
+        for modelId in downloadedModels {
+            if let size = getModelSize(modelId: modelId) {
+                totalSize += size
+            }
+        }
+        return totalSize
     }
 
     // MARK: - Model Loading
@@ -184,9 +307,11 @@ final class MLXModelService: ObservableObject {
         isLoading = true
         downloadProgress = 0
         loadingStatus = "Preparing to download model..."
+        downloadingModel = modelId
 
         defer {
             isLoading = false
+            downloadingModel = nil
         }
 
         print("[MLXModelService] Loading model: \(modelId)")
@@ -214,7 +339,14 @@ final class MLXModelService: ObservableObject {
 
             self.modelContainer = container
             self.currentModelId = modelId
+            self.modelInMemory = modelId
             loadingStatus = "Model ready!"
+            
+            // Update downloaded models list
+            await MainActor.run {
+                downloadedModels.insert(modelId)
+            }
+            
             print("[MLXModelService] Model loaded successfully: \(modelId)")
 
             // Log model info
@@ -242,11 +374,9 @@ final class MLXModelService: ObservableObject {
         maxTokens: Int = 2048
     ) async throws -> String {
         #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
-        // Ensure model is loaded
-        try await loadModel()
-
+        // Verify model is loaded (orchestrator should have already loaded it)
         guard let container = modelContainer else {
-            throw MLXModelError.loadFailed("Model container not available")
+            throw MLXModelError.loadFailed("No model loaded. Please load a model first using loadModel(modelId:)")
         }
 
         // Convert messages to the format expected by MLX
@@ -346,5 +476,31 @@ final class MLXModelService: ObservableObject {
         cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
 
         return cleaned
+    }
+}
+
+// MARK: - FileManager Extension for Directory Size
+
+extension FileManager {
+    /// Calculate the allocated size of a directory and its contents
+    func allocatedSizeOfDirectory(at url: URL) throws -> Int64 {
+        guard let enumerator = self.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
+        ) else {
+            return 0
+        }
+        
+        var totalSize: Int64 = 0
+        
+        for case let fileURL as URL in enumerator {
+            guard let resourceValues = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey]),
+                  let size = resourceValues.totalFileAllocatedSize ?? resourceValues.fileAllocatedSize else {
+                continue
+            }
+            totalSize += Int64(size)
+        }
+        
+        return totalSize
     }
 }

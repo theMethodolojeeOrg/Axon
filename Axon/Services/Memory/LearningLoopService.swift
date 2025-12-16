@@ -379,6 +379,20 @@ class LearningLoopService: ObservableObject {
         pendingPredictions.removeAll()
         recentLearningEvents.removeAll()
     }
+
+    /// Reset learning data for a specific memory (gives it a fresh start)
+    func resetLearningData(for memoryId: String) {
+        learningData.removeValue(forKey: memoryId)
+
+        // Also remove any learning events that reference this memory
+        recentLearningEvents.removeAll { event in
+            event.affectedMemoryIds.contains(memoryId)
+        }
+
+        #if DEBUG
+        print("[LearningLoop] Reset learning data for memory: \(memoryId)")
+        #endif
+    }
 }
 
 // MARK: - Supporting Types

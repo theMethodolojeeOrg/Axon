@@ -466,6 +466,9 @@ struct ToolApprovalDetailSheet: View {
                 }
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 450, idealWidth: 500, minHeight: 500, idealHeight: 600)
+        #endif
     }
 
     private func biometricIcon(for type: String) -> String {

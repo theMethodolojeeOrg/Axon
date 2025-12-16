@@ -399,6 +399,9 @@ struct MemoryDetailView: View {
                 Text("This action cannot be undone.")
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 480, idealWidth: 520, minHeight: 500, idealHeight: 600)
+        #endif
     }
     
     private func saveChanges() {

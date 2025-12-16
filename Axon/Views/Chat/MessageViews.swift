@@ -588,11 +588,15 @@ struct TextSelectorSheet: View {
                                 Label("Quote", systemImage: "text.quote")
                             }
                         }
-                    }
                 }
+            }
         }
+        #if os(macOS)
+        .frame(minWidth: 450, idealWidth: 550, minHeight: 350, idealHeight: 450)
+        #else
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        #endif
     }
 
     private func quoteFromClipboard() {

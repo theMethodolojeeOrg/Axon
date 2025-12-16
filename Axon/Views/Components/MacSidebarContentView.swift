@@ -36,14 +36,8 @@ struct MacSidebarContentView: View {
 
             Divider().background(AppColors.divider)
 
-            switch currentView {
-            case .chat:
-                conversationsSection
-            case .memory:
-                navHint(title: "Memory")
-            case .settings:
-                navHint(title: "Settings")
-            }
+            // Always show conversations - they're accessible from any view
+            conversationsSection
 
             Spacer(minLength: 0)
 
@@ -288,21 +282,6 @@ struct MacSidebarContentView: View {
         }
         .padding(10)
         .background(AppColors.substratePrimary)
-    }
-
-    private func navHint(title: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(AppTypography.labelMedium())
-                .foregroundColor(AppColors.textTertiary)
-                .padding(.horizontal, 12)
-                .padding(.top, 12)
-
-            Text("Select a chat, or use the buttons below to switch sections.")
-                .font(AppTypography.bodySmall())
-                .foregroundColor(AppColors.textSecondary)
-                .padding(.horizontal, 12)
-        }
     }
 
     // MARK: - Actions

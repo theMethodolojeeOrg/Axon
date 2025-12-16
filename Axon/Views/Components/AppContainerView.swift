@@ -170,7 +170,7 @@ struct AppContainerView: View {
                         }
                     )
                 case .memory:
-                    MemoryListView()
+                    MemoryView()
                 case .settings:
                     SettingsView()
                 }
@@ -333,6 +333,7 @@ struct ChatContainerView: View {
     @StateObject private var costService = CostService.shared
     @StateObject private var taglineManager = TaglineManager.shared
     @StateObject private var promptManager = PromptManager.shared
+    @StateObject private var draftService = DraftMessageService.shared
     @ObservedObject private var ttsService = TTSPlaybackService.shared
     @ObservedObject private var toolApprovalService = ToolApprovalService.shared
     @ObservedObject private var mlxService = MLXModelService.shared
@@ -341,6 +342,7 @@ struct ChatContainerView: View {
     #endif
     @State private var messageText = ""
     @State private var selectedAttachments: [MessageAttachment] = []
+    @State private var draftSaveTask: Task<Void, Never>?
     // Tools are now controlled via Settings > Tools tab
     // This computed property reflects the enabled tools from settings
     @State private var isLoading = false
@@ -491,11 +493,26 @@ struct ChatContainerView: View {
                 isInputFocused = false
                 // Set conversation for session-based approvals
                 toolApprovalService.setCurrentConversation(UUID(uuidString: conversation.id) ?? UUID())
+                
+                // Load draft for this conversation
+                loadDraft(for: conversation.id)
+                
                 await loadMessages(for: conversation)
             } else {
                 conversationService.clearCurrentConversation()
                 conversationService.messages = []
+                
+                // Load "New Chat" draft if exists
+                loadDraft(for: DraftMessageService.newChatDraftKey)
             }
+        }
+        .onChange(of: messageText) { oldValue, newValue in
+            // Auto-save draft with debouncing
+            saveDraftDebounced()
+        }
+        .onChange(of: selectedAttachments) { oldValue, newValue in
+            // Auto-save draft when attachments change
+            saveDraftDebounced()
         }
     }
 
@@ -769,6 +786,11 @@ struct ChatContainerView: View {
 
         let content = messageText
         let attachments = selectedAttachments
+        
+        // Clear draft before sending
+        let draftKey = conversation?.id ?? DraftMessageService.newChatDraftKey
+        draftService.clearDraft(conversationId: draftKey)
+        
         messageText = ""
         selectedAttachments = []
         
@@ -797,6 +819,9 @@ struct ChatContainerView: View {
                         firstMessage: nil  // Don't send message during creation
                     )
                     onConversationCreated(conv)
+                    
+                    // Transfer "New Chat" draft to actual conversation
+                    draftService.transferNewChatDraft(to: conv.id)
                 }
 
                 // Get enabled tools from settings
@@ -883,6 +908,38 @@ struct ChatContainerView: View {
             // Remove override to use the canonical content (ensures formatting like Markdown re-renders once fully present)
             streamingOverrides.removeValue(forKey: assistant.id)
             onComplete?()
+        }
+    }
+    
+    // MARK: - Draft Management
+    
+    private func loadDraft(for conversationId: String) {
+        if let draft = draftService.loadDraft(conversationId: conversationId) {
+            messageText = draft.text
+            selectedAttachments = draft.attachments
+            print("[ChatContainer] Loaded draft for conversation: \(conversationId)")
+        }
+    }
+    
+    private func saveDraftDebounced() {
+        // Cancel previous save task
+        draftSaveTask?.cancel()
+        
+        // Schedule new save with debounce
+        draftSaveTask = Task {
+            do {
+                try await Task.sleep(nanoseconds: 500_000_000) // 0.5 second debounce
+                
+                // Save draft
+                let draftKey = conversation?.id ?? DraftMessageService.newChatDraftKey
+                draftService.saveDraft(
+                    conversationId: draftKey,
+                    text: messageText,
+                    attachments: selectedAttachments
+                )
+            } catch {
+                // Task was cancelled, ignore
+            }
         }
     }
 }
