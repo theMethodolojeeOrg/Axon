@@ -134,17 +134,26 @@ class iCloudKeyValueSync: ObservableObject {
             let syncableSettings = try decoder.decode(SyncableSettings.self, from: data)
 
             // Merge cloud settings with local settings
-            if var currentSettings = SettingsStorage.shared.loadSettings() {
-                syncableSettings.apply(to: &currentSettings)
+            // If local settings are corrupt/unreadable, start from defaults
+            var currentSettings = SettingsStorage.shared.loadSettings() ?? AppSettings()
+            syncableSettings.apply(to: &currentSettings)
 
-                // Notify listeners about the change
-                settingsChangedFromCloud.send(currentSettings)
-                print("[iCloudKVSync] Settings loaded from iCloud and merged")
+            // Save the merged settings back to local storage
+            do {
+                try SettingsStorage.shared.saveSettings(currentSettings)
+                print("[iCloudKVSync] Settings loaded from iCloud and merged with local")
+            } catch {
+                print("[iCloudKVSync] Warning: Failed to save merged settings locally: \(error)")
             }
+
+            // Notify listeners about the change
+            settingsChangedFromCloud.send(currentSettings)
 
             if let timestamp = kvStore.object(forKey: lastSyncKey) as? TimeInterval {
                 lastSyncTime = Date(timeIntervalSince1970: timestamp)
             }
+
+            syncError = nil
         } catch {
             syncError = "Failed to load settings: \(error.localizedDescription)"
             print("[iCloudKVSync] Error loading settings: \(error)")

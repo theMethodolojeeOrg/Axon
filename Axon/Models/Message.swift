@@ -23,6 +23,13 @@ struct Message: Codable, Identifiable, Equatable {
     let groundingSources: [MessageGroundingSource]?  // Sources from tool calls (web search, etc.)
     let memoryOperations: [MessageMemoryOperation]?  // Memory operations performed by assistant
     let reasoning: String?  // Chain-of-thought / thinking tokens from reasoning models
+    let editHistory: [MessageEdit]?  // Version history for edited messages
+    let currentVersion: Int?  // Which version is currently displayed (0 = original)
+
+    // Computed property to check if message has been edited
+    var isEdited: Bool {
+        return editHistory != nil && !(editHistory?.isEmpty ?? true)
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -40,6 +47,8 @@ struct Message: Codable, Identifiable, Equatable {
         case groundingSources
         case memoryOperations
         case reasoning
+        case editHistory
+        case currentVersion
     }
 
     init(
@@ -57,7 +66,9 @@ struct Message: Codable, Identifiable, Equatable {
         attachments: [MessageAttachment]? = nil,
         groundingSources: [MessageGroundingSource]? = nil,
         memoryOperations: [MessageMemoryOperation]? = nil,
-        reasoning: String? = nil
+        reasoning: String? = nil,
+        editHistory: [MessageEdit]? = nil,
+        currentVersion: Int? = nil
     ) {
         self.id = id
         self.conversationId = conversationId
@@ -74,6 +85,8 @@ struct Message: Codable, Identifiable, Equatable {
         self.groundingSources = groundingSources
         self.memoryOperations = memoryOperations
         self.reasoning = reasoning
+        self.editHistory = editHistory
+        self.currentVersion = currentVersion
     }
 
     // Custom decoder to handle timestamp conversion from milliseconds
@@ -136,6 +149,8 @@ struct Message: Codable, Identifiable, Equatable {
         groundingSources = try container.decodeIfPresent([MessageGroundingSource].self, forKey: .groundingSources)
         memoryOperations = try container.decodeIfPresent([MessageMemoryOperation].self, forKey: .memoryOperations)
         reasoning = try container.decodeIfPresent(String.self, forKey: .reasoning)
+        editHistory = try container.decodeIfPresent([MessageEdit].self, forKey: .editHistory)
+        currentVersion = try container.decodeIfPresent(Int.self, forKey: .currentVersion)
     }
 
     // Custom encoder to convert timestamp back to milliseconds
@@ -160,6 +175,30 @@ struct Message: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(groundingSources, forKey: .groundingSources)
         try container.encodeIfPresent(memoryOperations, forKey: .memoryOperations)
         try container.encodeIfPresent(reasoning, forKey: .reasoning)
+        try container.encodeIfPresent(editHistory, forKey: .editHistory)
+        try container.encodeIfPresent(currentVersion, forKey: .currentVersion)
+    }
+}
+
+// MARK: - Message Edit History
+
+/// Represents a single edit/version of a message
+struct MessageEdit: Codable, Equatable, Identifiable {
+    let id: String
+    let content: String
+    let timestamp: Date
+    let version: Int  // 0 = original, 1 = first edit, etc.
+
+    init(
+        id: String = UUID().uuidString,
+        content: String,
+        timestamp: Date = Date(),
+        version: Int
+    ) {
+        self.id = id
+        self.content = content
+        self.timestamp = timestamp
+        self.version = version
     }
 }
 

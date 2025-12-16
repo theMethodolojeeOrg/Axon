@@ -47,6 +47,10 @@ export class BridgeClient {
     private reconnectInterval: number = 5000;
     private pairingToken: string = '';
 
+    // Exponential backoff state
+    private reconnectAttempts: number = 0;
+    private readonly maxReconnectInterval: number = 60000; // 1 minute max
+
     constructor(statusBar: StatusBar) {
         this.statusBar = statusBar;
         this.fileHandler = new FileHandler();
@@ -108,19 +112,52 @@ export class BridgeClient {
 
             this.ws.on('close', (code: number, reason: Buffer) => {
                 console.log(`[AxonBridge] Connection closed: ${code} ${reason.toString()}`);
+                this.cleanupSocket();
                 this.handleDisconnect();
             });
 
             this.ws.on('error', (error: Error) => {
                 console.error('[AxonBridge] WebSocket error:', error.message);
                 this.isConnecting = false;
-                // Don't show notification for connection errors during auto-connect
-                // They'll keep trying silently
+                
+                // Clean up the failed socket properly to prevent resource leaks
+                this.cleanupSocket();
+                
+                // Schedule reconnect if autoConnect is enabled
+                if (this.autoConnect) {
+                    this.scheduleReconnect();
+                }
             });
         } catch (error) {
             console.error('[AxonBridge] Failed to create WebSocket:', error);
             this.isConnecting = false;
-            this.scheduleReconnect();
+            this.cleanupSocket();
+            
+            if (this.autoConnect) {
+                this.scheduleReconnect();
+            }
+        }
+    }
+
+    /**
+     * Clean up WebSocket resources properly
+     */
+    private cleanupSocket() {
+        if (this.ws) {
+            // Remove all listeners to prevent memory leaks and zombie handlers
+            this.ws.removeAllListeners();
+            
+            // Close if still open (use try-catch in case already closed)
+            try {
+                if (this.ws.readyState === WebSocket.OPEN || 
+                    this.ws.readyState === WebSocket.CONNECTING) {
+                    this.ws.close();
+                }
+            } catch (e) {
+                // Ignore close errors
+            }
+            
+            this.ws = null;
         }
     }
 
@@ -129,12 +166,17 @@ export class BridgeClient {
      */
     disconnect() {
         this.cancelReconnect();
+        this.reconnectAttempts = 0;
 
         if (this.ws) {
-            this.ws.close(1000, 'User requested disconnect');
-            this.ws = null;
+            try {
+                this.ws.close(1000, 'User requested disconnect');
+            } catch (e) {
+                // Ignore
+            }
         }
-
+        
+        this.cleanupSocket();
         this.sessionId = null;
         this.statusBar.setState('disconnected');
         this.statusBar.showNotification('Disconnected from Axon');
@@ -155,14 +197,29 @@ export class BridgeClient {
             return `Connected (session: ${this.sessionId?.substring(0, 8) ?? 'unknown'})`;
         } else if (this.isConnecting) {
             return 'Connecting...';
+        } else if (this.reconnectTimer) {
+            return `Disconnected (reconnecting in ${this.getNextReconnectDelay() / 1000}s)`;
         } else {
             return 'Disconnected';
         }
     }
 
+    /**
+     * Calculate the next reconnect delay with exponential backoff
+     */
+    private getNextReconnectDelay(): number {
+        return Math.min(
+            this.reconnectInterval * Math.pow(2, this.reconnectAttempts),
+            this.maxReconnectInterval
+        );
+    }
+
     // MARK: - Message Handling
 
     private sendHello() {
+        // Reset reconnect attempts on successful connection
+        this.reconnectAttempts = 0;
+        
         const folders = vscode.workspace.workspaceFolders;
         const workspaceRoot = folders?.[0]?.uri.fsPath ?? '';
         const workspaceName = vscode.workspace.name ?? folders?.[0]?.name ?? 'Unknown';
@@ -304,7 +361,6 @@ export class BridgeClient {
 
     private handleDisconnect() {
         this.isConnecting = false;
-        this.ws = null;
         this.sessionId = null;
         this.statusBar.setState('disconnected');
 
@@ -318,12 +374,16 @@ export class BridgeClient {
             return;
         }
 
-        console.log(`[AxonBridge] Scheduling reconnect in ${this.reconnectInterval}ms...`);
+        // Exponential backoff: 5s, 10s, 20s, 40s, 60s max
+        const delay = this.getNextReconnectDelay();
+        this.reconnectAttempts++;
+
+        console.log(`[AxonBridge] Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts})...`);
 
         this.reconnectTimer = setTimeout(() => {
             this.reconnectTimer = null;
             this.connect();
-        }, this.reconnectInterval);
+        }, delay);
     }
 
     private cancelReconnect() {
@@ -337,9 +397,6 @@ export class BridgeClient {
 
     dispose() {
         this.cancelReconnect();
-        if (this.ws) {
-            this.ws.close();
-            this.ws = null;
-        }
+        this.cleanupSocket();
     }
 }

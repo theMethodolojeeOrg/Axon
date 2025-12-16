@@ -80,7 +80,8 @@
       "axonBridge": [
         {
           "id": "axonBridgeLogsView",
-          "name": "Bridge Logs"
+          "name": "Bridge Logs",
+          "icon": "resources/axon.svg"
         }
       ]
     }

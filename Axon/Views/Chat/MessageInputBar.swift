@@ -273,6 +273,7 @@ struct MessageInputBar: View {
     @Binding var attachments: [MessageAttachment]
     let isLoading: Bool
     let onSend: () -> Void
+    let onStop: (() -> Void)?
     let focus: FocusState<Bool>.Binding?
 
     private let inputMaxHeight: CGFloat = 120
@@ -303,6 +304,7 @@ struct MessageInputBar: View {
         attachments: Binding<[MessageAttachment]> = .constant([]),
         isLoading: Bool,
         onSend: @escaping () -> Void,
+        onStop: (() -> Void)? = nil,
         focus: FocusState<Bool>.Binding? = nil,
         conversationId: String? = nil
     ) {
@@ -310,6 +312,7 @@ struct MessageInputBar: View {
         self._attachments = attachments
         self.isLoading = isLoading
         self.onSend = onSend
+        self.onStop = onStop
         self.focus = focus
         self.conversationId = conversationId
     }
@@ -358,6 +361,11 @@ struct MessageInputBar: View {
     private func handleSend() {
         guard canSend && !isLoading else { return }
         onSend()
+    }
+    
+    private func handleStop() {
+        guard isLoading else { return }
+        onStop?()
     }
 
     var body: some View {
@@ -596,29 +604,30 @@ struct MessageInputBar: View {
     
     @ViewBuilder
     private var sendButton: some View {
-        Button(action: handleSend) {
+        Button(action: isLoading ? handleStop : handleSend) {
             Group {
                 if isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(0.8)
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
                 } else {
                     Image(systemName: "arrow.up")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(canSend && !isLoading ? AppColors.signalLichen : .white)
+                        .foregroundColor(.white)
                 }
             }
             .frame(width: 28, height: 28)
             .background(
                 Circle()
-                    .fill(canSend && !isLoading ? AppColors.signalLichen : AppColors.textDisabled.opacity(0.3))
-                    .shadow(color: canSend ? AppColors.signalLichen.opacity(0.3) : .clear, radius: 4, x: 0, y: 2)
+                    .fill(isLoading ? .white.opacity(0.3) : (canSend ? AppColors.signalLichen : AppColors.textDisabled.opacity(0.3)))
+                    .shadow(color: canSend && !isLoading ? AppColors.signalLichen.opacity(0.3) : .clear, radius: 4, x: 0, y: 2)
             )
         }
         .buttonStyle(.plain)
-        .disabled(isLoading || !canSend)
+        .disabled(!isLoading && !canSend)
         .animation(.easeInOut(duration: 0.15), value: canSend)
-        .scaleEffect(canSend ? 1.0 : 0.95)
+        .animation(.easeInOut(duration: 0.15), value: isLoading)
+        .scaleEffect(canSend || isLoading ? 1.0 : 0.95)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: canSend)
     }
 

@@ -13,10 +13,14 @@ class SettingsStorage {
 
     private let defaults = UserDefaults.standard
     private let settingsKey = "app.settings"
+    private let corruptBackupKey = "app.settings.corrupt.backup"
 
     // Additional keys for conversation management
     private let displayNameOverridesKey = "conversation.displayNameOverrides"
     private let archivedConversationsKey = "conversation.archived"
+
+    // Throttle decode error logging (only log once per launch)
+    private var hasLoggedDecodeError = false
 
     // Helper type for archiving entries
     struct ArchivedEntry: Codable, Equatable {
@@ -38,15 +42,39 @@ class SettingsStorage {
     func loadSettings() -> AppSettings? {
         guard let data = defaults.data(forKey: settingsKey) else { return nil }
 
+        // Detect zero-length data (corruption indicator)
+        if data.count == 0 {
+            print("[SettingsStorage] ⚠️ Detected zero-length settings data. Removing corrupt entry.")
+            defaults.removeObject(forKey: settingsKey)
+            return nil
+        }
+
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970
 
         do {
             return try decoder.decode(AppSettings.self, from: data)
         } catch {
-            print("[SettingsStorage] Error decoding settings: \(error.localizedDescription)")
+            // Only log the first decode error per launch to avoid spam
+            if !hasLoggedDecodeError {
+                print("[SettingsStorage] ⚠️ Error decoding settings: \(error.localizedDescription)")
+                print("[SettingsStorage] Backing up corrupt data and resetting to defaults.")
+                hasLoggedDecodeError = true
+            }
+
+            // Backup the corrupt data for debugging
+            defaults.set(data, forKey: corruptBackupKey)
+
+            // Remove the corrupt settings so next load returns nil (falls back to defaults)
+            defaults.removeObject(forKey: settingsKey)
+
             return nil
         }
+    }
+
+    /// Load settings with automatic fallback to defaults
+    func loadSettingsOrDefault() -> AppSettings {
+        return loadSettings() ?? AppSettings()
     }
 
     // MARK: - Conversation Display Name Overrides
@@ -132,6 +160,19 @@ class SettingsStorage {
         defaults.removeObject(forKey: displayNameOverridesKey)
         defaults.removeObject(forKey: archivedConversationsKey)
         defaults.removeObject(forKey: settingsKey)
+        defaults.removeObject(forKey: corruptBackupKey)
+    }
+
+    // MARK: - Corruption Recovery
+
+    /// Check if there's a backed-up corrupt settings blob
+    func hasCorruptBackup() -> Bool {
+        return defaults.data(forKey: corruptBackupKey) != nil
+    }
+
+    /// Clear the corrupt backup (useful after successful recovery)
+    func clearCorruptBackup() {
+        defaults.removeObject(forKey: corruptBackupKey)
     }
 }
 
@@ -256,4 +297,3 @@ class APIKeysStorage {
         }
     }
 }
-

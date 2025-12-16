@@ -19,8 +19,8 @@ struct ToolSettingsView: View {
         VStack(alignment: .leading, spacing: 24) {
             // Master Toggle
             SettingsSection(title: "AI Tools") {
-                VStack(spacing: 16) {
-                    Toggle(isOn: Binding(
+                HStack(spacing: 12) {
+                    Toggle("", isOn: Binding(
                         get: { viewModel.settings.toolSettings.toolsEnabled },
                         set: { newValue in
                             Task {
@@ -29,18 +29,22 @@ struct ToolSettingsView: View {
                                 await viewModel.updateSetting(\.toolSettings, updated)
                             }
                         }
-                    )) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Enable AI Tools")
-                                .font(AppTypography.bodyMedium(.medium))
-                                .foregroundColor(AppColors.textPrimary)
-
-                            Text("Allow AI to use external tools like web search and code execution")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-                    }
+                    ))
+                    .toggleStyle(.switch)
                     .tint(AppColors.signalMercury)
+                    .labelsHidden()
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Enable AI Tools")
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Text("Allow AI to use external tools like web search and code execution")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+
+                    Spacer()
                 }
                 .padding()
                 .background(AppColors.substrateSecondary)
@@ -207,17 +211,22 @@ struct ToolSettingsView: View {
             if viewModel.settings.toolSettings.experimentalFeaturesEnabled {
                 SettingsSection(title: "Experimental") {
                     VStack(spacing: 16) {
-                        Toggle(isOn: Binding(
-                            get: { viewModel.settings.toolSettings.mediaProxyEnabled },
-                            set: { newValue in
-                                Task {
-                                    var updated = viewModel.settings.toolSettings
-                                    updated.mediaProxyEnabled = newValue
-                                    await viewModel.updateSetting(\.toolSettings, updated)
+                        HStack(spacing: 12) {
+                            Toggle("", isOn: Binding(
+                                get: { viewModel.settings.toolSettings.mediaProxyEnabled },
+                                set: { newValue in
+                                    Task {
+                                        var updated = viewModel.settings.toolSettings
+                                        updated.mediaProxyEnabled = newValue
+                                        await viewModel.updateSetting(\.toolSettings, updated)
+                                    }
                                 }
-                            }
-                        )) {
-                            VStack(alignment: .leading, spacing: 4) {
+                            ))
+                            .toggleStyle(.switch)
+                            .tint(AppColors.signalMercury)
+                            .labelsHidden()
+
+                            VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 6) {
                                     Text("Gemini Media Proxy")
                                         .font(AppTypography.bodyMedium(.medium))
@@ -236,8 +245,9 @@ struct ToolSettingsView: View {
                                     .font(AppTypography.bodySmall())
                                     .foregroundColor(AppColors.textSecondary)
                             }
+
+                            Spacer()
                         }
-                        .tint(AppColors.signalMercury)
 
                         // Warning about experimental status
                         HStack(alignment: .top, spacing: 8) {
@@ -256,17 +266,22 @@ struct ToolSettingsView: View {
 
             // Experimental Features Toggle (always visible)
             SettingsSection(title: "Advanced") {
-                Toggle(isOn: Binding(
-                    get: { viewModel.settings.toolSettings.experimentalFeaturesEnabled },
-                    set: { newValue in
-                        Task {
-                            var updated = viewModel.settings.toolSettings
-                            updated.experimentalFeaturesEnabled = newValue
-                            await viewModel.updateSetting(\.toolSettings, updated)
+                HStack(spacing: 12) {
+                    Toggle("", isOn: Binding(
+                        get: { viewModel.settings.toolSettings.experimentalFeaturesEnabled },
+                        set: { newValue in
+                            Task {
+                                var updated = viewModel.settings.toolSettings
+                                updated.experimentalFeaturesEnabled = newValue
+                                await viewModel.updateSetting(\.toolSettings, updated)
+                            }
                         }
-                    }
-                )) {
-                    VStack(alignment: .leading, spacing: 4) {
+                    ))
+                    .toggleStyle(.switch)
+                    .tint(AppColors.signalMercury)
+                    .labelsHidden()
+
+                    VStack(alignment: .leading, spacing: 2) {
                         Text("Experimental Features")
                             .font(AppTypography.bodyMedium(.medium))
                             .foregroundColor(AppColors.textPrimary)
@@ -275,8 +290,9 @@ struct ToolSettingsView: View {
                             .font(AppTypography.bodySmall())
                             .foregroundColor(AppColors.textSecondary)
                     }
+
+                    Spacer()
                 }
-                .tint(AppColors.signalMercury)
                 .padding()
                 .background(AppColors.substrateSecondary)
                 .cornerRadius(8)
@@ -319,28 +335,32 @@ struct ToolToggleRow: View {
     let onToggle: (Bool) -> Void
 
     var body: some View {
-        Toggle(isOn: Binding(
-            get: { isEnabled },
-            set: { onToggle($0) }
-        )) {
-            HStack(spacing: 12) {
-                Image(systemName: tool.icon)
-                    .font(.system(size: 20))
-                    .foregroundColor(isEnabled ? AppColors.signalMercury : AppColors.textTertiary)
-                    .frame(width: 32)
+        HStack(spacing: 12) {
+            Toggle("", isOn: Binding(
+                get: { isEnabled },
+                set: { onToggle($0) }
+            ))
+            .toggleStyle(.switch)
+            .tint(AppColors.signalMercury)
+            .labelsHidden()
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(tool.displayName)
-                        .font(AppTypography.bodyMedium(.medium))
-                        .foregroundColor(AppColors.textPrimary)
+            Image(systemName: tool.icon)
+                .font(.system(size: 20))
+                .foregroundColor(isEnabled ? AppColors.signalMercury : AppColors.textTertiary)
+                .frame(width: 28)
 
-                    Text(tool.description)
-                        .font(AppTypography.bodySmall())
-                        .foregroundColor(AppColors.textSecondary)
-                }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tool.displayName)
+                    .font(AppTypography.bodyMedium(.medium))
+                    .foregroundColor(AppColors.textPrimary)
+
+                Text(tool.description)
+                    .font(AppTypography.bodySmall())
+                    .foregroundColor(AppColors.textSecondary)
             }
+
+            Spacer()
         }
-        .tint(AppColors.signalMercury)
         .padding(.vertical, 8)
     }
 }

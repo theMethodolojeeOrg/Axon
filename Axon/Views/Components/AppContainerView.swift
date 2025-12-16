@@ -344,6 +344,7 @@ struct ChatContainerView: View {
     // Tools are now controlled via Settings > Tools tab
     // This computed property reflects the enabled tools from settings
     @State private var isLoading = false
+    @State private var currentSendTask: Task<Void, Never>?
     @State private var showWelcome = true
     @State private var streamingOverrides: [String: String] = [:]
     @State private var regeneratingMessageIds: Set<String> = []
@@ -381,6 +382,7 @@ struct ChatContainerView: View {
                     attachments: $selectedAttachments,
                     isLoading: isLoading,
                     onSend: sendMessage,
+                    onStop: stopGeneration,
                     focus: $isInputFocused,
                     conversationId: conversation?.id
                 )
@@ -780,7 +782,8 @@ struct ChatContainerView: View {
         isLoading = true
         showWelcome = false
 
-        Task {
+        // Store the task so we can cancel it if needed
+        currentSendTask = Task {
             do {
                 // Create conversation if needed
                 let conv: Conversation
@@ -838,11 +841,22 @@ struct ChatContainerView: View {
                         outputTokens: outputTokens
                     )
                 }
+            } catch is CancellationError {
+                // Task was cancelled - this is expected when user stops generation
+                print("[ChatContainer] Message generation was stopped by user")
             } catch {
                 print("Error sending message: \(error.localizedDescription)")
             }
             isLoading = false
+            currentSendTask = nil
         }
+    }
+    
+    private func stopGeneration() {
+        print("[ChatContainer] Stopping message generation...")
+        currentSendTask?.cancel()
+        currentSendTask = nil
+        isLoading = false
     }
 
     // Simulate streaming by progressively revealing the assistant's content
