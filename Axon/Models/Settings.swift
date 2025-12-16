@@ -379,6 +379,8 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
     case zai = "zai"
     case minimax = "minimax"
     case mistral = "mistral"
+    case appleFoundation = "appleFoundation"
+    case localMLX = "localMLX"
 
     var id: String { rawValue }
 
@@ -393,6 +395,8 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
         case .zai: return "Z.ai (GLM)"
         case .minimax: return "MiniMax"
         case .mistral: return "Mistral AI"
+        case .appleFoundation: return "Apple Intelligence"
+        case .localMLX: return "On-Device (MLX)"
         }
     }
 
@@ -825,9 +829,95 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     description: "Coding optimized. Best for FIM and code generation"
                 )
             ]
+        case .appleFoundation:
+            return [
+                AIModel(
+                    id: "apple-foundation-default",
+                    name: "Apple Intelligence",
+                    provider: .appleFoundation,
+                    contextWindow: 4_096,
+                    modalities: ["text"],
+                    description: "On-device ~3B model. Private, offline, free. Requires iOS 26+"
+                )
+            ]
+        case .localMLX:
+            return [
+                AIModel(
+                    id: "mlx-community/SmolLM2-1.7B-Instruct-4bit",
+                    name: "SmolLM2 1.7B",
+                    provider: .localMLX,
+                    contextWindow: 8_192,
+                    modalities: ["text"],
+                    description: "HuggingFace's efficient small model. ~1GB download. Private, offline, free."
+                ),
+                AIModel(
+                    id: "mlx-community/Llama-3.2-1B-Instruct-4bit",
+                    name: "Llama 3.2 1B",
+                    provider: .localMLX,
+                    contextWindow: 8_192,
+                    modalities: ["text"],
+                    description: "Meta's compact model. ~0.7GB download. Private, offline, free."
+                ),
+                AIModel(
+                    id: "mlx-community/Qwen3-1.7B-4bit",
+                    name: "Qwen3 1.7B",
+                    provider: .localMLX,
+                    contextWindow: 32_768,
+                    modalities: ["text"],
+                    description: "Alibaba's multilingual model. ~1GB download. Private, offline, free."
+                ),
+                AIModel(
+                    id: "mlx-community/Phi-4-mini-instruct-4bit",
+                    name: "Phi-4 Mini",
+                    provider: .localMLX,
+                    contextWindow: 16_384,
+                    modalities: ["text"],
+                    description: "Microsoft's capable small model. ~2GB download. Private, offline, free."
+                )
+            ]
         }
     }
 
+    /// Whether this provider is available on the current device/OS
+    var isAvailable: Bool {
+        switch self {
+        case .appleFoundation:
+            // Apple Foundation Models require iOS 26+ / macOS 26+
+            if #available(iOS 26.0, macOS 26.0, *) {
+                return true
+            }
+            return false
+        case .localMLX:
+            // MLX models require physical device with Apple Silicon (Metal GPU)
+            #if targetEnvironment(simulator)
+            return false
+            #else
+            return true
+            #endif
+        default:
+            // Cloud providers are always available (API key validation happens separately)
+            return true
+        }
+    }
+
+    /// Human-readable reason if provider is unavailable
+    var unavailableReason: String? {
+        switch self {
+        case .appleFoundation:
+            if #available(iOS 26.0, macOS 26.0, *) {
+                return nil
+            }
+            return "Requires iOS 26.0+ or macOS 26.0+"
+        case .localMLX:
+            #if targetEnvironment(simulator)
+            return "Requires physical device (MLX uses Metal GPU)"
+            #else
+            return nil
+            #endif
+        default:
+            return nil
+        }
+    }
 }
 
 // MARK: - AI Model
@@ -1297,6 +1387,31 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
             return true
         case .createMemory, .conversationSearch, .reflectOnConversation:
             return false
+        }
+    }
+
+    /// Whether this tool requires user approval before execution
+    var requiresApproval: Bool {
+        switch self {
+        case .reflectOnConversation:
+            return true  // Meta-analysis should require user awareness
+        case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch,
+             .createMemory, .conversationSearch:
+            return false
+        }
+    }
+
+    /// Approval scopes describing what this tool will do
+    var approvalScopes: [String] {
+        switch self {
+        case .reflectOnConversation:
+            return [
+                "Analyze conversation metadata (models, timestamps, tokens)",
+                "Review memory operations performed",
+                "Identify task types and topic shifts"
+            ]
+        default:
+            return []
         }
     }
 

@@ -43,7 +43,10 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
     // MARK: - Tool System Prompt
 
     /// Generate system prompt injection describing available tools
-    func generateToolSystemPrompt(enabledTools: Set<ToolId>) -> String {
+    /// - Parameters:
+    ///   - enabledTools: Set of tool IDs that are enabled
+    ///   - maxToolCalls: Maximum number of tool calls allowed per turn (from settings)
+    func generateToolSystemPrompt(enabledTools: Set<ToolId>, maxToolCalls: Int = 5) -> String {
         guard !enabledTools.isEmpty else { return "" }
 
         var prompt = """
@@ -51,6 +54,8 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         ## Available Tools
 
         You have access to the following tools. When you need real-time information, current data, or to perform calculations, you can request a tool be executed by responding with a JSON tool request block.
+
+        **Tool Call Limit:** You may use up to \(maxToolCalls) tool call\(maxToolCalls == 1 ? "" : "s") per response. Plan your tool usage efficiently.
 
         To use a tool, include a code block with the tool request in this exact format:
         ```tool_request
@@ -170,7 +175,9 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 ### reflect_on_conversation
                 Analyze the current conversation to understand model usage patterns, task distribution, memory operations, and topic shifts. Use this to gain meta-awareness about how the conversation has been handled across different substrates.
 
-                **Options (JSON object):**
+                **Note:** This tool requires user approval before execution.
+
+                **Options:**
                 - `show_model_timeline`: Show which models handled which messages (default: true)
                 - `show_task_distribution`: Show what types of tasks each model handled (default: true)
                 - `show_memory_usage`: Show memory retrieval and creation events (default: true)
@@ -182,12 +189,8 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 - Pivots: Where the conversation shifted topics or tasks
                 - Insights: Patterns about model strengths and handoffs
 
-                Example: ```tool_request
-                {"tool": "reflect_on_conversation", "query": "{}"}
-                ```
-
-                With options: ```tool_request
-                {"tool": "reflect_on_conversation", "query": "{\\"show_model_timeline\\": true, \\"show_task_distribution\\": true, \\"show_memory_usage\\": true}"}
+                Example (flat format): ```tool_request
+                {"tool": "reflect_on_conversation", "show_model_timeline": true, "show_task_distribution": true, "show_memory_usage": true}
                 ```
 
                 """
@@ -472,6 +475,14 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
         // Handle internal tools (no Gemini API needed)
         if toolId.provider == .internal {
+            // Check if this internal tool requires approval
+            if toolId.requiresApproval {
+                return await executeInternalToolWithApproval(
+                    toolId: toolId,
+                    query: request.query,
+                    context: conversationContext
+                )
+            }
             return await executeInternalTool(toolId: toolId, query: request.query, context: conversationContext)
         }
 
@@ -748,6 +759,102 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 tool: toolId.rawValue,
                 success: false,
                 result: "Unknown internal tool: \(toolId.rawValue)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+    }
+
+    // MARK: - Internal Tool Approval
+
+    /// Execute an internal tool that requires biometric approval
+    private func executeInternalToolWithApproval(
+        toolId: ToolId,
+        query: String,
+        context: ToolConversationContext?
+    ) async -> ToolResult {
+        print("[ToolProxy] Internal tool '\(toolId.rawValue)' requires biometric approval")
+
+        // Create a DynamicToolConfig facade for the approval service
+        let toolConfig = DynamicToolConfig(
+            id: toolId.rawValue,
+            name: toolId.displayName,
+            description: toolId.description,
+            category: .utility,
+            enabled: true,
+            icon: toolId.icon,
+            requiredSecrets: [],
+            pipeline: [],
+            parameters: [:],
+            requiresApproval: true,
+            approvalScopes: toolId.approvalScopes
+        )
+
+        let inputs: [String: Any] = ["query": query]
+        let approvalResult = await toolApprovalService.requestApproval(tool: toolConfig, inputs: inputs)
+
+        switch approvalResult {
+        case .approved(let record), .approvedForSession(let record):
+            let isSession = if case .approvedForSession = approvalResult { true } else { false }
+            let approvalNote = isSession
+                ? "✅ *Session-approved by \(formatBiometricType(record.biometricType))*"
+                : "✅ *Approved by \(formatBiometricType(record.biometricType)) at \(record.formattedTime)*"
+            print("[ToolProxy] Internal tool '\(toolId.rawValue)' \(isSession ? "session-" : "")approved")
+
+            // Execute the internal tool now that we have approval
+            var result = await executeInternalTool(toolId: toolId, query: query, context: context)
+
+            // Append approval note to result
+            return ToolResult(
+                tool: result.tool,
+                success: result.success,
+                result: result.result + "\n\n\(approvalNote)",
+                sources: result.sources,
+                memoryOperation: result.memoryOperation,
+                approvalRecord: record
+            )
+
+        case .denied:
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: false,
+                result: "⛔ Tool execution was not authorized by the user.",
+                sources: nil,
+                memoryOperation: nil
+            )
+
+        case .cancelled:
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: false,
+                result: "Tool execution was cancelled.",
+                sources: nil,
+                memoryOperation: nil
+            )
+
+        case .timeout:
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: false,
+                result: "⏱️ Tool approval request timed out. Please try again.",
+                sources: nil,
+                memoryOperation: nil
+            )
+
+        case .stop:
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: false,
+                result: "🛑 Tool execution was stopped by the user.",
+                sources: nil,
+                memoryOperation: nil
+            )
+
+        case .error(let message):
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: false,
+                result: "Approval error: \(message)",
                 sources: nil,
                 memoryOperation: nil
             )
@@ -1111,6 +1218,7 @@ struct ToolRequest: Decodable {
     /// Custom decoder to accept multiple key names for the query field
     /// LLMs sometimes use "memory", "content", "input", etc. instead of "query"
     /// Also handles nested "parameters" object format: {"tool": "...", "parameters": {"query": "...", "content": "..."}}
+    /// Also handles tools like reflect_on_conversation where options are sent as top-level fields
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         tool = try container.decode(String.self, forKey: .tool)
@@ -1160,6 +1268,35 @@ struct ToolRequest: Decodable {
             } else if let q = try? container.decode(String.self, forKey: .data) {
                 query = q
             } else {
+                // Special case: reflect_on_conversation and similar tools may send options as top-level fields
+                // e.g., {"tool":"reflect_on_conversation","show_model_timeline":true,"show_task_distribution":true}
+                // In this case, reconstruct the query as JSON from all non-tool fields
+                if tool == "reflect_on_conversation" {
+                    // Decode all fields as a dictionary and re-serialize without "tool"
+                    let dynamicContainer = try decoder.container(keyedBy: DynamicCodingKeys.self)
+                    var optionsDict: [String: Any] = [:]
+
+                    for key in dynamicContainer.allKeys where key.stringValue != "tool" {
+                        if let boolValue = try? dynamicContainer.decode(Bool.self, forKey: key) {
+                            optionsDict[key.stringValue] = boolValue
+                        } else if let stringValue = try? dynamicContainer.decode(String.self, forKey: key) {
+                            optionsDict[key.stringValue] = stringValue
+                        } else if let intValue = try? dynamicContainer.decode(Int.self, forKey: key) {
+                            optionsDict[key.stringValue] = intValue
+                        }
+                    }
+
+                    // Convert back to JSON string for the query
+                    if let jsonData = try? JSONSerialization.data(withJSONObject: optionsDict, options: []),
+                       let jsonString = String(data: jsonData, encoding: .utf8) {
+                        query = jsonString
+                    } else {
+                        query = "{}"  // Empty options
+                    }
+                    separateContent = nil
+                    return
+                }
+
                 throw DecodingError.keyNotFound(
                     CodingKeys.query,
                     DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "No valid query key found (tried: query, memory, content, input, data)")
@@ -1178,6 +1315,22 @@ struct ToolRequest: Decodable {
         case data
         case parameters
         case path
+    }
+
+    /// Dynamic coding keys for parsing arbitrary fields
+    private struct DynamicCodingKeys: CodingKey {
+        var stringValue: String
+        var intValue: Int?
+
+        init?(stringValue: String) {
+            self.stringValue = stringValue
+            self.intValue = nil
+        }
+
+        init?(intValue: Int) {
+            self.stringValue = String(intValue)
+            self.intValue = intValue
+        }
     }
 }
 

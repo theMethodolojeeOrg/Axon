@@ -43,6 +43,7 @@ export class BridgeClient {
     private port: number = 8081;
     private autoConnect: boolean = true;
     private reconnectInterval: number = 5000;
+    private pairingToken: string = '';
 
     constructor(statusBar: StatusBar) {
         this.statusBar = statusBar;
@@ -67,6 +68,7 @@ export class BridgeClient {
         this.port = config.get('port', 8081);
         this.autoConnect = config.get('autoConnect', true);
         this.reconnectInterval = config.get('reconnectInterval', 5000);
+        this.pairingToken = config.get('pairingToken', '');
     }
 
     /**
@@ -176,6 +178,7 @@ export class BridgeClient {
             ],
             extensionVersion: EXTENSION_VERSION,
             vscodeVersion: vscode.version,
+            pairingToken: this.pairingToken?.trim() ? this.pairingToken.trim() : undefined,
         };
 
         // Send as a request (expecting welcome response)

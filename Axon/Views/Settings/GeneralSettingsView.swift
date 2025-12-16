@@ -355,6 +355,12 @@ struct GeneralSettingsView: View {
             // Prefer Codestral (cheapest) as default
             let candidates = models.filter { containsCaseInsensitive($0.id, "codestral") }
             return candidates.first?.id ?? models.first?.id
+        case .appleFoundation:
+            // Only one model available - the default system model
+            return models.first?.id
+        case .localMLX:
+            // Default to SmolLM2 (first in list)
+            return models.first?.id
         }
     }
 
@@ -458,6 +464,15 @@ struct GeneralSettingsView: View {
             if name.contains("pixtral") || id.contains("pixtral") { return "Pixtral" }
             if name.contains("codestral") || id.contains("codestral") { return "Codestral" }
             return "Large"
+        case .appleFoundation:
+            return "Apple Intelligence"
+        case .localMLX:
+            // Show model name from the HuggingFace ID
+            if id.contains("smollm") { return "SmolLM2" }
+            if id.contains("llama") { return "Llama" }
+            if id.contains("qwen") { return "Qwen3" }
+            if id.contains("phi") { return "Phi-4" }
+            return "MLX Model"
         }
     }
 
@@ -498,6 +513,10 @@ struct GeneralSettingsView: View {
             if name.contains("pixtral") || id.contains("pixtral") { return "Pixtral Series" }
             if name.contains("codestral") || id.contains("codestral") { return "Codestral Series" }
             return "Mistral Large Series"
+        case .appleFoundation:
+            return "Apple Intelligence"
+        case .localMLX:
+            return "On-Device (MLX)"
         }
     }
 

@@ -6,22 +6,17 @@
  */
 
 import * as vscode from 'vscode';
-import { exec, ExecOptions } from 'child_process';
-import * as path from 'path';
+import { execFile } from 'child_process';
 import {
     TerminalRunParams,
     TerminalRunResult,
     BridgeErrorCode,
     createError,
 } from '../Protocol';
+import { PathPolicy } from '../PathPolicy';
 
 export class TerminalHandler {
-    private workspaceRoot: string;
-
-    constructor() {
-        const folders = vscode.workspace.workspaceFolders;
-        this.workspaceRoot = folders?.[0]?.uri.fsPath ?? process.cwd();
-    }
+    constructor() {}
 
     /**
      * Run a terminal command and capture output
@@ -31,48 +26,49 @@ export class TerminalHandler {
         const args = params.args ?? [];
         const timeout = params.timeout ?? 60000; // 60s default
 
-        // Build full command
-        const fullCommand = args.length > 0
-            ? `${command} ${args.map(a => `"${a}"`).join(' ')}`
-            : command;
+        // Resolve working directory (sandboxed to workspace)
+        const cwd = PathPolicy.resolveAndValidateCwd(params.cwd);
 
-        // Resolve working directory
-        let cwd = this.workspaceRoot;
-        if (params.cwd) {
-            cwd = path.isAbsolute(params.cwd)
-                ? params.cwd
-                : path.join(this.workspaceRoot, params.cwd);
+        // Basic command validation
+        if (!command.trim()) {
+            throw createError(BridgeErrorCode.InvalidParams, 'Command cannot be empty');
         }
 
         const startTime = Date.now();
 
-        const options: ExecOptions = {
-            cwd,
-            timeout,
-            maxBuffer: 10 * 1024 * 1024, // 10MB output buffer
-            env: {
-                ...process.env,
-                ...params.env,
-            },
-        };
+        const maxBuffer = 10 * 1024 * 1024; // 10MB output buffer
 
         return new Promise((resolve) => {
-            const childProcess = exec(fullCommand, options, (error, stdout, stderr) => {
-                const duration = Date.now() - startTime;
+            const childProcess = execFile(
+                command,
+                args,
+                {
+                    cwd,
+                    timeout,
+                    maxBuffer,
+                    windowsHide: true,
+                    shell: false,
+                    env: {
+                        ...process.env,
+                        ...params.env,
+                    },
+                },
+                (error, stdout, stderr) => {
+                    const duration = Date.now() - startTime;
 
-                // Check if timed out
-                const timedOut = error?.killed === true || error?.code === null;
+                    const anyError = error as any;
+                    const timedOut = anyError?.killed === true || anyError?.signal === 'SIGTERM';
 
-                resolve({
-                    output: typeof stdout === 'string' ? stdout : stdout.toString(),
-                    stderr: stderr ? (typeof stderr === 'string' ? stderr : stderr.toString()) : undefined,
-                    exitCode: error?.code ?? 0,
-                    duration,
-                    timedOut,
-                });
-            });
+                    resolve({
+                        output: stdout ?? '',
+                        stderr: stderr ?? undefined,
+                        exitCode: typeof anyError?.code === 'number' ? anyError.code : (timedOut ? 124 : 0),
+                        duration,
+                        timedOut,
+                    });
+                }
+            );
 
-            // Handle process errors
             childProcess.on('error', (error) => {
                 const duration = Date.now() - startTime;
                 resolve({

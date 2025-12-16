@@ -21,24 +21,16 @@ import {
     BridgeErrorCode,
     createError,
 } from '../Protocol';
+import { PathPolicy } from '../PathPolicy';
 
 export class FileHandler {
-    private workspaceRoot: string;
-
-    constructor() {
-        const folders = vscode.workspace.workspaceFolders;
-        this.workspaceRoot = folders?.[0]?.uri.fsPath ?? '';
-    }
+    constructor() {}
 
     /**
-     * Resolve a path relative to workspace root
+     * Resolve and validate a path using the workspace sandbox policy.
      */
     private resolvePath(filePath: string): vscode.Uri {
-        // If absolute, use as-is; otherwise, resolve relative to workspace
-        const resolved = path.isAbsolute(filePath)
-            ? filePath
-            : path.join(this.workspaceRoot, filePath);
-        return vscode.Uri.file(resolved);
+        return PathPolicy.resolveAndValidatePath(filePath, { purpose: 'file path' });
     }
 
     /**

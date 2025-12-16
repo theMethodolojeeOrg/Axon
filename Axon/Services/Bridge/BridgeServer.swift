@@ -447,6 +447,18 @@ class BridgeServer: ObservableObject {
             let helloData = try JSONEncoder().encode(params)
             let hello = try JSONDecoder().decode(BridgeHello.self, from: helloData)
 
+            // Enforce optional pairing token (defense-in-depth against arbitrary localhost clients)
+            let requiredToken = BridgeSettingsStorage.shared.settings.requiredPairingToken.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !requiredToken.isEmpty {
+                let presentedToken = (hello.pairingToken ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                if presentedToken != requiredToken {
+                    let error = BridgeError(code: .invalidRequest, message: "Pairing token mismatch. Set axonBridge.pairingToken in VS Code to match Axon Bridge settings.")
+                    sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+                    connection.cancel()
+                    return
+                }
+            }
+
             // Create session
             let capabilities = hello.capabilities.compactMap { BridgeCapability(rawValue: $0) }
 

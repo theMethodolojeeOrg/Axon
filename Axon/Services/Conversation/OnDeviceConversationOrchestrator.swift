@@ -10,6 +10,10 @@
 import Foundation
 import CoreLocation
 
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
+
 /// Result from provider API calls including content and optional reasoning
 struct ProviderResponse {
     let content: String
@@ -154,9 +158,15 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         let useToolProxy = hasGeminiTools && !isGeminiProvider
         if useToolProxy {
             let enabledToolIds = Set(requestedGeminiTools.compactMap { ToolId(rawValue: $0) })
-            let toolPrompt = await ToolProxyService.shared.generateToolSystemPrompt(enabledTools: enabledToolIds)
+            let maxToolCalls = await MainActor.run {
+                SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
+            }
+            let toolPrompt = await ToolProxyService.shared.generateToolSystemPrompt(
+                enabledTools: enabledToolIds,
+                maxToolCalls: maxToolCalls
+            )
             systemPrompt = (systemPrompt ?? "") + toolPrompt
-            print("[OnDeviceOrchestrator] Tool proxy mode (non-Gemini provider): injected tool prompt for \(enabledToolIds.count) tools")
+            print("[OnDeviceOrchestrator] Tool proxy mode (non-Gemini provider): injected tool prompt for \(enabledToolIds.count) tools (max \(maxToolCalls) calls)")
         }
 
         // Log if any tools were filtered out for Gemini 3
@@ -269,13 +279,19 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
             // If tool proxy mode, check for tool requests and execute them
             if useToolProxy, let geminiKey = config.geminiKey {
+                // Get max tool calls from settings
+                let maxToolCalls = await MainActor.run {
+                    SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
+                }
+
                 let (finalResponse, toolUsed, sources, memOps) = try await handleToolProxyLoop(
                     initialResponse: responseContent,
                     conversationId: conversationId,
                     config: config,
                     systemPrompt: systemPrompt,
                     messages: finalMessages,
-                    geminiKey: geminiKey
+                    geminiKey: geminiKey,
+                    maxIterations: maxToolCalls
                 )
                 responseContent = finalResponse
                 usedToolProxy = toolUsed
@@ -685,6 +701,21 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 apiKey: apiKey,
                 baseUrl: baseUrl,
                 model: config.model,
+                system: system,
+                messages: messages
+            )
+            return ProviderResponse(content: content)
+
+        case "appleFoundation":
+            let content = try await callAppleFoundation(
+                system: system,
+                messages: messages
+            )
+            return ProviderResponse(content: content)
+
+        case "localMLX":
+            let content = try await callLocalMLX(
+                modelId: config.model,
                 system: system,
                 messages: messages
             )
@@ -1820,4 +1851,114 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         "txt": "text/plain",
         "text": "text/plain",
     ]
+
+    // MARK: - Apple Foundation Models
+
+    /// Call Apple's on-device Foundation Model (iOS 26+, macOS 26+)
+    /// Uses the FoundationModels framework for private, offline inference
+    private func callAppleFoundation(system: String?, messages: [Message]) async throws -> String {
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, macOS 26.0, *) {
+            return try await callAppleFoundationImpl(system: system, messages: messages)
+        } else {
+            throw APIError.networkError("Apple Intelligence requires iOS 26.0+ or macOS 26.0+")
+        }
+        #else
+        throw APIError.networkError("Apple Intelligence is not available on this platform")
+        #endif
+    }
+
+    #if canImport(FoundationModels)
+    @available(iOS 26.0, macOS 26.0, *)
+    private func callAppleFoundationImpl(system: String?, messages: [Message]) async throws -> String {
+        // Check model availability
+        let model = SystemLanguageModel.default
+        switch model.availability {
+        case .available:
+            break
+        case .unavailable(let reason):
+            let reasonText: String
+            switch reason {
+            case .deviceNotEligible:
+                reasonText = "This device doesn't support Apple Intelligence"
+            case .appleIntelligenceNotEnabled:
+                reasonText = "Apple Intelligence is not enabled. Enable it in Settings > Apple Intelligence & Siri"
+            case .modelNotReady:
+                reasonText = "Apple Intelligence model is still downloading or preparing"
+            @unknown default:
+                reasonText = "Apple Intelligence is unavailable"
+            }
+            throw APIError.networkError(reasonText)
+        }
+
+        // Build conversation history for multi-turn context
+        // The FoundationModels API uses a simple prompt string, so we format the conversation
+        var conversationLines: [String] = []
+
+        for msg in messages where msg.role != .system {
+            let role = msg.role == .user ? "User" : "Assistant"
+            let content = msg.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !content.isEmpty {
+                conversationLines.append("\(role): \(content)")
+            }
+        }
+
+        // Get the last user message as the main prompt
+        let lastUserMessage = messages.last(where: { $0.role == .user })?.content ?? ""
+
+        // Create session with system instructions
+        let session: LanguageModelSession
+        if let system = system, !system.isEmpty {
+            session = LanguageModelSession(instructions: system)
+        } else {
+            session = LanguageModelSession()
+        }
+
+        // If we have conversation history, include it for context
+        let prompt: String
+        if conversationLines.count > 1 {
+            // Multi-turn: include context but let the model respond to the last message
+            let context = conversationLines.dropLast().joined(separator: "\n\n")
+            prompt = """
+            Previous conversation:
+            \(context)
+
+            Now respond to: \(lastUserMessage)
+            """
+        } else {
+            // Single turn: just use the user message directly
+            prompt = lastUserMessage
+        }
+
+        // Generate response
+        let response = try await session.respond(to: prompt)
+        return response.content
+    }
+    #endif
+
+    // MARK: - Local MLX Models
+
+    /// Call a local MLX model (downloads from HuggingFace on first use)
+    /// - Parameter modelId: HuggingFace model ID (e.g., "mlx-community/SmolLM2-1.7B-Instruct-4bit")
+    private func callLocalMLX(modelId: String, system: String?, messages: [Message]) async throws -> String {
+        #if targetEnvironment(simulator)
+        throw APIError.networkError("MLX models require a physical device (Metal GPU)")
+        #else
+        do {
+            // Load the specific model (will download if not cached)
+            try await MLXModelService.shared.loadModel(modelId: modelId)
+
+            let response = try await MLXModelService.shared.generate(
+                systemPrompt: system,
+                messages: messages,
+                maxTokens: 2048
+            )
+            return response
+        } catch let error as MLXModelError {
+            throw APIError.networkError(error.localizedDescription)
+        } catch {
+            throw APIError.networkError("MLX inference failed: \(error.localizedDescription)")
+        }
+        #endif
+    }
 }

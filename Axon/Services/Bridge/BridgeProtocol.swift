@@ -158,6 +158,7 @@ struct BridgeHello: Codable {
     let capabilities: [String]
     let extensionVersion: String
     let vscodeVersion: String?
+    let pairingToken: String?
 }
 
 /// Welcome response from Axon

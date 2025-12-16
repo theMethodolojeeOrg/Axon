@@ -51,6 +51,11 @@
           "type": "number",
           "default": 5000,
           "description": "Reconnection interval in milliseconds"
+        },
+        "axonBridge.pairingToken": {
+          "type": "string",
+          "default": "",
+          "description": "Optional pairing token (recommended). When set, Axon will reject connections that do not provide the same token."
         }
       }
     }

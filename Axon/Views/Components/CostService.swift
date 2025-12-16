@@ -329,6 +329,8 @@ struct PricingKeyResolver {
         case .zai: return .glm45Air
         case .minimax: return .minimaxM2
         case .mistral: return .codestral
+        case .appleFoundation: return .claudeHaiku45  // Apple Intelligence is free, no pricing key needed - fallback for display
+        case .localMLX: return .claudeHaiku45  // Local MLX models are free, no pricing key needed - fallback for display
         }
     }
 }

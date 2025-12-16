@@ -66,6 +66,7 @@ export interface BridgeHello {
     capabilities: string[];
     extensionVersion: string;
     vscodeVersion: string;
+    pairingToken?: string;
 }
 
 export interface BridgeWelcome {

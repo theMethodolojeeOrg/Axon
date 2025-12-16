@@ -34,6 +34,12 @@ struct BridgeSettings: Codable, Equatable, Sendable {
     /// Terminal command timeout (seconds)
     var terminalTimeout: Int = 60
 
+    /// Optional pairing token required to accept VS Code connections.
+    ///
+    /// When set (non-empty), Axon will reject hello handshakes that do not present
+    /// the same token. This prevents arbitrary localhost processes from connecting.
+    var requiredPairingToken: String = ""
+
     /// Blocked file patterns (glob-style)
     var blockedPatterns: [String] = [
         "**/.env",
