@@ -66,6 +66,23 @@
           "description": "Optional pairing token (recommended). When set, Axon will reject connections that do not provide the same token."
         }
       }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "axonBridge",
+          "title": "Axon",
+          "icon": "resources/axon.svg"
+        }
+      ]
+    },
+    "views": {
+      "axonBridge": [
+        {
+          "id": "axonBridgeLogsView",
+          "name": "Bridge Logs"
+        }
+      ]
     }
   },
   "scripts": {

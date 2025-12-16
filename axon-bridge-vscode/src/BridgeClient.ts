@@ -24,7 +24,7 @@ import { TerminalHandler } from './handlers/TerminalHandler';
 import { WorkspaceHandler } from './handlers/WorkspaceHandler';
 import { StatusBar, ConnectionState } from './ui/StatusBar';
 import { BridgeLogService } from './BridgeLogService';
-import { BridgeLogsPanel } from './ui/BridgeLogsPanel';
+import { BridgeLogsViewProvider } from './ui/BridgeLogsViewProvider';
 
 const EXTENSION_VERSION = '0.1.0';
 
@@ -101,7 +101,7 @@ export class BridgeClient {
 
                 // Mirror incoming traffic to extension logs
                 BridgeLogService.shared.logIncoming(text);
-                BridgeLogsPanel.currentPanel?.notifyNewEntry();
+                BridgeLogsViewProvider.shared?.notifyNewEntry();
 
                 this.handleMessage(text);
             });
@@ -295,7 +295,7 @@ export class BridgeClient {
 
         // Mirror outgoing traffic to extension logs
         BridgeLogService.shared.logOutgoing(data);
-        BridgeLogsPanel.currentPanel?.notifyNewEntry();
+        BridgeLogsViewProvider.shared?.notifyNewEntry();
 
         this.ws.send(data);
     }

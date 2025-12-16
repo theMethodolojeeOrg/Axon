@@ -9,8 +9,8 @@
 import * as vscode from 'vscode';
 import { BridgeClient } from './BridgeClient';
 import { StatusBar } from './ui/StatusBar';
-import { BridgeLogsPanel } from './ui/BridgeLogsPanel';
 import { BridgeLogService } from './BridgeLogService';
+import { BridgeLogsViewProvider } from './ui/BridgeLogsViewProvider';
 
 let client: BridgeClient;
 let statusBar: StatusBar;
@@ -21,6 +21,14 @@ export function activate(context: vscode.ExtensionContext) {
     // Create UI components
     statusBar = new StatusBar();
     context.subscriptions.push({ dispose: () => statusBar.dispose() });
+
+    // Side bar logs view
+    const logsViewProvider = new BridgeLogsViewProvider();
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(BridgeLogsViewProvider.viewType, logsViewProvider, {
+            webviewOptions: { retainContextWhenHidden: true },
+        })
+    );
 
     // Create bridge client
     client = new BridgeClient(statusBar);
@@ -47,8 +55,8 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('axon-bridge.logs', () => {
-            BridgeLogsPanel.show(context.extensionUri);
+        vscode.commands.registerCommand('axon-bridge.logs', async () => {
+            logsViewProvider.reveal();
             BridgeLogService.shared.showOutput();
         })
     );
