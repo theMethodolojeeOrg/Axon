@@ -1,36 +1,6 @@
 {
   "images" : [
     {
-      "filename" : "AxonLogoStyles_2ndTry.png",
-      "idiom" : "universal",
-      "platform" : "ios",
-      "size" : "1024x1024"
-    },
-    {
-      "appearances" : [
-        {
-          "appearance" : "luminosity",
-          "value" : "dark"
-        }
-      ],
-      "filename" : "AxonLogoStyles_2ndTry_Dark.png",
-      "idiom" : "universal",
-      "platform" : "ios",
-      "size" : "1024x1024"
-    },
-    {
-      "appearances" : [
-        {
-          "appearance" : "luminosity",
-          "value" : "tinted"
-        }
-      ],
-      "filename" : "AxonLogoStyles_2ndTry 1.png",
-      "idiom" : "universal",
-      "platform" : "ios",
-      "size" : "1024x1024"
-    },
-    {
       "filename" : "IconComposer-macOS-Default-16x16@1x.png",
       "idiom" : "mac",
       "scale" : "1x",
