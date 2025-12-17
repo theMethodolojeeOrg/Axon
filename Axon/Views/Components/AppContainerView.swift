@@ -356,6 +356,13 @@ struct ChatContainerView: View {
     @State private var showScrollToBottom = false
     @State private var scrollProxy: ScrollViewProxy?
 
+    // Streaming state for real-time tool visibility
+    @State private var streamingMessageId: String?
+    @State private var streamedContent: [String: String] = [:]
+    @State private var streamedReasoning: [String: String] = [:]
+    @State private var liveToolCalls: [String: [LiveToolCall]] = [:]
+    @State private var useRealStreaming: Bool = true  // Toggle for streaming vs pseudo-streaming
+
     // VS Code bridge connection banner
     #if os(macOS)
     @State private var showBridgeConnectedBanner = false
@@ -654,7 +661,7 @@ struct ChatContainerView: View {
                                 } else {
                                     AssistantMessageView(
                                         message: message,
-                                        overrideContent: streamingOverrides[message.id],
+                                        overrideContent: streamedContent[message.id] ?? streamingOverrides[message.id],
                                         onCopy: { msg in
                                             AppClipboard.copy(msg.content)
                                         },
@@ -684,7 +691,9 @@ struct ChatContainerView: View {
                                             } else {
                                                 messageText += "\n\n" + quotedText
                                             }
-                                        }
+                                        },
+                                        liveToolCalls: liveToolCalls[message.id],
+                                        streamingReasoning: streamedReasoning[message.id]
                                     )
                                 }
 
@@ -786,14 +795,14 @@ struct ChatContainerView: View {
 
         let content = messageText
         let attachments = selectedAttachments
-        
+
         // Clear draft before sending
         let draftKey = conversation?.id ?? DraftMessageService.newChatDraftKey
         draftService.clearDraft(conversationId: draftKey)
-        
+
         messageText = ""
         selectedAttachments = []
-        
+
         // Dismiss keyboard on send
         #if canImport(UIKit)
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
@@ -803,6 +812,11 @@ struct ChatContainerView: View {
         isInputFocused = false
         isLoading = true
         showWelcome = false
+
+        // Check if we should use real streaming (On-Device mode only)
+        let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
+        let isOnDeviceMode = settings.useOnDeviceOrchestration || settings.deviceMode == .onDevice
+        let shouldStream = useRealStreaming && isOnDeviceMode
 
         // Store the task so we can cancel it if needed
         currentSendTask = Task {
@@ -819,61 +833,287 @@ struct ChatContainerView: View {
                         firstMessage: nil  // Don't send message during creation
                     )
                     onConversationCreated(conv)
-                    
+
                     // Transfer "New Chat" draft to actual conversation
                     draftService.transferNewChatDraft(to: conv.id)
                 }
 
                 // Get enabled tools from settings
-                let settings = SettingsViewModel.shared.settings
                 let enabledTools: [String] = settings.toolSettings.toolsEnabled
                     ? Array(settings.toolSettings.enabledToolIds)
                     : []
 
-                // Send message and get assistant response
-                let assistant = try await conversationService.sendMessage(
-                    conversationId: conv.id,
-                    content: content,
-                    attachments: attachments,
-                    enabledTools: enabledTools
-                )
-
-                // Pseudo-stream the assistant content
-                startPseudoStream(for: assistant)
-
-                // Record usage with actual provider/model from response
-                let inputTokens = max(1, content.count / 4)
-                let outputTokens = max(1, assistant.content.count / 4)
-                
-                // Map provider string to AIProvider
-                var provider: AIProvider? = AIProvider(rawValue: assistant.providerName ?? "")
-                if provider == nil {
-                    if assistant.providerName == "openai-compatible" {
-                        provider = .openai // Fallback for pricing
-                    } else if let name = assistant.providerName?.lowercased() {
-                        if name.contains("anthropic") { provider = .anthropic }
-                        else if name.contains("openai") { provider = .openai }
-                        else if name.contains("gemini") || name.contains("google") { provider = .gemini }
-                        else if name.contains("grok") || name.contains("xai") { provider = .xai }
-                    }
-                }
-                
-                if let provider = provider {
-                    costService.recordUsage(
-                        provider: provider,
-                        modelId: assistant.modelName ?? "unknown",
-                        inputTokens: inputTokens,
-                        outputTokens: outputTokens
+                if shouldStream {
+                    // Use real streaming with inline tool visibility
+                    try await sendMessageWithStreaming(
+                        conversationId: conv.id,
+                        content: content,
+                        attachments: attachments,
+                        enabledTools: enabledTools
                     )
+                } else {
+                    // Fallback to non-streaming path
+                    let assistant = try await conversationService.sendMessage(
+                        conversationId: conv.id,
+                        content: content,
+                        attachments: attachments,
+                        enabledTools: enabledTools
+                    )
+
+                    // Pseudo-stream the assistant content
+                    startPseudoStream(for: assistant)
+
+                    // Record usage
+                    recordUsage(for: assistant, inputContent: content)
                 }
             } catch is CancellationError {
                 // Task was cancelled - this is expected when user stops generation
                 print("[ChatContainer] Message generation was stopped by user")
+                await MainActor.run { cleanupStreamingState() }
             } catch {
                 print("Error sending message: \(error.localizedDescription)")
+                await MainActor.run { cleanupStreamingState() }
             }
             isLoading = false
             currentSendTask = nil
+        }
+    }
+
+    /// Send message with real streaming and inline tool visibility
+    private func sendMessageWithStreaming(
+        conversationId: String,
+        content: String,
+        attachments: [MessageAttachment],
+        enabledTools: [String]
+    ) async throws {
+        // Create user message
+        let userMessage = Message(
+            conversationId: conversationId,
+            role: .user,
+            content: content,
+            attachments: attachments.isEmpty ? nil : attachments
+        )
+        conversationService.messages.append(userMessage)
+
+        // Create placeholder assistant message
+        let assistantId = UUID().uuidString
+        let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
+        let apiKeysStorage = APIKeysStorage.shared
+
+        // Get provider and model info
+        let providerString = settings.defaultProvider.rawValue
+        let modelId = settings.defaultModel
+        let providerDisplayName = settings.defaultProvider.displayName
+
+        let placeholderMessage = Message(
+            id: assistantId,
+            conversationId: conversationId,
+            role: .assistant,
+            content: "",
+            isStreaming: true,
+            modelName: modelId,
+            providerName: providerString
+        )
+        conversationService.messages.append(placeholderMessage)
+
+        // Initialize streaming state
+        streamingMessageId = assistantId
+        streamedContent[assistantId] = ""
+        streamedReasoning[assistantId] = ""
+        liveToolCalls[assistantId] = []
+
+        // Get API keys from storage
+        let anthropicKey = try? apiKeysStorage.getAPIKey(for: .anthropic)
+        let openaiKey = try? apiKeysStorage.getAPIKey(for: .openai)
+        let geminiKey = try? apiKeysStorage.getAPIKey(for: .gemini)
+        let grokKey = try? apiKeysStorage.getAPIKey(for: .xai)
+        let perplexityKey = try? apiKeysStorage.getAPIKey(for: .perplexity)
+        let deepseekKey = try? apiKeysStorage.getAPIKey(for: .deepseek)
+        let zaiKey = try? apiKeysStorage.getAPIKey(for: .zai)
+        let minimaxKey = try? apiKeysStorage.getAPIKey(for: .minimax)
+        let mistralKey = try? apiKeysStorage.getAPIKey(for: .mistral)
+
+        // Get custom provider config if needed
+        var customBaseUrl: String? = nil
+        var customApiKey: String? = nil
+        if providerString == "openai-compatible",
+           let providerId = settings.selectedCustomProviderId,
+           let customProvider = settings.customProviders.first(where: { $0.id == providerId }) {
+            customBaseUrl = customProvider.apiEndpoint
+            if let apiKey = try? apiKeysStorage.getCustomProviderAPIKey(providerId: providerId), !apiKey.isEmpty {
+                customApiKey = apiKey
+            }
+        }
+
+        // Build orchestration config
+        let config = OrchestrationConfig(
+            provider: providerString,
+            model: modelId,
+            providerName: providerDisplayName,
+            anthropicKey: anthropicKey,
+            openaiKey: openaiKey,
+            geminiKey: geminiKey,
+            grokKey: grokKey,
+            perplexityKey: perplexityKey,
+            deepseekKey: deepseekKey,
+            zaiKey: zaiKey,
+            minimaxKey: minimaxKey,
+            mistralKey: mistralKey,
+            customBaseUrl: customBaseUrl,
+            customApiKey: customApiKey
+        )
+
+        // Get all messages for context
+        let contextMessages = conversationService.messages.filter { $0.id != assistantId }
+
+        // Stream the response
+        let orchestrator = OnDeviceConversationOrchestrator()
+        let stream = orchestrator.sendMessageStreaming(
+            conversationId: conversationId,
+            content: content,
+            attachments: attachments,
+            enabledTools: enabledTools,
+            messages: contextMessages,
+            config: config
+        )
+
+        var finalContent = ""
+        var finalReasoning = ""
+        var finalToolCalls: [LiveToolCall] = []
+        var finalSources: [MessageGroundingSource] = []
+        var finalMemoryOps: [MessageMemoryOperation] = []
+
+        for try await event in stream {
+            try Task.checkCancellation()
+
+            await MainActor.run {
+                switch event {
+                case .textDelta(let text):
+                    finalContent += text
+                    streamedContent[assistantId] = finalContent
+
+                case .reasoningDelta(let text):
+                    finalReasoning += text
+                    streamedReasoning[assistantId] = finalReasoning
+
+                case .toolCallStart(let toolCall):
+                    finalToolCalls.append(toolCall)
+                    liveToolCalls[assistantId] = finalToolCalls
+
+                case .toolCallProgress(let id, let progress):
+                    if let index = finalToolCalls.firstIndex(where: { $0.id == id }) {
+                        finalToolCalls[index].state = progress.state
+                        finalToolCalls[index].statusMessage = progress.statusMessage
+                        liveToolCalls[assistantId] = finalToolCalls
+                    }
+
+                case .toolCallComplete(let id, let result):
+                    if let index = finalToolCalls.firstIndex(where: { $0.id == id }) {
+                        finalToolCalls[index].state = result.success ? .success : .failure
+                        finalToolCalls[index].result = result
+                        finalToolCalls[index].completedAt = Date()
+                        liveToolCalls[assistantId] = finalToolCalls
+                    }
+
+                case .completion(let completion):
+                    finalContent = completion.fullContent
+                    finalReasoning = completion.reasoning ?? ""
+                    finalSources = completion.groundingSources
+                    finalMemoryOps = completion.memoryOperations
+
+                case .error(let error):
+                    print("[ChatContainer] Streaming error: \(error.localizedDescription)")
+                }
+            }
+        }
+
+        // Finalize the message
+        await MainActor.run {
+            finalizeStreamingMessage(
+                assistantId: assistantId,
+                conversationId: conversationId,
+                content: finalContent,
+                reasoning: finalReasoning.isEmpty ? nil : finalReasoning,
+                toolCalls: finalToolCalls,
+                sources: finalSources,
+                memoryOps: finalMemoryOps,
+                modelName: config.model,
+                providerName: config.providerName
+            )
+        }
+    }
+
+    /// Finalize a streaming message with all collected data
+    private func finalizeStreamingMessage(
+        assistantId: String,
+        conversationId: String,
+        content: String,
+        reasoning: String?,
+        toolCalls: [LiveToolCall],
+        sources: [MessageGroundingSource],
+        memoryOps: [MessageMemoryOperation],
+        modelName: String,
+        providerName: String?
+    ) {
+        // Update the placeholder message with final content
+        if let index = conversationService.messages.firstIndex(where: { $0.id == assistantId }) {
+            let finalMessage = Message(
+                id: assistantId,
+                conversationId: conversationId,
+                role: .assistant,
+                content: content,
+                isStreaming: false,
+                modelName: modelName,
+                providerName: providerName,
+                groundingSources: sources.isEmpty ? nil : sources,
+                memoryOperations: memoryOps.isEmpty ? nil : memoryOps,
+                reasoning: reasoning
+            )
+            conversationService.messages[index] = finalMessage
+
+            // Record usage
+            recordUsage(for: finalMessage, inputContent: "")
+        }
+
+        // Clean up streaming state
+        cleanupStreamingState()
+    }
+
+    /// Clean up streaming state after completion or error
+    private func cleanupStreamingState() {
+        if let messageId = streamingMessageId {
+            streamedContent.removeValue(forKey: messageId)
+            streamedReasoning.removeValue(forKey: messageId)
+            liveToolCalls.removeValue(forKey: messageId)
+        }
+        streamingMessageId = nil
+    }
+
+    /// Record usage for cost tracking
+    private func recordUsage(for assistant: Message, inputContent: String) {
+        let inputTokens = max(1, inputContent.count / 4)
+        let outputTokens = max(1, assistant.content.count / 4)
+
+        // Map provider string to AIProvider
+        var provider: AIProvider? = AIProvider(rawValue: assistant.providerName ?? "")
+        if provider == nil {
+            if assistant.providerName == "openai-compatible" {
+                provider = .openai
+            } else if let name = assistant.providerName?.lowercased() {
+                if name.contains("anthropic") { provider = .anthropic }
+                else if name.contains("openai") { provider = .openai }
+                else if name.contains("gemini") || name.contains("google") { provider = .gemini }
+                else if name.contains("grok") || name.contains("xai") { provider = .xai }
+            }
+        }
+
+        if let provider = provider {
+            costService.recordUsage(
+                provider: provider,
+                modelId: assistant.modelName ?? "unknown",
+                inputTokens: inputTokens,
+                outputTokens: outputTokens
+            )
         }
     }
     

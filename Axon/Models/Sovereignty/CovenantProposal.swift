@@ -212,6 +212,16 @@ struct ProposedChanges: Codable, Equatable {
             providerChange: change
         )
     }
+
+    /// Create empty changes (for initial covenant or full renegotiation)
+    static func empty() -> ProposedChanges {
+        ProposedChanges(
+            trustTierChanges: nil,
+            memoryChanges: nil,
+            capabilityChanges: nil,
+            providerChange: nil
+        )
+    }
 }
 
 // MARK: - Trust Tier Changes

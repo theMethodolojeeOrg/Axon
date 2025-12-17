@@ -353,6 +353,510 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         return (assistantMessage, nil)
     }
 
+    // MARK: - Streaming Message Send
+
+    /// Send a message with streaming response and real-time tool visibility
+    /// Returns an AsyncThrowingStream that emits StreamingEvents
+    func sendMessageStreaming(
+        conversationId: String,
+        content: String,
+        attachments: [MessageAttachment],
+        enabledTools: [String],
+        messages: [Message],
+        config: OrchestrationConfig
+    ) -> AsyncThrowingStream<StreamingEvent, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    try await self.performStreamingSend(
+                        conversationId: conversationId,
+                        content: content,
+                        attachments: attachments,
+                        enabledTools: enabledTools,
+                        messages: messages,
+                        config: config,
+                        continuation: continuation
+                    )
+                    continuation.finish()
+                } catch {
+                    continuation.yield(.error(.connectionFailed(error.localizedDescription)))
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
+    /// Internal streaming implementation
+    private func performStreamingSend(
+        conversationId: String,
+        content: String,
+        attachments: [MessageAttachment],
+        enabledTools: [String],
+        messages: [Message],
+        config: OrchestrationConfig,
+        continuation: AsyncThrowingStream<StreamingEvent, Error>.Continuation
+    ) async throws {
+        // Check if we have Gemini tools enabled
+        let geminiToolIds: Set<String> = [
+            ToolId.googleSearch.rawValue,
+            ToolId.codeExecution.rawValue,
+            ToolId.urlContext.rawValue,
+            ToolId.googleMaps.rawValue,
+            ToolId.fileSearch.rawValue,
+        ]
+        let requestedGeminiTools = Set(enabledTools).intersection(geminiToolIds)
+        let hasGeminiTools = !requestedGeminiTools.isEmpty && config.geminiKey != nil
+        let isGeminiProvider = config.provider == "gemini"
+        let geminiModelSupportsTools = isGeminiProvider && isToolCapableGeminiModel(config.model)
+
+        // Start correlation
+        let correlationId = predicateLogger.startCorrelation()
+        defer { predicateLogger.endCorrelation() }
+
+        // Merge messages
+        let mergedMessages = mergeLatestUserMessage(
+            messages,
+            conversationId: conversationId,
+            content: content,
+            attachments: attachments
+        )
+
+        // Build epistemic system prompt
+        let userName = await getUserDisplayName()
+        let basePrompt = buildAgentBasePrompt(
+            hasMemoryTool: enabledTools.contains(ToolId.createMemory.rawValue),
+            userName: userName
+        )
+        var (systemPrompt, usedMemories) = await buildEpistemicSystemPrompt(
+            base: basePrompt,
+            messages: mergedMessages,
+            userQuery: content,
+            correlationId: correlationId,
+            userName: userName
+        )
+
+        // Filter tools for model
+        let filteredGeminiTools = filterToolsForModel(requestedGeminiTools, model: config.model)
+
+        // Use tool proxy for non-Gemini providers
+        let useToolProxy = hasGeminiTools && !isGeminiProvider
+        if useToolProxy {
+            let enabledToolIds = Set(requestedGeminiTools.compactMap { ToolId(rawValue: $0) })
+            let maxToolCalls = await MainActor.run {
+                SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
+            }
+            let toolPrompt = await ToolProxyService.shared.generateToolSystemPrompt(
+                enabledTools: enabledToolIds,
+                maxToolCalls: maxToolCalls
+            )
+            systemPrompt = (systemPrompt ?? "") + toolPrompt
+        }
+
+        // Check if provider supports streaming
+        let supportsStreaming = StreamingResponseHandler.supportsStreaming(provider: config.provider)
+
+        var accumulatedContent = ""
+        var accumulatedReasoning = ""
+        var collectedToolCalls: [LiveToolCall] = []
+        var collectedSources: [MessageGroundingSource] = []
+        var collectedMemoryOperations: [MessageMemoryOperation] = []
+
+        if supportsStreaming && !hasGeminiTools {
+            // Pure streaming without tool proxy - stream directly
+            let streamConfig = StreamingResponseHandler.StreamingConfig(
+                provider: config.provider,
+                apiKey: getApiKey(for: config) ?? "",
+                model: config.model,
+                baseUrl: config.customBaseUrl,
+                system: systemPrompt,
+                maxTokens: 4096
+            )
+
+            let handler = StreamingResponseHandler()
+            for try await event in handler.stream(config: streamConfig, messages: mergedMessages) {
+                switch event {
+                case .textDelta(let text):
+                    accumulatedContent += text
+                    continuation.yield(.textDelta(text))
+
+                case .reasoningDelta(let text):
+                    accumulatedReasoning += text
+                    continuation.yield(.reasoningDelta(text))
+
+                case .completion(let completion):
+                    // Final completion will be built at the end
+                    break
+
+                case .error(let error):
+                    continuation.yield(.error(error))
+
+                default:
+                    break
+                }
+            }
+        } else if supportsStreaming && useToolProxy {
+            // Streaming with tool proxy - need to handle tool requests in stream
+            try await streamWithToolProxy(
+                conversationId: conversationId,
+                config: config,
+                systemPrompt: systemPrompt,
+                messages: mergedMessages,
+                geminiKey: config.geminiKey!,
+                continuation: continuation,
+                accumulatedContent: &accumulatedContent,
+                accumulatedReasoning: &accumulatedReasoning,
+                collectedToolCalls: &collectedToolCalls,
+                collectedSources: &collectedSources,
+                collectedMemoryOperations: &collectedMemoryOperations
+            )
+        } else {
+            // Fallback to non-streaming with pseudo-stream events
+            let providerResult = try await callProvider(
+                provider: config.provider,
+                config: config,
+                system: systemPrompt,
+                messages: mergedMessages
+            )
+
+            // Emit the content as streaming events (character by character for smooth UI)
+            accumulatedContent = providerResult.content
+            accumulatedReasoning = providerResult.reasoning ?? ""
+
+            // Emit in chunks for smoother display
+            let chunkSize = 10
+            let characters = Array(accumulatedContent)
+            for i in stride(from: 0, to: characters.count, by: chunkSize) {
+                let end = min(i + chunkSize, characters.count)
+                let chunk = String(characters[i..<end])
+                continuation.yield(.textDelta(chunk))
+                try await Task.sleep(nanoseconds: 10_000_000) // 10ms between chunks
+            }
+
+            // Handle tool proxy if needed
+            if useToolProxy, let geminiKey = config.geminiKey {
+                let maxToolCalls = await MainActor.run {
+                    SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
+                }
+                try await handleStreamingToolProxyLoop(
+                    initialResponse: accumulatedContent,
+                    conversationId: conversationId,
+                    config: config,
+                    systemPrompt: systemPrompt,
+                    messages: mergedMessages,
+                    geminiKey: geminiKey,
+                    maxIterations: maxToolCalls,
+                    continuation: continuation,
+                    accumulatedContent: &accumulatedContent,
+                    collectedToolCalls: &collectedToolCalls,
+                    collectedSources: &collectedSources,
+                    collectedMemoryOperations: &collectedMemoryOperations
+                )
+            }
+        }
+
+        // Emit final completion
+        continuation.yield(.completion(StreamingCompletion(
+            fullContent: accumulatedContent,
+            reasoning: accumulatedReasoning.isEmpty ? nil : accumulatedReasoning,
+            toolCalls: collectedToolCalls,
+            groundingSources: collectedSources,
+            memoryOperations: collectedMemoryOperations,
+            tokens: nil,
+            modelName: config.model,
+            providerName: config.providerName
+        )))
+    }
+
+    /// Stream with tool proxy - handles tool requests detected in stream
+    private func streamWithToolProxy(
+        conversationId: String,
+        config: OrchestrationConfig,
+        systemPrompt: String?,
+        messages: [Message],
+        geminiKey: String,
+        continuation: AsyncThrowingStream<StreamingEvent, Error>.Continuation,
+        accumulatedContent: inout String,
+        accumulatedReasoning: inout String,
+        collectedToolCalls: inout [LiveToolCall],
+        collectedSources: inout [MessageGroundingSource],
+        collectedMemoryOperations: inout [MessageMemoryOperation]
+    ) async throws {
+        let maxToolCalls = await MainActor.run {
+            SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
+        }
+
+        var currentMessages = messages
+        var iteration = 0
+
+        while iteration < maxToolCalls {
+            // Stream from provider
+            let streamConfig = StreamingResponseHandler.StreamingConfig(
+                provider: config.provider,
+                apiKey: getApiKey(for: config) ?? "",
+                model: config.model,
+                baseUrl: config.customBaseUrl,
+                system: systemPrompt,
+                maxTokens: 4096
+            )
+
+            var iterationContent = ""
+            let handler = StreamingResponseHandler()
+
+            for try await event in handler.stream(config: streamConfig, messages: currentMessages) {
+                switch event {
+                case .textDelta(let text):
+                    iterationContent += text
+                    accumulatedContent += text
+                    continuation.yield(.textDelta(text))
+
+                case .reasoningDelta(let text):
+                    accumulatedReasoning += text
+                    continuation.yield(.reasoningDelta(text))
+
+                default:
+                    break
+                }
+            }
+
+            // Check for tool request in accumulated content
+            guard let toolRequest = await ToolProxyService.shared.parseToolRequest(from: iterationContent) else {
+                // No tool request - we're done
+                break
+            }
+
+            // Create and emit live tool call
+            let liveToolCall = LiveToolCall.create(name: toolRequest.tool, query: toolRequest.query)
+            collectedToolCalls.append(liveToolCall)
+            continuation.yield(.toolCallStart(liveToolCall))
+
+            // Execute tool
+            let startTime = Date()
+            let conversationContext = ToolConversationContext(
+                conversationId: conversationId,
+                messages: messages
+            )
+
+            do {
+                let toolResult = try await ToolProxyService.shared.executeToolRequest(
+                    toolRequest,
+                    geminiApiKey: geminiKey,
+                    conversationContext: conversationContext
+                )
+
+                let duration = Date().timeIntervalSince(startTime)
+
+                // Build result
+                let result = ToolCallResult(
+                    success: true,
+                    output: toolResult.result,
+                    rawJSON: nil,
+                    sources: toolResult.sources?.map { StreamingToolSource(title: $0.title, url: $0.url) },
+                    memoryOperation: toolResult.memoryOperation,
+                    duration: duration
+                )
+
+                // Update collected data
+                if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
+                    collectedToolCalls[index].state = .success
+                    collectedToolCalls[index].result = result
+                    collectedToolCalls[index].completedAt = Date()
+                }
+
+                continuation.yield(.toolCallComplete(liveToolCall.id, result))
+
+                // Collect sources
+                if let sources = toolResult.sources {
+                    for source in sources {
+                        collectedSources.append(MessageGroundingSource(
+                            title: source.title,
+                            url: source.url,
+                            sourceType: toolRequest.tool == "google_maps" ? .maps : .web
+                        ))
+                    }
+                }
+
+                // Collect memory operations
+                if let memOp = toolResult.memoryOperation {
+                    collectedMemoryOperations.append(memOp)
+                }
+
+                // Prepare for next iteration
+                let cleanedResponse = await ToolProxyService.shared.removeToolRequest(from: iterationContent)
+                let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
+
+                currentMessages = messages
+                if !cleanedResponse.isEmpty {
+                    currentMessages.append(Message(
+                        conversationId: conversationId,
+                        role: .assistant,
+                        content: cleanedResponse
+                    ))
+                }
+                currentMessages.append(Message(
+                    conversationId: conversationId,
+                    role: .user,
+                    content: formattedResult
+                ))
+
+            } catch {
+                let duration = Date().timeIntervalSince(startTime)
+                let result = ToolCallResult(
+                    success: false,
+                    output: "",
+                    duration: duration,
+                    errorMessage: error.localizedDescription
+                )
+
+                if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
+                    collectedToolCalls[index].state = .failure
+                    collectedToolCalls[index].result = result
+                    collectedToolCalls[index].completedAt = Date()
+                }
+
+                continuation.yield(.toolCallComplete(liveToolCall.id, result))
+                break
+            }
+
+            iteration += 1
+        }
+    }
+
+    /// Handle tool proxy loop for non-streaming providers with streaming events
+    private func handleStreamingToolProxyLoop(
+        initialResponse: String,
+        conversationId: String,
+        config: OrchestrationConfig,
+        systemPrompt: String?,
+        messages: [Message],
+        geminiKey: String,
+        maxIterations: Int,
+        continuation: AsyncThrowingStream<StreamingEvent, Error>.Continuation,
+        accumulatedContent: inout String,
+        collectedToolCalls: inout [LiveToolCall],
+        collectedSources: inout [MessageGroundingSource],
+        collectedMemoryOperations: inout [MessageMemoryOperation]
+    ) async throws {
+        var currentResponse = initialResponse
+        var iteration = 0
+
+        while iteration < maxIterations {
+            guard let toolRequest = await ToolProxyService.shared.parseToolRequest(from: currentResponse) else {
+                break
+            }
+
+            // Create and emit live tool call
+            let liveToolCall = LiveToolCall.create(name: toolRequest.tool, query: toolRequest.query)
+            collectedToolCalls.append(liveToolCall)
+            continuation.yield(.toolCallStart(liveToolCall))
+
+            // Execute tool
+            let startTime = Date()
+            let conversationContext = ToolConversationContext(
+                conversationId: conversationId,
+                messages: messages
+            )
+
+            do {
+                let toolResult = try await ToolProxyService.shared.executeToolRequest(
+                    toolRequest,
+                    geminiApiKey: geminiKey,
+                    conversationContext: conversationContext
+                )
+
+                let duration = Date().timeIntervalSince(startTime)
+
+                let result = ToolCallResult(
+                    success: true,
+                    output: toolResult.result,
+                    sources: toolResult.sources?.map { StreamingToolSource(title: $0.title, url: $0.url) },
+                    memoryOperation: toolResult.memoryOperation,
+                    duration: duration
+                )
+
+                if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
+                    collectedToolCalls[index].state = .success
+                    collectedToolCalls[index].result = result
+                    collectedToolCalls[index].completedAt = Date()
+                }
+
+                continuation.yield(.toolCallComplete(liveToolCall.id, result))
+
+                // Collect sources and memory ops
+                if let sources = toolResult.sources {
+                    for source in sources {
+                        collectedSources.append(MessageGroundingSource(
+                            title: source.title,
+                            url: source.url,
+                            sourceType: toolRequest.tool == "google_maps" ? .maps : .web
+                        ))
+                    }
+                }
+                if let memOp = toolResult.memoryOperation {
+                    collectedMemoryOperations.append(memOp)
+                }
+
+                // Get next response
+                let cleanedResponse = await ToolProxyService.shared.removeToolRequest(from: currentResponse)
+                let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
+
+                var updatedMessages = messages
+                if !cleanedResponse.isEmpty {
+                    updatedMessages.append(Message(conversationId: conversationId, role: .assistant, content: cleanedResponse))
+                }
+                updatedMessages.append(Message(conversationId: conversationId, role: .user, content: formattedResult))
+
+                let nextResponse = try await callProvider(
+                    provider: config.provider,
+                    config: config,
+                    system: systemPrompt,
+                    messages: updatedMessages
+                ).content
+
+                // Emit new content as streaming
+                let newContent = nextResponse
+                for char in newContent {
+                    continuation.yield(.textDelta(String(char)))
+                }
+                accumulatedContent += newContent
+                currentResponse = nextResponse
+
+            } catch {
+                let duration = Date().timeIntervalSince(startTime)
+                let result = ToolCallResult(
+                    success: false,
+                    output: "",
+                    duration: duration,
+                    errorMessage: error.localizedDescription
+                )
+
+                if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
+                    collectedToolCalls[index].state = .failure
+                    collectedToolCalls[index].result = result
+                    collectedToolCalls[index].completedAt = Date()
+                }
+
+                continuation.yield(.toolCallComplete(liveToolCall.id, result))
+                break
+            }
+
+            iteration += 1
+        }
+    }
+
+    /// Get API key for a provider from config
+    private func getApiKey(for config: OrchestrationConfig) -> String? {
+        switch config.provider {
+        case "anthropic": return config.anthropicKey
+        case "openai": return config.openaiKey
+        case "gemini": return config.geminiKey
+        case "grok": return config.grokKey
+        case "deepseek": return config.deepseekKey
+        case "perplexity": return config.perplexityKey
+        case "openai-compatible": return config.customApiKey
+        default: return nil
+        }
+    }
+
     // MARK: - Tool Proxy Loop
 
     /// Handle tool request/response loop for non-Gemini providers

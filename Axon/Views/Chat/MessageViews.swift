@@ -7,6 +7,7 @@
 
 import SwiftUI
 import MarkdownUI
+import Combine
 
 #if canImport(UIKit)
 import UIKit
@@ -294,23 +295,43 @@ struct AssistantMessageView: View {
     let onRegenerate: (Message) -> Void
     var onQuote: ((String) -> Void)? = nil
 
+    /// Live tool calls during streaming (nil when not streaming)
+    var liveToolCalls: [LiveToolCall]? = nil
+
+    /// Streaming reasoning content (nil when not streaming)
+    var streamingReasoning: String? = nil
+
     @ObservedObject private var ttsService = TTSPlaybackService.shared
-    
+
     private var textToRender: String {
         overrideContent ?? message.content
     }
-    
+
     private var modelProvider: ModelProvider {
         provider(for: message.modelName, providerName: message.providerName)
     }
-    
+
+    /// Check if we're in streaming mode
+    private var isStreaming: Bool {
+        message.isStreaming == true || overrideContent != nil
+    }
+
+    /// Reasoning to display (streaming or final)
+    private var displayReasoning: String? {
+        if let streaming = streamingReasoning, !streaming.isEmpty {
+            return streaming
+        }
+        return message.reasoning
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Reasoning tokens (from reasoning models like DeepSeek R1, Perplexity Sonar Reasoning, etc.)
-            if let reasoning = message.reasoning, !reasoning.isEmpty {
+            if let reasoning = displayReasoning, !reasoning.isEmpty {
                 ReasoningView(
                     reasoning: reasoning,
-                    providerColor: providerColor(for: modelProvider, modelName: message.modelName)
+                    providerColor: providerColor(for: modelProvider, modelName: message.modelName),
+                    isStreaming: isStreaming && streamingReasoning != nil
                 )
                 .padding(.bottom, 12)
             }
@@ -325,30 +346,47 @@ struct AssistantMessageView: View {
                 .padding(.bottom, 12)
             }
 
-            // Main content - markdown with fenced code blocks rendered as rich code boxes.
-            AssistantMarkdownView(content: textToRender)
-                .codeArtifactHost()
+            // Main content with inline tool calls during streaming
+            if let toolCalls = liveToolCalls, !toolCalls.isEmpty {
+                // Streaming mode with tool calls - interleave content and tools
+                StreamingContentWithToolsView(
+                    content: textToRender,
+                    toolCalls: toolCalls
+                )
+            } else {
+                // Standard markdown rendering
+                AssistantMarkdownView(content: textToRender)
+                    .codeArtifactHost()
+            }
 
             // Grounding sources (from tool calls like web search, maps)
-            if let sources = message.groundingSources, !sources.isEmpty {
+            // Only show when not streaming (they'll be in inline tool calls during streaming)
+            if !isStreaming, let sources = message.groundingSources, !sources.isEmpty {
                 MessageSourcesView(sources: sources)
                     .padding(.top, 12)
             }
 
             // Memory operations (from create_memory tool calls)
-            if let memOps = message.memoryOperations, !memOps.isEmpty {
+            // Only show when not streaming
+            if !isStreaming, let memOps = message.memoryOperations, !memOps.isEmpty {
                 MemoryOperationsView(operations: memOps)
                     .padding(.top, 12)
             }
 
-            // Footer toolbar
-            AssistantToolbar(
-                message: message,
-                onCopy: onCopy,
-                onRegenerate: onRegenerate,
-                onQuote: onQuote
-            )
-            .padding(.top, 12)
+            // Footer toolbar (hide during streaming)
+            if !isStreaming {
+                AssistantToolbar(
+                    message: message,
+                    onCopy: onCopy,
+                    onRegenerate: onRegenerate,
+                    onQuote: onQuote
+                )
+                .padding(.top, 12)
+            } else {
+                // Streaming indicator
+                StreamingIndicator(modelName: message.modelName)
+                    .padding(.top, 12)
+            }
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
@@ -655,6 +693,113 @@ struct MessageSeparator: View {
             .fill(AppColors.glassBorder.opacity(0.5))
             .frame(height: 1)
             .padding(.horizontal)
+    }
+}
+
+// MARK: - Streaming Content With Tools View
+
+/// Renders streaming content with inline tool calls
+struct StreamingContentWithToolsView: View {
+    let content: String
+    let toolCalls: [LiveToolCall]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Render content up to first tool call marker
+            let (textBeforeTools, hasToolMarker) = extractTextBeforeTools()
+
+            if !textBeforeTools.isEmpty {
+                AssistantMarkdownView(content: textBeforeTools)
+                    .codeArtifactHost()
+            }
+
+            // Render inline tool calls
+            if !toolCalls.isEmpty {
+                InlineToolCallsView(toolCalls: toolCalls)
+            }
+
+            // If there's content after the tool request marker, render it
+            if hasToolMarker {
+                let textAfterTools = extractTextAfterTools()
+                if !textAfterTools.isEmpty {
+                    AssistantMarkdownView(content: textAfterTools)
+                        .codeArtifactHost()
+                }
+            }
+        }
+    }
+
+    /// Extract text before any tool_request block
+    private func extractTextBeforeTools() -> (String, Bool) {
+        // Look for tool_request code block
+        let patterns = [
+            "```tool_request",
+            "```tool_request\n",
+            "```\ntool_request"
+        ]
+
+        for pattern in patterns {
+            if let range = content.range(of: pattern) {
+                let before = String(content[..<range.lowerBound])
+                return (before.trimmingCharacters(in: .whitespacesAndNewlines), true)
+            }
+        }
+
+        // No tool marker found - return all content
+        return (content, false)
+    }
+
+    /// Extract text after the tool_request block (if any)
+    private func extractTextAfterTools() -> String {
+        // Look for closing ``` after tool_request
+        guard let startRange = content.range(of: "```tool_request") else {
+            return ""
+        }
+
+        let afterStart = content[startRange.upperBound...]
+
+        // Find the closing ```
+        guard let endRange = afterStart.range(of: "```") else {
+            return ""
+        }
+
+        let afterEnd = afterStart[endRange.upperBound...]
+        return String(afterEnd).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+// MARK: - Streaming Indicator
+
+/// Shows a streaming indicator while AI is generating
+struct StreamingIndicator: View {
+    let modelName: String?
+
+    @State private var dotCount = 0
+    private let timer = Timer.publish(every: 0.4, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        HStack(spacing: 8) {
+            // Pulsing dots
+            HStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .fill(AppColors.textTertiary)
+                        .frame(width: 6, height: 6)
+                        .opacity(dotCount % 3 == index ? 1.0 : 0.3)
+                }
+            }
+
+            Text("Generating")
+                .font(AppTypography.labelSmall())
+                .foregroundColor(AppColors.textTertiary)
+
+            Spacer()
+        }
+        .onReceive(timer) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                dotCount += 1
+            }
+        }
     }
 }
 

@@ -11,6 +11,7 @@ import SwiftUI
 struct ReasoningView: View {
     let reasoning: String
     let providerColor: Color
+    var isStreaming: Bool = false
 
     @State private var isExpanded = false
     @State private var isPulsing = true
@@ -39,9 +40,15 @@ struct ReasoningView: View {
                     Spacer()
 
                     // Token count indicator
-                    Text("\(reasoning.split(separator: " ").count) tokens")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    if isStreaming {
+                        Text("streaming...")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("\(reasoning.split(separator: " ").count) tokens")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
 
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption)

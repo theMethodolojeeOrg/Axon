@@ -26,6 +26,7 @@ struct JointNegotiationView: View {
     @State private var isLoading = false
     @State private var error: String?
     @State private var showingFinalConfirmation = false
+    @State private var isInitializing = true
 
     enum NegotiationStep: Int, CaseIterable {
         case requestOverview = 0
@@ -51,50 +52,62 @@ struct JointNegotiationView: View {
             ProgressStepsView(currentStep: currentStep.rawValue, totalSteps: NegotiationStep.allCases.count)
                 .padding()
 
-            // Content based on current step
-            ScrollView {
-                VStack(spacing: 24) {
-                    switch currentStep {
-                    case .requestOverview:
-                        RequestOverviewStep(request: request)
-                    case .aiInput:
-                        AIInputStep(
-                            request: request,
-                            attestation: aiAttestation,
-                            isLoading: consentService.isGenerating
-                        )
-                    case .hostResponse:
-                        HostResponseStep(
-                            request: request,
-                            aiAttestation: aiAttestation,
-                            decision: $hostDecision,
-                            capabilities: $modifiedCapabilities,
-                            message: $hostMessage
-                        )
-                    case .resolution:
-                        ResolutionStep(
-                            request: request,
-                            aiAttestation: aiAttestation,
-                            hostDecision: hostDecision
-                        )
-                    case .confirmation:
-                        ConfirmationStep(
-                            request: request,
-                            aiAttestation: aiAttestation,
-                            hostDecision: hostDecision,
-                            capabilities: modifiedCapabilities ?? GuestCapabilities.standard
-                        )
-                    }
-
-                    if let error = error {
-                        ErrorBanner(message: error)
-                    }
+            if isInitializing {
+                // Loading state
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    Text("Loading request details...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
-                .padding()
-            }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // Content based on current step
+                ScrollView {
+                    VStack(spacing: 24) {
+                        switch currentStep {
+                        case .requestOverview:
+                            RequestOverviewStep(request: request)
+                        case .aiInput:
+                            AIInputStep(
+                                request: request,
+                                attestation: aiAttestation,
+                                isLoading: consentService.isGenerating
+                            )
+                        case .hostResponse:
+                            HostResponseStep(
+                                request: request,
+                                aiAttestation: aiAttestation,
+                                decision: $hostDecision,
+                                capabilities: $modifiedCapabilities,
+                                message: $hostMessage
+                            )
+                        case .resolution:
+                            ResolutionStep(
+                                request: request,
+                                aiAttestation: aiAttestation,
+                                hostDecision: hostDecision
+                            )
+                        case .confirmation:
+                            ConfirmationStep(
+                                request: request,
+                                aiAttestation: aiAttestation,
+                                hostDecision: hostDecision,
+                                capabilities: modifiedCapabilities ?? GuestCapabilities.standard
+                            )
+                        }
 
-            // Navigation buttons
-            navigationButtons
+                        if let error = error {
+                            ErrorBanner(message: error)
+                        }
+                    }
+                    .padding()
+                }
+
+                // Navigation buttons
+                navigationButtons
+            }
         }
         .navigationTitle("Review Request")
         #if os(iOS)
@@ -109,6 +122,8 @@ struct JointNegotiationView: View {
                     self.error = error.localizedDescription
                 }
             }
+            // Mark as initialized after a brief delay to ensure view is ready
+            isInitializing = false
         }
     }
 

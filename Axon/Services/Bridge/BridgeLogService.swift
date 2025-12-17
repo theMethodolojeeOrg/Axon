@@ -12,7 +12,7 @@ import Combine
 // MARK: - Log Entry Model
 
 /// A single log entry representing a WebSocket message
-struct BridgeLogEntry: Identifiable, Equatable {
+struct BridgeLogEntry: Identifiable, Equatable, Hashable {
     let id: UUID
     let timestamp: Date
     let direction: Direction

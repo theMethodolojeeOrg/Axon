@@ -476,7 +476,7 @@ struct CodeArtifactInspectorColumn: View {
                         emptyState
                     }
                 case .bridgeLogs:
-                    BridgeLogInspectorView()
+                    BridgeLogInspector()
                 }
             }
         }

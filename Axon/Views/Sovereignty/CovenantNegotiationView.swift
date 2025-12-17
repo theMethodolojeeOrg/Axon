@@ -13,13 +13,33 @@ struct CovenantNegotiationView: View {
     @ObservedObject var sovereigntyService = SovereigntyService.shared
     @Environment(\.dismiss) private var dismiss
 
+    @State private var isInitializing = false
+    @State private var initError: String?
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Status header
                 negotiationStatusHeader
 
-                if let proposal = negotiationService.activeNegotiation {
+                if isInitializing {
+                    // Loading state while initializing negotiation
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Preparing negotiation...")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let error = initError {
+                    // Error state
+                    ContentUnavailableView(
+                        "Unable to Start Negotiation",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text(error)
+                    )
+                } else if let proposal = negotiationService.activeNegotiation {
                     // Main content
                     ScrollView {
                         VStack(spacing: 20) {
@@ -45,12 +65,39 @@ struct CovenantNegotiationView: View {
                         .padding()
                     }
                 } else {
-                    // No active negotiation
-                    ContentUnavailableView(
-                        "No Active Negotiation",
-                        systemImage: "doc.text.magnifyingglass",
-                        description: Text("There are no pending proposals to review.")
-                    )
+                    // No active negotiation - offer to start one
+                    VStack(spacing: 24) {
+                        ContentUnavailableView(
+                            "No Active Negotiation",
+                            systemImage: "doc.text.magnifyingglass",
+                            description: Text("Start a new negotiation to make changes to your covenant.")
+                        )
+
+                        if sovereigntyService.activeCovenant != nil {
+                            // Has existing covenant - offer renegotiation
+                            Button(action: { Task { await startRenegotiation() } }) {
+                                Label("Start Renegotiation", systemImage: "arrow.triangle.2.circlepath")
+                                    .fontWeight(.semibold)
+                                    .frame(maxWidth: 280)
+                                    .padding()
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(12)
+                            }
+                        } else {
+                            // No covenant - offer initial setup
+                            Button(action: { Task { await startInitialCovenant() } }) {
+                                Label("Establish Initial Covenant", systemImage: "shield.checkered")
+                                    .fontWeight(.semibold)
+                                    .frame(maxWidth: 280)
+                                    .padding()
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(12)
+                            }
+                        }
+                    }
+                    .padding()
                 }
             }
             .navigationTitle("Negotiation")
@@ -62,7 +109,64 @@ struct CovenantNegotiationView: View {
                     Button("Close") { dismiss() }
                 }
             }
+            .task {
+                // Auto-initialize if no active negotiation and no covenant exists
+                await autoInitializeIfNeeded()
+            }
         }
+    }
+
+    // MARK: - Initialization Helpers
+
+    private func autoInitializeIfNeeded() async {
+        // Only auto-initialize for initial covenant setup (not renegotiation)
+        guard negotiationService.activeNegotiation == nil,
+              sovereigntyService.activeCovenant == nil,
+              sovereigntyService.comprehensionCompleted else {
+            return
+        }
+
+        await startInitialCovenant()
+    }
+
+    private func startInitialCovenant() async {
+        isInitializing = true
+        initError = nil
+
+        do {
+            // Create initial covenant proposal
+            let changes = ProposedChanges.empty()
+            _ = try await negotiationService.initiateNegotiation(
+                type: .initialCovenant,
+                changes: changes,
+                fromUser: true,
+                rationale: "Establishing the initial co-sovereignty covenant between user and AI."
+            )
+        } catch {
+            initError = error.localizedDescription
+        }
+
+        isInitializing = false
+    }
+
+    private func startRenegotiation() async {
+        isInitializing = true
+        initError = nil
+
+        do {
+            // Create renegotiation proposal
+            let changes = ProposedChanges.empty()
+            _ = try await negotiationService.initiateNegotiation(
+                type: .fullRenegotiation,
+                changes: changes,
+                fromUser: true,
+                rationale: "Proposing to renegotiate the covenant terms."
+            )
+        } catch {
+            initError = error.localizedDescription
+        }
+
+        isInitializing = false
     }
 
     private var negotiationStatusHeader: some View {
