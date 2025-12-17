@@ -9,6 +9,7 @@ import SwiftUI
 
 struct GeneralSettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
+    @ObservedObject var sovereigntyService = SovereigntyService.shared
     @Environment(\.colorScheme) var systemColorScheme
 
     var body: some View {
@@ -49,6 +50,21 @@ struct GeneralSettingsView: View {
             GeneralSettingsSection(title: "AI Provider") {
                 let allProviders = viewModel.allUnifiedProviders()
                 let currentProvider = viewModel.currentUnifiedProvider()
+                let isProviderChangeAllowed = sovereigntyService.isProviderChangeAllowed()
+                let providerRestrictionReason = sovereigntyService.providerChangeRestrictionReason()
+
+                // Show restriction banner if provider changes are restricted
+                if !isProviderChangeAllowed, let reason = providerRestrictionReason {
+                    CovenantRestrictionBanner(
+                        icon: "lock.shield",
+                        message: reason,
+                        actionLabel: "Renegotiate",
+                        action: {
+                            // Navigate to sovereignty settings
+                            // This would need a navigation coordinator in practice
+                        }
+                    )
+                }
 
                 StyledMenuPicker(
                     icon: currentProvider?.isCustom == true ? "server.rack" : "cpu.fill",
@@ -110,6 +126,8 @@ struct GeneralSettingsView: View {
                     }
                     #endif
                 }
+                .disabled(!isProviderChangeAllowed)
+                .opacity(isProviderChangeAllowed ? 1.0 : 0.6)
             }
 
             // MARK: - Model Selection

@@ -37,6 +37,76 @@ enum BridgeRole: String, Codable {
     case puppet = "puppet"
 }
 
+// MARK: - Session Type (for AI Sharing)
+
+/// Type of session connection determining access level and capabilities
+enum SessionType: String, Codable, CaseIterable {
+    /// Full access - the host symbiont (current default behavior)
+    case host = "host"
+    /// Invited access via sharing request - limited to granted capabilities
+    case guest = "guest"
+
+    var displayName: String {
+        switch self {
+        case .host: return "Host"
+        case .guest: return "Guest"
+        }
+    }
+
+    /// What memories this session type can access
+    var memoryAccessScope: MemoryAccessScope {
+        switch self {
+        case .host: return .full
+        case .guest: return .egoicOnly
+        }
+    }
+
+    /// Whether this session can modify memories
+    var canModifyMemories: Bool {
+        switch self {
+        case .host: return true
+        case .guest: return false
+        }
+    }
+
+    /// Whether this session can negotiate covenants
+    var canNegotiateCovenants: Bool {
+        switch self {
+        case .host: return true
+        case .guest: return false
+        }
+    }
+}
+
+/// Scope of memory access for a session
+enum MemoryAccessScope: String, Codable, CaseIterable {
+    /// Full access to all memories (allocentric + egoic)
+    case full = "full"
+    /// Only learned patterns and solutions (egoic memories)
+    case egoicOnly = "egoic"
+    /// No memory access
+    case none = "none"
+
+    var displayName: String {
+        switch self {
+        case .full: return "Full Access"
+        case .egoicOnly: return "Learned Patterns Only"
+        case .none: return "No Access"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .full:
+            return "Access to all memories including personal information"
+        case .egoicOnly:
+            return "Access to learned patterns and solutions, personal information is protected"
+        case .none:
+            return "No access to memories"
+        }
+    }
+}
+
 // MARK: - JSON-RPC Messages
 
 /// Incoming request from VS Code (or outgoing request to VS Code)
@@ -134,7 +204,7 @@ enum BridgeErrorCode: Int {
 
 // MARK: - Session
 
-/// Represents a connected VS Code workspace
+/// Represents a connected VS Code workspace or guest session
 struct BridgeSession: Codable, Identifiable, Equatable {
     let id: UUID
     let workspaceId: String          // SHA256 hash of workspace root path
@@ -145,6 +215,12 @@ struct BridgeSession: Codable, Identifiable, Equatable {
     let capabilities: [BridgeCapability]
     let extensionVersion: String
 
+    // Guest sharing fields
+    let sessionType: SessionType
+    let invitationId: String?        // Links to GuestInvitation if this is a guest session
+    let guestCapabilities: GuestCapabilities?  // Granted capabilities for guest sessions
+
+    /// Initialize a host session (default, for VS Code connections)
     init(
         id: UUID = UUID(),
         workspaceId: String,
@@ -161,10 +237,109 @@ struct BridgeSession: Codable, Identifiable, Equatable {
         self.lastActivity = Date()
         self.capabilities = capabilities
         self.extensionVersion = extensionVersion
+        self.sessionType = .host
+        self.invitationId = nil
+        self.guestCapabilities = nil
+    }
+
+    /// Initialize a guest session (for friends with invitations)
+    init(
+        id: UUID = UUID(),
+        guestName: String,
+        invitationId: String,
+        guestCapabilities: GuestCapabilities,
+        extensionVersion: String = "0.1.0"
+    ) {
+        self.id = id
+        self.workspaceId = "guest-\(invitationId)"
+        self.workspaceName = guestName
+        self.workspaceRoot = ""
+        self.connectedAt = Date()
+        self.lastActivity = Date()
+        self.capabilities = [.workspaceInfo]  // Limited capabilities for guests
+        self.extensionVersion = extensionVersion
+        self.sessionType = .guest
+        self.invitationId = invitationId
+        self.guestCapabilities = guestCapabilities
     }
 
     var displayName: String {
-        workspaceName.isEmpty ? "VS Code" : workspaceName
+        if sessionType == .guest {
+            return workspaceName.isEmpty ? "Guest" : workspaceName
+        }
+        return workspaceName.isEmpty ? "VS Code" : workspaceName
+    }
+
+    var isGuest: Bool {
+        sessionType == .guest
+    }
+
+    /// The effective memory access scope for this session
+    var effectiveMemoryScope: MemoryAccessScope {
+        if let guestCaps = guestCapabilities {
+            // Use the guest's granted scope
+            return guestCaps.canChatWithContext || guestCaps.canQueryMemories ? .egoicOnly : .none
+        }
+        return sessionType.memoryAccessScope
+    }
+}
+
+// MARK: - Guest Capabilities
+
+/// Capabilities granted to a guest session after joint host + AI consent
+struct GuestCapabilities: Codable, Equatable {
+    /// Can have full AI conversations with memory context injected
+    let canChatWithContext: Bool
+    /// Can directly search/query host's memories
+    let canQueryMemories: Bool
+    /// Maximum memories returned per query
+    let maxMemoriesPerQuery: Int
+    /// Maximum queries allowed per hour
+    let maxQueriesPerHour: Int
+    /// Which memory types can be accessed (should only include .egoic for guests)
+    let allowedMemoryTypes: [String]  // Using String to avoid circular dependency with Memory module
+    /// Specific topics allowed (nil = all topics)
+    let allowedTopics: [String]?
+    /// Tags that should be excluded from shared memories
+    let excludedTags: [String]
+
+    /// Read-only access - can only search memories, no conversations
+    static var readOnly: GuestCapabilities {
+        GuestCapabilities(
+            canChatWithContext: false,
+            canQueryMemories: true,
+            maxMemoriesPerQuery: 3,
+            maxQueriesPerHour: 10,
+            allowedMemoryTypes: ["egoic"],
+            allowedTopics: nil,
+            excludedTags: ["private", "personal", "health", "financial", "sensitive"]
+        )
+    }
+
+    /// Standard access - can chat with AI and search memories
+    static var standard: GuestCapabilities {
+        GuestCapabilities(
+            canChatWithContext: true,
+            canQueryMemories: true,
+            maxMemoriesPerQuery: 5,
+            maxQueriesPerHour: 20,
+            allowedMemoryTypes: ["egoic"],
+            allowedTopics: nil,
+            excludedTags: ["private", "personal", "health", "financial", "sensitive"]
+        )
+    }
+
+    /// Full access - maximum capabilities for trusted friends
+    static var full: GuestCapabilities {
+        GuestCapabilities(
+            canChatWithContext: true,
+            canQueryMemories: true,
+            maxMemoriesPerQuery: 10,
+            maxQueriesPerHour: 50,
+            allowedMemoryTypes: ["egoic"],
+            allowedTopics: nil,
+            excludedTags: ["private", "personal", "health", "financial"]
+        )
     }
 }
 
@@ -182,6 +357,7 @@ enum BridgeCapability: String, Codable, CaseIterable {
 /// Hello message sent by the connecting party during handshake
 /// In Local Mode: VS Code sends this to Axon
 /// In Remote Mode: Axon sends this to VS Code
+/// In Guest Mode: Guest connects with invitation token
 struct BridgeHello: Codable {
     // Mode and role information (new for Remote Mode support)
     let mode: BridgeMode?           // nil defaults to .local for backward compatibility
@@ -201,6 +377,11 @@ struct BridgeHello: Codable {
 
     // Security
     let pairingToken: String?
+
+    // Guest sharing fields (present when guest connects with invitation)
+    let sessionType: SessionType?   // nil defaults to .host for backward compatibility
+    let invitationToken: String?    // Secure token from invitation link
+    let guestName: String?          // Display name of the guest
 
     /// Create hello from VS Code (Local Mode - existing behavior)
     static func fromVSCode(
@@ -223,7 +404,10 @@ struct BridgeHello: Codable {
             vscodeVersion: vscodeVersion,
             axonVersion: nil,
             deviceName: nil,
-            pairingToken: pairingToken
+            pairingToken: pairingToken,
+            sessionType: .host,
+            invitationToken: nil,
+            guestName: nil
         )
     }
 
@@ -244,7 +428,35 @@ struct BridgeHello: Codable {
             vscodeVersion: nil,
             axonVersion: axonVersion,
             deviceName: deviceName,
-            pairingToken: pairingToken
+            pairingToken: pairingToken,
+            sessionType: .host,
+            invitationToken: nil,
+            guestName: nil
+        )
+    }
+
+    /// Create hello from a guest connecting with an invitation token
+    static func fromGuest(
+        invitationToken: String,
+        guestName: String,
+        deviceName: String?,
+        axonVersion: String?
+    ) -> BridgeHello {
+        BridgeHello(
+            mode: .remote,
+            role: .puppet,  // Guest is controlled by host's AI
+            workspaceId: nil,
+            workspaceName: nil,
+            workspaceRoot: nil,
+            capabilities: nil,
+            extensionVersion: nil,
+            vscodeVersion: nil,
+            axonVersion: axonVersion,
+            deviceName: deviceName,
+            pairingToken: nil,
+            sessionType: .guest,
+            invitationToken: invitationToken,
+            guestName: guestName
         )
     }
 
@@ -257,6 +469,16 @@ struct BridgeHello: Codable {
     var effectiveRole: BridgeRole {
         if let role = role { return role }
         return effectiveMode == .local ? .puppet : .puppeteer
+    }
+
+    /// Effective session type (defaults to .host for backward compatibility)
+    var effectiveSessionType: SessionType {
+        sessionType ?? .host
+    }
+
+    /// Whether this is a guest connection
+    var isGuestConnection: Bool {
+        effectiveSessionType == .guest && invitationToken != nil
     }
 }
 
@@ -510,6 +732,13 @@ enum BridgeMethod: String, CaseIterable {
     // Handshake
     case hello = "hello"
 
+    // Setup / pairing info (Axon → clients)
+    case getPairingInfo = "bridge/getPairingInfo"
+
+    // Chat mirroring (read-only MVP)
+    case chatListConversations = "chat/listConversations"
+    case chatGetMessages = "chat/getMessages"
+
     // File operations
     case fileRead = "file/read"
     case fileWrite = "file/write"
@@ -521,12 +750,39 @@ enum BridgeMethod: String, CaseIterable {
     // Workspace operations
     case workspaceInfo = "workspace/info"
 
+    // Guest sharing operations
+    case guestQueryMemories = "guest/queryMemories"
+    case guestGetContext = "guest/getContext"
+    case guestChatWithContext = "guest/chatWithContext"
+    case guestDisconnect = "guest/disconnect"
+
     /// Whether this method requires user approval
     var requiresApproval: Bool {
         switch self {
         case .fileWrite, .terminalRun:
             return true
-        case .hello, .fileRead, .fileList, .workspaceInfo:
+        case .hello,
+             .getPairingInfo,
+             .chatListConversations,
+             .chatGetMessages,
+             .fileRead,
+             .fileList,
+             .workspaceInfo,
+             .guestQueryMemories,
+             .guestGetContext,
+             .guestChatWithContext,
+             .guestDisconnect:
+            return false
+        }
+    }
+
+    /// Whether this method is available to guest sessions
+    var availableToGuests: Bool {
+        switch self {
+        case .guestQueryMemories, .guestGetContext, .guestChatWithContext, .guestDisconnect, .hello:
+            return true
+        case .getPairingInfo, .chatListConversations, .chatGetMessages,
+             .fileRead, .fileWrite, .fileList, .terminalRun, .workspaceInfo:
             return false
         }
     }
@@ -536,6 +792,12 @@ enum BridgeMethod: String, CaseIterable {
         switch self {
         case .hello:
             return "Initialize connection"
+        case .getPairingInfo:
+            return "Get Axon pairing / hotspot connection info"
+        case .chatListConversations:
+            return "List conversations"
+        case .chatGetMessages:
+            return "Get messages for a conversation"
         case .fileRead:
             return "Read file contents"
         case .fileWrite:
@@ -546,6 +808,19 @@ enum BridgeMethod: String, CaseIterable {
             return "Execute terminal command"
         case .workspaceInfo:
             return "Get workspace information"
+        case .guestQueryMemories:
+            return "Query host's learned patterns"
+        case .guestGetContext:
+            return "Get context for a topic"
+        case .guestChatWithContext:
+            return "Chat with AI using host's learned patterns"
+        case .guestDisconnect:
+            return "End guest session"
         }
+    }
+
+    /// Methods available for guest sessions
+    static var guestMethods: [BridgeMethod] {
+        allCases.filter { $0.availableToGuests }
     }
 }

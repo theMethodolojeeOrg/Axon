@@ -318,7 +318,7 @@ struct BlockedActionRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: action.actionType.icon)
+            Image(systemName: action.actionType.tierIcon)
                 .foregroundColor(.secondary)
                 .frame(width: 24)
 

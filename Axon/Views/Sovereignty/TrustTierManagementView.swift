@@ -256,7 +256,7 @@ struct ActionCategoryBadge: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: category.icon)
+            Image(systemName: category.tierIcon)
                 .font(compact ? .caption2 : .caption)
 
             if !compact {
@@ -1147,28 +1147,6 @@ struct ModifyTrustTierSheet: View {
 }
 
 // MARK: - Extensions
-
-extension ActionCategory {
-    var icon: String {
-        switch self {
-        case .fileRead: return "doc"
-        case .fileWrite: return "doc.badge.plus"
-        case .fileDelete: return "trash"
-        case .networkRequest: return "network"
-        case .toolInvocation: return "wrench.and.screwdriver"
-        case .shellCommand: return "terminal"
-        case .memoryRecall: return "brain"
-        case .memoryAdd: return "brain.head.profile"
-        case .memoryModify: return "pencil"
-        case .memoryDelete: return "trash"
-        case .capabilityEnable: return "checkmark.circle"
-        case .capabilityDisable: return "xmark.circle"
-        case .providerSwitch: return "arrow.triangle.2.circlepath"
-        case .systemPromptChange: return "text.alignleft"
-        case .personalityAdjust: return "person.crop.circle"
-        }
-    }
-}
 
 extension TrustTier {
     var isExpiringSoon: Bool {

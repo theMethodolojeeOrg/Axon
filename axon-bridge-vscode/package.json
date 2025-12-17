@@ -58,7 +58,10 @@
       "properties": {
         "axonBridge.mode": {
           "type": "string",
-          "enum": ["local", "remote"],
+          "enum": [
+            "local",
+            "remote"
+          ],
           "default": "local",
           "enumDescriptions": [
             "Local Mode: VS Code connects to Axon (default)",
@@ -119,6 +122,16 @@
     },
     "views": {
       "axonBridge": [
+        {
+          "id": "axonSetupView",
+          "name": "Axon Setup",
+          "icon": "resources/axon.svg"
+        },
+        {
+          "id": "axonChatView",
+          "name": "Axon Chat",
+          "icon": "resources/axon.svg"
+        },
         {
           "id": "axonBridgeLogsView",
           "name": "Bridge Logs",

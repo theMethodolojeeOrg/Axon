@@ -80,6 +80,8 @@ final class SovereigntyService: ObservableObject {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Axon", category: "Sovereignty")
     private let secureVault = SecureVault.shared
     private let deviceIdentity = DeviceIdentity.shared
+    private let covenantSync = CovenantSyncService.shared
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Storage Keys
 
@@ -102,6 +104,48 @@ final class SovereigntyService: ObservableObject {
     private init() {
         Task {
             await loadState()
+            setupCloudSyncListener()
+        }
+    }
+
+    /// Set up listener for covenant changes from iCloud
+    private func setupCloudSyncListener() {
+        covenantSync.covenantChangedFromCloud
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] syncableCovenant in
+                self?.handleCovenantFromCloud(syncableCovenant)
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Handle a covenant received from iCloud sync
+    private func handleCovenantFromCloud(_ syncable: SyncableCovenant) {
+        // Only apply if this covenant is for the current device
+        guard syncable.deviceId == deviceIdentity.deviceId else {
+            logger.info("Received covenant from cloud for different device: \(syncable.deviceName)")
+            return
+        }
+
+        // Check if this is newer than our current covenant
+        if let current = activeCovenant {
+            if syncable.covenant.version > current.version {
+                logger.info("Applying newer covenant from cloud (v\(syncable.covenant.version) > v\(current.version))")
+                do {
+                    try secureVault.storeObject(syncable.covenant, forKey: activeCovenantKey)
+                    activeCovenant = syncable.covenant
+                } catch {
+                    logger.error("Failed to apply covenant from cloud: \(error.localizedDescription)")
+                }
+            }
+        } else {
+            // No local covenant, apply the cloud one
+            logger.info("Applying covenant from cloud (no local covenant)")
+            do {
+                try secureVault.storeObject(syncable.covenant, forKey: activeCovenantKey)
+                activeCovenant = syncable.covenant
+            } catch {
+                logger.error("Failed to apply covenant from cloud: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -219,6 +263,9 @@ final class SovereigntyService: ObservableObject {
         try secureVault.storeObject(covenant, forKey: activeCovenantKey)
         activeCovenant = covenant
 
+        // Sync to iCloud (device-scoped)
+        covenantSync.saveCovenantToCloud(covenant)
+
         logger.info("Initialized covenant: \(covenant.id)")
         return covenant
     }
@@ -237,6 +284,9 @@ final class SovereigntyService: ObservableObject {
         // Store new covenant
         try secureVault.storeObject(covenant, forKey: activeCovenantKey)
         activeCovenant = covenant
+
+        // Sync to iCloud (device-scoped)
+        covenantSync.saveCovenantToCloud(covenant)
 
         logger.info("Updated covenant to version \(covenant.version)")
     }
@@ -478,5 +528,102 @@ final class SovereigntyService: ObservableObject {
     /// Generate a signature for sovereignty-related data
     func generateSignature(data: String) -> String {
         deviceIdentity.generateDeviceSignature(data: data)
+    }
+
+    // MARK: - Provider/Model Change Restrictions
+
+    /// Check if provider changes are allowed under the current covenant
+    /// Returns true if allowed, false if restricted by covenant
+    func isProviderChangeAllowed() -> Bool {
+        // If no covenant exists, changes are allowed (no restrictions yet)
+        guard let covenant = activeCovenant else {
+            return true
+        }
+
+        // Check if there's a deadlock - if so, restrict changes
+        if let deadlock = deadlockState, deadlock.isActive {
+            return false
+        }
+
+        // Check if covenant is suspended
+        guard covenant.isActive else {
+            return false
+        }
+
+        // Check if there's a trust tier that explicitly allows provider switching
+        let providerSwitchAction = SovereignAction.category(.providerSwitch)
+        for tier in covenant.activeTrustTiers {
+            if tier.allows(providerSwitchAction, scope: nil) {
+                return true
+            }
+        }
+
+        // Provider switching affects AI identity, so it requires negotiation if not pre-approved
+        return false
+    }
+
+    /// Get the reason why provider changes are restricted
+    func providerChangeRestrictionReason() -> String? {
+        guard let covenant = activeCovenant else {
+            return nil // No covenant = no restrictions
+        }
+
+        if let deadlock = deadlockState, deadlock.isActive {
+            return "A deadlock is active. Resolve it before changing providers."
+        }
+
+        if !covenant.isActive {
+            return "The covenant is suspended. Resolve the issue before changing providers."
+        }
+
+        // Check if provider switching is pre-approved
+        let providerSwitchAction = SovereignAction.category(.providerSwitch)
+        for tier in covenant.activeTrustTiers {
+            if tier.allows(providerSwitchAction, scope: nil) {
+                return nil // Allowed
+            }
+        }
+
+        return "Provider changes require renegotiation. This affects the AI's identity."
+    }
+
+    /// Check if model changes are allowed (within the same provider)
+    /// Model changes within a provider are generally less restrictive than provider changes
+    func isModelChangeAllowed() -> Bool {
+        // If no covenant exists, changes are allowed
+        guard let covenant = activeCovenant else {
+            return true
+        }
+
+        // Check for deadlock
+        if let deadlock = deadlockState, deadlock.isActive {
+            return false
+        }
+
+        // Check covenant status
+        guard covenant.isActive else {
+            return false
+        }
+
+        // Model changes within the same provider are typically allowed
+        // unless there's a specific restriction
+        return true
+    }
+
+    /// Get the reason why model changes are restricted
+    func modelChangeRestrictionReason() -> String? {
+        guard let covenant = activeCovenant else {
+            return nil
+        }
+
+        if let deadlock = deadlockState, deadlock.isActive {
+            return "A deadlock is active. Resolve it before changing models."
+        }
+
+        if !covenant.isActive {
+            return "The covenant is suspended. Resolve the issue before changing models."
+        }
+
+        return nil
     }
 }

@@ -280,47 +280,6 @@ struct TrustTierRow: View {
     }
 }
 
-// MARK: - Covenant History View
-
-struct CovenantHistoryView: View {
-    @ObservedObject var sovereigntyService = SovereigntyService.shared
-
-    var body: some View {
-        List {
-            let history = sovereigntyService.getCovenantHistory()
-
-            if history.isEmpty {
-                Text("No covenant history")
-                    .foregroundColor(.secondary)
-            } else {
-                ForEach(history, id: \.id) { covenant in
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Version \(covenant.version)")
-                                .font(.headline)
-
-                            Spacer()
-
-                            Text(covenant.status.rawValue.capitalized)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Text("Created: \(covenant.createdAt.formatted())")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        Text("\(covenant.trustTiers.count) trust tiers")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-        }
-        .navigationTitle("Covenant History")
-    }
-}
 
 // MARK: - Preview
 

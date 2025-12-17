@@ -521,10 +521,173 @@ class BridgeServer: ObservableObject {
             return
         }
 
-        // For other methods, we don't expect requests FROM VS Code in MVP
-        // VS Code only sends responses to our requests
-        let error = BridgeError(code: .methodNotFound, message: "Unexpected request from client")
-        sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+        // Route guest sessions to guest handler (they have a different allowlist)
+        if let sessionId = connectionToSession[connectionId],
+           let session = sessions[sessionId],
+           session.sessionType == .guest {
+            await handleGuestRequest(request, session: session, on: connection)
+            return
+        }
+
+        // Host sessions: allow a small set of Axon-originating APIs (setup + chat mirror)
+        guard let method = BridgeMethod(rawValue: request.method) else {
+            let error = BridgeError(code: .methodNotFound, message: "Unknown method: \(request.method)")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            return
+        }
+
+        switch method {
+        case .getPairingInfo:
+            await handleGetPairingInfo(request, on: connection)
+
+        case .chatListConversations:
+            await handleChatListConversations(request, on: connection)
+
+        case .chatGetMessages:
+            await handleChatGetMessages(request, on: connection)
+
+        // Everything else is not allowed FROM VS Code.
+        default:
+            let error = BridgeError(code: .methodNotFound, message: "Unexpected request from client")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+        }
+    }
+
+    // MARK: - VS Code → Axon (Setup + Chat Mirror)
+
+    private struct PairingInfo: Codable {
+        let axonBridgeWsLocalhostUrl: String
+        let axonBridgePort: UInt16
+        let requiredPairingToken: String?
+        let deviceName: String?
+        let isRunning: Bool
+        let connectionCount: Int
+        let qrPayload: String
+    }
+
+    private func handleGetPairingInfo(_ request: BridgeRequest, on connection: NWConnection) async {
+        // Note: Axon’s BridgeServer listens on localhost by design.
+        // This info is still useful for showing the VSIX how to connect, and for QR payload.
+        let settings = BridgeSettingsStorage.shared.settings
+        let port = settings.port
+        let token = settings.requiredPairingToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tokenOrNil: String? = token.isEmpty ? nil : token
+
+        let wsUrl = "ws://localhost:\(port)"
+        let deviceName = settings.effectiveDeviceName
+
+        // Simple payload; the phone-side QR can interpret it however it wants.
+        // We include token if present.
+        var payload = wsUrl
+        if let t = tokenOrNil {
+            payload += "?pairingToken=\(t)"
+        }
+
+        let info = PairingInfo(
+            axonBridgeWsLocalhostUrl: wsUrl,
+            axonBridgePort: port,
+            requiredPairingToken: tokenOrNil,
+            deviceName: deviceName,
+            isRunning: isRunning,
+            connectionCount: connectionCount,
+            qrPayload: payload
+        )
+
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(info)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: "Failed to encode pairing info: \(error.localizedDescription)")
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private struct ChatConversationSummary: Codable {
+        let id: String
+        let title: String
+        let updatedAt: Date?
+        let messageCount: Int?
+    }
+
+    private struct ChatListConversationsResult: Codable {
+        let conversations: [ChatConversationSummary]
+    }
+
+    private func handleChatListConversations(_ request: BridgeRequest, on connection: NWConnection) async {
+        do {
+            // Ensure local list is up to date.
+            try await ConversationService.shared.listConversations(limit: 50, offset: 0)
+
+            let summaries = ConversationService.shared.conversations.map { c in
+                ChatConversationSummary(
+                    id: c.id,
+                    title: c.title,
+                    updatedAt: c.updatedAt,
+                    messageCount: c.messageCount
+                )
+            }
+
+            let result = ChatListConversationsResult(conversations: summaries)
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: "Failed to list conversations: \(error.localizedDescription)")
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private struct ChatGetMessagesParams: Codable {
+        let conversationId: String
+        let limit: Int?
+    }
+
+    private struct ChatMessageDTO: Codable {
+        let id: String
+        let role: String
+        let content: String
+        let createdAt: Date?
+    }
+
+    private struct ChatGetMessagesResult: Codable {
+        let conversationId: String
+        let messages: [ChatMessageDTO]
+    }
+
+    private func handleChatGetMessages(_ request: BridgeRequest, on connection: NWConnection) async {
+        guard let paramsAny = request.params else {
+            let err = BridgeError(code: .invalidParams, message: "Missing params")
+            sendResponse(BridgeResponse.failure(id: request.id, error: err), on: connection)
+            return
+        }
+
+        do {
+            let paramsData = try JSONEncoder().encode(paramsAny)
+            let params = try JSONDecoder().decode(ChatGetMessagesParams.self, from: paramsData)
+
+            let limit = params.limit ?? 100
+            let messages = try await ConversationService.shared.getMessages(conversationId: params.conversationId, limit: limit)
+
+            let dtos = messages.map { m in
+                ChatMessageDTO(
+                    id: m.id,
+                    role: m.role.rawValue,
+                    content: m.content,
+                    createdAt: m.timestamp
+                )
+            }
+
+            let result = ChatGetMessagesResult(conversationId: params.conversationId, messages: dtos)
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: "Failed to get messages: \(error.localizedDescription)")
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
     }
 
     private func handleIncomingResponse(_ response: BridgeResponse) {
@@ -552,7 +715,13 @@ class BridgeServer: ObservableObject {
             let helloData = try JSONEncoder().encode(params)
             let hello = try JSONDecoder().decode(BridgeHello.self, from: helloData)
 
-            // Enforce optional pairing token (defense-in-depth against arbitrary localhost clients)
+            // Check if this is a guest connection
+            if hello.isGuestConnection {
+                await handleGuestHello(request, hello: hello, on: connection, connectionId: connectionId)
+                return
+            }
+
+            // Host connection - enforce optional pairing token
             let requiredToken = BridgeSettingsStorage.shared.settings.requiredPairingToken.trimmingCharacters(in: .whitespacesAndNewlines)
             if !requiredToken.isEmpty {
                 let presentedToken = (hello.pairingToken ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -565,7 +734,7 @@ class BridgeServer: ObservableObject {
                 }
             }
 
-            // Create session - handle both old and new BridgeHello formats
+            // Create host session - handle both old and new BridgeHello formats
             let capabilities = (hello.capabilities ?? []).compactMap { BridgeCapability(rawValue: $0) }
 
             let session = BridgeSession(
@@ -617,6 +786,192 @@ class BridgeServer: ObservableObject {
             let bridgeError = BridgeError(code: .invalidParams, message: "Invalid hello parameters")
             sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
         }
+    }
+
+    // MARK: - Guest Connection Handling
+
+    /// Handle a guest connection attempting to use a shared AI
+    private func handleGuestHello(_ request: BridgeRequest, hello: BridgeHello, on connection: NWConnection, connectionId: String) async {
+        // Check if sharing is enabled
+        let sharingSettings = SettingsViewModel.shared.settings.sharingSettings
+        guard sharingSettings.enabled else {
+            let error = BridgeError(code: .invalidRequest, message: "AI sharing is not enabled")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            connection.cancel()
+            cleanupConnection(connectionId: connectionId)
+            return
+        }
+
+        // Validate invitation token
+        guard let token = hello.invitationToken else {
+            let error = BridgeError(code: .invalidParams, message: "Missing invitation token")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            connection.cancel()
+            cleanupConnection(connectionId: connectionId)
+            return
+        }
+
+        guard let invitation = GuestSharingService.shared.validateInvitation(token: token) else {
+            let error = BridgeError(code: .invalidRequest, message: "Invalid or expired invitation")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            connection.cancel()
+            cleanupConnection(connectionId: connectionId)
+            return
+        }
+
+        // Accept the guest connection
+        do {
+            let guestSession = try await GuestSharingService.shared.acceptGuestConnection(
+                invitation: invitation,
+                guestDeviceName: hello.guestName ?? hello.deviceName ?? "Unknown Guest"
+            )
+
+            // Create BridgeSession with guest type
+            let session = BridgeSession(
+                guestName: invitation.guestName,
+                invitationId: invitation.id,
+                guestCapabilities: invitation.grantedCapabilities,
+                extensionVersion: hello.axonVersion ?? "unknown"
+            )
+
+            let sessionId = session.id.uuidString
+
+            // Store session and mappings
+            sessions[sessionId] = session
+            connectionToSession[connectionId] = sessionId
+            sessionToConnection[sessionId] = connectionId
+
+            print("[BridgeServer] Guest connected: \(invitation.guestName) [session: \(sessionId.prefix(8)), guest session: \(guestSession.id.prefix(8))]")
+
+            // Notify observers
+            NotificationCenter.default.post(
+                name: .bridgeConnectionDidChange,
+                object: self,
+                userInfo: [
+                    "connected": true,
+                    "session": session,
+                    "sessionId": sessionId,
+                    "isGuest": true,
+                    "guestSession": guestSession,
+                    "totalSessions": sessions.count
+                ]
+            )
+
+            // Send welcome with guest-specific methods only
+            let guestMethods = BridgeMethod.guestMethods.map { $0.rawValue }
+            let welcome = BridgeWelcome.fromAxon(
+                sessionId: sessionId,
+                axonVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0",
+                supportedMethods: guestMethods
+            )
+
+            let welcomeData = try JSONEncoder().encode(welcome)
+            let welcomeAny = try JSONDecoder().decode(AnyCodable.self, from: welcomeData)
+
+            sendResponse(BridgeResponse.success(id: request.id, result: welcomeAny), on: connection)
+
+        } catch {
+            print("[BridgeServer] Failed to accept guest connection: \(error)")
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+            connection.cancel()
+            cleanupConnection(connectionId: connectionId)
+        }
+    }
+
+    // MARK: - Guest Method Handling
+
+    /// Handle a request from a guest session
+    private func handleGuestRequest(_ request: BridgeRequest, session: BridgeSession, on connection: NWConnection) async {
+        guard session.sessionType == .guest else { return }
+        guard let guestCapabilities = session.guestCapabilities else {
+            let error = BridgeError(code: .invalidRequest, message: "Guest session missing capabilities")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            return
+        }
+
+        // Check if the method is available to guests
+        guard let method = BridgeMethod(rawValue: request.method),
+              method.availableToGuests else {
+            let error = BridgeError(code: .methodNotFound, message: "Method not available to guests")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            return
+        }
+
+        // Rate limiting check
+        guard let invitationId = session.invitationId,
+              GuestSharingService.shared.recordQuery(sessionId: invitationId) else {
+            let error = BridgeError(code: .invalidRequest, message: "Rate limit exceeded")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            return
+        }
+
+        // Handle guest-specific methods
+        switch method {
+        case .guestQueryMemories:
+            await handleGuestQueryMemories(request, capabilities: guestCapabilities, on: connection)
+        case .guestGetContext:
+            await handleGuestGetContext(request, capabilities: guestCapabilities, on: connection)
+        case .guestChatWithContext:
+            await handleGuestChatWithContext(request, capabilities: guestCapabilities, on: connection)
+        case .guestDisconnect:
+            handleGuestDisconnect(request, session: session, on: connection)
+        default:
+            let error = BridgeError(code: .methodNotFound, message: "Unknown guest method")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+        }
+    }
+
+    private func handleGuestQueryMemories(_ request: BridgeRequest, capabilities: GuestCapabilities, on connection: NWConnection) async {
+        guard capabilities.canQueryMemories else {
+            let error = BridgeError(code: .invalidRequest, message: "Memory query not permitted")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            return
+        }
+
+        // TODO: Implement memory query with scope filtering
+        // This would integrate with MemoryService and apply egoic-only filtering
+        let result = AnyCodable.object([
+            "memories": .array([]),
+            "message": .string("Memory query not yet implemented")
+        ])
+        sendResponse(BridgeResponse.success(id: request.id, result: result), on: connection)
+    }
+
+    private func handleGuestGetContext(_ request: BridgeRequest, capabilities: GuestCapabilities, on connection: NWConnection) async {
+        // TODO: Implement context retrieval for guests
+        let result = AnyCodable.object([
+            "context": .string(""),
+            "message": .string("Context retrieval not yet implemented")
+        ])
+        sendResponse(BridgeResponse.success(id: request.id, result: result), on: connection)
+    }
+
+    private func handleGuestChatWithContext(_ request: BridgeRequest, capabilities: GuestCapabilities, on connection: NWConnection) async {
+        guard capabilities.canChatWithContext else {
+            let error = BridgeError(code: .invalidRequest, message: "Chat with context not permitted")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            return
+        }
+
+        // TODO: Implement chat with context for guests
+        // This would use the AI service with scoped memory injection
+        let result = AnyCodable.object([
+            "response": .string(""),
+            "message": .string("Chat not yet implemented")
+        ])
+        sendResponse(BridgeResponse.success(id: request.id, result: result), on: connection)
+    }
+
+    private func handleGuestDisconnect(_ request: BridgeRequest, session: BridgeSession, on connection: NWConnection) {
+        if let invitationId = session.invitationId {
+            GuestSharingService.shared.disconnectSession(invitationId)
+        }
+
+        let result = AnyCodable.object(["status": .string("disconnected")])
+        sendResponse(BridgeResponse.success(id: request.id, result: result), on: connection)
+
+        connection.cancel()
     }
 }
 

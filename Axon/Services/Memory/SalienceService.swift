@@ -36,19 +36,45 @@ class SalienceService: ObservableObject {
         settings: MemoryInjectionSettings = .default,
         userName: String? = nil
     ) -> SalienceInjectionResult {
+        // Use full memory access scope by default (host sessions)
+        return injectSalientWithScope(
+            conversation: conversation,
+            memories: memories,
+            availableTokens: availableTokens,
+            sessionScope: .full,
+            correlationId: correlationId,
+            settings: settings,
+            userName: userName
+        )
+    }
+
+    /// Generate salient memory injection with scope-based filtering (for guest sessions)
+    /// - Parameter sessionScope: Memory access scope to filter by (guests get egoicOnly)
+    func injectSalientWithScope(
+        conversation: [Message],
+        memories: [Memory],
+        availableTokens: Int,
+        sessionScope: MemoryAccessScope,
+        correlationId: String,
+        settings: MemoryInjectionSettings = .default,
+        userName: String? = nil
+    ) -> SalienceInjectionResult {
+        // 0. Filter memories based on session scope FIRST
+        let scopedMemories = filterMemoriesForScope(memories, scope: sessionScope)
+
         // 1. Extract context from recent conversation
         let conversationContext = extractConversationContext(from: conversation)
 
         // 2. Get epistemic grounding
         let epistemicContext = epistemicEngine.ground(
             userMessage: conversationContext.recentQuery,
-            memories: memories,
+            memories: scopedMemories,
             correlationId: correlationId
         )
 
         // 3. Rank memories by salience
         let rankedMemories = rankBySalience(
-            memories: memories,
+            memories: scopedMemories,
             context: conversationContext,
             settings: settings
         )
@@ -65,7 +91,8 @@ class SalienceService: ObservableObject {
             memories: selectedMemories,
             epistemicContext: epistemicContext,
             settings: settings,
-            userName: userName
+            userName: userName,
+            scope: sessionScope
         )
 
         // 6. Log predicate
@@ -80,8 +107,61 @@ class SalienceService: ObservableObject {
             selectedMemories: selectedMemories,
             epistemicContext: epistemicContext,
             tokenCount: usedTokens,
-            totalCandidates: memories.count
+            totalCandidates: memories.count,
+            scopedCandidates: scopedMemories.count,
+            appliedScope: sessionScope
         )
+    }
+
+    // MARK: - Scope-Based Filtering
+
+    /// Filter memories based on access scope (used for guest sessions)
+    private func filterMemoriesForScope(_ memories: [Memory], scope: MemoryAccessScope) -> [Memory] {
+        switch scope {
+        case .full:
+            // Host sessions get all memories
+            return memories
+
+        case .egoicOnly:
+            // Guest sessions only get egoic (learned patterns) memories
+            // Filter out allocentric (personal facts) and low-confidence memories
+            let sharingSettings = SettingsViewModel.shared.settings.sharingSettings
+            let excludedTags = Set(sharingSettings.excludedTags)
+
+            return memories.filter { memory in
+                // Must be egoic type
+                let isEgoic = memory.type == .egoic || memory.type.toNewSchema == .egoic
+
+                // Must have reasonable confidence
+                let hasConfidence = memory.confidence >= 0.7
+
+                // Must not have excluded tags
+                let hasExcludedTag = !memory.tags.filter { excludedTags.contains($0.lowercased()) }.isEmpty
+
+                return isEgoic && hasConfidence && !hasExcludedTag
+            }
+
+        case .none:
+            // No memory access
+            return []
+        }
+    }
+
+    /// Check if a memory is shareable with guests
+    func isMemoryShareable(_ memory: Memory) -> Bool {
+        let sharingSettings = SettingsViewModel.shared.settings.sharingSettings
+        let excludedTags = Set(sharingSettings.excludedTags)
+
+        // Must be egoic
+        let isEgoic = memory.type == .egoic || memory.type.toNewSchema == .egoic
+
+        // Must have reasonable confidence
+        let hasConfidence = memory.confidence >= 0.7
+
+        // Must not have excluded tags
+        let hasExcludedTag = !memory.tags.filter { excludedTags.contains($0.lowercased()) }.isEmpty
+
+        return isEgoic && hasConfidence && !hasExcludedTag
     }
 
     // MARK: - Context Extraction
@@ -331,7 +411,8 @@ class SalienceService: ObservableObject {
         memories: [RankedMemory],
         epistemicContext: EpistemicContext,
         settings: MemoryInjectionSettings,
-        userName: String? = nil
+        userName: String? = nil,
+        scope: MemoryAccessScope = .full
     ) -> String {
         var lines: [String] = []
 
@@ -344,8 +425,13 @@ class SalienceService: ObservableObject {
         let firstName = userName?.components(separatedBy: " ").first
 
         // Header - first-person framing for intrinsic memory
+        // Adjust header based on scope (guest sessions get different framing)
         lines.append("")
-        if let name = firstName {
+        if scope == .egoicOnly {
+            // Guest session - frame as shared patterns
+            lines.append("## Shared Problem-Solving Patterns")
+            lines.append("*These are learned approaches that may help with your task:*")
+        } else if let name = firstName {
             lines.append("## What I Remember About \(name)")
         } else {
             lines.append("## What I Remember")
@@ -356,7 +442,8 @@ class SalienceService: ObservableObject {
         let allocentricMemories = memories.filter { $0.memory.type == .allocentric || $0.memory.type.toNewSchema == .allocentric }
         let egoicMemories = memories.filter { $0.memory.type == .egoic || $0.memory.type.toNewSchema == .egoic }
 
-        if !allocentricMemories.isEmpty {
+        // Only show allocentric memories for full access (not guest sessions)
+        if !allocentricMemories.isEmpty && scope == .full {
             if let name = firstName {
                 lines.append("### About \(name)")
             } else {
@@ -369,7 +456,10 @@ class SalienceService: ObservableObject {
         }
 
         if !egoicMemories.isEmpty {
-            if let name = firstName {
+            if scope == .egoicOnly {
+                // Guest session - neutral framing without personal references
+                lines.append("### Learned Approaches")
+            } else if let name = firstName {
                 lines.append("### What works with \(name)")
             } else {
                 lines.append("### What works")
@@ -380,8 +470,8 @@ class SalienceService: ObservableObject {
             lines.append("")
         }
 
-        // Epistemic boundaries (if verbose mode)
-        if settings.includeEpistemicBoundaries {
+        // Epistemic boundaries (if verbose mode and full access)
+        if settings.includeEpistemicBoundaries && scope == .full {
             lines.append("### Epistemic Boundaries")
             for grounded in epistemicContext.shiftLog.epistemicScope.grounded.prefix(2) {
                 lines.append("- ✓ \(grounded)")
@@ -432,9 +522,39 @@ struct SalienceInjectionResult {
     let epistemicContext: EpistemicContext
     let tokenCount: Int
     let totalCandidates: Int
+    let scopedCandidates: Int
+    let appliedScope: MemoryAccessScope
+
+    init(
+        injectionBlock: String,
+        selectedMemories: [RankedMemory],
+        epistemicContext: EpistemicContext,
+        tokenCount: Int,
+        totalCandidates: Int,
+        scopedCandidates: Int? = nil,
+        appliedScope: MemoryAccessScope = .full
+    ) {
+        self.injectionBlock = injectionBlock
+        self.selectedMemories = selectedMemories
+        self.epistemicContext = epistemicContext
+        self.tokenCount = tokenCount
+        self.totalCandidates = totalCandidates
+        self.scopedCandidates = scopedCandidates ?? totalCandidates
+        self.appliedScope = appliedScope
+    }
 
     var isEmpty: Bool {
         selectedMemories.isEmpty
+    }
+
+    /// Number of memories filtered out by scope
+    var memoriesFilteredByScope: Int {
+        totalCandidates - scopedCandidates
+    }
+
+    /// Whether this result used scope filtering
+    var usedScopeFiltering: Bool {
+        appliedScope != .full
     }
 }
 

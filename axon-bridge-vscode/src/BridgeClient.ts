@@ -13,6 +13,10 @@ import {
     BridgeResponse,
     BridgeHello,
     BridgeWelcome,
+    BridgePairingInfo,
+    ChatListConversationsResult,
+    ChatGetMessagesParams,
+    ChatGetMessagesResult,
     isRequest,
     isResponse,
     createResponse,
@@ -34,6 +38,14 @@ export class BridgeClient {
     private reconnectTimer: NodeJS.Timeout | null = null;
     private isConnecting = false;
     private sessionId: string | null = null;
+
+    private pendingResolvers = new Map<
+        string,
+        {
+            resolve: (value: unknown) => void;
+            reject: (err: unknown) => void;
+        }
+    >();
 
     // Handlers
     private fileHandler: FileHandler;
@@ -130,10 +142,10 @@ export class BridgeClient {
             this.ws.on('error', (error: Error) => {
                 console.error('[AxonBridge] WebSocket error:', error.message);
                 this.isConnecting = false;
-                
+
                 // Clean up the failed socket properly to prevent resource leaks
                 this.cleanupSocket();
-                
+
                 // Schedule reconnect if autoConnect is enabled
                 if (this.autoConnect) {
                     this.scheduleReconnect();
@@ -143,7 +155,7 @@ export class BridgeClient {
             console.error('[AxonBridge] Failed to create WebSocket:', error);
             this.isConnecting = false;
             this.cleanupSocket();
-            
+
             if (this.autoConnect) {
                 this.scheduleReconnect();
             }
@@ -157,17 +169,17 @@ export class BridgeClient {
         if (this.ws) {
             // Remove all listeners to prevent memory leaks and zombie handlers
             this.ws.removeAllListeners();
-            
+
             // Close if still open (use try-catch in case already closed)
             try {
-                if (this.ws.readyState === WebSocket.OPEN || 
+                if (this.ws.readyState === WebSocket.OPEN ||
                     this.ws.readyState === WebSocket.CONNECTING) {
                     this.ws.close();
                 }
             } catch (e) {
                 // Ignore close errors
             }
-            
+
             this.ws = null;
         }
     }
@@ -186,7 +198,7 @@ export class BridgeClient {
                 // Ignore
             }
         }
-        
+
         this.cleanupSocket();
         this.sessionId = null;
         this.statusBar.setState('disconnected');
@@ -230,7 +242,7 @@ export class BridgeClient {
     private sendHello() {
         // Reset reconnect attempts on successful connection
         this.reconnectAttempts = 0;
-        
+
         const folders = vscode.workspace.workspaceFolders;
         const workspaceRoot = folders?.[0]?.uri.fsPath ?? '';
         const workspaceName = vscode.workspace.name ?? folders?.[0]?.name ?? 'Unknown';
@@ -285,6 +297,18 @@ export class BridgeClient {
     }
 
     private handleResponse(response: BridgeResponse) {
+        // Resolve any pending request promise first
+        const pending = this.pendingResolvers.get(response.id);
+        if (pending) {
+            this.pendingResolvers.delete(response.id);
+            if (response.error) {
+                pending.reject(new Error(response.error.message));
+            } else {
+                pending.resolve(response.result);
+            }
+            return;
+        }
+
         // Handle hello response (welcome)
         if (response.id === 'hello') {
             if (response.error) {
@@ -366,6 +390,50 @@ export class BridgeClient {
         BridgeLogsViewProvider.shared?.notifyNewEntry();
 
         this.ws.send(data);
+    }
+
+    // MARK: - Axon Setup + Chat Mirror (read-only)
+
+    async getPairingInfo(): Promise<BridgePairingInfo> {
+        return await this.sendRequestAndWaitForResult<BridgePairingInfo>('bridge/getPairingInfo');
+    }
+
+    async chatListConversations(): Promise<ChatListConversationsResult> {
+        return await this.sendRequestAndWaitForResult<ChatListConversationsResult>('chat/listConversations');
+    }
+
+    async chatGetMessages(params: ChatGetMessagesParams): Promise<ChatGetMessagesResult> {
+        return await this.sendRequestAndWaitForResult<ChatGetMessagesResult>('chat/getMessages', params);
+    }
+
+    private sendRequestAndWaitForResult<T>(method: string, params?: unknown, timeoutMs: number = 15000): Promise<T> {
+        return new Promise<T>((resolve, reject) => {
+            if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+                reject(new Error('Not connected'));
+                return;
+            }
+
+            const id = `${method}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            const request: BridgeRequest = { jsonrpc: '2.0', id, method, params };
+
+            const timer = setTimeout(() => {
+                this.pendingResolvers.delete(id);
+                reject(new Error(`Request timed out: ${method}`));
+            }, timeoutMs);
+
+            this.pendingResolvers.set(id, {
+                resolve: (value: unknown) => {
+                    clearTimeout(timer);
+                    resolve(value as T);
+                },
+                reject: (err: unknown) => {
+                    clearTimeout(timer);
+                    reject(err instanceof Error ? err : new Error(String(err)));
+                }
+            });
+
+            this.send(request);
+        });
     }
 
     // MARK: - Reconnection

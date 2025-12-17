@@ -12,6 +12,8 @@ import { BridgeConnectionManager } from './BridgeConnectionManager';
 import { StatusBar } from './ui/StatusBar';
 import { BridgeLogService } from './BridgeLogService';
 import { BridgeLogsViewProvider } from './ui/BridgeLogsViewProvider';
+import { AxonSetupViewProvider } from './ui/AxonSetupViewProvider';
+import { AxonChatViewProvider } from './ui/AxonChatViewProvider';
 // TLSConfig imported for future TLS fingerprint display
 // import { showCertificateFingerprint } from './TLSConfig';
 import { BridgeMode } from './Protocol';
@@ -26,10 +28,19 @@ export function activate(context: vscode.ExtensionContext) {
     statusBar = new StatusBar();
     context.subscriptions.push({ dispose: () => statusBar.dispose() });
 
-    // Side bar logs view
+    // Side bar views
     const logsViewProvider = new BridgeLogsViewProvider();
+    const setupViewProvider = new AxonSetupViewProvider(context, () => connectionManager.getClient() ?? undefined);
+    const chatViewProvider = new AxonChatViewProvider(context, () => connectionManager.getClient() ?? undefined);
+
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(BridgeLogsViewProvider.viewType, logsViewProvider, {
+            webviewOptions: { retainContextWhenHidden: true },
+        }),
+        vscode.window.registerWebviewViewProvider(AxonSetupViewProvider.viewType, setupViewProvider, {
+            webviewOptions: { retainContextWhenHidden: true },
+        }),
+        vscode.window.registerWebviewViewProvider(AxonChatViewProvider.viewType, chatViewProvider, {
             webviewOptions: { retainContextWhenHidden: true },
         })
     );

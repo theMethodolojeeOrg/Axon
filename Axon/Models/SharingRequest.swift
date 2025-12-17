@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Combine
 
 // MARK: - Sharing Request
 
@@ -191,7 +192,7 @@ struct AIShareAttestation: Codable, Equatable, Identifiable {
     let requestId: String
     let timestamp: Date
 
-    let reasoning: AttestationReasoning
+    let reasoning: ShareAttestationReasoning
     let decision: ShareDecision
     let conditions: [String]?
     let concerns: [String]?
@@ -203,7 +204,7 @@ struct AIShareAttestation: Codable, Equatable, Identifiable {
         id: String = UUID().uuidString,
         requestId: String,
         timestamp: Date = Date(),
-        reasoning: AttestationReasoning,
+        reasoning: ShareAttestationReasoning,
         decision: ShareDecision,
         conditions: [String]? = nil,
         concerns: [String]? = nil,
@@ -231,8 +232,8 @@ struct AIShareAttestation: Codable, Equatable, Identifiable {
     }
 }
 
-/// AI's detailed reasoning about the sharing request
-struct AttestationReasoning: Codable, Equatable {
+/// AI's detailed reasoning about a sharing request (distinct from sovereignty attestations)
+struct ShareAttestationReasoning: Codable, Equatable {
     let summary: String
     let knowledgeImpact: String
     let privacyAssessment: String
@@ -365,13 +366,13 @@ struct SharingNegotiation: Codable, Identifiable, Equatable {
     var aiAttestation: AIShareAttestation?
     var hostResponse: HostResponse?
     var discussionMessages: [NegotiationMessage]
-    var state: NegotiationState
+    var state: SharingNegotiationState
 
     init(
         id: String = UUID().uuidString,
         requestId: String,
         startedAt: Date = Date(),
-        state: NegotiationState = .awaitingAIInput
+        state: SharingNegotiationState = .awaitingAIInput
     ) {
         self.id = id
         self.requestId = requestId
@@ -385,7 +386,7 @@ struct SharingNegotiation: Codable, Identifiable, Equatable {
     }
 }
 
-enum NegotiationState: String, Codable, CaseIterable {
+enum SharingNegotiationState: String, Codable, CaseIterable {
     case awaitingAIInput = "awaiting_ai_input"
     case aiResponded = "ai_responded"
     case hostResponded = "host_responded"

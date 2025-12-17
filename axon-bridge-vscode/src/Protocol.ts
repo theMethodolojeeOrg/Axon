@@ -243,6 +243,46 @@ export interface TerminalRunResult {
     timedOut: boolean;
 }
 
+// MARK: - Pairing / Setup
+
+export interface BridgePairingInfo {
+    axonBridgeWsLocalhostUrl: string;
+    axonBridgePort: number;
+    requiredPairingToken?: string;
+    deviceName?: string;
+    isRunning: boolean;
+    connectionCount: number;
+    qrPayload: string;
+}
+
+export interface ChatConversationSummary {
+    id: string;
+    title: string;
+    updatedAt?: string; // ISO8601
+    messageCount?: number;
+}
+
+export interface ChatListConversationsResult {
+    conversations: ChatConversationSummary[];
+}
+
+export interface ChatGetMessagesParams {
+    conversationId: string;
+    limit?: number;
+}
+
+export interface ChatMessageDTO {
+    id: string;
+    role: string;
+    content: string;
+    createdAt?: string; // ISO8601
+}
+
+export interface ChatGetMessagesResult {
+    conversationId: string;
+    messages: ChatMessageDTO[];
+}
+
 // MARK: - Workspace Operations
 
 export interface WorkspaceInfoResult {

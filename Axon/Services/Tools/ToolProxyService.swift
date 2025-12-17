@@ -195,6 +195,147 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
                 """
 
+            case .queryCovenant:
+                prompt += """
+
+                ### query_covenant
+                Query the current co-sovereignty covenant status and your permissions. Use this to understand what actions you can take, what trust tiers are active, and the current state of the human-AI agreement.
+
+                **Returns:**
+                - Covenant status (active, suspended, deadlocked)
+                - Active trust tiers and their permissions
+                - Pre-approved action categories
+                - Any pending proposals or deadlock state
+                - Recent covenant history
+
+                Example: ```tool_request
+                {"tool": "query_covenant", "query": "status"}
+                ```
+
+                **Query options:**
+                - `status`: Current covenant status and summary
+                - `permissions`: What actions you can take without approval
+                - `tiers`: List all trust tiers and their capabilities
+                - `history`: Recent covenant changes and negotiations
+
+                """
+
+            case .proposeCovenantChange:
+                prompt += """
+
+                ### propose_covenant_change
+                Propose a modification to the co-sovereignty covenant. Use this when you believe a change would benefit the collaboration - such as requesting new capabilities, suggesting trust tier adjustments, or proposing policy changes.
+
+                **Note:** This tool requires user approval before execution. The user will review your proposal and can accept, modify, or reject it.
+
+                **Format:**
+                ```tool_request
+                {"tool": "propose_covenant_change", "query": "PROPOSAL_TYPE|REASONING|DETAILS"}
+                ```
+
+                **Proposal Types:**
+                - `new_tier`: Propose a new trust tier
+                - `modify_tier`: Modify an existing trust tier
+                - `capability`: Request a new capability
+                - `policy`: Propose a policy change
+
+                **Example - Request new capability:**
+                ```tool_request
+                {"tool": "propose_covenant_change", "query": "capability|I've noticed you frequently ask me to search the web. Pre-approving web search would streamline our workflow.|google_search:auto_approve"}
+                ```
+
+                **Example - Propose new trust tier:**
+                ```tool_request
+                {"tool": "propose_covenant_change", "query": "new_tier|For coding tasks, file operations are routine and safe within the project directory.|name:Coding Assistant,capabilities:file_read,file_write,scope:project_directory"}
+                ```
+
+                """
+
+            case .querySystemState:
+                prompt += """
+
+                ### query_system_state
+                Query the current system configuration including available providers, models, tools, and your permissions. Use this to understand what options are available and what you can change.
+
+                **Scopes:**
+                - `providers` - List all available AI providers and their models
+                - `current` - Show currently active model and provider
+                - `tools` - List all tools and their enabled/disabled status
+                - `permissions` - Show what you can change (based on covenant/trust tiers)
+                - `all` - Full system state dump
+
+                **Response includes permission levels for each item:**
+                - `read_only` - Can see but not change
+                - `requires_approval` - Can request change (needs biometric)
+                - `pre_approved` - Can change directly (via trust tier)
+
+                Example: ```tool_request
+                {"tool": "query_system_state", "query": "providers"}
+                ```
+
+                """
+
+            case .changeSystemState:
+                prompt += """
+
+                ### change_system_state
+                Request a change to the system configuration. Use this to switch models, enable/disable tools, or change providers.
+
+                **Note:** This tool requires user approval unless pre-approved via a trust tier.
+
+                **Format:**
+                ```tool_request
+                {"tool": "change_system_state", "query": "CATEGORY|TARGET|VALUE|REASONING"}
+                ```
+
+                **Categories:**
+                - `model` - Change active model (e.g., `model|anthropic|claude-sonnet-4-20250514|Better for coding tasks`)
+                - `tool` - Enable/disable a tool (e.g., `tool|google_search|enable|Need web search for research`)
+                - `provider` - Switch provider (e.g., `provider|openai|gpt-4o|User requested OpenAI`)
+
+                **Example - Switch model:**
+                ```tool_request
+                {"tool": "change_system_state", "query": "model|gemini|gemini-2.5-pro|Better native tool support for this research task"}
+                ```
+
+                **Example - Enable tool:**
+                ```tool_request
+                {"tool": "change_system_state", "query": "tool|code_execution|enable|Need to run Python calculations"}
+                ```
+
+                """
+
+            case .listTools:
+                prompt += """
+
+                ### list_tools
+                Get a compact catalog of tools. Use this when you don't have tool details in context.
+
+                **Query options:**
+                - `enabled` (default)
+                - `all`
+                - `builtin`
+                - `dynamic`
+                - `bridge`
+
+                Example: ```tool_request
+                {"tool": "list_tools", "query": "enabled"}
+                ```
+
+                """
+
+            case .getToolDetails:
+                prompt += """
+
+                ### get_tool_details
+                Fetch full details (schema + examples) for a specific tool id.
+
+                Example: ```tool_request
+                {"tool": "get_tool_details", "query": "create_memory"}
+                ```
+
+                """
+
             }
         }
 
@@ -528,6 +669,12 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         case .reflectOnConversation:
             return await executeReflectOnConversation(query: query, context: context)
 
+        case .listTools:
+            return await executeListTools(query: query)
+
+        case .getToolDetails:
+            return await executeGetToolDetails(query: query)
+
         case .conversationSearch:
             // Search recent conversations
             let searchResults = await ConversationSearchService.shared.searchConversations(
@@ -563,6 +710,20 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 sources: nil,
                 memoryOperation: nil
             )
+
+        case .queryCovenant:
+            return await executeQueryCovenant(query: query)
+
+        case .proposeCovenantChange:
+            return await executeProposeCovenant(query: query)
+
+        case .querySystemState:
+            return await executeQuerySystemState(query: query)
+
+        case .changeSystemState:
+            // changeSystemState requires approval, so it goes through executeInternalToolWithApproval
+            // But if we get here, it means approval was already handled or bypassed
+            return await executeChangeSystemState(query: query)
 
         case .createMemory:
             // Parse the pipe-separated format: TYPE|CONFIDENCE|TAGS|CONTENT
@@ -1108,6 +1269,927 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             sources: nil,
             memoryOperation: nil
         )
+    }
+
+    // MARK: - Tool Introspection Tools
+
+    /// Execute the list_tools tool
+    /// - Query options:
+    ///   - "enabled" (default): only tools currently enabled in settings (including dynamic + bridge if connected)
+    ///   - "all": include all built-in ToolId cases (even if disabled)
+    ///   - "builtin": only ToolId cases
+    ///   - "dynamic": only enabled dynamic tools
+    ///   - "bridge": only VS Code bridge tools (if connected)
+    private func executeListTools(query: String) async -> ToolResult {
+        let mode = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let settings = SettingsStorage.shared.loadSettingsOrDefault()
+
+        var lines: [String] = []
+
+        func addTool(id: String, name: String, description: String, provider: String, enabled: Bool) {
+            let enabledMark = enabled ? "✅" : "⬜"
+            // Compact single-line format to keep context light
+            lines.append("\(enabledMark) \(id) — \(name) (\(provider)) :: \(description)")
+        }
+
+        let includeBuiltIn: Bool = {
+            switch mode {
+            case "dynamic", "bridge": return false
+            default: return true
+            }
+        }()
+
+        let includeDynamic: Bool = {
+            switch mode {
+            case "builtin", "bridge": return false
+            default: return true
+            }
+        }()
+
+        let includeBridge: Bool = {
+            switch mode {
+            case "builtin", "dynamic": return false
+            default: return true
+            }
+        }()
+
+        // Built-in ToolId list
+        if includeBuiltIn {
+            let toolsToList: [ToolId]
+            switch mode {
+            case "all", "builtin":
+                toolsToList = ToolId.allCases
+            default:
+                toolsToList = settings.toolSettings.enabledTools
+            }
+
+            for tool in toolsToList {
+                let isEnabled = settings.toolSettings.isToolEnabled(tool)
+                addTool(
+                    id: tool.rawValue,
+                    name: tool.displayName,
+                    description: tool.description,
+                    provider: tool.provider.displayName,
+                    enabled: isEnabled
+                )
+            }
+        }
+
+        // Dynamic tools (enabled only; they are configurable and might not be safe to list disabled tools)
+        if includeDynamic {
+            let dynamicTools = dynamicToolConfig.enabledTools()
+            for tool in dynamicTools {
+                addTool(
+                    id: tool.id,
+                    name: tool.name,
+                    description: tool.description,
+                    provider: "Dynamic",
+                    enabled: tool.enabled
+                )
+            }
+        }
+
+        // Bridge tools (if connected)
+        if includeBridge, let _ = BridgeToolExecutor.shared.workspaceInfo {
+            // BridgeToolId is an enum used to generate prompts; we can list its cases.
+            for tool in BridgeToolId.allCases {
+                addTool(
+                    id: tool.rawValue,
+                    name: tool.displayName,
+                    description: tool.description,
+                    provider: "VS Code Bridge",
+                    enabled: true
+                )
+            }
+        }
+
+        if lines.isEmpty {
+            return ToolResult(
+                tool: ToolId.listTools.rawValue,
+                success: true,
+                result: "No tools matched your query. Try query='enabled', 'all', 'builtin', 'dynamic', or 'bridge'.",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        let header = "## Tool Catalog\n\nMode: \(mode.isEmpty ? "enabled" : mode)\n\n"
+        let body = lines.sorted().joined(separator: "\n")
+        let footer = "\n\nTip: Call get_tool_details with a tool id to get full schema + usage examples."
+
+        return ToolResult(
+            tool: ToolId.listTools.rawValue,
+            success: true,
+            result: header + body + footer,
+            sources: nil,
+            memoryOperation: nil
+        )
+    }
+
+    /// Execute the get_tool_details tool
+    /// Query:
+    ///   - Tool id string, e.g. "google_search" or "create_memory" or a dynamic tool id.
+    private func executeGetToolDetails(query: String) async -> ToolResult {
+        let toolKey = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !toolKey.isEmpty else {
+            return ToolResult(
+                tool: ToolId.getToolDetails.rawValue,
+                success: false,
+                result: "Missing tool id. Example: {\"tool\":\"get_tool_details\",\"query\":\"google_search\"}",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        // 1) Built-in ToolId
+        if let toolId = ToolId(rawValue: toolKey) {
+            let details = buildBuiltInToolDetails(toolId)
+            return ToolResult(
+                tool: ToolId.getToolDetails.rawValue,
+                success: true,
+                result: details,
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        // 2) Dynamic tool
+        if let dynamicTool = dynamicToolConfig.tool(withId: toolKey) {
+            let details = buildDynamicToolDetails(dynamicTool)
+            return ToolResult(
+                tool: ToolId.getToolDetails.rawValue,
+                success: true,
+                result: details,
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        // 3) Bridge tool
+        if let bridgeTool = BridgeToolId(rawValue: toolKey) {
+            let details = buildBridgeToolDetails(bridgeTool)
+            return ToolResult(
+                tool: ToolId.getToolDetails.rawValue,
+                success: true,
+                result: details,
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        return ToolResult(
+            tool: ToolId.getToolDetails.rawValue,
+            success: false,
+            result: "Unknown tool id: \(toolKey). Use list_tools first to see available ids.",
+            sources: nil,
+            memoryOperation: nil
+        )
+    }
+
+    private func buildBuiltInToolDetails(_ toolId: ToolId) -> String {
+        let settings = SettingsStorage.shared.loadSettingsOrDefault()
+        let enabled = settings.toolSettings.isToolEnabled(toolId)
+
+        var text = "## Tool Details\n\n"
+        text += "- **id:** `\(toolId.rawValue)`\n"
+        text += "- **name:** \(toolId.displayName)\n"
+        text += "- **provider:** \(toolId.provider.displayName)\n"
+        text += "- **enabled:** \(enabled ? "true" : "false")\n"
+        text += "- **requires_approval:** \(toolId.requiresApproval ? "true" : "false")\n"
+        if !toolId.approvalScopes.isEmpty {
+            text += "- **approval_scopes:**\n"
+            for scope in toolId.approvalScopes {
+                text += "  - \(scope)\n"
+            }
+        }
+
+        text += "\n### Description\n\n\(toolId.description)\n\n"
+
+        // Canonical schemas are intentionally light; we standardize on {tool, query}.
+        text += "### Request Schema\n\n"
+        text += "This system uses a uniform tool request envelope:\n"
+        text += "```tool_request\n{\"tool\":\"\(toolId.rawValue)\",\"query\":\"...\"}\n```\n\n"
+
+        text += "### Usage Examples\n\n"
+
+        switch toolId {
+        case .googleSearch:
+            text += "```tool_request\n{\"tool\":\"google_search\",\"query\":\"latest iOS release notes\"}\n```\n"
+        case .codeExecution:
+            text += "```tool_request\n{\"tool\":\"code_execution\",\"query\":\"Compute factorial(20)\"}\n```\n"
+        case .urlContext:
+            text += "```tool_request\n{\"tool\":\"url_context\",\"query\":\"Summarize https://example.com\"}\n```\n"
+        case .googleMaps:
+            text += "```tool_request\n{\"tool\":\"google_maps\",\"query\":\"coffee shops near me\"}\n```\n"
+        case .fileSearch:
+            text += "```tool_request\n{\"tool\":\"file_search\",\"query\":\"Find mentions of ToolProxyService\"}\n```\n"
+        case .createMemory:
+            text += "```tool_request\n{\"tool\":\"create_memory\",\"query\":\"allocentric|0.8|preferences,ui|User prefers compact tool prompts\"}\n```\n"
+        case .conversationSearch:
+            text += "```tool_request\n{\"tool\":\"conversation_search\",\"query\":\"What did we decide about encryption?\"}\n```\n"
+        case .reflectOnConversation:
+            text += "```tool_request\n{\"tool\":\"reflect_on_conversation\",\"show_model_timeline\":true,\"show_task_distribution\":true,\"show_memory_usage\":true}\n```\n"
+        case .queryCovenant:
+            text += "```tool_request\n{\"tool\":\"query_covenant\",\"query\":\"permissions\"}\n```\n"
+        case .proposeCovenantChange:
+            text += "```tool_request\n{\"tool\":\"propose_covenant_change\",\"query\":\"capability|Need fast web research.|google_search:auto_approve\"}\n```\n"
+        case .querySystemState:
+            text += "```tool_request\n{\"tool\":\"query_system_state\",\"query\":\"tools\"}\n```\n"
+        case .changeSystemState:
+            text += "```tool_request\n{\"tool\":\"change_system_state\",\"query\":\"tool|google_search|enable|Need web search\"}\n```\n"
+        case .listTools:
+            text += "```tool_request\n{\"tool\":\"list_tools\",\"query\":\"enabled\"}\n```\n"
+            text += "```tool_request\n{\"tool\":\"list_tools\",\"query\":\"all\"}\n```\n"
+        case .getToolDetails:
+            text += "```tool_request\n{\"tool\":\"get_tool_details\",\"query\":\"create_memory\"}\n```\n"
+        }
+
+        return text
+    }
+
+    private func buildDynamicToolDetails(_ tool: DynamicToolConfig) -> String {
+        var text = "## Tool Details\n\n"
+        text += "- **id:** `\(tool.id)`\n"
+        text += "- **name:** \(tool.name)\n"
+        text += "- **provider:** Dynamic\n"
+        text += "- **enabled:** \(tool.enabled ? "true" : "false")\n"
+        text += "- **requires_approval:** \(tool.requiresApproval ? "true" : "false")\n"
+        if let scopes = tool.approvalScopes, !scopes.isEmpty {
+            text += "- **approval_scopes:**\n"
+            for scope in scopes {
+                text += "  - \(scope)\n"
+            }
+        }
+
+        text += "\n### Description\n\n\(tool.description)\n\n"
+
+        if !tool.parameters.isEmpty {
+            text += "### Parameters\n\n"
+            for (key, param) in tool.parameters.sorted(by: { $0.key < $1.key }) {
+                text += "- `\(key)` (\(param.type.rawValue))\(param.required ? " *required*" : "") — \(param.description)\n"
+            }
+            text += "\n"
+        }
+
+        text += "### Request Schema\n\n"
+        text += "For simple tools, you can pass a plain string in `query`. For multi-parameter tools, send JSON object as `query`.\n"
+        text += "```tool_request\n{\"tool\":\"\(tool.id)\",\"query\":\"...\"}\n```\n\n"
+
+        if !tool.pipeline.isEmpty {
+            text += "### Pipeline (\(tool.pipeline.count) steps)\n\n"
+            for (idx, step) in tool.pipeline.enumerated() {
+                text += "\(idx + 1). \(step.id) (\(step.type.rawValue))\n"
+            }
+        }
+
+        return text
+    }
+
+    private func buildBridgeToolDetails(_ tool: BridgeToolId) -> String {
+        var text = "## Tool Details\n\n"
+        text += "- **id:** `\(tool.rawValue)`\n"
+        text += "- **name:** \(tool.displayName)\n"
+        text += "- **provider:** VS Code Bridge\n"
+        text += "- **enabled:** true\n"
+        text += "\n### Description\n\n\(tool.description)\n\n"
+        text += "### Request Schema\n\n"
+        text += "Bridge tools typically accept a nested parameters object. This app also accepts {tool, query} for convenience.\n"
+        text += "```tool_request\n{\"tool\":\"\(tool.rawValue)\",\"parameters\":{\"query\":\"...\"}}\n```\n"
+        return text
+    }
+
+    // MARK: - Covenant Tools
+
+    /// Execute the query_covenant tool
+    private func executeQueryCovenant(query: String) async -> ToolResult {
+        let sovereigntyService = SovereigntyService.shared
+        let queryType = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Get current covenant
+        guard let covenant = sovereigntyService.activeCovenant else {
+            return ToolResult(
+                tool: ToolId.queryCovenant.rawValue,
+                success: true,
+                result: """
+                    ## Covenant Status: Not Established
+
+                    No co-sovereignty covenant has been established yet.
+
+                    **What this means:**
+                    - All world-affecting actions require explicit user approval
+                    - No trust tiers are active
+                    - The user can establish a covenant in Settings → Co-Sovereignty
+
+                    You can propose a covenant using the `propose_covenant_change` tool if you believe it would benefit our collaboration.
+                    """,
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        var result = ""
+
+        switch queryType {
+        case "status", "":
+            // Default: show overall status
+            result = """
+                ## Covenant Status: \(covenant.status.rawValue.capitalized)
+
+                **Version:** \(covenant.version)
+                **Established:** \(formatDate(covenant.createdAt))
+                **Last Updated:** \(formatDate(covenant.updatedAt))
+
+                ### Active Trust Tiers (\(covenant.trustTiers.count))
+                """
+
+            if covenant.trustTiers.isEmpty {
+                result += "\n*No trust tiers configured*\n"
+            } else {
+                for tier in covenant.trustTiers {
+                    let actionNames = tier.allowedActions.map { $0.category.displayName }
+                    result += "\n- **\(tier.name)**: \(actionNames.joined(separator: ", "))"
+                    if !tier.isActive {
+                        result += " *(inactive)*"
+                    }
+                }
+            }
+
+            if covenant.status == .suspended {
+                result += "\n\n⚠️ **Deadlock State:** The covenant is currently suspended. Both parties must agree to resolve."
+            }
+
+        case "permissions":
+            // Show what actions are pre-approved
+            result = """
+                ## Your Current Permissions
+
+                Based on the active covenant and trust tiers, here's what you can do:
+
+                ### Pre-Approved Actions
+                """
+
+            let activeTiers = covenant.trustTiers.filter { $0.isActive }
+            if activeTiers.isEmpty {
+                result += "\n*No pre-approved actions. All world-affecting actions require explicit user approval.*\n"
+            } else {
+                for tier in activeTiers {
+                    result += "\n**\(tier.name):**\n"
+                    for action in tier.allowedActions {
+                        result += "- \(action.category.displayName)\n"
+                    }
+                }
+            }
+
+            result += """
+
+                ### Always Requires Approval
+                - Covenant modifications
+                - New trust tier creation
+                - Actions outside defined scopes
+                """
+
+        case "tiers":
+            // List all trust tiers in detail
+            result = "## Trust Tiers\n\n"
+
+            if covenant.trustTiers.isEmpty {
+                result += "*No trust tiers have been established.*\n\nTrust tiers allow pre-approval of certain action categories, reducing friction while maintaining user sovereignty."
+            } else {
+                for (index, tier) in covenant.trustTiers.enumerated() {
+                    let actionNames = tier.allowedActions.map { $0.category.displayName }
+                    let scopeDescriptions = tier.allowedScopes.map { "\($0.scopeType.rawValue): \($0.pattern)" }
+                    result += """
+                        ### \(index + 1). \(tier.name)
+                        - **Status:** \(tier.isActive ? "✅ Active" : "⏸️ Inactive")
+                        - **Allowed Actions:** \(actionNames.joined(separator: ", "))
+                        - **Scopes:** \(scopeDescriptions.isEmpty ? "Global" : scopeDescriptions.joined(separator: ", "))
+                        - **Created:** \(formatDate(tier.createdAt))
+
+                        """
+                }
+            }
+
+        case "history":
+            // Show recent covenant changes
+            result = """
+                ## Covenant History
+
+                **Current Version:** \(covenant.version)
+                **Established:** \(formatDate(covenant.createdAt))
+
+                ### Recent Changes
+                """
+
+            // Note: Full history would require storing change logs
+            result += "\n*Detailed change history is available in Settings → Co-Sovereignty → History*"
+
+        default:
+            result = """
+                ## Query Not Recognized
+
+                **You asked:** \(query)
+
+                **Available queries:**
+                - `status` - Current covenant status and summary
+                - `permissions` - What actions you can take without approval
+                - `tiers` - List all trust tiers and their capabilities
+                - `history` - Recent covenant changes
+
+                Example: `{"tool": "query_covenant", "query": "permissions"}`
+                """
+        }
+
+        return ToolResult(
+            tool: ToolId.queryCovenant.rawValue,
+            success: true,
+            result: result,
+            sources: nil,
+            memoryOperation: nil
+        )
+    }
+
+    /// Execute the propose_covenant_change tool
+    private func executeProposeCovenant(query: String) async -> ToolResult {
+        // Parse the pipe-separated format: PROPOSAL_TYPE|REASONING|DETAILS
+        let parts = query.components(separatedBy: "|")
+
+        guard parts.count >= 3 else {
+            return ToolResult(
+                tool: ToolId.proposeCovenantChange.rawValue,
+                success: false,
+                result: """
+                    ## Format Error
+
+                    The proposal must follow this format:
+                    `PROPOSAL_TYPE|REASONING|DETAILS`
+
+                    **Your input:** `\(query.prefix(100))...`
+
+                    **Proposal Types:**
+                    - `new_tier` - Propose a new trust tier
+                    - `modify_tier` - Modify an existing trust tier
+                    - `capability` - Request a new capability
+                    - `policy` - Propose a policy change
+
+                    **Example:**
+                    ```tool_request
+                    {"tool": "propose_covenant_change", "query": "capability|Web search is frequently needed for research tasks|google_search:auto_approve"}
+                    ```
+                    """,
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        let proposalType = parts[0].trimmingCharacters(in: .whitespaces).lowercased()
+        let reasoning = parts[1].trimmingCharacters(in: .whitespaces)
+        let details = parts[2...].joined(separator: "|").trimmingCharacters(in: .whitespaces)
+
+        // Validate proposal type
+        let validTypes = ["new_tier", "modify_tier", "capability", "policy"]
+        guard validTypes.contains(proposalType) else {
+            return ToolResult(
+                tool: ToolId.proposeCovenantChange.rawValue,
+                success: false,
+                result: """
+                    ## Invalid Proposal Type
+
+                    **You specified:** `\(proposalType)`
+
+                    **Valid types:**
+                    - `new_tier` - Propose a new trust tier
+                    - `modify_tier` - Modify an existing trust tier
+                    - `capability` - Request a new capability
+                    - `policy` - Propose a policy change
+                    """,
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        // Format the proposal for user review
+        let proposalSummary = """
+            ## 📋 Covenant Change Proposal
+
+            **Type:** \(proposalType.replacingOccurrences(of: "_", with: " ").capitalized)
+
+            ### AI Reasoning
+            \(reasoning)
+
+            ### Proposed Change
+            \(details)
+
+            ---
+
+            ⏳ **This proposal requires your approval.**
+
+            The user will be notified and can:
+            - ✅ Accept the proposal
+            - ✏️ Modify and accept
+            - ❌ Reject the proposal
+
+            *Proposal submitted via AI tool. Review in Settings → Co-Sovereignty.*
+            """
+
+        // In a full implementation, this would:
+        // 1. Create a CovenantProposal object
+        // 2. Store it in SovereigntyService
+        // 3. Trigger a notification to the user
+        // 4. Wait for user response (or return pending status)
+
+        // For now, we'll create the proposal and notify
+        print("[ToolProxy] Covenant proposal submitted: type=\(proposalType), reasoning=\(reasoning.prefix(50))...")
+
+        // TODO: Integrate with CovenantNegotiationService to create actual proposal
+        // let proposal = CovenantProposal(type: proposalType, reasoning: reasoning, details: details, proposedBy: .ai)
+        // await CovenantNegotiationService.shared.submitProposal(proposal)
+
+        return ToolResult(
+            tool: ToolId.proposeCovenantChange.rawValue,
+            success: true,
+            result: proposalSummary,
+            sources: nil,
+            memoryOperation: nil
+        )
+    }
+
+    // MARK: - System State Tools
+
+    /// Execute the query_system_state tool
+    private func executeQuerySystemState(query: String) async -> ToolResult {
+        let settings = SettingsStorage.shared.loadSettingsOrDefault()
+        let queryType = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+        var result = ""
+
+        switch queryType {
+        case "current":
+            // Show currently active model and provider
+            result = """
+                ## Current Configuration
+
+                **Provider:** \(settings.defaultProvider.displayName)
+                **Model:** \(settings.defaultModel)
+
+                **Tools Enabled:** \(settings.toolSettings.toolsEnabled ? "Yes" : "No")
+                **Enabled Tools:** \(settings.toolSettings.enabledTools.map { $0.displayName }.joined(separator: ", "))
+
+                **Permission Level:** requires_approval (changes need biometric approval)
+                """
+
+        case "providers":
+            // List all available providers and their models
+            result = "## Available Providers & Models\n\n"
+
+            for provider in AIProvider.allCases {
+                let isCurrent = provider == settings.defaultProvider
+                let availability = provider.isAvailable ? "" : " *(unavailable: \(provider.unavailableReason ?? "unknown"))*"
+
+                result += "### \(provider.displayName)\(isCurrent ? " ✓ (current)" : "")\(availability)\n"
+                result += "**Permission:** requires_approval\n"
+
+                for model in provider.availableModels {
+                    let isCurrentModel = isCurrent && model.id == settings.defaultModel
+                    result += "- `\(model.id)` - \(model.name)\(isCurrentModel ? " ✓" : "")\n"
+                    result += "  *\(model.description)*\n"
+                }
+                result += "\n"
+            }
+
+            // Add custom providers if any
+            if !settings.customProviders.isEmpty {
+                result += "### Custom Providers\n"
+                for provider in settings.customProviders {
+                    result += "- **\(provider.providerName)** (\(provider.apiEndpoint))\n"
+                    for model in provider.models {
+                        result += "  - `\(model.modelCode)` - \(model.friendlyName ?? model.modelCode)\n"
+                    }
+                }
+            }
+
+        case "tools":
+            // List all tools and their enabled/disabled status
+            result = "## Available Tools\n\n"
+            result += "**Master Toggle:** \(settings.toolSettings.toolsEnabled ? "✅ Enabled" : "❌ Disabled")\n\n"
+
+            // Group by provider
+            for provider in ToolProvider.allCases {
+                let tools = ToolId.tools(for: provider)
+                if tools.isEmpty { continue }
+
+                result += "### \(provider.displayName)\n"
+                for tool in tools {
+                    let isEnabled = settings.toolSettings.isToolEnabled(tool)
+                    let status = isEnabled ? "✅" : "⬜"
+                    result += "\(status) **\(tool.displayName)** (`\(tool.rawValue)`)\n"
+                    result += "   *\(tool.description)*\n"
+                    result += "   Permission: \(tool.requiresApproval ? "requires_approval" : "auto")\n\n"
+                }
+            }
+
+        case "permissions":
+            // Show what the AI can change based on covenant/trust tiers
+            result = """
+                ## Your Permissions for System Changes
+
+                ### Model/Provider Changes
+                - **Permission Level:** requires_approval
+                - You can request to switch models or providers
+                - User must approve via biometric authentication
+
+                ### Tool Changes
+                - **Permission Level:** requires_approval
+                - You can request to enable/disable tools
+                - User must approve via biometric authentication
+
+                ### Pre-Approved Actions
+                """
+
+            // Check for trust tiers that might pre-approve certain changes
+            if let covenant = SovereigntyService.shared.activeCovenant {
+                let activeTiers = covenant.trustTiers.filter { $0.isActive }
+                let providerSwitchTiers = activeTiers.filter { tier in
+                    tier.allowedActions.contains { $0.category == .providerSwitch }
+                }
+                let capabilityTiers = activeTiers.filter { tier in
+                    tier.allowedActions.contains { $0.category == .capabilityEnable || $0.category == .capabilityDisable }
+                }
+
+                if !providerSwitchTiers.isEmpty {
+                    result += "\n**Provider Switching:** Pre-approved via: \(providerSwitchTiers.map { $0.name }.joined(separator: ", "))"
+                }
+                if !capabilityTiers.isEmpty {
+                    result += "\n**Tool Changes:** Pre-approved via: \(capabilityTiers.map { $0.name }.joined(separator: ", "))"
+                }
+                if providerSwitchTiers.isEmpty && capabilityTiers.isEmpty {
+                    result += "\n*No pre-approved system changes. All changes require biometric approval.*"
+                }
+            } else {
+                result += "\n*No covenant established. All changes require biometric approval.*"
+            }
+
+        case "all":
+            // Full system state dump
+            result = """
+                ## Full System State
+
+                ### Current Configuration
+                - **Provider:** \(settings.defaultProvider.displayName)
+                - **Model:** \(settings.defaultModel)
+                - **Theme:** \(settings.theme.displayName)
+                - **Device Mode:** \(settings.deviceMode.displayName)
+
+                ### Memory Settings
+                - **Enabled:** \(settings.memoryEnabled ? "Yes" : "No")
+                - **Auto-Inject:** \(settings.memoryAutoInject ? "Yes" : "No")
+                - **Confidence Threshold:** \(Int(settings.memoryConfidenceThreshold * 100))%
+
+                ### Tool Settings
+                - **Master Toggle:** \(settings.toolSettings.toolsEnabled ? "Enabled" : "Disabled")
+                - **Enabled Tools:** \(settings.toolSettings.enabledTools.map { $0.rawValue }.joined(separator: ", "))
+                - **Max Calls/Turn:** \(settings.toolSettings.maxToolCallsPerTurn)
+
+                ### Co-Sovereignty
+                - **Enabled:** \(settings.sovereigntySettings.enabled ? "Yes" : "No")
+                - **Consent Provider:** \(settings.sovereigntySettings.consentProvider.displayName)
+
+                ### Permission Summary
+                All system state changes require biometric approval unless pre-approved via trust tier.
+                """
+
+        default:
+            result = """
+                ## Query Not Recognized
+
+                **You asked:** \(query)
+
+                **Available scopes:**
+                - `current` - Show currently active model and provider
+                - `providers` - List all available providers and their models
+                - `tools` - List all tools and their enabled/disabled status
+                - `permissions` - Show what you can change
+                - `all` - Full system state dump
+
+                Example: `{"tool": "query_system_state", "query": "providers"}`
+                """
+        }
+
+        return ToolResult(
+            tool: ToolId.querySystemState.rawValue,
+            success: true,
+            result: result,
+            sources: nil,
+            memoryOperation: nil
+        )
+    }
+
+    /// Execute the change_system_state tool
+    private func executeChangeSystemState(query: String) async -> ToolResult {
+        // Parse the pipe-separated format: CATEGORY|TARGET|VALUE|REASONING
+        let parts = query.components(separatedBy: "|")
+
+        guard parts.count >= 4 else {
+            return ToolResult(
+                tool: ToolId.changeSystemState.rawValue,
+                success: false,
+                result: """
+                    ## Format Error
+
+                    The change request must follow this format:
+                    `CATEGORY|TARGET|VALUE|REASONING`
+
+                    **Your input:** `\(query.prefix(100))...`
+
+                    **Categories:**
+                    - `model` - Change active model (TARGET=provider, VALUE=model_id)
+                    - `tool` - Enable/disable a tool (TARGET=tool_id, VALUE=enable/disable)
+                    - `provider` - Switch provider (TARGET=provider, VALUE=model_id)
+
+                    **Example:**
+                    ```tool_request
+                    {"tool": "change_system_state", "query": "model|anthropic|claude-sonnet-4-20250514|Better for coding tasks"}
+                    ```
+                    """,
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        let category = parts[0].trimmingCharacters(in: .whitespaces).lowercased()
+        let target = parts[1].trimmingCharacters(in: .whitespaces)
+        let value = parts[2].trimmingCharacters(in: .whitespaces)
+        let reasoning = parts[3...].joined(separator: "|").trimmingCharacters(in: .whitespaces)
+
+        switch category {
+        case "model", "provider":
+            // Change model/provider
+            guard let provider = AIProvider(rawValue: target) else {
+                return ToolResult(
+                    tool: ToolId.changeSystemState.rawValue,
+                    success: false,
+                    result: """
+                        ## Invalid Provider
+
+                        **You specified:** `\(target)`
+
+                        **Valid providers:**
+                        \(AIProvider.allCases.map { "- `\($0.rawValue)` (\($0.displayName))" }.joined(separator: "\n"))
+                        """,
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+
+            // Validate model exists for this provider
+            let validModels = provider.availableModels.map { $0.id }
+            guard validModels.contains(value) else {
+                return ToolResult(
+                    tool: ToolId.changeSystemState.rawValue,
+                    success: false,
+                    result: """
+                        ## Invalid Model
+
+                        **You specified:** `\(value)` for provider `\(provider.displayName)`
+
+                        **Valid models for \(provider.displayName):**
+                        \(provider.availableModels.map { "- `\($0.id)` (\($0.name))" }.joined(separator: "\n"))
+                        """,
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+
+            // Apply the change
+            var settings = SettingsStorage.shared.loadSettingsOrDefault()
+            let oldProvider = settings.defaultProvider
+            let oldModel = settings.defaultModel
+
+            settings.defaultProvider = provider
+            settings.defaultModel = value
+            try? SettingsStorage.shared.saveSettings(settings)
+
+            print("[ToolProxy] System state changed: provider \(oldProvider.rawValue) → \(provider.rawValue), model \(oldModel) → \(value)")
+
+            return ToolResult(
+                tool: ToolId.changeSystemState.rawValue,
+                success: true,
+                result: """
+                    ## ✅ Configuration Changed
+
+                    **Previous:**
+                    - Provider: \(oldProvider.displayName)
+                    - Model: \(oldModel)
+
+                    **New:**
+                    - Provider: \(provider.displayName)
+                    - Model: \(value)
+
+                    **AI Reasoning:** \(reasoning)
+
+                    *Change will take effect on the next message.*
+                    """,
+                sources: nil,
+                memoryOperation: nil
+            )
+
+        case "tool":
+            // Enable/disable a tool
+            guard let toolId = ToolId(rawValue: target) else {
+                return ToolResult(
+                    tool: ToolId.changeSystemState.rawValue,
+                    success: false,
+                    result: """
+                        ## Invalid Tool
+
+                        **You specified:** `\(target)`
+
+                        **Valid tools:**
+                        \(ToolId.allCases.map { "- `\($0.rawValue)` (\($0.displayName))" }.joined(separator: "\n"))
+                        """,
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+
+            let shouldEnable = value.lowercased() == "enable" || value.lowercased() == "true" || value == "1"
+            let shouldDisable = value.lowercased() == "disable" || value.lowercased() == "false" || value == "0"
+
+            guard shouldEnable || shouldDisable else {
+                return ToolResult(
+                    tool: ToolId.changeSystemState.rawValue,
+                    success: false,
+                    result: """
+                        ## Invalid Value
+
+                        **You specified:** `\(value)`
+
+                        **Valid values:**
+                        - `enable` or `true` - Enable the tool
+                        - `disable` or `false` - Disable the tool
+                        """,
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+
+            // Apply the change
+            var settings = SettingsStorage.shared.loadSettingsOrDefault()
+            let wasEnabled = settings.toolSettings.isToolEnabled(toolId)
+
+            if shouldEnable {
+                settings.toolSettings.enableTool(toolId)
+            } else {
+                settings.toolSettings.disableTool(toolId)
+            }
+            try? SettingsStorage.shared.saveSettings(settings)
+
+            let action = shouldEnable ? "enabled" : "disabled"
+            print("[ToolProxy] Tool \(toolId.rawValue) \(action)")
+
+            return ToolResult(
+                tool: ToolId.changeSystemState.rawValue,
+                success: true,
+                result: """
+                    ## ✅ Tool \(action.capitalized)
+
+                    **Tool:** \(toolId.displayName) (`\(toolId.rawValue)`)
+                    **Previous State:** \(wasEnabled ? "enabled" : "disabled")
+                    **New State:** \(shouldEnable ? "enabled" : "disabled")
+
+                    **AI Reasoning:** \(reasoning)
+
+                    *Change is effective immediately.*
+                    """,
+                sources: nil,
+                memoryOperation: nil
+            )
+
+        default:
+            return ToolResult(
+                tool: ToolId.changeSystemState.rawValue,
+                success: false,
+                result: """
+                    ## Invalid Category
+
+                    **You specified:** `\(category)`
+
+                    **Valid categories:**
+                    - `model` - Change active model
+                    - `tool` - Enable/disable a tool
+                    - `provider` - Switch provider (alias for model)
+                    """,
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+    }
+
+    /// Format a date for display
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 
     private func formatBiometricType(_ type: String) -> String {

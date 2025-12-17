@@ -82,6 +82,9 @@ struct AppSettings: Codable, Equatable, Sendable {
     // Co-Sovereignty
     var sovereigntySettings: SovereigntySettings = SovereigntySettings()
 
+    // AI Sharing with Friends
+    var sharingSettings: SharingSettings = SharingSettings()
+
     // Backend Configuration (optional - for cloud features)
     var backendAPIURL: String? = nil  // e.g., "https://us-central1-your-project.cloudfunctions.net"
     var backendAuthToken: String? = nil  // Optional auth token for backend (stored in Keychain separately)
@@ -399,6 +402,77 @@ struct SovereigntySettings: Codable, Equatable, Sendable {
 
     /// Whether to log all consent decisions for audit
     var auditLoggingEnabled: Bool = true
+}
+
+// MARK: - AI Sharing Settings
+
+/// Settings for sharing AI learned patterns with friends (guest access)
+struct SharingSettings: Codable, Equatable, Sendable {
+    /// Whether sharing is enabled at all
+    var enabled: Bool = false
+
+    /// Default expiration time for new invitations (in hours)
+    var defaultExpirationHours: Int = 24
+
+    /// Maximum number of concurrent guest sessions allowed
+    var maxConcurrentGuests: Int = 3
+
+    /// Tags to always exclude from shared memories
+    var excludedTags: [String] = ["private", "personal", "health", "financial", "password", "secret"]
+
+    /// Whether to send push notifications when guests connect
+    var notifyOnGuestConnect: Bool = true
+
+    /// Whether to require biometric authentication for creating invitations
+    var requireBiometricForInvitations: Bool = true
+
+    /// Whether the AI must also consent to sharing (joint consent model)
+    var requireAIConsent: Bool = true
+
+    /// Memory types that can be shared (by default, only egoic/learned patterns)
+    var shareableMemoryTypes: [String] = ["egoic"]
+
+    /// Default capabilities preset for new guests
+    var defaultCapabilitiesPreset: GuestCapabilitiesPreset = .standard
+
+    /// Whether to log all sharing activity for audit
+    var auditLoggingEnabled: Bool = true
+}
+
+/// Presets for guest capabilities
+enum GuestCapabilitiesPreset: String, Codable, CaseIterable, Identifiable, Sendable {
+    case readOnly = "read_only"
+    case standard = "standard"
+    case full = "full"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .readOnly: return "Read Only"
+        case .standard: return "Standard"
+        case .full: return "Full Access"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .readOnly:
+            return "Memory search only, no chat context"
+        case .standard:
+            return "Chat with context, limited memory search"
+        case .full:
+            return "Full chat and memory access within egoic scope"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .readOnly: return "eye"
+        case .standard: return "person.badge.shield.checkmark"
+        case .full: return "person.fill.checkmark"
+        }
+    }
 }
 
 // MARK: - AI Providers
@@ -1364,6 +1438,19 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
     case conversationSearch = "conversation_search"  // Search recent conversations for context
     case reflectOnConversation = "reflect_on_conversation"  // Meta-analysis of current conversation
 
+    // Tool Introspection Tools
+    // Used to keep system prompt injection light: model can fetch tool metadata on demand.
+    case listTools = "list_tools"  // Compact list of available tools
+    case getToolDetails = "get_tool_details"  // Detailed schema/usage for a specific tool
+
+    // Co-Sovereignty Tools
+    case queryCovenant = "query_covenant"  // Query current covenant status and permissions
+    case proposeCovenantChange = "propose_covenant_change"  // AI proposes covenant modifications
+
+    // System State Tools (AI self-configuration)
+    case querySystemState = "query_system_state"  // Query available providers, models, tools, permissions
+    case changeSystemState = "change_system_state"  // Request changes to model, provider, or tools
+
     var id: String { rawValue }
 
     var displayName: String {
@@ -1376,6 +1463,12 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .createMemory: return "Memory Creation"
         case .conversationSearch: return "Conversation History"
         case .reflectOnConversation: return "Conversation Reflection"
+        case .listTools: return "List Tools"
+        case .getToolDetails: return "Tool Details"
+        case .queryCovenant: return "Query Covenant"
+        case .proposeCovenantChange: return "Propose Covenant Change"
+        case .querySystemState: return "Query System State"
+        case .changeSystemState: return "Change System State"
         }
     }
 
@@ -1389,6 +1482,12 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .createMemory: return "AI creates memories about you during chat"
         case .conversationSearch: return "Search recent conversations for context"
         case .reflectOnConversation: return "Analyze model usage, memories, and topic shifts"
+        case .listTools: return "List all available tools in a compact format"
+        case .getToolDetails: return "Get detailed usage and input schema for a specific tool"
+        case .queryCovenant: return "Query current covenant status and permissions"
+        case .proposeCovenantChange: return "AI proposes modifications to the covenant"
+        case .querySystemState: return "Query available providers, models, tools, and permissions"
+        case .changeSystemState: return "Request changes to model, provider, or tool configuration"
         }
     }
 
@@ -1402,6 +1501,12 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .createMemory: return "brain.head.profile"
         case .conversationSearch: return "clock.arrow.circlepath"
         case .reflectOnConversation: return "waveform.path.ecg"
+        case .listTools: return "list.bullet"
+        case .getToolDetails: return "info.circle"
+        case .queryCovenant: return "doc.badge.gearshape"
+        case .proposeCovenantChange: return "doc.badge.plus"
+        case .querySystemState: return "gearshape.2"
+        case .changeSystemState: return "gearshape.arrow.triangle.2.circlepath"
         }
     }
 
@@ -1409,7 +1514,10 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
             return .gemini
-        case .createMemory, .conversationSearch, .reflectOnConversation:
+        case .createMemory, .conversationSearch, .reflectOnConversation,
+             .listTools, .getToolDetails,
+             .queryCovenant, .proposeCovenantChange,
+             .querySystemState, .changeSystemState:
             return .internal
         }
     }
@@ -1419,7 +1527,10 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
             return true
-        case .createMemory, .conversationSearch, .reflectOnConversation:
+        case .createMemory, .conversationSearch, .reflectOnConversation,
+             .listTools, .getToolDetails,
+             .queryCovenant, .proposeCovenantChange,
+             .querySystemState, .changeSystemState:
             return false
         }
     }
@@ -1429,8 +1540,13 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .reflectOnConversation:
             return true  // Meta-analysis should require user awareness
+        case .proposeCovenantChange:
+            return true  // Covenant changes always require user consent
+        case .changeSystemState:
+            return true  // System state changes require user approval (unless pre-approved via trust tier)
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch,
-             .createMemory, .conversationSearch:
+             .createMemory, .conversationSearch, .queryCovenant, .querySystemState,
+             .listTools, .getToolDetails:
             return false
         }
     }
@@ -1443,6 +1559,18 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
                 "Analyze conversation metadata (models, timestamps, tokens)",
                 "Review memory operations performed",
                 "Identify task types and topic shifts"
+            ]
+        case .proposeCovenantChange:
+            return [
+                "Propose modifications to the co-sovereignty covenant",
+                "Request new trust tiers or capability changes",
+                "Initiate negotiation process requiring your consent"
+            ]
+        case .changeSystemState:
+            return [
+                "Change active AI model or provider",
+                "Enable or disable tools",
+                "Modify system configuration"
             ]
         default:
             return []
