@@ -24,6 +24,18 @@ let statusBar: StatusBar;
 export function activate(context: vscode.ExtensionContext) {
     console.log('[AxonBridge] Extension activating...');
 
+    const activationOutput = vscode.window.createOutputChannel('Axon Bridge (Activation)');
+    activationOutput.appendLine(`[AxonBridge] activating (cwd: ${process.cwd()})`);
+    activationOutput.appendLine(`[AxonBridge] package version: ${context.extension.packageJSON?.version ?? 'unknown'}`);
+    activationOutput.appendLine(`[AxonBridge] extensionUri: ${String(context.extensionUri)}`);
+    activationOutput.appendLine(`[AxonBridge] views registered in code: ${[
+        BridgeLogsViewProvider.viewType,
+        AxonSetupViewProvider.viewType,
+        AxonChatViewProvider.viewType,
+    ].join(', ')}`);
+    activationOutput.show(true);
+    context.subscriptions.push(activationOutput);
+
     // Create UI components
     statusBar = new StatusBar();
     context.subscriptions.push({ dispose: () => statusBar.dispose() });
@@ -33,17 +45,24 @@ export function activate(context: vscode.ExtensionContext) {
     const setupViewProvider = new AxonSetupViewProvider(context, () => connectionManager.getClient() ?? undefined);
     const chatViewProvider = new AxonChatViewProvider(context, () => connectionManager.getClient() ?? undefined);
 
-    context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider(BridgeLogsViewProvider.viewType, logsViewProvider, {
-            webviewOptions: { retainContextWhenHidden: true },
-        }),
-        vscode.window.registerWebviewViewProvider(AxonSetupViewProvider.viewType, setupViewProvider, {
-            webviewOptions: { retainContextWhenHidden: true },
-        }),
-        vscode.window.registerWebviewViewProvider(AxonChatViewProvider.viewType, chatViewProvider, {
-            webviewOptions: { retainContextWhenHidden: true },
-        })
-    );
+    try {
+        context.subscriptions.push(
+            vscode.window.registerWebviewViewProvider(BridgeLogsViewProvider.viewType, logsViewProvider, {
+                webviewOptions: { retainContextWhenHidden: true },
+            }),
+            vscode.window.registerWebviewViewProvider(AxonSetupViewProvider.viewType, setupViewProvider, {
+                webviewOptions: { retainContextWhenHidden: true },
+            }),
+            vscode.window.registerWebviewViewProvider(AxonChatViewProvider.viewType, chatViewProvider, {
+                webviewOptions: { retainContextWhenHidden: true },
+            })
+        );
+        activationOutput.appendLine('[AxonBridge] registered WebviewViewProviders successfully');
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        activationOutput.appendLine(`[AxonBridge] ERROR registering WebviewViewProviders: ${msg}`);
+        vscode.window.showErrorMessage(`Axon Bridge failed to register sidebar views: ${msg}`);
+    }
 
     // Initialize connection manager
     connectionManager = BridgeConnectionManager.initialize(statusBar);
