@@ -113,7 +113,11 @@ class ConversationService: ObservableObject {
     /// Process pending offline operations
     func syncPendingOperations() async {
         await localStore.processPendingOperations()
+        
+        // Update the count - this will be 0 if operations were cleared (no backend configured)
         pendingOperationsCount = localStore.pendingOperationCount
+        
+        print("[ConversationService] Pending operations after sync: \(pendingOperationsCount)")
 
         // Reload conversations to reflect any ID changes from synced local conversations
         loadLocalConversations()

@@ -19,6 +19,9 @@ class SettingsStorage {
     private let displayNameOverridesKey = "conversation.displayNameOverrides"
     private let archivedConversationsKey = "conversation.archived"
 
+    // Migration keys
+    private let iCloudSyncMigrationKey = "migration.iCloudSyncDefault.v1"
+
     // Throttle decode error logging (only log once per launch)
     private var hasLoggedDecodeError = false
 
@@ -53,7 +56,12 @@ class SettingsStorage {
         decoder.dateDecodingStrategy = .secondsSince1970
 
         do {
-            return try decoder.decode(AppSettings.self, from: data)
+            var settings = try decoder.decode(AppSettings.self, from: data)
+
+            // Run migrations
+            settings = migrateSettingsIfNeeded(settings)
+
+            return settings
         } catch {
             // Only log the first decode error per launch to avoid spam
             if !hasLoggedDecodeError {
@@ -152,6 +160,39 @@ class SettingsStorage {
         if let data = try? JSONEncoder().encode(entries) {
             defaults.set(data, forKey: archivedConversationsKey)
         }
+    }
+
+    // MARK: - Migrations
+
+    /// Run any necessary migrations on loaded settings
+    private func migrateSettingsIfNeeded(_ settings: AppSettings) -> AppSettings {
+        var migrated = settings
+
+        // Migration: iCloud sync default change (Dec 2025)
+        // Existing users who had cloudSyncProvider = .none but had been using the app
+        // should be migrated to .iCloud to restore cross-device sync functionality.
+        // This only runs once per device.
+        if !defaults.bool(forKey: iCloudSyncMigrationKey) {
+            if migrated.deviceModeConfig.cloudSyncProvider == .none {
+                // Check if this is an existing user (has completed onboarding or has conversations)
+                // If so, they likely had sync working before the default was changed to .none
+                if migrated.hasCompletedOnboarding {
+                    print("[SettingsStorage] 🔄 Migration: Restoring iCloud sync for existing user")
+                    migrated.deviceModeConfig.cloudSyncProvider = .iCloud
+
+                    // Save the migrated settings
+                    do {
+                        try saveSettings(migrated)
+                        print("[SettingsStorage] ✅ Migration: iCloud sync restored and saved")
+                    } catch {
+                        print("[SettingsStorage] ⚠️ Migration: Failed to save migrated settings: \(error)")
+                    }
+                }
+            }
+            defaults.set(true, forKey: iCloudSyncMigrationKey)
+        }
+
+        return migrated
     }
 
     // MARK: - Clear

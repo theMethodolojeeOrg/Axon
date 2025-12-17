@@ -3,10 +3,39 @@
 //  Axon
 //
 //  JSON-RPC 2.0 style protocol for communication between Axon and VS Code.
-//  Axon acts as the "puppeteer" (server), VS Code as the "puppet" (client).
+//  Axon acts as the "puppeteer", VS Code as the "puppet".
+//
+//  Supports two connection modes:
+//  - Local Mode: Axon is server (default), VS Code connects as client
+//  - Remote Mode: VS Code is server, Axon connects as client (for LAN access)
 //
 
 import Foundation
+
+// MARK: - Connection Mode
+
+/// Connection mode determines which side acts as the WebSocket server
+enum BridgeMode: String, Codable, CaseIterable {
+    /// Axon acts as WebSocket server, VS Code connects (default, local development)
+    case local = "local"
+    /// VS Code acts as WebSocket server, Axon connects (remote/LAN access from phone)
+    case remote = "remote"
+
+    var displayName: String {
+        switch self {
+        case .local: return "Local (Axon Server)"
+        case .remote: return "Remote (VS Code Server)"
+        }
+    }
+}
+
+/// Role in the puppeteer/puppet relationship (independent of connection direction)
+enum BridgeRole: String, Codable {
+    /// Axon - sends commands, controls VS Code
+    case puppeteer = "puppeteer"
+    /// VS Code - receives and executes commands
+    case puppet = "puppet"
+}
 
 // MARK: - JSON-RPC Messages
 
@@ -150,22 +179,152 @@ enum BridgeCapability: String, Codable, CaseIterable {
 
 // MARK: - Handshake Messages
 
-/// Initial hello message from VS Code
+/// Hello message sent by the connecting party during handshake
+/// In Local Mode: VS Code sends this to Axon
+/// In Remote Mode: Axon sends this to VS Code
 struct BridgeHello: Codable {
-    let workspaceId: String
-    let workspaceName: String
-    let workspaceRoot: String
-    let capabilities: [String]
-    let extensionVersion: String
+    // Mode and role information (new for Remote Mode support)
+    let mode: BridgeMode?           // nil defaults to .local for backward compatibility
+    let role: BridgeRole?           // nil inferred from mode
+
+    // Workspace info (always present when VS Code sends, optional when Axon sends)
+    let workspaceId: String?
+    let workspaceName: String?
+    let workspaceRoot: String?
+    let capabilities: [String]?
+    let extensionVersion: String?
     let vscodeVersion: String?
+
+    // Axon info (present when Axon sends in Remote Mode)
+    let axonVersion: String?
+    let deviceName: String?         // e.g., "Tom's iPhone"
+
+    // Security
     let pairingToken: String?
+
+    /// Create hello from VS Code (Local Mode - existing behavior)
+    static func fromVSCode(
+        workspaceId: String,
+        workspaceName: String,
+        workspaceRoot: String,
+        capabilities: [String],
+        extensionVersion: String,
+        vscodeVersion: String?,
+        pairingToken: String?
+    ) -> BridgeHello {
+        BridgeHello(
+            mode: .local,
+            role: .puppet,
+            workspaceId: workspaceId,
+            workspaceName: workspaceName,
+            workspaceRoot: workspaceRoot,
+            capabilities: capabilities,
+            extensionVersion: extensionVersion,
+            vscodeVersion: vscodeVersion,
+            axonVersion: nil,
+            deviceName: nil,
+            pairingToken: pairingToken
+        )
+    }
+
+    /// Create hello from Axon (Remote Mode - new)
+    static func fromAxon(
+        axonVersion: String,
+        deviceName: String?,
+        pairingToken: String?
+    ) -> BridgeHello {
+        BridgeHello(
+            mode: .remote,
+            role: .puppeteer,
+            workspaceId: nil,
+            workspaceName: nil,
+            workspaceRoot: nil,
+            capabilities: nil,
+            extensionVersion: nil,
+            vscodeVersion: nil,
+            axonVersion: axonVersion,
+            deviceName: deviceName,
+            pairingToken: pairingToken
+        )
+    }
+
+    /// Effective mode (defaults to .local for backward compatibility)
+    var effectiveMode: BridgeMode {
+        mode ?? .local
+    }
+
+    /// Effective role (inferred from mode if not specified)
+    var effectiveRole: BridgeRole {
+        if let role = role { return role }
+        return effectiveMode == .local ? .puppet : .puppeteer
+    }
 }
 
-/// Welcome response from Axon
+/// Welcome response sent by the server during handshake
+/// In Local Mode: Axon sends this to VS Code
+/// In Remote Mode: VS Code sends this to Axon
 struct BridgeWelcome: Codable {
     let sessionId: String
-    let axonVersion: String
+    let mode: BridgeMode?           // Echo back the mode for confirmation
+
+    // Server info (always present)
+    let axonVersion: String?        // Present in Local Mode (Axon is server)
+    let extensionVersion: String?   // Present in Remote Mode (VS Code is server)
+
+    // Workspace info (present in Remote Mode response from VS Code)
+    let workspaceId: String?
+    let workspaceName: String?
+    let workspaceRoot: String?
+    let capabilities: [String]?
+
     let supportedMethods: [String]
+
+    /// Create welcome from Axon (Local Mode - existing behavior)
+    static func fromAxon(
+        sessionId: String,
+        axonVersion: String,
+        supportedMethods: [String]
+    ) -> BridgeWelcome {
+        BridgeWelcome(
+            sessionId: sessionId,
+            mode: .local,
+            axonVersion: axonVersion,
+            extensionVersion: nil,
+            workspaceId: nil,
+            workspaceName: nil,
+            workspaceRoot: nil,
+            capabilities: nil,
+            supportedMethods: supportedMethods
+        )
+    }
+
+    /// Create welcome from VS Code (Remote Mode - new)
+    static func fromVSCode(
+        sessionId: String,
+        extensionVersion: String,
+        workspaceId: String,
+        workspaceName: String,
+        workspaceRoot: String,
+        capabilities: [String],
+        supportedMethods: [String]
+    ) -> BridgeWelcome {
+        BridgeWelcome(
+            sessionId: sessionId,
+            mode: .remote,
+            axonVersion: nil,
+            extensionVersion: extensionVersion,
+            workspaceId: workspaceId,
+            workspaceName: workspaceName,
+            workspaceRoot: workspaceRoot,
+            capabilities: capabilities,
+            supportedMethods: supportedMethods
+        )
+    }
+
+    /// Effective mode (defaults to .local for backward compatibility)
+    var effectiveMode: BridgeMode {
+        mode ?? .local
+    }
 }
 
 // MARK: - File Operation Types

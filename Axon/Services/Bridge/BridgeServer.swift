@@ -5,6 +5,8 @@
 //  WebSocket server using Network.framework that allows VS Code to connect
 //  and receive commands from the AI. Axon is the "puppeteer", VS Code is the "puppet".
 //
+//  Supports multiple concurrent VS Code connections (multi-session).
+//
 
 import Foundation
 import Network
@@ -17,16 +19,45 @@ class BridgeServer: ObservableObject {
     // MARK: - Published State
 
     @Published private(set) var isRunning = false
-    @Published private(set) var isConnected = false
-    @Published private(set) var connectedSession: BridgeSession?
     @Published private(set) var lastError: String?
+
+    /// All active sessions (keyed by session ID)
+    @Published private(set) var sessions: [String: BridgeSession] = [:]
+
+    /// Whether any VS Code is connected
+    var isConnected: Bool {
+        !connections.isEmpty
+    }
+
+    /// The first connected session (for backward compatibility with single-session code)
+    var connectedSession: BridgeSession? {
+        sessions.values.first
+    }
+
+    /// Number of active connections
+    var connectionCount: Int {
+        connections.count
+    }
 
     // MARK: - Private Properties
 
     private var listener: NWListener?
-    private var connection: NWConnection?
+
+    /// Active connections keyed by connection ID (UUID string)
+    private var connections: [String: NWConnection] = [:]
+
+    /// Maps connection ID to session ID (for reverse lookup)
+    private var connectionToSession: [String: String] = [:]
+
+    /// Maps session ID to connection ID (for sending to specific session)
+    private var sessionToConnection: [String: String] = [:]
+
+    /// Pending requests keyed by request ID
     private var pendingRequests: [String: PendingBridgeRequest] = [:]
-    private var messageBuffer = Data()
+
+    /// Message buffers per connection (keyed by connection ID)
+    private var messageBuffers: [String: Data] = [:]
+
     private var port: UInt16 = 8081
 
     private let queue = DispatchQueue(label: "com.axon.bridge", qos: .userInitiated)
@@ -83,7 +114,7 @@ class BridgeServer: ObservableObject {
         }
     }
 
-    /// Stop the server and disconnect any clients
+    /// Stop the server and disconnect all clients
     func stop() async {
         guard isRunning else { return }
 
@@ -93,11 +124,15 @@ class BridgeServer: ObservableObject {
         }
         pendingRequests.removeAll()
 
-        // Close connection
-        connection?.cancel()
-        connection = nil
-        connectedSession = nil
-        isConnected = false
+        // Close all connections
+        for (_, connection) in connections {
+            connection.cancel()
+        }
+        connections.removeAll()
+        sessions.removeAll()
+        connectionToSession.removeAll()
+        sessionToConnection.removeAll()
+        messageBuffers.removeAll()
 
         // Stop listener
         listener?.cancel()
@@ -107,12 +142,39 @@ class BridgeServer: ObservableObject {
         print("[BridgeServer] Stopped")
     }
 
+    /// Disconnect a specific session
+    func disconnectSession(_ sessionId: String) {
+        guard let connectionId = sessionToConnection[sessionId],
+              let connection = connections[connectionId] else {
+            return
+        }
+        connection.cancel()
+        cleanupConnection(connectionId: connectionId)
+    }
+
     // MARK: - Message Sending
 
     /// Send a request to VS Code and wait for response
-    func sendRequest(method: String, params: AnyCodable? = nil, timeout: TimeInterval? = nil) async throws -> BridgeResponse {
-        guard isConnected, let connection = connection else {
-            throw BridgeError(code: .notConnected, message: "No VS Code connection")
+    /// - Parameters:
+    ///   - method: The bridge method to call
+    ///   - params: Optional parameters
+    ///   - sessionId: Target a specific session (nil = first available)
+    ///   - timeout: Request timeout
+    func sendRequest(method: String, params: AnyCodable? = nil, sessionId: String? = nil, timeout: TimeInterval? = nil) async throws -> BridgeResponse {
+        // Find the target connection
+        let targetConnection: NWConnection
+        if let sessionId = sessionId {
+            guard let connectionId = sessionToConnection[sessionId],
+                  let connection = connections[connectionId] else {
+                throw BridgeError(code: .notConnected, message: "Session not found: \(sessionId)")
+            }
+            targetConnection = connection
+        } else {
+            // Use first available connection (backward compatibility)
+            guard let firstConnection = connections.values.first else {
+                throw BridgeError(code: .notConnected, message: "No VS Code connection")
+            }
+            targetConnection = firstConnection
         }
 
         let request = BridgeRequest(method: method, params: params)
@@ -142,7 +204,7 @@ class BridgeServer: ObservableObject {
             // Send request
             do {
                 let data = try BridgeMessage.encode(request)
-                self.sendWebSocketMessage(data, on: connection)
+                self.sendWebSocketMessage(data, on: targetConnection)
             } catch {
                 pendingRequests.removeValue(forKey: request.id)
                 continuation.resume(throwing: error)
@@ -151,17 +213,30 @@ class BridgeServer: ObservableObject {
     }
 
     /// Send a notification (no response expected)
-    func sendNotification(method: String, params: AnyCodable? = nil) {
-        guard isConnected, let connection = connection else {
-            print("[BridgeServer] Cannot send notification: not connected")
-            return
-        }
-
+    /// - Parameters:
+    ///   - method: The notification method
+    ///   - params: Optional parameters
+    ///   - sessionId: Target a specific session (nil = broadcast to all)
+    func sendNotification(method: String, params: AnyCodable? = nil, sessionId: String? = nil) {
         let notification = BridgeNotification(method: method, params: params)
 
         do {
             let data = try BridgeMessage.encode(notification)
-            sendWebSocketMessage(data, on: connection)
+
+            if let sessionId = sessionId {
+                // Send to specific session
+                guard let connectionId = sessionToConnection[sessionId],
+                      let connection = connections[connectionId] else {
+                    print("[BridgeServer] Cannot send notification: session not found")
+                    return
+                }
+                sendWebSocketMessage(data, on: connection)
+            } else {
+                // Broadcast to all connections
+                for connection in connections.values {
+                    sendWebSocketMessage(data, on: connection)
+                }
+            }
         } catch {
             print("[BridgeServer] Failed to encode notification: \(error)")
         }
@@ -175,6 +250,23 @@ class BridgeServer: ObservableObject {
         } catch {
             print("[BridgeServer] Failed to encode response: \(error)")
         }
+    }
+
+    // MARK: - Session Lookup
+
+    /// Get a session by ID
+    func session(for sessionId: String) -> BridgeSession? {
+        sessions[sessionId]
+    }
+
+    /// Get a session by workspace ID (e.g., "sha256:...")
+    func session(forWorkspaceId workspaceId: String) -> BridgeSession? {
+        sessions.values.first { $0.workspaceId == workspaceId }
+    }
+
+    /// Get all sessions as an array (sorted by connected time)
+    var allSessions: [BridgeSession] {
+        sessions.values.sorted { $0.connectedAt < $1.connectedAt }
     }
 
     // MARK: - Tool Execution
@@ -274,68 +366,81 @@ class BridgeServer: ObservableObject {
     }
 
     private func handleNewConnection(_ newConnection: NWConnection) async {
-        // Only allow one connection at a time (MVP)
-        if connection != nil {
-            print("[BridgeServer] Rejecting connection: already connected")
+        let settings = BridgeSettingsStorage.shared.settings
+
+        // Check if we allow multiple sessions
+        if !settings.allowMultipleSessions && !connections.isEmpty {
+            print("[BridgeServer] Rejecting connection: already connected (multi-session disabled)")
             newConnection.cancel()
             return
         }
 
-        print("[BridgeServer] New connection from VS Code")
-        connection = newConnection
+        // Generate a unique connection ID
+        let connectionId = UUID().uuidString
+        print("[BridgeServer] New connection from VS Code (connectionId: \(connectionId.prefix(8)))")
 
-        newConnection.stateUpdateHandler = { [weak self] state in
+        connections[connectionId] = newConnection
+        messageBuffers[connectionId] = Data()
+
+        newConnection.stateUpdateHandler = { [weak self, connectionId] state in
             Task { @MainActor in
-                self?.handleConnectionState(state)
+                self?.handleConnectionState(state, connectionId: connectionId)
             }
         }
 
         newConnection.start(queue: queue)
-        startReceiving(on: newConnection)
+        startReceiving(on: newConnection, connectionId: connectionId)
     }
 
-    private func handleConnectionState(_ state: NWConnection.State) {
+    private func handleConnectionState(_ state: NWConnection.State, connectionId: String) {
         switch state {
         case .ready:
-            print("[BridgeServer] Connection ready")
-            // Don't set isConnected yet - wait for handshake
+            print("[BridgeServer] Connection ready (connectionId: \(connectionId.prefix(8)))")
+            // Don't consider connected yet - wait for handshake
 
         case .failed(let error):
-            print("[BridgeServer] Connection failed: \(error)")
+            print("[BridgeServer] Connection failed: \(error) (connectionId: \(connectionId.prefix(8)))")
             lastError = "Connection failed: \(error.localizedDescription)"
-            disconnectClient()
+            cleanupConnection(connectionId: connectionId)
 
         case .cancelled:
-            print("[BridgeServer] Connection cancelled")
-            disconnectClient()
+            print("[BridgeServer] Connection cancelled (connectionId: \(connectionId.prefix(8)))")
+            cleanupConnection(connectionId: connectionId)
 
         default:
             break
         }
     }
 
-    private func disconnectClient() {
-        let wasConnected = isConnected
+    /// Clean up a disconnected connection and its associated session
+    private func cleanupConnection(connectionId: String) {
+        // Remove connection
+        connections.removeValue(forKey: connectionId)
+        messageBuffers.removeValue(forKey: connectionId)
 
-        connection = nil
-        connectedSession = nil
-        isConnected = false
-        messageBuffer = Data()
+        // Find and remove associated session
+        if let sessionId = connectionToSession.removeValue(forKey: connectionId) {
+            let session = sessions.removeValue(forKey: sessionId)
+            sessionToConnection.removeValue(forKey: sessionId)
 
-        // Cancel pending requests
-        for (_, pending) in pendingRequests {
-            pending.continuation.resume(throwing: BridgeError(code: .notConnected, message: "Connection lost"))
-        }
-        pendingRequests.removeAll()
-
-        // Notify observers that VS Code disconnected
-        if wasConnected {
+            // Notify observers
             NotificationCenter.default.post(
                 name: .bridgeConnectionDidChange,
                 object: self,
-                userInfo: ["connected": false]
+                userInfo: [
+                    "connected": false,
+                    "sessionId": sessionId,
+                    "session": session as Any,
+                    "remainingSessions": sessions.count
+                ]
             )
+
+            print("[BridgeServer] Session disconnected: \(session?.displayName ?? sessionId) (\(sessions.count) remaining)")
         }
+
+        // Note: We don't cancel pending requests here because they're keyed by request ID,
+        // not connection ID. In a multi-session setup, we'd need to track which requests
+        // belong to which session if we wanted to cancel them on disconnect.
     }
 
     // MARK: - WebSocket Message Handling
@@ -356,14 +461,14 @@ class BridgeServer: ObservableObject {
         })
     }
 
-    private func startReceiving(on connection: NWConnection) {
-        connection.receiveMessage { [weak self] content, context, isComplete, error in
+    private func startReceiving(on connection: NWConnection, connectionId: String) {
+        connection.receiveMessage { [weak self, connectionId] content, context, isComplete, error in
             guard let self = self else { return }
 
             if let error = error {
-                print("[BridgeServer] Receive error: \(error)")
+                print("[BridgeServer] Receive error: \(error) (connectionId: \(connectionId.prefix(8)))")
                 Task { @MainActor in
-                    self.disconnectClient()
+                    self.cleanupConnection(connectionId: connectionId)
                 }
                 return
             }
@@ -372,47 +477,47 @@ class BridgeServer: ObservableObject {
                 Task { @MainActor in
                     // Log incoming message
                     BridgeLogService.shared.logIncoming(content)
-                    await self.handleReceivedData(content)
+                    await self.handleReceivedData(content, connectionId: connectionId)
                 }
             }
 
-            // Continue receiving
-            if self.connection != nil {
-                self.startReceiving(on: connection)
+            // Continue receiving if connection still exists
+            if self.connections[connectionId] != nil {
+                self.startReceiving(on: connection, connectionId: connectionId)
             }
         }
     }
 
-    private func handleReceivedData(_ data: Data) async {
+    private func handleReceivedData(_ data: Data, connectionId: String) async {
         do {
             let message = try BridgeMessage.decode(from: data)
 
             switch message {
             case .request(let request):
-                await handleIncomingRequest(request)
+                await handleIncomingRequest(request, connectionId: connectionId)
 
             case .response(let response):
                 handleIncomingResponse(response)
 
             case .notification(let notification):
-                handleIncomingNotification(notification)
+                handleIncomingNotification(notification, connectionId: connectionId)
             }
         } catch {
-            print("[BridgeServer] Failed to decode message: \(error)")
+            print("[BridgeServer] Failed to decode message: \(error) (connectionId: \(connectionId.prefix(8)))")
             if let str = String(data: data, encoding: .utf8) {
                 print("[BridgeServer] Raw message: \(str.prefix(200))")
             }
         }
     }
 
-    private func handleIncomingRequest(_ request: BridgeRequest) async {
-        print("[BridgeServer] Received request: \(request.method)")
+    private func handleIncomingRequest(_ request: BridgeRequest, connectionId: String) async {
+        print("[BridgeServer] Received request: \(request.method) (connectionId: \(connectionId.prefix(8)))")
 
-        guard let connection = connection else { return }
+        guard let connection = connections[connectionId] else { return }
 
         // Handle handshake specially
         if request.method == BridgeMethod.hello.rawValue {
-            await handleHello(request, on: connection)
+            await handleHello(request, on: connection, connectionId: connectionId)
             return
         }
 
@@ -431,12 +536,12 @@ class BridgeServer: ObservableObject {
         pending.continuation.resume(returning: response)
     }
 
-    private func handleIncomingNotification(_ notification: BridgeNotification) {
-        print("[BridgeServer] Received notification: \(notification.method)")
+    private func handleIncomingNotification(_ notification: BridgeNotification, connectionId: String) {
+        print("[BridgeServer] Received notification: \(notification.method) (connectionId: \(connectionId.prefix(8)))")
         // Handle notifications from VS Code if needed (e.g., file changed events)
     }
 
-    private func handleHello(_ request: BridgeRequest, on connection: NWConnection) async {
+    private func handleHello(_ request: BridgeRequest, on connection: NWConnection, connectionId: String) async {
         guard let params = request.params else {
             let error = BridgeError(code: .invalidParams, message: "Missing hello parameters")
             sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
@@ -455,36 +560,49 @@ class BridgeServer: ObservableObject {
                     let error = BridgeError(code: .invalidRequest, message: "Pairing token mismatch. Set axonBridge.pairingToken in VS Code to match Axon Bridge settings.")
                     sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
                     connection.cancel()
+                    cleanupConnection(connectionId: connectionId)
                     return
                 }
             }
 
-            // Create session
-            let capabilities = hello.capabilities.compactMap { BridgeCapability(rawValue: $0) }
+            // Create session - handle both old and new BridgeHello formats
+            let capabilities = (hello.capabilities ?? []).compactMap { BridgeCapability(rawValue: $0) }
 
             let session = BridgeSession(
-                workspaceId: hello.workspaceId,
-                workspaceName: hello.workspaceName,
-                workspaceRoot: hello.workspaceRoot,
+                workspaceId: hello.workspaceId ?? "unknown",
+                workspaceName: hello.workspaceName ?? "VS Code",
+                workspaceRoot: hello.workspaceRoot ?? "",
                 capabilities: capabilities.isEmpty ? BridgeCapability.allCases : capabilities,
-                extensionVersion: hello.extensionVersion
+                extensionVersion: hello.extensionVersion ?? "unknown"
             )
 
-            connectedSession = session
-            isConnected = true
+            let sessionId = session.id.uuidString
 
-            print("[BridgeServer] VS Code connected: \(session.displayName) (\(session.workspaceRoot))")
+            // Store session and mappings
+            sessions[sessionId] = session
+            connectionToSession[connectionId] = sessionId
+            sessionToConnection[sessionId] = connectionId
+
+            print("[BridgeServer] VS Code connected: \(session.displayName) (\(session.workspaceRoot)) [session: \(sessionId.prefix(8)), total: \(sessions.count)]")
+
+            // Record in settings for auto-reconnect
+            BridgeSettingsStorage.shared.recordConnection(session)
 
             // Notify observers that VS Code connected
             NotificationCenter.default.post(
                 name: .bridgeConnectionDidChange,
                 object: self,
-                userInfo: ["connected": true, "session": session]
+                userInfo: [
+                    "connected": true,
+                    "session": session,
+                    "sessionId": sessionId,
+                    "totalSessions": sessions.count
+                ]
             )
 
-            // Send welcome response
-            let welcome = BridgeWelcome(
-                sessionId: session.id.uuidString,
+            // Send welcome response using the new format
+            let welcome = BridgeWelcome.fromAxon(
+                sessionId: sessionId,
                 axonVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0",
                 supportedMethods: BridgeMethod.allCases.map { $0.rawValue }
             )

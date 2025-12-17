@@ -858,6 +858,27 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 sources: nil,
                 memoryOperation: nil
             )
+
+        case .approvedViaTrustTier(let tierName):
+            // Pre-approved via co-sovereignty trust tier - execute directly
+            print("[ToolProxy] Internal tool '\(toolId.rawValue)' pre-approved via trust tier: \(tierName)")
+            var result = await executeInternalTool(toolId: toolId, query: query, context: context)
+            return ToolResult(
+                tool: result.tool,
+                success: result.success,
+                result: result.result + "\n\n✅ *Pre-approved via trust tier: \(tierName)*",
+                sources: result.sources,
+                memoryOperation: result.memoryOperation
+            )
+
+        case .blocked(let reason):
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: false,
+                result: "🚫 Tool blocked: \(reason)",
+                sources: nil,
+                memoryOperation: nil
+            )
         }
     }
 
@@ -978,6 +999,37 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                     tool: tool.id,
                     success: false,
                     result: "Approval error: \(message)",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+
+            case .approvedViaTrustTier(let tierName):
+                // Pre-approved via co-sovereignty trust tier - execute directly
+                print("[ToolProxy] Tool '\(tool.id)' pre-approved via trust tier: \(tierName)")
+                do {
+                    let result = try await dynamicToolEngine.execute(toolId: tool.id, inputs: inputs)
+                    return ToolResult(
+                        tool: tool.id,
+                        success: result.success,
+                        result: result.output + "\n\n✅ *Pre-approved via trust tier: \(tierName)*",
+                        sources: nil,
+                        memoryOperation: nil
+                    )
+                } catch {
+                    return ToolResult(
+                        tool: tool.id,
+                        success: false,
+                        result: "Dynamic tool failed: \(error.localizedDescription)",
+                        sources: nil,
+                        memoryOperation: nil
+                    )
+                }
+
+            case .blocked(let reason):
+                return ToolResult(
+                    tool: tool.id,
+                    success: false,
+                    result: "🚫 Tool blocked: \(reason)",
                     sources: nil,
                     memoryOperation: nil
                 )

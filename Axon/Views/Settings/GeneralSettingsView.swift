@@ -817,9 +817,22 @@ private struct DeviceModeToggle: View {
 
 private struct SyncStatusIndicator: View {
     @StateObject private var conversationService = ConversationService.shared
+    @StateObject private var cloudKitSync = CloudKitSyncService.shared
+    
+    // Check if backend is configured
+    private var isBackendConfigured: Bool {
+        APIClient.shared.isBackendConfigured
+    }
+    
+    // Check if using iCloud sync
+    private var isUsingiCloudSync: Bool {
+        let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
+        return settings.deviceModeConfig.cloudSyncProvider == .iCloud
+    }
 
     var body: some View {
-        if conversationService.pendingOperationsCount > 0 || conversationService.isOfflineMode {
+        // Only show status indicator when there's something to show
+        if shouldShowIndicator {
             HStack(spacing: 12) {
                 // Status icon
                 ZStack {
@@ -827,7 +840,7 @@ private struct SyncStatusIndicator: View {
                         .fill(statusColor.opacity(0.2))
                         .frame(width: 32, height: 32)
 
-                    if conversationService.isSyncing {
+                    if conversationService.isSyncing || cloudKitSync.isSyncing {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: statusColor))
                             .scaleEffect(0.8)
@@ -851,11 +864,19 @@ private struct SyncStatusIndicator: View {
 
                 Spacer()
 
-                // Sync button
-                if conversationService.pendingOperationsCount > 0 && !conversationService.isSyncing {
+                // Sync button - context-aware
+                if showSyncButton {
                     Button(action: {
                         Task {
-                            await conversationService.syncPendingOperations()
+                            if isBackendConfigured {
+                                // Backend mode: sync pending operations to API
+                                await conversationService.syncPendingOperations()
+                            } else if isUsingiCloudSync {
+                                // iCloud-only mode: trigger CloudKit sync
+                                await AutoSyncOrchestrator.shared.pullNow()
+                                // Clear any stale pending operations
+                                await conversationService.syncPendingOperations()
+                            }
                         }
                     }) {
                         Text("Sync")
@@ -881,13 +902,50 @@ private struct SyncStatusIndicator: View {
             )
         }
     }
+    
+    private var shouldShowIndicator: Bool {
+        // Show if syncing
+        if conversationService.isSyncing || cloudKitSync.isSyncing {
+            return true
+        }
+        // Show if offline
+        if conversationService.isOfflineMode {
+            return true
+        }
+        // Show if there are pending operations AND a backend is configured
+        if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
+            return true
+        }
+        // Show CloudKit errors if using iCloud
+        if isUsingiCloudSync && cloudKitSync.syncError != nil {
+            return true
+        }
+        return false
+    }
+    
+    private var showSyncButton: Bool {
+        let isSyncing = conversationService.isSyncing || cloudKitSync.isSyncing
+        if isSyncing { return false }
+        
+        // Show sync button if there are pending operations with backend
+        if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
+            return true
+        }
+        // Show sync button for iCloud errors
+        if isUsingiCloudSync && cloudKitSync.syncError != nil {
+            return true
+        }
+        return false
+    }
 
     private var statusColor: Color {
-        if conversationService.isSyncing {
+        if conversationService.isSyncing || cloudKitSync.isSyncing {
             return AppColors.signalMercury
         } else if conversationService.isOfflineMode {
             return AppColors.accentWarning
-        } else if conversationService.pendingOperationsCount > 0 {
+        } else if isUsingiCloudSync && cloudKitSync.syncError != nil {
+            return AppColors.accentWarning
+        } else if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
             return AppColors.accentWarning
         }
         return AppColors.accentSuccess
@@ -896,18 +954,22 @@ private struct SyncStatusIndicator: View {
     private var statusIcon: String {
         if conversationService.isOfflineMode {
             return "wifi.slash"
-        } else if conversationService.pendingOperationsCount > 0 {
+        } else if isUsingiCloudSync && cloudKitSync.syncError != nil {
+            return "exclamationmark.icloud"
+        } else if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
             return "exclamationmark.arrow.triangle.2.circlepath"
         }
         return "checkmark.circle"
     }
 
     private var statusTitle: String {
-        if conversationService.isSyncing {
+        if conversationService.isSyncing || cloudKitSync.isSyncing {
             return "Syncing..."
         } else if conversationService.isOfflineMode {
             return "Offline Mode"
-        } else if conversationService.pendingOperationsCount > 0 {
+        } else if isUsingiCloudSync && cloudKitSync.syncError != nil {
+            return "iCloud Sync Issue"
+        } else if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
             return "Pending Sync"
         }
         return "Synced"
@@ -916,9 +978,13 @@ private struct SyncStatusIndicator: View {
     private var statusSubtitle: String {
         if conversationService.isSyncing {
             return "Uploading changes..."
+        } else if cloudKitSync.isSyncing {
+            return "Syncing with iCloud..."
         } else if conversationService.isOfflineMode {
             return "Changes will sync when connected"
-        } else if conversationService.pendingOperationsCount > 0 {
+        } else if isUsingiCloudSync, let error = cloudKitSync.syncError {
+            return error
+        } else if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
             return "\(conversationService.pendingOperationsCount) operations pending"
         }
         return "All changes saved"

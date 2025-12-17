@@ -5,9 +5,16 @@
 //  Persistent settings for the VS Code bridge, including paired devices
 //  for automatic reconnection.
 //
+//  Supports two connection modes:
+//  - Local Mode: Axon is server (default), VS Code connects as client
+//  - Remote Mode: VS Code is server, Axon connects as client (for LAN access)
+//
 
 import Foundation
 import Combine
+#if os(iOS)
+import UIKit
+#endif
 
 // MARK: - Bridge Settings
 
@@ -16,8 +23,41 @@ struct BridgeSettings: Codable, Equatable, Sendable {
     /// Whether the bridge feature is enabled
     var enabled: Bool = false
 
-    /// Port to listen on for WebSocket connections
+    // MARK: - Connection Mode
+
+    /// Connection mode: local (Axon server) or remote (VS Code server)
+    var mode: BridgeMode = .local
+
+    // MARK: - Local Mode Settings (Axon as Server)
+
+    /// Port to listen on for WebSocket connections (Local Mode)
     var port: UInt16 = 8081
+
+    // MARK: - Remote Mode Settings (VS Code as Server)
+
+    /// Host/IP address of the VS Code server (Remote Mode)
+    var remoteHost: String = ""
+
+    /// Port of the VS Code server (Remote Mode)
+    var remotePort: UInt16 = 8082
+
+    /// Device name to identify this Axon instance (Remote Mode)
+    var deviceName: String = ""
+
+    // MARK: - TLS Settings
+
+    /// Whether to use TLS (wss://) for connections
+    var tlsEnabled: Bool = false
+
+    /// Trusted certificate fingerprints (SHA-256) for self-signed certs
+    var trustedCertFingerprints: [String] = []
+
+    // MARK: - Multi-Session Settings
+
+    /// Allow multiple VS Code workspaces to connect simultaneously
+    var allowMultipleSessions: Bool = true
+
+    // MARK: - General Settings
 
     /// Auto-start bridge when app launches (if enabled)
     var autoStart: Bool = false
@@ -51,6 +91,31 @@ struct BridgeSettings: Codable, Equatable, Sendable {
         "**/id_rsa*",
         "**/id_ed25519*"
     ]
+
+    // MARK: - Computed Properties
+
+    /// The WebSocket URL for Remote Mode connections
+    var remoteURL: String {
+        let scheme = tlsEnabled ? "wss" : "ws"
+        return "\(scheme)://\(remoteHost):\(remotePort)"
+    }
+
+    /// Whether Remote Mode settings are valid
+    var isRemoteModeConfigured: Bool {
+        !remoteHost.isEmpty && remotePort > 0
+    }
+
+    /// Get the effective device name (or fallback)
+    var effectiveDeviceName: String {
+        if deviceName.isEmpty {
+            #if os(iOS)
+            return UIDevice.current.name
+            #else
+            return Host.current().localizedName ?? "Mac"
+            #endif
+        }
+        return deviceName
+    }
 
     // MARK: - Device Management
 
@@ -230,5 +295,33 @@ class BridgeSettingsStorage: ObservableObject {
     /// Update port
     func setPort(_ port: UInt16) {
         settings.port = port
+    }
+
+    /// Update connection mode
+    func setMode(_ mode: BridgeMode) {
+        settings.mode = mode
+    }
+
+    /// Update Remote Mode settings
+    func setRemoteConfig(host: String, port: UInt16) {
+        settings.remoteHost = host
+        settings.remotePort = port
+    }
+
+    /// Update TLS settings
+    func setTLSEnabled(_ enabled: Bool) {
+        settings.tlsEnabled = enabled
+    }
+
+    /// Add a trusted certificate fingerprint
+    func addTrustedCertFingerprint(_ fingerprint: String) {
+        if !settings.trustedCertFingerprints.contains(fingerprint) {
+            settings.trustedCertFingerprints.append(fingerprint)
+        }
+    }
+
+    /// Remove a trusted certificate fingerprint
+    func removeTrustedCertFingerprint(_ fingerprint: String) {
+        settings.trustedCertFingerprints.removeAll { $0 == fingerprint }
     }
 }

@@ -11,8 +11,10 @@ import SwiftUI
 struct DeviceModeConfigSheet: View {
     @ObservedObject var viewModel: SettingsViewModel
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var cloudKitService = CloudKitSyncService.shared
 
     @State private var localConfig: DeviceModeConfig
+    @State private var showSyncDisabledWarning: Bool = false
 
     init(viewModel: SettingsViewModel) {
         self.viewModel = viewModel
@@ -40,6 +42,15 @@ struct DeviceModeConfigSheet: View {
                             .foregroundColor(AppColors.textSecondary)
                     }
                     .padding(.bottom, 8)
+
+                    // Sync Disabled Warning Banner
+                    if localConfig.cloudSyncProvider == .none && cloudKitService.isCloudKitAvailable {
+                        SyncDisabledWarningBanner {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                localConfig.cloudSyncProvider = .iCloud
+                            }
+                        }
+                    }
 
                     // Data Storage Section
                     ConfigSection(title: "Data Storage", icon: "externaldrive.fill") {
@@ -519,9 +530,37 @@ private struct CloudSyncProviderCard: View {
 private struct SyncStatusCard: View {
     @ObservedObject var viewModel: SettingsViewModel
     @StateObject private var conversationService = ConversationService.shared
+    @StateObject private var cloudKitSync = CloudKitSyncService.shared
+    
+    // Check if backend is configured
+    private var isBackendConfigured: Bool {
+        APIClient.shared.isBackendConfigured
+    }
+    
+    // Check if using iCloud sync
+    private var isUsingiCloudSync: Bool {
+        viewModel.settings.deviceModeConfig.cloudSyncProvider == .iCloud
+    }
+    
+    // Only show if there's something relevant to display
+    private var shouldShow: Bool {
+        // Show if syncing
+        if conversationService.isSyncing || cloudKitSync.isSyncing {
+            return true
+        }
+        // Show if there are pending operations AND a backend is configured
+        if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
+            return true
+        }
+        // Show CloudKit errors if using iCloud
+        if isUsingiCloudSync && cloudKitSync.syncError != nil {
+            return true
+        }
+        return false
+    }
 
     var body: some View {
-        if conversationService.pendingOperationsCount > 0 || conversationService.isSyncing {
+        if shouldShow {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.triangle.2.circlepath")
@@ -537,37 +576,45 @@ private struct SyncStatusCard: View {
                     // Status icon
                     ZStack {
                         Circle()
-                            .fill(conversationService.isSyncing ? AppColors.signalMercury.opacity(0.2) : AppColors.accentWarning.opacity(0.2))
+                            .fill(statusColor.opacity(0.2))
                             .frame(width: 44, height: 44)
 
-                        if conversationService.isSyncing {
+                        if conversationService.isSyncing || cloudKitSync.isSyncing {
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: AppColors.signalMercury))
+                                .progressViewStyle(CircularProgressViewStyle(tint: statusColor))
                         } else {
-                            Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
+                            Image(systemName: statusIcon)
                                 .font(.system(size: 18))
-                                .foregroundColor(AppColors.accentWarning)
+                                .foregroundColor(statusColor)
                         }
                     }
 
                     // Status text
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(conversationService.isSyncing ? "Syncing..." : "Pending Operations")
+                        Text(statusTitle)
                             .font(AppTypography.bodyMedium(.medium))
                             .foregroundColor(AppColors.textPrimary)
 
-                        Text("\(conversationService.pendingOperationsCount) operations waiting to sync")
+                        Text(statusSubtitle)
                             .font(AppTypography.bodySmall())
                             .foregroundColor(AppColors.textSecondary)
                     }
 
                     Spacer()
 
-                    // Sync button
-                    if !conversationService.isSyncing {
+                    // Sync button - context-aware
+                    if showSyncButton {
                         Button(action: {
                             Task {
-                                await conversationService.syncPendingOperations()
+                                if isBackendConfigured {
+                                    // Backend mode: sync pending operations to API
+                                    await conversationService.syncPendingOperations()
+                                } else if isUsingiCloudSync {
+                                    // iCloud-only mode: trigger CloudKit sync
+                                    await AutoSyncOrchestrator.shared.pullNow()
+                                    // Clear any stale pending operations
+                                    await conversationService.syncPendingOperations()
+                                }
                             }
                         }) {
                             Text("Sync Now")
@@ -593,6 +640,121 @@ private struct SyncStatusCard: View {
                 )
             }
         }
+    }
+    
+    private var showSyncButton: Bool {
+        let isSyncing = conversationService.isSyncing || cloudKitSync.isSyncing
+        if isSyncing { return false }
+        
+        // Show sync button if there are pending operations with backend
+        if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
+            return true
+        }
+        // Show sync button for iCloud errors
+        if isUsingiCloudSync && cloudKitSync.syncError != nil {
+            return true
+        }
+        return false
+    }
+    
+    private var statusColor: Color {
+        if conversationService.isSyncing || cloudKitSync.isSyncing {
+            return AppColors.signalMercury
+        } else if isUsingiCloudSync && cloudKitSync.syncError != nil {
+            return AppColors.accentWarning
+        } else if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
+            return AppColors.accentWarning
+        }
+        return AppColors.accentSuccess
+    }
+    
+    private var statusIcon: String {
+        if isUsingiCloudSync && cloudKitSync.syncError != nil {
+            return "exclamationmark.icloud"
+        } else if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
+            return "exclamationmark.arrow.triangle.2.circlepath"
+        }
+        return "checkmark.circle"
+    }
+    
+    private var statusTitle: String {
+        if conversationService.isSyncing || cloudKitSync.isSyncing {
+            return "Syncing..."
+        } else if isUsingiCloudSync && cloudKitSync.syncError != nil {
+            return "iCloud Sync Issue"
+        } else if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
+            return "Pending Operations"
+        }
+        return "Synced"
+    }
+    
+    private var statusSubtitle: String {
+        if conversationService.isSyncing {
+            return "Uploading changes..."
+        } else if cloudKitSync.isSyncing {
+            return "Syncing with iCloud..."
+        } else if isUsingiCloudSync, let error = cloudKitSync.syncError {
+            return error
+        } else if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
+            return "\(conversationService.pendingOperationsCount) operations waiting to sync"
+        }
+        return "All changes saved"
+    }
+}
+
+// MARK: - Sync Disabled Warning Banner
+
+private struct SyncDisabledWarningBanner: View {
+    let onEnableSync: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "exclamationmark.icloud.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(AppColors.accentWarning)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Cross-Device Sync Disabled")
+                        .font(AppTypography.bodyMedium(.semibold))
+                        .foregroundColor(AppColors.textPrimary)
+
+                    Text("Your conversations and settings won't sync to other devices. Enable iCloud sync to keep everything in sync.")
+                        .font(AppTypography.bodySmall())
+                        .foregroundColor(AppColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+            }
+
+            Button(action: onEnableSync) {
+                HStack(spacing: 8) {
+                    Image(systemName: "icloud.fill")
+                        .font(.system(size: 14))
+
+                    Text("Enable iCloud Sync")
+                        .font(AppTypography.labelMedium())
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(AppColors.signalMercury)
+                )
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(AppColors.accentWarning.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(AppColors.accentWarning.opacity(0.3), lineWidth: 1)
+                )
+        )
     }
 }
 

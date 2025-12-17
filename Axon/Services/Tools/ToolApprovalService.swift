@@ -25,10 +25,12 @@ enum ToolApprovalStatus: String, Codable, Sendable {
 enum ToolApprovalResult: Sendable {
     case approved(ToolApprovalRecord)
     case approvedForSession(ToolApprovalRecord)  // Allow for entire session without re-prompting
+    case approvedViaTrustTier(String)  // Pre-approved by co-sovereignty trust tier (tier name)
     case denied
     case cancelled
     case timeout
     case stop  // User wants to stop all tool execution (like Claude Code)
+    case blocked(String)  // Blocked by co-sovereignty (deadlock, etc.)
     case error(String)
 }
 
@@ -119,6 +121,9 @@ final class ToolApprovalService: ObservableObject {
     private let deviceIdentity = DeviceIdentity.shared
     private let secureVault = SecureVault.shared
 
+    // Co-sovereignty service (lazy to avoid init cycle)
+    private var sovereigntyService: SovereigntyService { SovereigntyService.shared }
+
     // MARK: - Published State
 
     @Published private(set) var state: ApprovalState = .idle
@@ -192,7 +197,50 @@ final class ToolApprovalService: ObservableObject {
 
     // MARK: - Public API
 
-    /// Request approval for a tool execution
+    /// Request approval for a tool execution with co-sovereignty integration
+    /// Checks trust tiers first, then falls back to biometric approval
+    func requestApprovalWithSovereignty(
+        tool: DynamicToolConfig,
+        inputs: [String: Any],
+        timeoutSeconds: Int? = nil
+    ) async -> ToolApprovalResult {
+        // 1. Check co-sovereignty trust tiers first
+        let action = SovereignAction.specific(.toolInvocation, action: tool.id)
+        let permission = sovereigntyService.checkActionPermission(action)
+
+        switch permission {
+        case .preApproved(let tier):
+            // Action is within a trust tier - approved without biometric
+            logger.info("Tool '\(tool.id)' pre-approved via trust tier: \(tier.name)")
+            return .approvedViaTrustTier(tier.name)
+
+        case .blocked(let reason):
+            // Blocked by deadlock or other sovereignty issue
+            switch reason {
+            case .deadlocked(let id):
+                logger.warning("Tool '\(tool.id)' blocked due to deadlock: \(id)")
+                return .blocked("Blocked by active deadlock. Please resolve the disagreement first.")
+            case .noCovenant:
+                // No covenant - fall through to normal approval
+                break
+            case .integrityViolation:
+                logger.warning("Tool '\(tool.id)' blocked due to integrity violation")
+                return .blocked("Blocked due to integrity violation. Please review the covenant status.")
+            case .covenantSuspended:
+                logger.warning("Tool '\(tool.id)' blocked - covenant suspended")
+                return .blocked("Blocked: covenant is suspended pending resolution.")
+            }
+
+        case .requiresApproval, .requiresAIConsent:
+            // Fall through to biometric approval
+            break
+        }
+
+        // 2. Fall through to standard biometric approval
+        return await requestApproval(tool: tool, inputs: inputs, timeoutSeconds: timeoutSeconds)
+    }
+
+    /// Request approval for a tool execution (original method)
     /// This suspends until the user approves, denies, or the request times out
     func requestApproval(
         tool: DynamicToolConfig,

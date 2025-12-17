@@ -415,7 +415,12 @@ class LocalConversationStore: ObservableObject {
     func processPendingOperations() async {
         // Check if backend is configured before attempting to sync pending operations
         guard apiClient.isBackendConfigured else {
-            print("[LocalConversationStore] No backend configured, keeping \(pendingOperations.count) operations pending")
+            // In On-Device mode with iCloud sync, pending operations are not applicable
+            // Clear them since Core Data + CloudKit handles sync automatically
+            if !pendingOperations.isEmpty {
+                print("[LocalConversationStore] No backend configured - clearing \(pendingOperations.count) pending operations (iCloud/CoreData handles sync)")
+                clearPendingOperations()
+            }
             return
         }
 

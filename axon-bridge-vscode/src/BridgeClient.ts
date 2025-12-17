@@ -46,6 +46,7 @@ export class BridgeClient {
     private autoConnect: boolean = true;
     private reconnectInterval: number = 5000;
     private pairingToken: string = '';
+    private tlsEnabled: boolean = false;
 
     // Exponential backoff state
     private reconnectAttempts: number = 0;
@@ -75,6 +76,7 @@ export class BridgeClient {
         this.autoConnect = config.get('autoConnect', true);
         this.reconnectInterval = config.get('reconnectInterval', 5000);
         this.pairingToken = config.get('pairingToken', '');
+        this.tlsEnabled = config.get('tlsEnabled', false);
     }
 
     /**
@@ -88,11 +90,20 @@ export class BridgeClient {
         this.isConnecting = true;
         this.statusBar.setState('connecting');
 
-        const url = `ws://${this.host}:${this.port}`;
+        const scheme = this.tlsEnabled ? 'wss' : 'ws';
+        const url = `${scheme}://${this.host}:${this.port}`;
         console.log(`[AxonBridge] Connecting to ${url}...`);
 
         try {
-            this.ws = new WebSocket(url);
+            // Configure WebSocket options for TLS if needed
+            const wsOptions: WebSocket.ClientOptions = {};
+            if (this.tlsEnabled) {
+                // For self-signed certificates, we might need to disable cert validation
+                // In production, proper cert validation should be used
+                wsOptions.rejectUnauthorized = false;
+            }
+
+            this.ws = new WebSocket(url, wsOptions);
 
             this.ws.on('open', () => {
                 console.log('[AxonBridge] Connection opened');

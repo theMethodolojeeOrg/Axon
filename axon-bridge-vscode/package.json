@@ -35,35 +35,76 @@
       {
         "command": "axon-bridge.logs.clear",
         "title": "Axon: Clear Bridge Logs"
+      },
+      {
+        "command": "axon-bridge.startServer",
+        "title": "Axon: Start Server (Remote Mode)"
+      },
+      {
+        "command": "axon-bridge.stopServer",
+        "title": "Axon: Stop Server (Remote Mode)"
+      },
+      {
+        "command": "axon-bridge.showServerAddress",
+        "title": "Axon: Show Server Address"
+      },
+      {
+        "command": "axon-bridge.switchMode",
+        "title": "Axon: Switch Connection Mode"
       }
     ],
     "configuration": {
       "title": "Axon Bridge",
       "properties": {
+        "axonBridge.mode": {
+          "type": "string",
+          "enum": ["local", "remote"],
+          "default": "local",
+          "enumDescriptions": [
+            "Local Mode: VS Code connects to Axon (default)",
+            "Remote Mode: VS Code acts as server, Axon connects over LAN"
+          ],
+          "description": "Connection mode. Local: connect to Axon. Remote: accept connections from Axon."
+        },
         "axonBridge.host": {
           "type": "string",
           "default": "localhost",
-          "description": "Host where Axon is running"
+          "description": "Host where Axon is running (Local Mode)"
         },
         "axonBridge.port": {
           "type": "number",
           "default": 8081,
-          "description": "Port for WebSocket connection"
+          "description": "Port for connecting to Axon (Local Mode)"
         },
         "axonBridge.autoConnect": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically connect when VS Code starts"
+          "description": "Automatically connect/start when VS Code starts"
         },
         "axonBridge.reconnectInterval": {
           "type": "number",
           "default": 5000,
-          "description": "Reconnection interval in milliseconds"
+          "description": "Reconnection interval in milliseconds (Local Mode)"
         },
         "axonBridge.pairingToken": {
           "type": "string",
           "default": "",
-          "description": "Optional pairing token (recommended). When set, Axon will reject connections that do not provide the same token."
+          "description": "Optional pairing token for authentication. Must match in both Axon and VS Code."
+        },
+        "axonBridge.serverPort": {
+          "type": "number",
+          "default": 8082,
+          "description": "Port to listen on (Remote Mode)"
+        },
+        "axonBridge.serverBindAddress": {
+          "type": "string",
+          "default": "0.0.0.0",
+          "description": "Address to bind server (Remote Mode). Use 0.0.0.0 for LAN access."
+        },
+        "axonBridge.tlsEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable TLS encryption (wss://)"
         }
       }
     },

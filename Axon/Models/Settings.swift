@@ -79,6 +79,9 @@ struct AppSettings: Codable, Equatable, Sendable {
     // Onboarding
     var hasCompletedOnboarding: Bool = false
 
+    // Co-Sovereignty
+    var sovereigntySettings: SovereigntySettings = SovereigntySettings()
+
     // Backend Configuration (optional - for cloud features)
     var backendAPIURL: String? = nil  // e.g., "https://us-central1-your-project.cloudfunctions.net"
     var backendAuthToken: String? = nil  // Optional auth token for backend (stored in Keychain separately)
@@ -187,7 +190,8 @@ struct DeviceModeConfig: Codable, Equatable, Sendable {
     var memoryStorage: MemoryStorageMode = .localOnly  // Default: local memory
 
     /// Cloud sync provider (when sync is enabled)
-    var cloudSyncProvider: CloudSyncProvider = .none
+    /// Default: iCloud for seamless cross-device sync on Apple platforms
+    var cloudSyncProvider: CloudSyncProvider = .iCloud
 
     /// Settings sync interval (seconds). Used for scheduled sync when a provider is selected.
     /// Default: 60s
@@ -365,6 +369,36 @@ enum PredicateVerbosity: String, Codable, CaseIterable, Identifiable, Sendable {
         case .verbose: return "Full proof trees and all predicates"
         }
     }
+}
+
+// MARK: - Co-Sovereignty Settings
+
+/// Settings for co-sovereignty features (AI consent, negotiations, deadlocks)
+struct SovereigntySettings: Codable, Equatable, Sendable {
+    /// Whether co-sovereignty is enabled
+    var enabled: Bool = true
+
+    /// The provider to use for AI consent/attestation generation
+    /// Apple Intelligence is the default for on-device, private negotiations
+    var consentProvider: AIProvider = .appleFoundation
+
+    /// The model to use for consent generation (provider-specific)
+    /// Empty string means use the provider's default
+    var consentModel: String = ""
+
+    /// Whether to require biometric authentication for all world-affecting actions
+    /// When false, uses trust tiers for pre-approved actions
+    var requireBiometricForAllActions: Bool = false
+
+    /// Whether to show detailed AI reasoning during negotiations
+    var showDetailedReasoning: Bool = true
+
+    /// Maximum time (in seconds) to wait for AI consent before timing out
+    /// 0 means no timeout (default for deadlocks)
+    var consentTimeoutSeconds: Int = 0
+
+    /// Whether to log all consent decisions for audit
+    var auditLoggingEnabled: Bool = true
 }
 
 // MARK: - AI Providers

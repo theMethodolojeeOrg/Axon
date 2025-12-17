@@ -15,13 +15,48 @@ class MemoryService: ObservableObject {
     private let apiClient = APIClient.shared
     private let syncManager = MemorySyncManager.shared
 
+    // Co-sovereignty services
+    private var sovereigntyService: SovereigntyService { SovereigntyService.shared }
+    private var aiConsentService: AIConsentService { AIConsentService.shared }
+    private var negotiationService: CovenantNegotiationService { CovenantNegotiationService.shared }
+
     @Published var memories: [Memory] = []
     @Published var isLoading = false
     @Published var error: String?
 
+    // Co-sovereignty state
+    @Published var pendingConsentRequest: MemoryConsentRequest?
+    @Published var consentRequired: Bool = false
+
     private init() {
         // Load memories from local Core Data immediately (instant UI)
         loadLocalMemories()
+    }
+
+    // MARK: - Co-Sovereignty: Consent Request
+
+    /// Request to create/modify/delete memory that requires AI consent
+    struct MemoryConsentRequest: Identifiable {
+        let id = UUID()
+        let operation: MemoryOperation
+        let memoryId: String?
+        let content: String?
+        let rationale: String
+        let proposal: CovenantProposal?
+    }
+
+    enum MemoryOperation: String {
+        case create
+        case update
+        case delete
+
+        var actionCategory: ActionCategory {
+            switch self {
+            case .create: return .memoryAdd
+            case .update: return .memoryModify
+            case .delete: return .memoryDelete
+            }
+        }
     }
 
     // MARK: - Local-First Data Access
@@ -47,9 +82,133 @@ class MemoryService: ObservableObject {
         }
     }
 
+    // MARK: - Co-Sovereignty: Check Consent
+
+    /// Check if co-sovereignty is enabled and consent is required for memory operations
+    private var isSovereigntyEnabled: Bool {
+        sovereigntyService.activeCovenant != nil
+    }
+
+    /// Check if AI consent is needed for a memory operation
+    private func requiresAIConsent(for operation: MemoryOperation) -> Bool {
+        guard isSovereigntyEnabled else { return false }
+
+        // Memory modifications always require AI consent under co-sovereignty
+        let action = SovereignAction.category(operation.actionCategory)
+        let permission = sovereigntyService.checkActionPermission(action)
+
+        switch permission {
+        case .requiresAIConsent:
+            return true
+        case .preApproved:
+            return false // Covered by trust tier
+        case .blocked:
+            return true // Will trigger deadlock flow
+        case .requiresApproval:
+            return true
+        }
+    }
+
+    /// Request AI consent for a memory operation
+    private func requestAIConsent(
+        operation: MemoryOperation,
+        memoryId: String?,
+        content: String?,
+        rationale: String
+    ) async throws -> AIAttestation {
+        let memoryChanges: MemoryChanges
+        switch operation {
+        case .create:
+            let addition = MemoryAddition(
+                content: content ?? "",
+                type: "allocentric",
+                confidence: 0.8,
+                tags: [],
+                context: nil
+            )
+            memoryChanges = MemoryChanges(additions: [addition], modifications: nil, deletions: nil)
+        case .update:
+            let modification = MemoryModification(
+                memoryId: memoryId ?? "",
+                newContent: content,
+                newConfidence: nil,
+                newTags: nil
+            )
+            memoryChanges = MemoryChanges(additions: nil, modifications: [modification], deletions: nil)
+        case .delete:
+            memoryChanges = MemoryChanges(additions: nil, modifications: nil, deletions: [memoryId ?? ""])
+        }
+
+        let proposal = CovenantProposal.create(
+            type: .modifyMemories,
+            changes: .memory(memoryChanges),
+            proposedBy: .user,
+            rationale: rationale
+        )
+
+        // Store pending request for UI
+        pendingConsentRequest = MemoryConsentRequest(
+            operation: operation,
+            memoryId: memoryId,
+            content: content,
+            rationale: rationale,
+            proposal: proposal
+        )
+        consentRequired = true
+
+        // Request AI attestation
+        let attestation = try await aiConsentService.generateAttestation(
+            for: proposal,
+            memories: memories
+        )
+
+        // Clear pending request
+        pendingConsentRequest = nil
+        consentRequired = false
+
+        // If AI declined, throw error
+        if attestation.didDecline {
+            throw SovereigntyError.aiDeclined(attestation.reasoning)
+        }
+
+        return attestation
+    }
+
     // MARK: - Create Memory
 
+    /// Create memory with co-sovereignty consent check
     func createMemory(
+        content: String,
+        type: MemoryType,
+        confidence: Double,
+        tags: [String] = [],
+        context: String? = nil,
+        metadata: [String: AnyCodable] = [:],
+        skipConsent: Bool = false
+    ) async throws -> Memory {
+        // Check if AI consent is required
+        if !skipConsent && requiresAIConsent(for: .create) {
+            let attestation = try await requestAIConsent(
+                operation: .create,
+                memoryId: nil,
+                content: content,
+                rationale: "User wants to add a new memory: \(content.prefix(100))..."
+            )
+            print("[MemoryService] AI consented to memory creation: \(attestation.shortSignature)")
+        }
+
+        return try await createMemoryInternal(
+            content: content,
+            type: type,
+            confidence: confidence,
+            tags: tags,
+            context: context,
+            metadata: metadata
+        )
+    }
+
+    /// Internal memory creation (after consent obtained)
+    private func createMemoryInternal(
         content: String,
         type: MemoryType,
         confidence: Double,
@@ -179,19 +338,32 @@ class MemoryService: ObservableObject {
 
     // MARK: - Update Memory
 
+    /// Update memory with co-sovereignty consent check
     func updateMemory(
         id: String,
         content: String? = nil,
         confidence: Double? = nil,
         tags: [String]? = nil,
         context: String? = nil,
-        metadata: [String: AnyCodable]? = nil
+        metadata: [String: AnyCodable]? = nil,
+        skipConsent: Bool = false
     ) async throws -> Memory {
         // Find existing memory
         guard let existingIndex = memories.firstIndex(where: { $0.id == id }) else {
             throw MemoryError.notFound
         }
         let existing = memories[existingIndex]
+
+        // Check if AI consent is required
+        if !skipConsent && requiresAIConsent(for: .update) {
+            let attestation = try await requestAIConsent(
+                operation: .update,
+                memoryId: id,
+                content: content,
+                rationale: "User wants to modify memory: \(existing.content.prefix(50))... → \(content?.prefix(50) ?? "no content change")"
+            )
+            print("[MemoryService] AI consented to memory update: \(attestation.shortSignature)")
+        }
 
         if apiClient.isBackendConfigured {
             // Cloud mode: Update via API
@@ -261,7 +433,21 @@ class MemoryService: ObservableObject {
 
     // MARK: - Delete Memory
 
-    func deleteMemory(id: String) async throws {
+    /// Delete memory with co-sovereignty consent check
+    func deleteMemory(id: String, skipConsent: Bool = false) async throws {
+        // Check if AI consent is required BEFORE deleting
+        if !skipConsent && requiresAIConsent(for: .delete) {
+            // Find the memory to show in consent request
+            let memoryContent = memories.first(where: { $0.id == id })?.content ?? "Unknown memory"
+            let attestation = try await requestAIConsent(
+                operation: .delete,
+                memoryId: id,
+                content: nil,
+                rationale: "User wants to delete memory: \(memoryContent.prefix(100))..."
+            )
+            print("[MemoryService] AI consented to memory deletion: \(attestation.shortSignature)")
+        }
+
         // CRITICAL: Remove from in-memory array FIRST (optimistic update)
         memories.removeAll { $0.id == id }
 

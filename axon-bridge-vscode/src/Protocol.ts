@@ -3,7 +3,24 @@
  *
  * JSON-RPC 2.0 style protocol definitions for Axon Bridge communication.
  * These types mirror the Swift BridgeProtocol.swift definitions.
+ *
+ * Supports two connection modes:
+ * - Local Mode: Axon is server (default), VS Code connects as client
+ * - Remote Mode: VS Code is server, Axon connects as client (for LAN access)
  */
+
+// MARK: - Connection Mode
+
+/**
+ * Connection mode determines which side acts as the WebSocket server.
+ * The puppeteer/puppet relationship stays the same regardless of mode.
+ */
+export type BridgeMode = 'local' | 'remote';
+
+/**
+ * Role in the puppeteer/puppet relationship (independent of connection direction)
+ */
+export type BridgeRole = 'puppeteer' | 'puppet';
 
 // MARK: - JSON-RPC Messages
 
@@ -59,7 +76,58 @@ export enum BridgeErrorCode {
 
 // MARK: - Handshake
 
+/**
+ * Hello message sent by the connecting party during handshake.
+ * In Local Mode: VS Code sends this to Axon
+ * In Remote Mode: Axon sends this to VS Code
+ */
 export interface BridgeHello {
+    // Mode and role information (new for Remote Mode support)
+    mode?: BridgeMode;              // undefined defaults to 'local' for backward compatibility
+    role?: BridgeRole;              // undefined inferred from mode
+
+    // Workspace info (always present when VS Code sends, optional when Axon sends)
+    workspaceId?: string;
+    workspaceName?: string;
+    workspaceRoot?: string;
+    capabilities?: string[];
+    extensionVersion?: string;
+    vscodeVersion?: string;
+
+    // Axon info (present when Axon sends in Remote Mode)
+    axonVersion?: string;
+    deviceName?: string;            // e.g., "Tom's iPhone"
+
+    // Security
+    pairingToken?: string;
+}
+
+/**
+ * Welcome response sent by the server during handshake.
+ * In Local Mode: Axon sends this to VS Code
+ * In Remote Mode: VS Code sends this to Axon
+ */
+export interface BridgeWelcome {
+    sessionId: string;
+    mode?: BridgeMode;              // Echo back the mode for confirmation
+
+    // Server info (always present)
+    axonVersion?: string;           // Present in Local Mode (Axon is server)
+    extensionVersion?: string;      // Present in Remote Mode (VS Code is server)
+
+    // Workspace info (present in Remote Mode response from VS Code)
+    workspaceId?: string;
+    workspaceName?: string;
+    workspaceRoot?: string;
+    capabilities?: string[];
+
+    supportedMethods: string[];
+}
+
+/**
+ * Create a hello message from VS Code (Local Mode - existing behavior)
+ */
+export function createHelloFromVSCode(params: {
     workspaceId: string;
     workspaceName: string;
     workspaceRoot: string;
@@ -67,12 +135,45 @@ export interface BridgeHello {
     extensionVersion: string;
     vscodeVersion: string;
     pairingToken?: string;
+}): BridgeHello {
+    return {
+        mode: 'local',
+        role: 'puppet',
+        ...params,
+    };
 }
 
-export interface BridgeWelcome {
+/**
+ * Create a welcome response from VS Code (Remote Mode - new)
+ */
+export function createWelcomeFromVSCode(params: {
     sessionId: string;
-    axonVersion: string;
+    extensionVersion: string;
+    workspaceId: string;
+    workspaceName: string;
+    workspaceRoot: string;
+    capabilities: string[];
     supportedMethods: string[];
+}): BridgeWelcome {
+    return {
+        mode: 'remote',
+        ...params,
+    };
+}
+
+/**
+ * Get the effective mode (defaults to 'local' for backward compatibility)
+ */
+export function getEffectiveMode(hello: BridgeHello): BridgeMode {
+    return hello.mode ?? 'local';
+}
+
+/**
+ * Get the effective role (inferred from mode if not specified)
+ */
+export function getEffectiveRole(hello: BridgeHello): BridgeRole {
+    if (hello.role) return hello.role;
+    return getEffectiveMode(hello) === 'local' ? 'puppet' : 'puppeteer';
 }
 
 // MARK: - File Operations

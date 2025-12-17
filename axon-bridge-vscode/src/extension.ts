@@ -2,17 +2,21 @@
  * extension.ts
  *
  * Entry point for the Axon Bridge VS Code extension.
- * Connects VS Code to Axon as a "puppet" - receiving commands to execute
- * file operations, terminal commands, and workspace queries.
+ * Supports two connection modes:
+ * - Local Mode: VS Code connects to Axon (default)
+ * - Remote Mode: VS Code acts as server, Axon connects over LAN
  */
 
 import * as vscode from 'vscode';
-import { BridgeClient } from './BridgeClient';
+import { BridgeConnectionManager } from './BridgeConnectionManager';
 import { StatusBar } from './ui/StatusBar';
 import { BridgeLogService } from './BridgeLogService';
 import { BridgeLogsViewProvider } from './ui/BridgeLogsViewProvider';
+// TLSConfig imported for future TLS fingerprint display
+// import { showCertificateFingerprint } from './TLSConfig';
+import { BridgeMode } from './Protocol';
 
-let client: BridgeClient;
+let connectionManager: BridgeConnectionManager;
 let statusBar: StatusBar;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -30,30 +34,155 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    // Create bridge client
-    client = new BridgeClient(statusBar);
-    context.subscriptions.push({ dispose: () => client.dispose() });
+    // Initialize connection manager
+    connectionManager = BridgeConnectionManager.initialize(statusBar);
+    context.subscriptions.push({ dispose: () => connectionManager.dispose() });
 
     // Register commands
+    registerCommands(context, logsViewProvider);
+
+    // Auto-start based on mode and settings
+    const config = vscode.workspace.getConfiguration('axonBridge');
+    if (config.get('autoConnect', true)) {
+        // Delay slightly to let VS Code finish loading
+        setTimeout(() => {
+            connectionManager.start();
+        }, 1000);
+    }
+
+    console.log('[AxonBridge] Extension activated');
+}
+
+function registerCommands(context: vscode.ExtensionContext, logsViewProvider: BridgeLogsViewProvider) {
+    // Connect (Local Mode)
     context.subscriptions.push(
         vscode.commands.registerCommand('axon-bridge.connect', () => {
-            client.connect();
+            const mode = connectionManager.getMode();
+            if (mode === 'local') {
+                connectionManager.getClient()?.connect();
+            } else {
+                vscode.window.showWarningMessage('Connect command only works in Local Mode. Use "Start Server" for Remote Mode.');
+            }
         })
     );
 
+    // Disconnect (Local Mode)
     context.subscriptions.push(
         vscode.commands.registerCommand('axon-bridge.disconnect', () => {
-            client.disconnect();
+            const mode = connectionManager.getMode();
+            if (mode === 'local') {
+                connectionManager.getClient()?.disconnect();
+            } else {
+                vscode.window.showWarningMessage('Disconnect command only works in Local Mode. Use "Stop Server" for Remote Mode.');
+            }
         })
     );
 
+    // Start Server (Remote Mode)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('axon-bridge.startServer', async () => {
+            const config = vscode.workspace.getConfiguration('axonBridge');
+            const mode = config.get<BridgeMode>('mode', 'local');
+
+            if (mode !== 'remote') {
+                const result = await vscode.window.showWarningMessage(
+                    'Starting server will switch to Remote Mode. Continue?',
+                    'Yes', 'No'
+                );
+                if (result !== 'Yes') return;
+
+                // Switch to remote mode
+                await config.update('mode', 'remote', vscode.ConfigurationTarget.Global);
+            }
+
+            await connectionManager.setMode('remote');
+            await connectionManager.start();
+        })
+    );
+
+    // Stop Server (Remote Mode)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('axon-bridge.stopServer', async () => {
+            const server = connectionManager.getServer();
+            if (server?.isRunning()) {
+                await server.stop();
+            } else {
+                vscode.window.showInformationMessage('Server is not running');
+            }
+        })
+    );
+
+    // Show Server Address
+    context.subscriptions.push(
+        vscode.commands.registerCommand('axon-bridge.showServerAddress', () => {
+            const server = connectionManager.getServer();
+            if (server?.isRunning()) {
+                const port = connectionManager.getServerPort();
+
+                // Get local IP addresses
+                const networkInterfaces = require('os').networkInterfaces();
+                const addresses: string[] = [];
+
+                for (const name of Object.keys(networkInterfaces)) {
+                    for (const iface of networkInterfaces[name]) {
+                        if (iface.family === 'IPv4' && !iface.internal) {
+                            addresses.push(`ws://${iface.address}:${port}`);
+                        }
+                    }
+                }
+
+                const message = addresses.length > 0
+                    ? `Server addresses:\n${addresses.join('\n')}`
+                    : `Server listening on port ${port}`;
+
+                vscode.window.showInformationMessage(message, { modal: true });
+            } else {
+                vscode.window.showInformationMessage('Server is not running. Start it first.');
+            }
+        })
+    );
+
+    // Switch Mode
+    context.subscriptions.push(
+        vscode.commands.registerCommand('axon-bridge.switchMode', async () => {
+            const currentMode = connectionManager.getMode();
+            const items: vscode.QuickPickItem[] = [
+                {
+                    label: 'Local Mode',
+                    description: currentMode === 'local' ? '(current)' : '',
+                    detail: 'VS Code connects to Axon running locally'
+                },
+                {
+                    label: 'Remote Mode',
+                    description: currentMode === 'remote' ? '(current)' : '',
+                    detail: 'VS Code acts as server, Axon connects over LAN'
+                }
+            ];
+
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: 'Select connection mode'
+            });
+
+            if (selected) {
+                const newMode: BridgeMode = selected.label === 'Local Mode' ? 'local' : 'remote';
+                if (newMode !== currentMode) {
+                    await connectionManager.setMode(newMode);
+                    vscode.window.showInformationMessage(`Switched to ${selected.label}`);
+                }
+            }
+        })
+    );
+
+    // Status
     context.subscriptions.push(
         vscode.commands.registerCommand('axon-bridge.status', () => {
-            const status = client.getStatus();
-            vscode.window.showInformationMessage(`Axon Bridge: ${status}`);
+            const status = connectionManager.getStatus();
+            const mode = connectionManager.getMode();
+            vscode.window.showInformationMessage(`Axon Bridge [${mode}]: ${status}`);
         })
     );
 
+    // Logs
     context.subscriptions.push(
         vscode.commands.registerCommand('axon-bridge.logs', async () => {
             logsViewProvider.reveal();
@@ -61,29 +190,19 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // Clear Logs
     context.subscriptions.push(
         vscode.commands.registerCommand('axon-bridge.logs.clear', () => {
             BridgeLogService.shared.clear();
         })
     );
-
-    // Auto-connect if enabled
-    const config = vscode.workspace.getConfiguration('axonBridge');
-    if (config.get('autoConnect', true)) {
-        // Delay slightly to let VS Code finish loading
-        setTimeout(() => {
-            client.connect();
-        }, 1000);
-    }
-
-    console.log('[AxonBridge] Extension activated');
 }
 
 export function deactivate() {
     console.log('[AxonBridge] Extension deactivating...');
 
-    if (client) {
-        client.dispose();
+    if (connectionManager) {
+        connectionManager.dispose();
     }
 
     if (statusBar) {
