@@ -334,23 +334,36 @@ export class BridgeClient {
 
         try {
             switch (request.method) {
+                case 'ping':
+                    // Simple ping-pong for connectivity testing
+                    result = {
+                        message: (request.params as { message?: string })?.message ?? 'pong',
+                        ts: Date.now(),
+                    };
+                    break;
+
                 case 'file/read':
+                case 'readFile': // Alias for more intuitive naming
                     result = await this.fileHandler.read(request.params as any);
                     break;
 
                 case 'file/write':
+                case 'writeFile': // Alias for more intuitive naming
                     result = await this.fileHandler.write(request.params as any);
                     break;
 
                 case 'file/list':
+                case 'listFiles': // Alias for more intuitive naming
                     result = await this.fileHandler.list(request.params as any);
                     break;
 
                 case 'terminal/run':
+                case 'runTerminal': // Alias for more intuitive naming
                     result = await this.terminalHandler.run(request.params as any);
                     break;
 
                 case 'workspace/info':
+                case 'workspaceInfo': // Alias for more intuitive naming
                     result = await this.workspaceHandler.getInfo();
                     break;
 

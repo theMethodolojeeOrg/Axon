@@ -4,7 +4,7 @@
 #
 # Creates versioned releases in the releases/ folder with automatic
 # manifest generation for dynamic download links.
-#
+# cd axon-bridge-vscode/scripts && run bash release.sh
 
 set -e
 
