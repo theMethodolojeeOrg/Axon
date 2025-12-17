@@ -1451,6 +1451,9 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
     case querySystemState = "query_system_state"  // Query available providers, models, tools, permissions
     case changeSystemState = "change_system_state"  // Request changes to model, provider, or tools
 
+    // Bridge Debugging
+    case debugBridge = "debug_bridge"  // Check bridge connection status and logs
+
     var id: String { rawValue }
 
     var displayName: String {
@@ -1469,6 +1472,7 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .proposeCovenantChange: return "Propose Covenant Change"
         case .querySystemState: return "Query System State"
         case .changeSystemState: return "Change System State"
+        case .debugBridge: return "Debug Bridge"
         }
     }
 
@@ -1488,6 +1492,7 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .proposeCovenantChange: return "AI proposes modifications to the covenant"
         case .querySystemState: return "Query available providers, models, tools, and permissions"
         case .changeSystemState: return "Request changes to model, provider, or tool configuration"
+        case .debugBridge: return "Check VS Code bridge connection status and recent logs"
         }
     }
 
@@ -1507,6 +1512,7 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .proposeCovenantChange: return "doc.badge.plus"
         case .querySystemState: return "gearshape.2"
         case .changeSystemState: return "gearshape.arrow.triangle.2.circlepath"
+        case .debugBridge: return "ladybug"
         }
     }
 
@@ -1517,7 +1523,8 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .createMemory, .conversationSearch, .reflectOnConversation,
              .listTools, .getToolDetails,
              .queryCovenant, .proposeCovenantChange,
-             .querySystemState, .changeSystemState:
+             .querySystemState, .changeSystemState,
+             .debugBridge:
             return .internal
         }
     }
@@ -1530,7 +1537,8 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .createMemory, .conversationSearch, .reflectOnConversation,
              .listTools, .getToolDetails,
              .queryCovenant, .proposeCovenantChange,
-             .querySystemState, .changeSystemState:
+             .querySystemState, .changeSystemState,
+             .debugBridge:
             return false
         }
     }
@@ -1546,7 +1554,8 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
             return true  // System state changes require user approval (unless pre-approved via trust tier)
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch,
              .createMemory, .conversationSearch, .queryCovenant, .querySystemState,
-             .listTools, .getToolDetails:
+             .listTools, .getToolDetails,
+             .debugBridge:
             return false
         }
     }

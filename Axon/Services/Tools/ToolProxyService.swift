@@ -336,6 +336,18 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
                 """
 
+            case .debugBridge:
+                prompt += """
+
+                ### debug_bridge
+                Check the status of the VS Code Bridge connection and view recent logs. Use this if tool execution fails or to diagnose connection issues.
+
+                Example: ```tool_request
+                {"tool": "debug_bridge", "query": "status"}
+                ```
+
+                """
+
             }
         }
 
@@ -724,6 +736,9 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             // changeSystemState requires approval, so it goes through executeInternalToolWithApproval
             // But if we get here, it means approval was already handled or bypassed
             return await executeChangeSystemState(query: query)
+
+        case .debugBridge:
+            return await executeDebugBridge(query: query)
 
         case .createMemory:
             // Parse the pipe-separated format: TYPE|CONFIDENCE|TAGS|CONTENT
@@ -1502,6 +1517,8 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             text += "```tool_request\n{\"tool\":\"list_tools\",\"query\":\"all\"}\n```\n"
         case .getToolDetails:
             text += "```tool_request\n{\"tool\":\"get_tool_details\",\"query\":\"create_memory\"}\n```\n"
+        case .debugBridge:
+            text += "```tool_request\n{\"tool\":\"debug_bridge\",\"query\":\"status\"}\n```\n"
         }
 
         return text
@@ -2249,6 +2266,52 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         }
 
         return detectedTags.joined(separator: ",")
+    }
+
+    // MARK: - Bridge Debugging
+
+    /// Execute the debug_bridge tool
+    private func executeDebugBridge(query: String) async -> ToolResult {
+        let server = BridgeServer.shared
+        // Access logs on main actor since BridgeLogService is MainActor isolated
+        let logs = BridgeLogService.shared.entries.prefix(15)
+
+        var result = "## VS Code Bridge Status\n\n"
+        result += "- **Running:** \(server.isRunning ? "Yes" : "No")\n"
+        result += "- **Connected:** \(server.isConnected ? "Yes" : "No")\n"
+        result += "- **Connections:** \(server.connectionCount)\n"
+        
+        if let session = server.connectedSession {
+            result += "- **Session:** \(session.displayName) (v\(session.extensionVersion))\n"
+        }
+        
+        if let error = server.lastError {
+            result += "- **Last Error:** \(error)\n"
+        }
+
+        result += "\n### Recent Logs (Last 15)\n\n"
+        
+        if logs.isEmpty {
+            result += "*No logs available.*\n"
+        } else {
+            for log in logs {
+                let direction = log.direction == .incoming ? "←" : "→"
+                let type = log.messageType.rawValue
+                let summary = log.summary
+                let time = log.formattedTimestamp
+                result += "`\(time)` \(direction) [\(type)] \(summary)\n"
+            }
+        }
+        
+        result += "\n\n*View full logs in Settings → Axon Bridge → Bridge Inspector*"
+        
+        return ToolResult(
+            tool: ToolId.debugBridge.rawValue,
+            success: true,
+            result: result,
+            sources: nil,
+            memoryOperation: nil
+        )
     }
 
     // MARK: - Format Tool Results

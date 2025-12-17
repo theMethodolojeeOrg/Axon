@@ -2,6 +2,22 @@
 
 Connect VS Code to [Axon](https://axon.app) AI assistant for AI-powered coding assistance. This extension enables Axon to read, write, and execute code in your VS Code workspace.
 
+## Current Release
+
+**Version 0.2.1** - Released December 17, 2025 at 08:45 PM
+
+**Filename:** `axon-bridge-0.2.1_12172025_at_0845PM.vsix`
+
+### Changes in this release:
+- Initial commit: Axon Bridge VS Code Extension
+- Initial commit: Axon Bridge VS Code Extension
+
+### Download
+- [Download Latest VSIX](https://github.com/theMethodolojeeOrg/Axon/raw/main/axon-bridge-vscode/releases/latest/axon-bridge-latest.vsix)
+- [Download This Version](https://github.com/theMethodolojeeOrg/Axon/raw/main/axon-bridge-vscode/releases/2025-12-17/axon-bridge-0.2.1_12172025_at_0845PM.vsix)
+
+---
+
 ## Features
 
 - **File Operations**: Axon can read and write files in your workspace

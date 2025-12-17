@@ -24,28 +24,34 @@ let statusBar: StatusBar;
 export function activate(context: vscode.ExtensionContext) {
     console.log('[AxonBridge] Extension activating...');
 
-    const activationOutput = vscode.window.createOutputChannel('Axon Bridge (Activation)');
-    activationOutput.appendLine(`[AxonBridge] activating (cwd: ${process.cwd()})`);
-    activationOutput.appendLine(`[AxonBridge] package version: ${context.extension.packageJSON?.version ?? 'unknown'}`);
-    activationOutput.appendLine(`[AxonBridge] extensionUri: ${String(context.extensionUri)}`);
-    activationOutput.appendLine(`[AxonBridge] views registered in code: ${[
-        BridgeLogsViewProvider.viewType,
-        AxonSetupViewProvider.viewType,
-        AxonChatViewProvider.viewType,
-    ].join(', ')}`);
-    activationOutput.show(true);
-    context.subscriptions.push(activationOutput);
-
-    // Create UI components
-    statusBar = new StatusBar();
-    context.subscriptions.push({ dispose: () => statusBar.dispose() });
-
-    // Side bar views
-    const logsViewProvider = new BridgeLogsViewProvider();
-    const setupViewProvider = new AxonSetupViewProvider(context, () => connectionManager.getClient() ?? undefined);
-    const chatViewProvider = new AxonChatViewProvider(context, () => connectionManager.getClient() ?? undefined);
-
+    // Use a try-catch block for the entire activation to ensure at least logs/UI work
+    // even if connection manager or other parts fail.
     try {
+        const activationOutput = vscode.window.createOutputChannel('Axon Bridge (Activation)');
+        activationOutput.appendLine(`[AxonBridge] activating (cwd: ${process.cwd()})`);
+        activationOutput.appendLine(`[AxonBridge] package version: ${context.extension.packageJSON?.version ?? 'unknown'}`);
+        activationOutput.appendLine(`[AxonBridge] extensionUri: ${String(context.extensionUri)}`);
+
+        context.subscriptions.push(activationOutput);
+
+        // Create UI components
+        statusBar = new StatusBar();
+        context.subscriptions.push({ dispose: () => statusBar.dispose() });
+
+        // Side bar views
+        // Note: The callbacks for setup/chat providers are safe because connectionManager
+        // is initialized later in this function, and the callbacks are executed lazily.
+        const logsViewProvider = new BridgeLogsViewProvider();
+        const setupViewProvider = new AxonSetupViewProvider(context, () => connectionManager?.getClient() ?? undefined);
+        const chatViewProvider = new AxonChatViewProvider(context, () => connectionManager?.getClient() ?? undefined);
+
+        activationOutput.appendLine(`[AxonBridge] Registering views: ${[
+            BridgeLogsViewProvider.viewType,
+            AxonSetupViewProvider.viewType,
+            AxonChatViewProvider.viewType,
+        ].join(', ')}`);
+
+        // Register views
         context.subscriptions.push(
             vscode.window.registerWebviewViewProvider(BridgeLogsViewProvider.viewType, logsViewProvider, {
                 webviewOptions: { retainContextWhenHidden: true },
@@ -58,29 +64,37 @@ export function activate(context: vscode.ExtensionContext) {
             })
         );
         activationOutput.appendLine('[AxonBridge] registered WebviewViewProviders successfully');
+
+        // Initialize connection manager
+        activationOutput.appendLine('[AxonBridge] Initializing Connection Manager...');
+        connectionManager = BridgeConnectionManager.initialize(statusBar);
+        context.subscriptions.push({ dispose: () => connectionManager.dispose() });
+
+        // Register commands
+        registerCommands(context, logsViewProvider);
+
+        // Auto-start based on mode and settings
+        const config = vscode.workspace.getConfiguration('axonBridge');
+        if (config.get('autoConnect', true)) {
+            activationOutput.appendLine('[AxonBridge] Auto-connecting in 1s...');
+            // Delay slightly to let VS Code finish loading
+            setTimeout(() => {
+                connectionManager.start().catch(err => {
+                    console.error('[AxonBridge] Auto-connect failed:', err);
+                    activationOutput.appendLine(`[AxonBridge] Auto-connect failed: ${err}`);
+                });
+            }, 1000);
+        }
+
+        console.log('[AxonBridge] Extension activated');
+        activationOutput.appendLine('[AxonBridge] Extension activated successfully');
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        activationOutput.appendLine(`[AxonBridge] ERROR registering WebviewViewProviders: ${msg}`);
-        vscode.window.showErrorMessage(`Axon Bridge failed to register sidebar views: ${msg}`);
+        console.error(`[AxonBridge] CRITICAL ACTIVATION ERROR: ${msg}`, e);
+
+        // Try to notify user even if output channel failed
+        vscode.window.showErrorMessage(`Axon Bridge Extension failed to activate: ${msg}`);
     }
-
-    // Initialize connection manager
-    connectionManager = BridgeConnectionManager.initialize(statusBar);
-    context.subscriptions.push({ dispose: () => connectionManager.dispose() });
-
-    // Register commands
-    registerCommands(context, logsViewProvider);
-
-    // Auto-start based on mode and settings
-    const config = vscode.workspace.getConfiguration('axonBridge');
-    if (config.get('autoConnect', true)) {
-        // Delay slightly to let VS Code finish loading
-        setTimeout(() => {
-            connectionManager.start();
-        }, 1000);
-    }
-
-    console.log('[AxonBridge] Extension activated');
 }
 
 function registerCommands(context: vscode.ExtensionContext, logsViewProvider: BridgeLogsViewProvider) {

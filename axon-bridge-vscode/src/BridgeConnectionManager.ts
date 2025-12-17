@@ -211,5 +211,6 @@ export class BridgeConnectionManager {
     dispose() {
         this.stop();
         this._onConnectionChange.dispose();
+        BridgeConnectionManager._instance = null;
     }
 }

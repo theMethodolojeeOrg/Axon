@@ -2,447 +2,263 @@
 //  BridgeLogInspector.swift
 //  Axon
 //
-//  Inspector view for VS Code Bridge WebSocket traffic logs.
-//  Shows live traffic with JSON validation and pretty printing.
+//  Inspector view for viewing VS Code Bridge WebSocket traffic logs.
 //
 
 import SwiftUI
-import UniformTypeIdentifiers
 
-#if os(macOS)
-
-struct BridgeLogInspectorView: View {
+struct BridgeLogInspector: View {
     @ObservedObject var logService = BridgeLogService.shared
-    @ObservedObject var bridgeServer = BridgeServer.shared
-
+    @State private var searchText = ""
     @State private var selectedEntry: BridgeLogEntry?
-    @State private var showFilters = false
-
+    
     var body: some View {
-        VStack(spacing: 0) {
-            // Connection status bar
-            connectionStatusBar
-
-            Divider()
-                .overlay(AppColors.glassBorder.opacity(0.4))
-
-            // Filter bar (collapsible)
-            if showFilters {
-                filterBar
-                    .transition(.move(edge: .top).combined(with: .opacity))
-
-                Divider()
-                    .overlay(AppColors.glassBorder.opacity(0.4))
-            }
-
-            // Main content
-            if logService.entries.isEmpty {
-                emptyState
-            } else {
-                HSplitView {
-                    // Log list
-                    logList
-                        .frame(minWidth: 200)
-
-                    // Detail view
-                    if let entry = selectedEntry {
-                        logDetailView(entry: entry)
-                            .frame(minWidth: 200)
-                    }
-                }
-            }
-
-            Divider()
-                .overlay(AppColors.glassBorder.opacity(0.4))
-
-            // Bottom toolbar
-            bottomToolbar
-        }
-        .background(AppColors.substratePrimary)
-    }
-
-    // MARK: - Connection Status Bar
-
-    private var connectionStatusBar: some View {
-        HStack(spacing: 10) {
-            // Connection indicator
-            Circle()
-                .fill(bridgeServer.isConnected ? AppColors.signalLichen : (bridgeServer.isRunning ? AppColors.accentWarning : AppColors.textTertiary))
-                .frame(width: 8, height: 8)
-
-            if let session = bridgeServer.connectedSession {
-                Text(session.displayName)
-                    .font(AppTypography.labelSmall())
-                    .foregroundColor(AppColors.textPrimary)
-
-                Text("•")
-                    .foregroundColor(AppColors.textTertiary)
-
-                Text(session.workspaceRoot)
-                    .font(AppTypography.labelSmall())
-                    .foregroundColor(AppColors.textSecondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            } else if bridgeServer.isRunning {
-                Text("Waiting for connection...")
-                    .font(AppTypography.labelSmall())
-                    .foregroundColor(AppColors.textSecondary)
-            } else {
-                Text("Bridge not running")
-                    .font(AppTypography.labelSmall())
-                    .foregroundColor(AppColors.textTertiary)
-            }
-
-            Spacer()
-
-            // Filter toggle
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showFilters.toggle()
-                }
-            } label: {
-                Image(systemName: showFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                    .font(.system(size: 14))
-                    .foregroundColor(showFilters ? AppColors.signalMercury : AppColors.textSecondary)
-            }
-            .buttonStyle(.plain)
-            .help("Toggle Filters")
-
-            // Stats
-            HStack(spacing: 8) {
-                StatBadge(icon: "arrow.up.arrow.down", count: logService.entries.count, color: AppColors.textSecondary)
-                if logService.errorCount > 0 {
-                    StatBadge(icon: "exclamationmark.triangle", count: logService.errorCount, color: AppColors.accentError)
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(AppColors.substrateElevated.opacity(0.3))
-    }
-
-    // MARK: - Filter Bar
-
-    private var filterBar: some View {
-        VStack(spacing: 8) {
-            // Search field
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(AppColors.textTertiary)
-                TextField("Filter by method, id, or content...", text: $logService.filterText)
-                    .textFieldStyle(.plain)
-                    .font(AppTypography.bodySmall())
-
-                if !logService.filterText.isEmpty {
-                    Button {
-                        logService.filterText = ""
+        HStack(spacing: 0) {
+            // Log List
+            VStack(spacing: 0) {
+                // Toolbar
+                HStack {
+                    SearchField(text: $searchText, placeholder: "Filter logs...")
+                    
+                    Menu {
+                        Toggle("Incoming", isOn: $logService.showIncoming)
+                        Toggle("Outgoing", isOn: $logService.showOutgoing)
+                        Divider()
+                        Toggle("Requests", isOn: $logService.showRequests)
+                        Toggle("Responses", isOn: $logService.showResponses)
+                        Toggle("Notifications", isOn: $logService.showNotifications)
+                        Toggle("Errors", isOn: $logService.showErrors)
+                        Divider()
+                        Toggle("Only Invalid", isOn: $logService.onlyShowInvalid)
                     } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(AppColors.textTertiary)
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .foregroundColor(logService.filteredEntries.count != logService.entries.count ? AppColors.accentPrimary : AppColors.textSecondary)
                     }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(AppColors.substrateSecondary)
-            .cornerRadius(8)
-
-            // Filter toggles
-            HStack(spacing: 12) {
-                FilterToggle(label: "Incoming", isOn: $logService.showIncoming, color: AppColors.signalLichen)
-                FilterToggle(label: "Outgoing", isOn: $logService.showOutgoing, color: AppColors.signalMercury)
-
-                Divider().frame(height: 16)
-
-                FilterToggle(label: "Requests", isOn: $logService.showRequests)
-                FilterToggle(label: "Responses", isOn: $logService.showResponses)
-                FilterToggle(label: "Errors", isOn: $logService.showErrors)
-
-                Divider().frame(height: 16)
-
-                FilterToggle(label: "Invalid Only", isOn: $logService.onlyShowInvalid, color: AppColors.accentError)
-
-                Spacer()
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(AppColors.substratePrimary)
-    }
-
-    // MARK: - Log List
-
-    private var logList: some View {
-        ScrollView {
-            LazyVStack(spacing: 2) {
-                ForEach(logService.filteredEntries) { entry in
-                    LogEntryRow(entry: entry, isSelected: selectedEntry?.id == entry.id)
-                        .onTapGesture {
-                            selectedEntry = entry
-                        }
-                }
-            }
-            .padding(8)
-        }
-        .background(AppColors.substratePrimary)
-    }
-
-    // MARK: - Log Detail View
-
-    private func logDetailView(entry: BridgeLogEntry) -> some View {
-        VStack(spacing: 0) {
-            // Detail header
-            HStack(spacing: 10) {
-                Image(systemName: entry.direction.icon)
-                    .foregroundColor(entry.direction == .incoming ? AppColors.signalLichen : AppColors.signalMercury)
-
-                Text(entry.summary)
-                    .font(AppTypography.bodySmall(.medium))
-                    .foregroundColor(AppColors.textPrimary)
-
-                Spacer()
-
-                Text(entry.formattedTimestamp)
-                    .font(AppTypography.labelSmall())
-                    .foregroundColor(AppColors.textTertiary)
-
-                // Copy button
-                Button {
-                    AppClipboard.copy(entry.prettyJSON)
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 12))
-                        .foregroundColor(AppColors.textSecondary)
-                }
-                .buttonStyle(.plain)
-                .help("Copy JSON")
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(AppColors.substrateElevated.opacity(0.3))
-
-            Divider()
-                .overlay(AppColors.glassBorder.opacity(0.4))
-
-            // Validation errors if any
-            if !entry.isValid {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(AppColors.accentError)
-                        Text("Validation Errors")
-                            .font(AppTypography.labelSmall())
-                            .foregroundColor(AppColors.accentError)
-                    }
-
-                    ForEach(entry.validationErrors, id: \.self) { error in
-                        Text("• \(error)")
-                            .font(AppTypography.labelSmall())
+                    
+                    Button(action: { logService.clear() }) {
+                        Image(systemName: "trash")
                             .foregroundColor(AppColors.textSecondary)
                     }
                 }
                 .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(AppColors.accentError.opacity(0.1))
-
+                .background(AppColors.substrateSecondary)
+                .onChange(of: searchText) { newValue in
+                    logService.filterText = newValue
+                }
+                
                 Divider()
-                    .overlay(AppColors.glassBorder.opacity(0.4))
-            }
-
-            // JSON content
-            ScrollView([.vertical, .horizontal]) {
-                Text(entry.prettyJSON)
-                    .font(.system(.body, design: .monospaced))
-                    .foregroundColor(AppColors.textPrimary)
-                    .textSelection(.enabled)
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .background(AppColors.substratePrimary)
-        }
-    }
-
-    // MARK: - Empty State
-
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "network")
-                .font(.system(size: 40))
-                .foregroundColor(AppColors.textTertiary)
-
-            Text("No WebSocket traffic yet")
-                .font(AppTypography.titleSmall())
-                .foregroundColor(AppColors.textPrimary)
-
-            Text("Messages between Axon and VS Code will appear here when the bridge is connected.")
-                .font(AppTypography.bodySmall())
-                .foregroundColor(AppColors.textSecondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 280)
-
-            if !bridgeServer.isRunning {
-                Button("Start Bridge") {
-                    Task {
-                        await bridgeServer.start()
+                
+                // List
+                ScrollViewReader { proxy in
+                    List(selection: $selectedEntry) {
+                        ForEach(logService.filteredEntries) { entry in
+                            LogEntryRow(entry: entry)
+                                .tag(entry)
+                                .listRowInsets(EdgeInsets())
+                                .listRowBackground(selectedEntry == entry ? AppColors.substrateTertiary : Color.clear)
+                        }
+                    }
+                    .listStyle(.plain)
+                    .onChange(of: logService.entries.count) { _ in
+                        // Auto-scroll to top if at top? No, logs are newest first.
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(AppColors.signalMercury)
+            }
+            .frame(minWidth: 300)
+            
+            Divider()
+            
+            // Detail View
+            if let entry = selectedEntry {
+                LogDetailView(entry: entry)
+                    .frame(minWidth: 400)
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "arrow.left.arrow.right.circle")
+                        .font(.system(size: 48))
+                        .foregroundColor(AppColors.substrateTertiary)
+                    Text("Select a log entry to view details")
+                        .font(AppTypography.bodyMedium())
+                        .foregroundColor(AppColors.textSecondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(AppColors.substratePrimary)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppColors.substratePrimary)
+        .navigationTitle("Bridge Inspector")
+        #if os(macOS)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: {
+                    AppClipboard.copy(logService.export())
+                }) {
+                    Label("Export JSON", systemImage: "square.and.arrow.up")
+                }
+            }
+        }
+        #endif
     }
+}
 
-    // MARK: - Bottom Toolbar
-
-    private var bottomToolbar: some View {
+struct LogEntryRow: View {
+    let entry: BridgeLogEntry
+    
+    var body: some View {
         HStack(spacing: 12) {
-            // Logging toggle
-            Toggle(isOn: $logService.isLoggingEnabled) {
-                Image(systemName: logService.isLoggingEnabled ? "record.circle" : "record.circle.fill")
-                    .foregroundColor(logService.isLoggingEnabled ? AppColors.accentError : AppColors.textTertiary)
+            // Direction & Type Icon
+            ZStack {
+                Circle()
+                    .fill(statusColor.opacity(0.1))
+                    .frame(width: 28, height: 28)
+                
+                Image(systemName: entry.messageType.icon)
+                    .font(.system(size: 14))
+                    .foregroundColor(statusColor)
             }
-            .toggleStyle(.switch)
-            .controlSize(.small)
-            .help(logService.isLoggingEnabled ? "Logging enabled" : "Logging paused")
-
-            Spacer()
-
-            // Export button
-            Button {
-                exportLogs()
-            } label: {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppColors.textSecondary)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(entry.direction == .outgoing ? "To VS Code" : "From VS Code")
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                    
+                    Spacer()
+                    
+                    Text(entry.formattedTimestamp)
+                        .font(AppTypography.labelSmall(.monospaced))
+                        .foregroundColor(AppColors.textTertiary)
+                }
+                
+                Text(entry.summary)
+                    .font(AppTypography.bodySmall(.medium))
+                    .foregroundColor(AppColors.textPrimary)
+                    .lineLimit(1)
             }
-            .buttonStyle(.plain)
-            .disabled(logService.entries.isEmpty)
-            .help("Export Logs")
-
-            // Clear button
-            Button {
-                logService.clear()
-                selectedEntry = nil
-            } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppColors.textSecondary)
-            }
-            .buttonStyle(.plain)
-            .disabled(logService.entries.isEmpty)
-            .help("Clear Logs")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(AppColors.substratePrimary)
-    }
-
-    private func exportLogs() {
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "bridge-logs-\(ISO8601DateFormatter().string(from: Date())).json"
-        panel.allowedContentTypes = [.json]
-        panel.canCreateDirectories = true
-
-        panel.begin { response in
-            guard response == .OK, let url = panel.url else { return }
-            do {
-                try logService.export().write(to: url, atomically: true, encoding: .utf8)
-            } catch {
-                print("[BridgeLogInspector] Failed to export: \(error)")
-            }
-        }
-    }
-}
-
-// MARK: - Helper Views
-
-private struct LogEntryRow: View {
-    let entry: BridgeLogEntry
-    let isSelected: Bool
-
-    var body: some View {
-        HStack(spacing: 8) {
-            // Direction indicator
-            Image(systemName: entry.direction.icon)
-                .font(.system(size: 12))
-                .foregroundColor(entry.direction == .incoming ? AppColors.signalLichen : AppColors.signalMercury)
-                .frame(width: 16)
-
-            // Method/Summary
-            Text(entry.summary)
-                .font(AppTypography.bodySmall(.medium))
-                .foregroundColor(AppColors.textPrimary)
-                .lineLimit(1)
-
-            Spacer()
-
-            // Validation indicator
-            if !entry.isValid {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 10))
-                    .foregroundColor(AppColors.accentError)
-            }
-
-            // Timestamp
-            Text(entry.formattedTimestamp)
-                .font(AppTypography.labelSmall())
-                .foregroundColor(AppColors.textTertiary)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? AppColors.signalMercury.opacity(0.2) : Color.clear)
-        )
         .contentShape(Rectangle())
     }
-}
-
-private struct StatBadge: View {
-    let icon: String
-    let count: Int
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 10))
-            Text("\(count)")
-                .font(AppTypography.labelSmall())
+    
+    var statusColor: Color {
+        if !entry.isValid || entry.messageType == .error {
+            return AppColors.accentError
         }
-        .foregroundColor(color)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            Capsule().fill(color.opacity(0.1))
-        )
+        switch entry.messageType {
+        case .request: return AppColors.accentPrimary
+        case .response: return AppColors.accentSuccess
+        case .notification: return AppColors.accentWarning
+        default: return AppColors.textSecondary
+        }
     }
 }
 
-private struct FilterToggle: View {
-    let label: String
-    @Binding var isOn: Bool
-    var color: Color = AppColors.textSecondary
-
+struct LogDetailView: View {
+    let entry: BridgeLogEntry
+    @State private var showRaw = false
+    
     var body: some View {
-        Button {
-            isOn.toggle()
-        } label: {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(entry.messageType.rawValue.uppercased())
+                        .font(AppTypography.labelSmall(.bold))
+                        .foregroundColor(AppColors.textSecondary)
+                    
+                    Text(entry.summary)
+                        .font(AppTypography.headerSmall())
+                        .foregroundColor(AppColors.textPrimary)
+                }
+                
+                Spacer()
+                
+                Picker("Format", selection: $showRaw) {
+                    Text("Pretty").tag(false)
+                    Text("Raw").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 120)
+            }
+            .padding()
+            .background(AppColors.substrateSecondary)
+            
+            Divider()
+            
+            // Content
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Metadata
+                    HStack(spacing: 24) {
+                        DetailField(label: "Time", value: entry.formattedTimestamp)
+                        DetailField(label: "Direction", value: entry.direction.label)
+                        if let id = entry.requestId {
+                            DetailField(label: "Request ID", value: id)
+                        }
+                    }
+                    
+                    if !entry.isValid {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Validation Errors")
+                                .font(AppTypography.labelSmall(.bold))
+                                .foregroundColor(AppColors.accentError)
+                            
+                            ForEach(entry.validationErrors, id: \.self) { error in
+                                Text("• \(error)")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.accentError)
+                            }
+                        }
+                        .padding()
+                        .background(AppColors.accentError.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                    
+                    // JSON
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Payload")
+                                .font(AppTypography.labelSmall(.bold))
+                                .foregroundColor(AppColors.textSecondary)
+                            Spacer()
+                            Button(action: {
+                                AppClipboard.copy(showRaw ? entry.rawJSON : entry.prettyJSON)
+                            }) {
+                                Image(systemName: "doc.on.doc")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
+                        }
+                        
+                        Text(showRaw ? entry.rawJSON : entry.prettyJSON)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(AppColors.textPrimary)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(AppColors.substrateSecondary)
+                            .cornerRadius(8)
+                    }
+                }
+                .padding()
+            }
+        }
+        .background(AppColors.substratePrimary)
+    }
+}
+
+struct DetailField: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(AppTypography.labelSmall())
-                .foregroundColor(isOn ? color : AppColors.textTertiary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill(isOn ? color.opacity(0.15) : AppColors.substrateSecondary)
-                )
+                .foregroundColor(AppColors.textTertiary)
+            Text(value)
+                .font(AppTypography.bodySmall(.medium))
+                .foregroundColor(AppColors.textPrimary)
         }
-        .buttonStyle(.plain)
     }
 }
-
-#endif

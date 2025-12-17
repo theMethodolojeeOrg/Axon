@@ -64,6 +64,11 @@ export class BridgeClient {
     private reconnectAttempts: number = 0;
     private readonly maxReconnectInterval: number = 60000; // 1 minute max
 
+    // Circuit breaker state
+    private connectionFailures: number[] = [];
+    private readonly failureWindow = 60000; // 1 minute window
+    private readonly maxFailures = 10; // Max failures per window
+
     constructor(statusBar: StatusBar) {
         this.statusBar = statusBar;
         this.fileHandler = new FileHandler();
@@ -240,44 +245,50 @@ export class BridgeClient {
     // MARK: - Message Handling
 
     private sendHello() {
-        // Reset reconnect attempts on successful connection
-        this.reconnectAttempts = 0;
+        try {
+            // Reset reconnect attempts on successful connection
+            this.reconnectAttempts = 0;
+            this.connectionFailures = []; // Clear circuit breaker history
 
-        const folders = vscode.workspace.workspaceFolders;
-        const workspaceRoot = folders?.[0]?.uri.fsPath ?? '';
-        const workspaceName = vscode.workspace.name ?? folders?.[0]?.name ?? 'Unknown';
+            const folders = vscode.workspace.workspaceFolders;
+            const workspaceRoot = folders?.[0]?.uri.fsPath ?? '';
+            const workspaceName = vscode.workspace.name ?? folders?.[0]?.name ?? 'Unknown';
 
-        // Generate a stable workspace ID from the path
-        const workspaceId = crypto.createHash('sha256')
-            .update(workspaceRoot)
-            .digest('hex')
-            .substring(0, 16);
+            // Generate a stable workspace ID from the path
+            const workspaceId = crypto.createHash('sha256')
+                .update(workspaceRoot)
+                .digest('hex')
+                .substring(0, 16);
 
-        const hello: BridgeHello = {
-            workspaceId: `sha256:${workspaceId}`,
-            workspaceName,
-            workspaceRoot,
-            capabilities: [
-                'file/read',
-                'file/write',
-                'file/list',
-                'terminal/run',
-                'workspace/info',
-            ],
-            extensionVersion: EXTENSION_VERSION,
-            vscodeVersion: vscode.version,
-            pairingToken: this.pairingToken?.trim() ? this.pairingToken.trim() : undefined,
-        };
+            const hello: BridgeHello = {
+                workspaceId: `sha256:${workspaceId}`,
+                workspaceName,
+                workspaceRoot,
+                capabilities: [
+                    'file/read',
+                    'file/write',
+                    'file/list',
+                    'terminal/run',
+                    'workspace/info',
+                ],
+                extensionVersion: EXTENSION_VERSION,
+                vscodeVersion: vscode.version,
+                pairingToken: this.pairingToken?.trim() ? this.pairingToken.trim() : undefined,
+            };
 
-        // Send as a request (expecting welcome response)
-        const request: BridgeRequest = {
-            jsonrpc: '2.0',
-            id: 'hello',
-            method: 'hello',
-            params: hello,
-        };
+            // Send as a request (expecting welcome response)
+            const request: BridgeRequest = {
+                jsonrpc: '2.0',
+                id: 'hello',
+                method: 'hello',
+                params: hello,
+            };
 
-        this.send(request);
+            this.send(request);
+        } catch (error) {
+            console.error('[AxonBridge] Failed to send hello:', error);
+            this.disconnect();
+        }
     }
 
     private handleMessage(data: string) {
@@ -463,6 +474,20 @@ export class BridgeClient {
 
     private scheduleReconnect() {
         if (this.reconnectTimer) {
+            return;
+        }
+
+        // Circuit breaker check
+        const now = Date.now();
+        // Remove old failures
+        this.connectionFailures = this.connectionFailures.filter(t => now - t < this.failureWindow);
+        // Add new failure
+        this.connectionFailures.push(now);
+
+        if (this.connectionFailures.length > this.maxFailures) {
+            console.error(`[AxonBridge] Circuit breaker tripped: ${this.connectionFailures.length} failures in ${this.failureWindow / 1000}s. Stopping auto-reconnect.`);
+            this.statusBar.showNotification('Connection unstable. Auto-reconnect stopped.', 'error');
+            this.statusBar.setState('disconnected', 'Circuit breaker tripped');
             return;
         }
 

@@ -128,6 +128,25 @@ struct ServerSettingsView: View {
                 }
             }
 
+            // Axon Bridge Debugging
+            SettingsSection(title: "Axon Bridge") {
+                NavigationLink(destination: BridgeLogInspector()) {
+                    HStack {
+                        Image(systemName: "ladybug.circle")
+                            .foregroundColor(AppColors.accentPrimary)
+                        Text("Bridge Inspector")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+                    .padding()
+                    .background(AppColors.substrateSecondary)
+                    .cornerRadius(8)
+                }
+            }
+
             // Configuration Section
             SettingsSection(title: "Configuration") {
                 VStack(spacing: 16) {
