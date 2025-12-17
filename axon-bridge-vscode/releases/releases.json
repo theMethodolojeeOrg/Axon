@@ -1,0 +1,18 @@
+{
+  "releases": [
+    {
+      "version": "0.2.0",
+      "date": "2025-12-17",
+      "timestamp": "20251217-164818",
+      "filename": "axon-bridge-0.2.0.vsix",
+      "path": "2025-12-17/axon-bridge-0.2.0.vsix",
+      "downloadUrl": "https://github.com/theMethodolojeeOrg/Axon/raw/main/axon-bridge-vscode/releases/2025-12-17/axon-bridge-0.2.0.vsix",
+      "changelog": "Remote Mode support - VS Code can now act as server for LAN connections from Axon"
+    }
+  ],
+  "latest": {
+    "version": "0.2.0",
+    "downloadUrl": "https://github.com/theMethodolojeeOrg/Axon/raw/main/axon-bridge-vscode/releases/2025-12-17/axon-bridge-0.2.0.vsix",
+    "latestUrl": "https://github.com/theMethodolojeeOrg/Axon/raw/main/axon-bridge-vscode/releases/latest/axon-bridge-latest.vsix"
+  }
+}

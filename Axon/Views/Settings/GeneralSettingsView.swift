@@ -660,33 +660,7 @@ struct SettingsOptionRow: View {
     }
 }
 
-struct SettingsToggleRow: View {
-    let title: String
-    let icon: String
-    @Binding var isOn: Bool
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundColor(AppColors.signalMercury)
-                .frame(width: 32)
-
-            Text(title)
-                .font(AppTypography.bodyMedium())
-                .foregroundColor(AppColors.textPrimary)
-
-            Spacer()
-
-            Toggle("", isOn: $isOn)
-                .labelsHidden()
-                .tint(AppColors.signalMercury)
-        }
-        .padding()
-        .background(AppColors.substrateSecondary)
-        .cornerRadius(8)
-    }
-}
+// SettingsToggleRow moved to SharedUIElements.swift
 
 // MARK: - Device Mode Section
 

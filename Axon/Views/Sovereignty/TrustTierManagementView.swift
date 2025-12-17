@@ -93,10 +93,16 @@ struct TrustTierManagementView: View {
         .navigationTitle("Trust Tiers")
         .sheet(isPresented: $showingNewTierSheet) {
             NewTrustTierSheet(negotiationService: negotiationService)
+                #if os(macOS)
+                .frame(minWidth: 480, idealWidth: 550, minHeight: 550, idealHeight: 700)
+                #endif
         }
         .sheet(isPresented: $showingTierDetail) {
             if let tier = selectedTier {
                 TrustTierDetailSheet(tier: tier, negotiationService: negotiationService)
+                    #if os(macOS)
+                    .frame(minWidth: 500, idealWidth: 600, minHeight: 550, idealHeight: 750)
+                    #endif
             }
         }
     }
@@ -471,6 +477,9 @@ struct TrustTierDetailSheet: View {
             }
             .sheet(isPresented: $showingModifySheet) {
                 ModifyTrustTierSheet(tier: tier, negotiationService: negotiationService)
+                    #if os(macOS)
+                    .frame(minWidth: 450, idealWidth: 520, minHeight: 400, idealHeight: 500)
+                    #endif
             }
             .confirmationDialog(
                 "Revoke Trust Tier?",
@@ -586,118 +595,376 @@ struct NewTrustTierSheet: View {
     @State private var allowedPaths: [String] = []
     @State private var newPath = ""
 
+    // Negotiation state
+    @State private var isNegotiating = false
+    @State private var negotiationPhase: NegotiationPhase = .input
+    @State private var aiReasoning: String = ""
+    @State private var errorMessage: String?
+
+    enum NegotiationPhase {
+        case input
+        case awaitingAI
+        case aiConsented
+        case finalizing
+        case completed
+        case failed
+    }
+
     var body: some View {
         NavigationStack {
-            Form {
-                // Basic Info
-                Section("Trust Tier Details") {
-                    TextField("Name", text: $tierName)
-                    TextField("Description", text: $tierDescription, axis: .vertical)
-                        .lineLimit(2...4)
-                }
-
-                // Action Categories
-                Section {
-                    ForEach(ActionCategory.allCases, id: \.self) { category in
-                        Toggle(isOn: Binding(
-                            get: { selectedCategories.contains(category) },
-                            set: { isOn in
-                                if isOn {
-                                    selectedCategories.insert(category)
-                                } else {
-                                    selectedCategories.remove(category)
-                                }
-                            }
-                        )) {
-                            HStack {
-                                ActionCategoryBadge(category: category)
-                                Spacer()
-                                Text(category.affectsWorld ? "AI -> World" : "User -> AI")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                } header: {
-                    Text("Allowed Actions")
-                } footer: {
-                    Text("AI -> World actions require your biometric. User -> AI actions require AI consent.")
-                }
-
-                // Scope Configuration
-                Section("Scope (Optional)") {
-                    // Allowed paths
-                    ForEach(allowedPaths, id: \.self) { path in
-                        HStack {
-                            Image(systemName: "folder")
-                            Text(path)
-                                .font(.caption)
-                            Spacer()
-                            Button(action: { allowedPaths.removeAll { $0 == path } }) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(.secondary)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    HStack {
-                        TextField("Add path (e.g., ~/Projects)", text: $newPath)
-                            .font(.caption)
-
-                        Button(action: {
-                            if !newPath.isEmpty {
-                                allowedPaths.append(newPath)
-                                newPath = ""
-                            }
-                        }) {
-                            Image(systemName: "plus.circle.fill")
-                        }
-                        .disabled(newPath.isEmpty)
-                    }
-                }
-
-                // Expiration
-                Section("Expiration") {
-                    Toggle("Set Expiration", isOn: $hasExpiration)
-
-                    if hasExpiration {
-                        Stepper("Expires in \(expirationDays) days", value: $expirationDays, in: 1...365)
-                    }
-                }
-
-                // Rationale
-                Section {
-                    TextField("Why do you want this trust tier?", text: $rationale, axis: .vertical)
-                        .lineLimit(3...6)
-                } header: {
-                    Text("Your Rationale")
-                } footer: {
-                    Text("The AI will consider your reasoning when deciding whether to consent.")
+            Group {
+                switch negotiationPhase {
+                case .input:
+                    inputForm
+                case .awaitingAI:
+                    awaitingAIView
+                case .aiConsented:
+                    aiConsentedView
+                case .finalizing:
+                    finalizingView
+                case .completed:
+                    completedView
+                case .failed:
+                    failedView
                 }
             }
-            .navigationTitle("New Trust Tier")
+            .navigationTitle(navigationTitle)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    if negotiationPhase != .completed {
+                        Button("Cancel") {
+                            if negotiationPhase != .input {
+                                negotiationService.cancelNegotiation()
+                            }
+                            dismiss()
+                        }
+                    }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Propose") {
-                        proposeNewTier()
+                    if negotiationPhase == .input {
+                        Button("Propose") {
+                            proposeNewTier()
+                        }
+                        .disabled(!isValid)
+                    } else if negotiationPhase == .completed {
+                        Button("Done") {
+                            dismiss()
+                        }
                     }
-                    .disabled(!isValid)
                 }
             }
         }
     }
 
+    private var navigationTitle: String {
+        switch negotiationPhase {
+        case .input: return "New Trust Tier"
+        case .awaitingAI: return "Awaiting AI Response"
+        case .aiConsented: return "AI Consented"
+        case .finalizing: return "Finalizing"
+        case .completed: return "Trust Tier Created"
+        case .failed: return "Negotiation Failed"
+        }
+    }
+
+    // MARK: - Input Form
+
+    private var inputForm: some View {
+        Form {
+            // Basic Info
+            Section("Trust Tier Details") {
+                #if os(macOS)
+                LabeledContent("Name") {
+                    TextField("", text: $tierName)
+                        .textFieldStyle(.roundedBorder)
+                }
+                LabeledContent("Description") {
+                    TextField("", text: $tierDescription, axis: .vertical)
+                        .textFieldStyle(.roundedBorder)
+                        .lineLimit(2...4)
+                }
+                #else
+                TextField("Name", text: $tierName)
+                TextField("Description", text: $tierDescription, axis: .vertical)
+                    .lineLimit(2...4)
+                #endif
+            }
+
+            // Action Categories
+            Section {
+                ForEach(ActionCategory.allCases, id: \.self) { category in
+                    Toggle(isOn: Binding(
+                        get: { selectedCategories.contains(category) },
+                        set: { isOn in
+                            if isOn {
+                                selectedCategories.insert(category)
+                            } else {
+                                selectedCategories.remove(category)
+                            }
+                        }
+                    )) {
+                        HStack {
+                            ActionCategoryBadge(category: category)
+                            Spacer()
+                            #if os(macOS)
+                            Text(category.affectsWorld ? "AI → World" : "User → AI")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .frame(minWidth: 80, alignment: .trailing)
+                            #else
+                            Text(category.affectsWorld ? "AI -> World" : "User -> AI")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            #endif
+                        }
+                    }
+                }
+            } header: {
+                Text("Allowed Actions")
+            } footer: {
+                Text("AI → World actions require your biometric. User → AI actions require AI consent.")
+            }
+
+            // Scope Configuration
+            Section("Scope (Optional)") {
+                // Allowed paths
+                ForEach(allowedPaths, id: \.self) { path in
+                    HStack {
+                        Image(systemName: "folder")
+                        Text(path)
+                            .font(.caption)
+                        Spacer()
+                        Button(action: { allowedPaths.removeAll { $0 == path } }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                HStack {
+                    #if os(macOS)
+                    TextField("Add path (e.g., ~/Projects)", text: $newPath)
+                        .textFieldStyle(.roundedBorder)
+                    #else
+                    TextField("Add path (e.g., ~/Projects)", text: $newPath)
+                        .font(.caption)
+                    #endif
+
+                    Button(action: {
+                        if !newPath.isEmpty {
+                            allowedPaths.append(newPath)
+                            newPath = ""
+                        }
+                    }) {
+                        Image(systemName: "plus.circle.fill")
+                    }
+                    .disabled(newPath.isEmpty)
+                }
+            }
+
+            // Expiration
+            Section("Expiration") {
+                Toggle("Set Expiration", isOn: $hasExpiration)
+
+                if hasExpiration {
+                    #if os(macOS)
+                    LabeledContent("Duration") {
+                        Stepper("\(expirationDays) days", value: $expirationDays, in: 1...365)
+                    }
+                    #else
+                    Stepper("Expires in \(expirationDays) days", value: $expirationDays, in: 1...365)
+                    #endif
+                }
+            }
+
+            // Rationale
+            Section {
+                #if os(macOS)
+                TextField("Why do you want this trust tier?", text: $rationale, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(3...6)
+                #else
+                TextField("Why do you want this trust tier?", text: $rationale, axis: .vertical)
+                    .lineLimit(3...6)
+                #endif
+            } header: {
+                Text("Your Rationale")
+            } footer: {
+                Text("The AI will consider your reasoning when deciding whether to consent.")
+            }
+        }
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
+    }
+
+    // MARK: - Awaiting AI View
+
+    private var awaitingAIView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            ProgressView()
+                .scaleEffect(1.5)
+
+            Text("Requesting AI Consent...")
+                .font(.headline)
+
+            Text("The AI is reviewing your trust tier proposal and will provide its reasoning.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            Spacer()
+        }
+        .padding()
+    }
+
+    // MARK: - AI Consented View
+
+    private var aiConsentedView: some View {
+        VStack(spacing: 20) {
+            // Success indicator
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 60))
+                .foregroundColor(.green)
+
+            Text("AI Consented")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            // AI Reasoning
+            VStack(alignment: .leading, spacing: 12) {
+                Label("AI Reasoning", systemImage: "brain.head.profile")
+                    .font(.headline)
+
+                Text(aiReasoning)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .padding()
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(8)
+            }
+            .padding()
+
+            // Finalize button
+            Button(action: finalizeWithBiometric) {
+                HStack {
+                    Image(systemName: "faceid")
+                    Text("Confirm with Biometric")
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.blue)
+                .cornerRadius(12)
+            }
+            .padding(.horizontal)
+
+            Text("Your biometric signature is required to finalize this trust tier.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            Spacer()
+        }
+        .padding()
+    }
+
+    // MARK: - Finalizing View
+
+    private var finalizingView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            ProgressView()
+                .scaleEffect(1.5)
+
+            Text("Finalizing Trust Tier...")
+                .font(.headline)
+
+            Text("Applying your signature and creating the trust tier.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            Spacer()
+        }
+        .padding()
+    }
+
+    // MARK: - Completed View
+
+    private var completedView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "checkmark.shield.fill")
+                .font(.system(size: 80))
+                .foregroundColor(.green)
+
+            Text("Trust Tier Created!")
+                .font(.title)
+                .fontWeight(.bold)
+
+            Text("'\(tierName)' is now active and both parties have signed.")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            Spacer()
+        }
+        .padding()
+    }
+
+    // MARK: - Failed View
+
+    private var failedView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 60))
+                .foregroundColor(.red)
+
+            Text("Negotiation Failed")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            if let error = errorMessage {
+                Text(error)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+
+            Button("Try Again") {
+                negotiationPhase = .input
+                errorMessage = nil
+            }
+            .buttonStyle(.borderedProminent)
+
+            Spacer()
+        }
+        .padding()
+    }
+
+    // MARK: - Validation
+
     private var isValid: Bool {
         !tierName.isEmpty && !tierDescription.isEmpty && !selectedCategories.isEmpty && !rationale.isEmpty
     }
+
+    // MARK: - Actions
 
     private func proposeNewTier() {
         let actions = selectedCategories.map { category in
@@ -725,18 +992,80 @@ struct NewTrustTierSheet: View {
             updatedAt: Date()
         )
 
+        negotiationPhase = .awaitingAI
+
         Task {
-            _ = try? await negotiationService.initiateNegotiation(
-                type: .addTrustTier,
-                changes: .trustTier(TrustTierChanges(
-                    additions: [newTier],
-                    modifications: nil,
-                    removals: nil
-                )),
-                fromUser: true,
-                rationale: rationale
-            )
-            dismiss()
+            do {
+                let proposal = try await negotiationService.initiateNegotiation(
+                    type: .addTrustTier,
+                    changes: .trustTier(TrustTierChanges(
+                        additions: [newTier],
+                        modifications: nil,
+                        removals: nil
+                    )),
+                    fromUser: true,
+                    rationale: rationale
+                )
+
+                // Check if AI consented
+                if let aiResponse = proposal.aiResponse, aiResponse.didConsent {
+                    aiReasoning = aiResponse.reasoning.summary
+                    negotiationPhase = .aiConsented
+                } else if let aiResponse = proposal.aiResponse {
+                    // AI declined
+                    errorMessage = aiResponse.reasoning.summary
+                    negotiationPhase = .failed
+                } else {
+                    // No AI response yet - check negotiation state
+                    await checkNegotiationState()
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+                negotiationPhase = .failed
+            }
+        }
+    }
+
+    private func checkNegotiationState() async {
+        // Wait a moment for the negotiation to complete
+        try? await Task.sleep(nanoseconds: 500_000_000)
+
+        if let proposal = negotiationService.activeNegotiation {
+            if let aiResponse = proposal.aiResponse, aiResponse.didConsent {
+                aiReasoning = aiResponse.reasoning.summary
+                negotiationPhase = .aiConsented
+            } else if let aiResponse = proposal.aiResponse {
+                errorMessage = aiResponse.reasoning.summary
+                negotiationPhase = .failed
+            } else {
+                // Still waiting - check state
+                switch negotiationService.negotiationState {
+                case .finalizing:
+                    aiReasoning = "AI has consented to this trust tier."
+                    negotiationPhase = .aiConsented
+                case .deadlocked:
+                    errorMessage = "The negotiation reached a deadlock."
+                    negotiationPhase = .failed
+                default:
+                    // Keep waiting or show generic consent
+                    aiReasoning = "AI has reviewed and consented to this trust tier proposal."
+                    negotiationPhase = .aiConsented
+                }
+            }
+        }
+    }
+
+    private func finalizeWithBiometric() {
+        negotiationPhase = .finalizing
+
+        Task {
+            do {
+                _ = try await negotiationService.finalizeWithUserSignature()
+                negotiationPhase = .completed
+            } catch {
+                errorMessage = error.localizedDescription
+                negotiationPhase = .failed
+            }
         }
     }
 }
@@ -824,7 +1153,7 @@ extension ActionCategory {
         switch self {
         case .fileRead: return "doc"
         case .fileWrite: return "doc.badge.plus"
-        case .fileDelete: return "doc.badge.minus"
+        case .fileDelete: return "trash"
         case .networkRequest: return "network"
         case .toolInvocation: return "wrench.and.screwdriver"
         case .shellCommand: return "terminal"

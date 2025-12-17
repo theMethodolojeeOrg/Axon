@@ -253,8 +253,15 @@ final class SovereigntyService: ObservableObject {
 
     /// Submit a proposal for covenant changes
     func submitProposal(_ proposal: CovenantProposal) throws {
-        guard activeCovenant != nil else {
-            throw SovereigntyError.noActiveCovenant
+        // Allow proposals even without a covenant for initial covenant creation
+        // The proposal type determines if this is valid
+        if activeCovenant == nil {
+            // Only allow certain proposal types without an existing covenant
+            let allowedWithoutCovenant: [ProposalType] = [.initialCovenant, .addTrustTier]
+            if !allowedWithoutCovenant.contains(proposal.proposalType) {
+                throw SovereigntyError.noActiveCovenant
+            }
+            logger.info("Allowing proposal without covenant for initial setup: \(proposal.proposalType.displayName)")
         }
 
         if let deadlock = deadlockState, deadlock.isActive {

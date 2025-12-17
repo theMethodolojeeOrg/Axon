@@ -24,6 +24,7 @@ struct SettingsTabView: View {
         case tools = "Tools"
         case dynamicTools = "Pipelines"
         case memory = "Memory"
+        case sovereignty = "Consent"
         case security = "Security"
         case server = "API Server"
         case backend = "Backend"
@@ -42,6 +43,7 @@ struct SettingsTabView: View {
             case .tools: return "wrench.and.screwdriver.fill"
             case .dynamicTools: return "arrow.triangle.branch"
             case .memory: return "AxonLogoTemplate"
+            case .sovereignty: return "shield.checkered"
             case .security: return "lock.shield.fill"
             case .server: return "network"
             case .backend: return "server.rack"
@@ -94,6 +96,8 @@ struct SettingsTabView: View {
                         DynamicToolsSettingsView(viewModel: viewModel)
                     case .memory:
                         MemorySettingsView(viewModel: viewModel)
+                    case .sovereignty:
+                        SovereigntySettingsView(viewModel: viewModel)
                     case .security:
                         SecuritySettingsView(viewModel: viewModel)
                     case .server:

@@ -548,6 +548,14 @@ final class CovenantNegotiationService: ObservableObject {
             throw SovereigntyError.invalidState("Proposal is not fully signed")
         }
 
+        // Auto-complete comprehension if creating first covenant through trust tier
+        // This allows users to skip the formal comprehension test if they're
+        // already creating trust tiers (which demonstrates understanding)
+        if !sovereigntyService.comprehensionCompleted {
+            logger.info("Auto-completing comprehension for first covenant creation")
+            sovereigntyService.markUserComprehensionCompleted()
+        }
+
         return try await sovereigntyService.initializeCovenant(
             aiAttestation: aiAttestation,
             userSignature: userSignature

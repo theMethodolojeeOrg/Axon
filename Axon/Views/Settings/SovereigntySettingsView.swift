@@ -15,6 +15,8 @@ struct SovereigntySettingsView: View {
 
     @State private var showingComprehensionOnboarding = false
     @State private var showingCovenantNegotiation = false
+    @State private var showingCovenantDetail = false
+    @State private var showingCovenantHistory = false
     @State private var showingTrustTierManagement = false
     @State private var showingDeadlockResolution = false
 
@@ -75,6 +77,20 @@ struct SovereigntySettingsView: View {
             #if os(macOS)
             .frame(minWidth: 500, idealWidth: 600, minHeight: 450, idealHeight: 600)
             #endif
+        }
+        .sheet(isPresented: $showingCovenantDetail) {
+            if let covenant = sovereigntyService.activeCovenant {
+                CovenantDetailView(covenant: covenant)
+                    #if os(macOS)
+                    .frame(minWidth: 500, idealWidth: 600, minHeight: 550, idealHeight: 700)
+                    #endif
+            }
+        }
+        .sheet(isPresented: $showingCovenantHistory) {
+            CovenantHistoryView()
+                #if os(macOS)
+                .frame(minWidth: 500, idealWidth: 600, minHeight: 500, idealHeight: 650)
+                #endif
         }
     }
 
@@ -264,7 +280,7 @@ struct SovereigntySettingsView: View {
                         Spacer()
 
                         Button("View") {
-                            showingCovenantNegotiation = true
+                            showingCovenantDetail = true
                         }
                         .font(AppTypography.labelMedium())
                         .foregroundColor(AppColors.signalMercury)
@@ -410,7 +426,7 @@ struct SovereigntySettingsView: View {
                     subtitle: "View past covenants and changes",
                     iconColor: .gray
                 ) {
-                    // Could navigate to history view
+                    showingCovenantHistory = true
                 }
 
                 Divider().background(AppColors.divider)

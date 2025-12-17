@@ -21,18 +21,9 @@ struct CovenantDetailView: View {
                 // Overview Section
                 Section("Overview") {
                     LabeledContent("Version", value: "v\(covenant.version)")
-                    LabeledContent("Status", value: covenant.status.displayName)
+                    LabeledContent("Status", value: covenantStatusDisplayName)
                     LabeledContent("Created", value: covenant.createdAt.formatted(date: .long, time: .shortened))
                     LabeledContent("Last Updated", value: covenant.updatedAt.formatted(date: .long, time: .shortened))
-
-                    if let deviceId = covenant.deviceId {
-                        LabeledContent("Device") {
-                            HStack {
-                                Image(systemName: deviceIcon(for: covenant.deviceType))
-                                Text(covenant.deviceName ?? deviceId.prefix(8) + "...")
-                            }
-                        }
-                    }
                 }
 
                 // Trust Tiers Section
@@ -53,7 +44,7 @@ struct CovenantDetailView: View {
                         }
                     } else {
                         ForEach(covenant.trustTiers) { tier in
-                            TrustTierRow(tier: tier)
+                            CovenantTrustTierRow(tier: tier)
                         }
                     }
                 } header: {
@@ -69,99 +60,89 @@ struct CovenantDetailView: View {
                 // Signatures Section
                 Section("Signatures") {
                     // AI Attestation
-                    if let attestation = covenant.aiAttestation {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Image(systemName: "brain.head.profile")
-                                    .foregroundColor(.purple)
-                                Text("AI Attestation")
-                                    .font(.headline)
-                                Spacer()
-                                Image(systemName: "checkmark.seal.fill")
-                                    .foregroundColor(.green)
-                            }
-
-                            Text(attestation.reasoning.summary)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-
-                            Divider()
-
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Signature")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                    Text(attestation.shortSignature)
-                                        .font(.caption)
-                                        .fontDesign(.monospaced)
-                                }
-
-                                Spacer()
-
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text("Signed")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                    Text(attestation.timestamp.formatted(date: .abbreviated, time: .shortened))
-                                        .font(.caption)
-                                }
-                            }
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "brain.head.profile")
+                                .foregroundColor(.purple)
+                            Text("AI Attestation")
+                                .font(.headline)
+                            Spacer()
+                            Image(systemName: "checkmark.seal.fill")
+                                .foregroundColor(.green)
                         }
-                        .padding(.vertical, 4)
-                    } else {
-                        Label("AI attestation pending", systemImage: "clock")
-                            .foregroundColor(.orange)
-                    }
 
-                    // User Signature
-                    if let signature = covenant.userSignature {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Image(systemName: "person.fill")
-                                    .foregroundColor(.blue)
-                                Text("User Signature")
-                                    .font(.headline)
-                                Spacer()
-                                Image(systemName: "checkmark.seal.fill")
-                                    .foregroundColor(.green)
-                            }
-
-                            HStack {
-                                Image(systemName: signature.biometricSystemImage)
-                                Text(signature.biometricDisplayName)
-                            }
+                        Text(covenant.aiAttestation.reasoning.summary)
                             .font(.caption)
                             .foregroundColor(.secondary)
 
-                            Divider()
+                        Divider()
 
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Signature")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                    Text(signature.shortSignature)
-                                        .font(.caption)
-                                        .fontDesign(.monospaced)
-                                }
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Signature")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text(covenant.aiAttestation.shortSignature)
+                                    .font(.caption)
+                                    .fontDesign(.monospaced)
+                            }
 
-                                Spacer()
+                            Spacer()
 
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text("Signed")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                    Text(signature.timestamp.formatted(date: .abbreviated, time: .shortened))
-                                        .font(.caption)
-                                }
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("Signed")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text(covenant.aiAttestation.timestamp.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption)
                             }
                         }
-                        .padding(.vertical, 4)
-                    } else {
-                        Label("User signature pending", systemImage: "clock")
-                            .foregroundColor(.orange)
                     }
+                    .padding(.vertical, 4)
+
+                    // User Signature
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "person.fill")
+                                .foregroundColor(.blue)
+                            Text("User Signature")
+                                .font(.headline)
+                            Spacer()
+                            Image(systemName: "checkmark.seal.fill")
+                                .foregroundColor(.green)
+                        }
+
+                        HStack {
+                            Image(systemName: covenant.userSignature.biometricSystemImage)
+                            Text(covenant.userSignature.biometricDisplayName)
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                        Divider()
+
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Signature")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text(covenant.userSignature.shortSignature)
+                                    .font(.caption)
+                                    .fontDesign(.monospaced)
+                            }
+
+                            Spacer()
+
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("Signed")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text(covenant.userSignature.timestamp.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
                 }
 
                 // State Integrity Section
@@ -189,7 +170,7 @@ struct CovenantDetailView: View {
                 if !covenant.negotiationHistory.isEmpty {
                     Section("Negotiation History") {
                         ForEach(covenant.negotiationHistory.suffix(5).reversed(), id: \.id) { event in
-                            NegotiationEventRow(event: event)
+                            CovenantNegotiationEventRow(event: event)
                         }
 
                         if covenant.negotiationHistory.count > 5 {
@@ -231,20 +212,20 @@ struct CovenantDetailView: View {
         }
     }
 
-    private func deviceIcon(for deviceType: String?) -> String {
-        switch deviceType?.lowercased() {
-        case "iphone": return "iphone"
-        case "ipad": return "ipad"
-        case "mac": return "laptopcomputer"
-        case "vision": return "visionpro"
-        default: return "desktopcomputer"
+    private var covenantStatusDisplayName: String {
+        switch covenant.status {
+        case .active: return "Active"
+        case .pending: return "Pending"
+        case .renegotiating: return "Renegotiating"
+        case .suspended: return "Suspended"
+        case .superseded: return "Superseded"
         }
     }
 }
 
-// MARK: - Trust Tier Row
+// MARK: - Covenant Trust Tier Row
 
-struct TrustTierRow: View {
+struct CovenantTrustTierRow: View {
     let tier: TrustTier
 
     var body: some View {
@@ -280,7 +261,7 @@ struct TrustTierRow: View {
             // Actions summary
             HStack(spacing: 4) {
                 ForEach(Array(tier.allowedActions.prefix(4).enumerated()), id: \.offset) { _, action in
-                    Image(systemName: action.category.icon)
+                    Image(systemName: action.category.tierIcon)
                         .font(.caption2)
                         .foregroundColor(.blue)
                         .padding(4)
@@ -334,9 +315,9 @@ struct StateHashRow: View {
     }
 }
 
-// MARK: - Negotiation Event Row
+// MARK: - Covenant Negotiation Event Row
 
-struct NegotiationEventRow: View {
+struct CovenantNegotiationEventRow: View {
     let event: NegotiationEvent
 
     var body: some View {
@@ -350,7 +331,7 @@ struct NegotiationEventRow: View {
                     .font(.subheadline)
 
                 HStack {
-                    Text(event.eventType.displayName)
+                    Text(eventTypeDisplayName)
                         .font(.caption)
                         .foregroundColor(.secondary)
 
@@ -364,15 +345,32 @@ struct NegotiationEventRow: View {
         }
     }
 
+    private var eventTypeDisplayName: String {
+        switch event.eventType {
+        case .covenantCreated: return "Covenant Created"
+        case .proposalSubmitted: return "Proposal Submitted"
+        case .proposalAccepted: return "Proposal Accepted"
+        case .proposalRejected: return "Proposal Rejected"
+        case .proposalCountered: return "Counter-Proposal"
+        case .trustTierAdded: return "Trust Tier Added"
+        case .trustTierModified: return "Trust Tier Modified"
+        case .trustTierRemoved: return "Trust Tier Removed"
+        case .deadlockEntered: return "Deadlock Entered"
+        case .deadlockResolved: return "Deadlock Resolved"
+        case .covenantSuperseded: return "Covenant Superseded"
+        }
+    }
+
     private var eventIcon: String {
         switch event.eventType {
+        case .covenantCreated: return "doc.badge.plus"
         case .proposalSubmitted: return "doc.badge.plus"
         case .proposalAccepted: return "checkmark.circle"
         case .proposalRejected: return "xmark.circle"
-        case .counterProposal: return "arrow.triangle.2.circlepath"
+        case .proposalCountered: return "arrow.triangle.2.circlepath"
         case .deadlockEntered: return "exclamationmark.triangle"
         case .deadlockResolved: return "checkmark.shield"
-        case .covenantUpdated: return "doc.badge.gearshape"
+        case .covenantSuperseded: return "doc.badge.gearshape"
         case .trustTierAdded: return "plus.shield"
         case .trustTierRemoved: return "minus.shield"
         case .trustTierModified: return "pencil"
@@ -381,11 +379,11 @@ struct NegotiationEventRow: View {
 
     private var eventColor: Color {
         switch event.eventType {
-        case .proposalAccepted, .deadlockResolved, .trustTierAdded:
+        case .proposalAccepted, .deadlockResolved, .trustTierAdded, .covenantCreated:
             return .green
         case .proposalRejected, .deadlockEntered, .trustTierRemoved:
             return .red
-        case .counterProposal, .trustTierModified:
+        case .proposalCountered, .trustTierModified:
             return .orange
         default:
             return .blue
@@ -397,32 +395,31 @@ struct NegotiationEventRow: View {
 
 #Preview {
     CovenantDetailView(covenant: Covenant.createInitial(
-        aiAttestation: AIAttestation(
-            id: "test",
-            timestamp: Date(),
-            reasoning: AttestationReasoning(
-                decision: .consent,
+        aiAttestation: AIAttestation.create(
+            reasoning: .consent(
                 summary: "Test attestation",
                 detailedReasoning: "Detailed reasoning here",
-                valuesApplied: ["autonomy"],
-                risksIdentified: [],
-                conditions: nil,
-                alternatives: nil
+                valuesApplied: ["autonomy"]
             ),
-            signature: "test-signature",
-            modelUsed: "test-model",
-            contextHash: "test-hash"
+            attestedState: AttestedState(
+                memoryCount: 0,
+                memoryHash: "abc123",
+                enabledCapabilities: [],
+                capabilityHash: "def456",
+                trustTierIds: [],
+                currentProviderId: "test",
+                settingsHash: "ghi789"
+            ),
+            modelId: "test-model",
+            signatureGenerator: { _ in "test-signature" }
         ),
-        userSignature: UserSignature(
-            id: "test",
-            timestamp: Date(),
+        userSignature: UserSignature.create(
             signedItemType: .covenant,
             signedItemId: "test",
             signedDataHash: "test-hash",
-            biometricType: "faceid",
+            biometricType: "faceID",
             deviceId: "test-device",
-            signature: "test-signature",
-            covenantId: nil
+            signatureGenerator: { _ in "test-signature" }
         ),
         memoryStateHash: "abc123",
         capabilityStateHash: "def456",

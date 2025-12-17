@@ -24,7 +24,7 @@ import {
 import { PathPolicy } from '../PathPolicy';
 
 export class FileHandler {
-    constructor() {}
+    constructor() { }
 
     /**
      * Resolve and validate a path using the workspace sandbox policy.
@@ -42,8 +42,16 @@ export class FileHandler {
         const maxSize = params.maxSize ?? 10 * 1024 * 1024; // 10MB default
 
         try {
-            // Check file exists
+            // Check file exists and is not a directory
             const stat = await vscode.workspace.fs.stat(uri);
+
+            // Prevent reading directories as files
+            if (stat.type === vscode.FileType.Directory) {
+                throw createError(
+                    BridgeErrorCode.FileReadError,
+                    `Cannot read directory as file: ${params.path}. Use file/list instead.`
+                );
+            }
 
             if (stat.size > maxSize) {
                 throw createError(

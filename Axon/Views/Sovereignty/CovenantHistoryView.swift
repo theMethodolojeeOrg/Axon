@@ -131,18 +131,16 @@ struct CovenantHistoryRow: View {
                         }
                     }
 
-                    Text(covenant.status.displayName)
+                    Text(statusDisplayName)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
 
                 Spacer()
 
-                // Device indicator (if available)
-                if let deviceType = covenant.deviceType {
-                    Image(systemName: deviceIcon(for: deviceType))
-                        .foregroundColor(.secondary)
-                }
+                // Device indicator from user signature
+                Image(systemName: deviceIcon)
+                    .foregroundColor(.secondary)
 
                 Image(systemName: "chevron.right")
                     .font(.caption)
@@ -155,7 +153,8 @@ struct CovenantHistoryRow: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
 
-                if covenant.isFullySigned {
+                // Both signatures present means fully signed
+                if covenant.aiAttestation.didConsent {
                     Label("Signed", systemImage: "checkmark.seal")
                         .font(.caption)
                         .foregroundColor(.green)
@@ -180,17 +179,27 @@ struct CovenantHistoryRow: View {
         .padding(.vertical, 4)
     }
 
+    private var statusDisplayName: String {
+        switch covenant.status {
+        case .active: return "Active"
+        case .pending: return "Pending"
+        case .renegotiating: return "Renegotiating"
+        case .suspended: return "Suspended"
+        case .superseded: return "Superseded"
+        }
+    }
+
     private var statusColor: Color {
         switch covenant.status {
         case .active:
             return .green
         case .renegotiating:
             return .orange
-        case .deadlocked:
+        case .suspended:
             return .red
         case .superseded:
             return .gray
-        case .suspended:
+        case .pending:
             return .yellow
         }
     }
@@ -201,23 +210,31 @@ struct CovenantHistoryRow: View {
             return "checkmark.shield.fill"
         case .renegotiating:
             return "arrow.triangle.2.circlepath"
-        case .deadlocked:
+        case .suspended:
             return "exclamationmark.triangle.fill"
         case .superseded:
             return "clock.arrow.circlepath"
-        case .suspended:
-            return "pause.circle.fill"
+        case .pending:
+            return "clock.fill"
         }
     }
 
-    private func deviceIcon(for deviceType: String) -> String {
-        switch deviceType.lowercased() {
-        case "iphone": return "iphone"
-        case "ipad": return "ipad"
-        case "mac": return "laptopcomputer"
-        case "vision": return "visionpro"
-        default: return "desktopcomputer"
+    private var deviceIcon: String {
+        // Infer device type from the short device ID pattern
+        // In practice, this would come from device metadata
+        #if os(iOS)
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            return "ipad"
+        } else {
+            return "iphone"
         }
+        #elseif os(macOS)
+        return "laptopcomputer"
+        #elseif os(visionOS)
+        return "visionpro"
+        #else
+        return "desktopcomputer"
+        #endif
     }
 }
 

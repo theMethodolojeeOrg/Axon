@@ -177,6 +177,27 @@ enum ActionCategory: String, Codable, CaseIterable, Equatable {
         case .personalityAdjust: return "Adjust Personality"
         }
     }
+
+    /// SF Symbol icon for this category
+    var tierIcon: String {
+        switch self {
+        case .fileRead: return "doc.text"
+        case .fileWrite: return "doc.badge.plus"
+        case .fileDelete: return "trash"
+        case .networkRequest: return "network"
+        case .toolInvocation: return "wrench.and.screwdriver"
+        case .shellCommand: return "terminal"
+        case .memoryRecall: return "brain"
+        case .memoryAdd: return "plus.circle"
+        case .memoryModify: return "pencil.circle"
+        case .memoryDelete: return "minus.circle"
+        case .capabilityEnable: return "checkmark.circle"
+        case .capabilityDisable: return "xmark.circle"
+        case .providerSwitch: return "arrow.triangle.2.circlepath"
+        case .systemPromptChange: return "text.badge.star"
+        case .personalityAdjust: return "person.crop.circle.badge.questionmark"
+        }
+    }
 }
 
 // MARK: - Action Scope
