@@ -58,6 +58,21 @@ class SettingsViewModel: ObservableObject {
             self.availableVoices = localSettings.ttsSettings.cachedVoices
         }
 
+        // One-time defaulting: if user hasn't explicitly chosen a consent provider,
+        // default it to the current main provider from General Settings.
+        if !settings.sovereigntySettings.consentProviderHasBeenSetByUser {
+            settings.sovereigntySettings.consentProvider = settings.defaultProvider
+            settings.sovereigntySettings.consentModel = "" // reset to provider default
+
+            // Persist this migration immediately so it is stable across launches.
+            // (No success UI; this is an automatic default.)
+            do {
+                try storageService.saveSettings(settings)
+            } catch {
+                print("[SettingsViewModel] Failed to persist default consent provider: \(error.localizedDescription)")
+            }
+        }
+
         // Check iCloud sync availability
         iCloudSyncEnabled = iCloudSync.isAvailable
 

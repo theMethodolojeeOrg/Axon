@@ -465,9 +465,10 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
             throw NSError(domain: "TTSPlaybackService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No voice selected in TTS settings. Please select a voice in Settings > Text-to-Speech."])
         }
 
+        let model = settings.ttsSettings.effectiveElevenLabsModel  // Use effective model based on quality tier
         print("[TTSPlaybackService] Using ElevenLabs voice ID: \(voiceId)")
         print("[TTSPlaybackService] Using voice name: \(settings.ttsSettings.selectedVoiceName ?? "unknown")")
-        print("[TTSPlaybackService] Using model: \(settings.ttsSettings.model.rawValue)")
+        print("[TTSPlaybackService] Using model: \(model.displayName), quality: \(settings.ttsSettings.qualityTier.displayName)")
 
         let vs = settings.ttsSettings.voiceSettings
         let payload = ElevenLabsService.VoiceSettingsPayload(
@@ -481,7 +482,7 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         return try await ElevenLabsService.shared.generateTTSBase64(
             text: text,
             voiceId: voiceId,
-            model: settings.ttsSettings.model.rawValue,
+            model: model.rawValue,
             format: settings.ttsSettings.outputFormat.rawValue,
             voiceSettings: payload
         )
@@ -497,12 +498,20 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         }
 
         let voice = settings.ttsSettings.geminiVoice
-        print("[TTSPlaybackService] Using Gemini voice: \(voice.displayName) (\(voice.toneDescription))")
+        let model = settings.ttsSettings.effectiveGeminiModel  // Use effective model based on quality tier
+        let direction = settings.ttsSettings.geminiVoiceDirection
+
+        print("[TTSPlaybackService] Using Gemini voice: \(voice.displayName) (\(voice.toneDescription)), model: \(model.displayName), quality: \(settings.ttsSettings.qualityTier.displayName)")
+        if !direction.isEmpty {
+            print("[TTSPlaybackService] Voice direction: \(direction.prefix(50))...")
+        }
 
         print("[TTSPlaybackService] Requesting audio generation from Gemini...")
         return try await GeminiTTSService.shared.generateSpeech(
             text: text,
-            voice: GeminiTTSService.GeminiVoice(rawValue: voice.rawValue) ?? .puck,
+            voiceName: voice.rawValue,
+            model: model,
+            direction: direction.isEmpty ? nil : direction,
             apiKey: geminiKey
         )
     }
@@ -517,11 +526,11 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         }
 
         let voice = settings.ttsSettings.openaiVoice
-        let model = settings.ttsSettings.openaiModel
+        let model = settings.ttsSettings.effectiveOpenAIModel  // Use effective model based on quality tier
         let speed = settings.ttsSettings.openaiSpeed
         let instructions = settings.ttsSettings.openaiVoiceInstructions
 
-        print("[TTSPlaybackService] Using OpenAI voice: \(voice.displayName) (\(voice.toneDescription))")
+        print("[TTSPlaybackService] Using OpenAI voice: \(voice.displayName) (\(voice.toneDescription)), quality: \(settings.ttsSettings.qualityTier.displayName)")
         print("[TTSPlaybackService] Using OpenAI model: \(model.displayName)")
         if !instructions.isEmpty && model.supportsInstructions {
             print("[TTSPlaybackService] Voice instructions: \(instructions)")
@@ -533,7 +542,7 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
             voice: voice,
             model: model,
             speed: speed,
-            instructions: instructions.isEmpty ? nil : instructions,
+            instructions: model.supportsInstructions && !instructions.isEmpty ? instructions : nil,
             apiKey: openaiKey
         )
     }
@@ -600,7 +609,7 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         let previewText = Self.previewText(for: .gemini, voiceName: voice.displayName)
 
         do {
-            var audioData = try await generateGeminiAudioForPreview(text: previewText, voice: voice)
+            var audioData = try await generateGeminiAudioForPreview(text: previewText, voice: voice, settings: settings)
             // Gemini returns raw PCM - ensure it has WAV headers
             audioData = ensureWAVFormat(audioData)
             isGenerating = false
@@ -655,14 +664,17 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         )
     }
 
-    private func generateGeminiAudioForPreview(text: String, voice: GeminiTTSVoice) async throws -> Data {
+    private func generateGeminiAudioForPreview(text: String, voice: GeminiTTSVoice, settings: AppSettings) async throws -> Data {
         guard let geminiKey = SettingsViewModel.shared.getAPIKey(.gemini), !geminiKey.isEmpty else {
             throw NSError(domain: "TTSPlaybackService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Gemini API key is required for Gemini TTS preview."])
         }
 
+        let direction = settings.ttsSettings.geminiVoiceDirection
         return try await GeminiTTSService.shared.generateSpeech(
             text: text,
-            voice: GeminiTTSService.GeminiVoice(rawValue: voice.rawValue) ?? .puck,
+            voiceName: voice.rawValue,
+            model: settings.ttsSettings.geminiModel,
+            direction: direction.isEmpty ? nil : direction,
             apiKey: geminiKey
         )
     }

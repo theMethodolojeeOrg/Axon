@@ -412,6 +412,11 @@ struct SovereigntySettings: Codable, Equatable, Sendable {
     /// Whether co-sovereignty is enabled
     var enabled: Bool = true
 
+    /// Whether the user has explicitly chosen a consent provider.
+    /// If false, we will default consentProvider to the current main provider (General Settings)
+    /// once, and then leave it alone.
+    var consentProviderHasBeenSetByUser: Bool = false
+
     /// The provider to use for AI consent/attestation generation
     /// Apple Intelligence is the default for on-device, private negotiations
     var consentProvider: AIProvider = .appleFoundation
@@ -732,6 +737,14 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     contextWindow: 1_000_000,
                     modalities: ["text", "image", "video", "audio", "pdf"],
                     description: "Most powerful agentic and coding model with advanced reasoning"
+                ),
+                AIModel(
+                    id: "gemini-3-flash-preview",
+                    name: "Gemini 3 Flash Preview",
+                    provider: .gemini,
+                    contextWindow: 1_048_576,
+                    modalities: ["text", "image", "video", "audio", "pdf"],
+                    description: "Most intelligent model built for speed, combining frontier intelligence with superior search and grounding"
                 ),
                 AIModel(
                     id: "gemini-2.5-flash-lite-preview-06-17",
@@ -1319,35 +1332,166 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-/// Gemini TTS voice options
-enum GeminiTTSVoice: String, Codable, CaseIterable, Identifiable {
-    case puck = "Puck"
-    case charon = "Charon"
-    case kore = "Kore"
-    case fenrir = "Fenrir"
-    case aoede = "Aoede"
-    case zephyr = "Zephyr"
-    case orus = "Orus"
-    case leda = "Leda"
+/// Voice gender classification
+enum VoiceGender: String, Codable, CaseIterable {
+    case male
+    case female
 
-    var id: String { rawValue }
-    var displayName: String { rawValue }
-
-    var toneDescription: String {
+    var displayName: String {
         switch self {
-        case .puck: return "Upbeat, energetic"
-        case .charon: return "Deep, informative"
-        case .kore: return "Firm, authoritative"
-        case .fenrir: return "Excitable, fast-paced"
-        case .aoede: return "Breezy, light"
-        case .zephyr: return "Bright, clear"
-        case .orus: return "Firm, direct"
-        case .leda: return "Youthful"
+        case .male: return "Male"
+        case .female: return "Female"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .male: return "person.fill"
+        case .female: return "person.fill"
         }
     }
 }
 
-/// OpenAI TTS voice options (11 built-in voices)
+/// Gemini TTS voice options (all 30 available voices)
+enum GeminiTTSVoice: String, Codable, CaseIterable, Identifiable {
+    // Original voices
+    case zephyr = "Zephyr"
+    case puck = "Puck"
+    case charon = "Charon"
+    case kore = "Kore"
+    case fenrir = "Fenrir"
+    case leda = "Leda"
+    case orus = "Orus"
+    case aoede = "Aoede"
+    // Additional voices
+    case callirrhoe = "Callirrhoe"
+    case autonoe = "Autonoe"
+    case enceladus = "Enceladus"
+    case iapetus = "Iapetus"
+    case umbriel = "Umbriel"
+    case algieba = "Algieba"
+    case despina = "Despina"
+    case erinome = "Erinome"
+    case algenib = "Algenib"
+    case rasalgethi = "Rasalgethi"
+    case laomedeia = "Laomedeia"
+    case achernar = "Achernar"
+    case alnilam = "Alnilam"
+    case schedar = "Schedar"
+    case gacrux = "Gacrux"
+    case pulcherrima = "Pulcherrima"
+    case achird = "Achird"
+    case zubenelgenubi = "Zubenelgenubi"
+    case vindemiatrix = "Vindemiatrix"
+    case sadachbia = "Sadachbia"
+    case sadaltager = "Sadaltager"
+    case sulafat = "Sulafat"
+
+    var id: String { rawValue }
+    var displayName: String { rawValue }
+
+    /// Voice gender based on the mythological/astronomical origin of the name
+    var gender: VoiceGender {
+        switch self {
+        // Female voices (Greek goddesses, nymphs, muses, female figures)
+        case .kore: return .female          // Persephone/maiden
+        case .leda: return .female          // Queen of Sparta
+        case .aoede: return .female         // Muse of song
+        case .callirrhoe: return .female    // Ocean nymph
+        case .autonoe: return .female       // Daughter of Cadmus
+        case .despina: return .female       // Sea nymph
+        case .erinome: return .female       // One of the Graces
+        case .laomedeia: return .female     // Sea nymph
+        case .pulcherrima: return .female   // Latin "most beautiful"
+        case .vindemiatrix: return .female  // Latin "grape gatherer"
+        // Male voices (Greek gods, titans, male figures, stars with male names)
+        case .zephyr: return .male          // God of west wind
+        case .puck: return .male            // Mischievous sprite
+        case .charon: return .male          // Ferryman of Hades
+        case .fenrir: return .male          // Norse wolf
+        case .orus: return .male            // Variant of Horus
+        case .enceladus: return .male       // Giant
+        case .iapetus: return .male         // Titan
+        case .umbriel: return .male         // Moon of Uranus (male spirit)
+        case .algieba: return .male         // Star name
+        case .algenib: return .male         // Star name
+        case .rasalgethi: return .male      // "Head of the kneeler"
+        case .achernar: return .male        // Star name
+        case .alnilam: return .male         // Star name
+        case .schedar: return .male         // Star name
+        case .gacrux: return .male          // Star name
+        case .achird: return .male          // Star name
+        case .zubenelgenubi: return .male   // Star name
+        case .sadachbia: return .male       // Star name
+        case .sadaltager: return .male      // Star name
+        case .sulafat: return .male         // Star name
+        }
+    }
+
+    var toneDescription: String {
+        switch self {
+        case .zephyr: return "Bright"
+        case .puck: return "Upbeat"
+        case .charon: return "Informative"
+        case .kore: return "Firm"
+        case .fenrir: return "Excitable"
+        case .leda: return "Youthful"
+        case .orus: return "Firm"
+        case .aoede: return "Breezy"
+        case .callirrhoe: return "Easy-going"
+        case .autonoe: return "Bright"
+        case .enceladus: return "Breathy"
+        case .iapetus: return "Clear"
+        case .umbriel: return "Easy-going"
+        case .algieba: return "Smooth"
+        case .despina: return "Smooth"
+        case .erinome: return "Clear"
+        case .algenib: return "Gravelly"
+        case .rasalgethi: return "Informative"
+        case .laomedeia: return "Upbeat"
+        case .achernar: return "Soft"
+        case .alnilam: return "Firm"
+        case .schedar: return "Even"
+        case .gacrux: return "Mature"
+        case .pulcherrima: return "Forward"
+        case .achird: return "Friendly"
+        case .zubenelgenubi: return "Casual"
+        case .vindemiatrix: return "Gentle"
+        case .sadachbia: return "Lively"
+        case .sadaltager: return "Knowledgeable"
+        case .sulafat: return "Warm"
+        }
+    }
+
+    /// Get all voices filtered by gender
+    static func voices(for gender: VoiceGender) -> [GeminiTTSVoice] {
+        allCases.filter { $0.gender == gender }
+    }
+}
+
+/// Gemini TTS model options
+enum GeminiTTSModel: String, Codable, CaseIterable, Identifiable {
+    case flash = "gemini-2.5-flash-preview-tts"
+    case pro = "gemini-2.5-pro-preview-tts"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .flash: return "Flash (Faster)"
+        case .pro: return "Pro (Higher Quality)"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .flash: return "Optimized for speed and cost efficiency"
+        case .pro: return "Best quality, more expressive output"
+        }
+    }
+}
+
+/// OpenAI TTS voice options (10 built-in voices)
 enum OpenAITTSVoice: String, Codable, CaseIterable, Identifiable {
     case alloy = "alloy"
     case ash = "ash"
@@ -1363,6 +1507,24 @@ enum OpenAITTSVoice: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
     var displayName: String { rawValue.capitalized }
 
+    /// Voice gender based on OpenAI's documented voice characteristics
+    var gender: VoiceGender {
+        switch self {
+        // Female voices
+        case .alloy: return .female     // Neutral female
+        case .coral: return .female     // Clear, friendly female
+        case .nova: return .female      // Bright, upbeat female
+        case .shimmer: return .female   // Light, airy female
+        case .ballad: return .female    // Soft, expressive female
+        // Male voices
+        case .ash: return .male         // Warm, confident male
+        case .echo: return .male        // Measured, composed male
+        case .fable: return .male       // Expressive male (British)
+        case .onyx: return .male        // Deep, authoritative male
+        case .sage: return .male        // Calm, thoughtful male
+        }
+    }
+
     var toneDescription: String {
         switch self {
         case .alloy: return "Neutral, balanced"
@@ -1376,6 +1538,11 @@ enum OpenAITTSVoice: String, Codable, CaseIterable, Identifiable {
         case .sage: return "Calm, thoughtful"
         case .shimmer: return "Light, airy"
         }
+    }
+
+    /// Get all voices filtered by gender
+    static func voices(for gender: VoiceGender) -> [OpenAITTSVoice] {
+        allCases.filter { $0.gender == gender }
     }
 }
 
@@ -1412,9 +1579,41 @@ enum OpenAITTSModel: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Quality tier for cost optimization
+enum TTSQualityTier: String, Codable, CaseIterable, Identifiable {
+    case standard    // Lower cost, faster
+    case high        // Best quality
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .standard: return "Standard"
+        case .high: return "High Quality"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .standard: return "Faster, lower cost"
+        case .high: return "Best quality audio"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .standard: return "bolt"
+        case .high: return "waveform"
+        }
+    }
+}
+
 struct TTSSettings: Codable, Equatable {
     /// Active TTS provider
     var provider: TTSProvider = .elevenlabs
+
+    /// Quality tier - affects model selection per provider
+    var qualityTier: TTSQualityTier = .high
 
     // MARK: - TTS Text Preprocessing
 
@@ -1426,6 +1625,10 @@ struct TTSSettings: Codable, Equatable {
     /// Off by default to preserve fidelity to displayed text.
     var spokenFriendlyTTS: Bool = false
 
+    // MARK: - Voice Gender Filter
+    /// Filter voices by gender (nil = show all)
+    var voiceGenderFilter: VoiceGender? = nil
+
     // MARK: - ElevenLabs Settings
     var model: TTSModel = .turboV25
     var outputFormat: TTSOutputFormat = .mp3128
@@ -1436,6 +1639,10 @@ struct TTSSettings: Codable, Equatable {
 
     // MARK: - Gemini TTS Settings
     var geminiVoice: GeminiTTSVoice = .puck
+    var geminiModel: GeminiTTSModel = .flash
+    /// Voice direction/style instructions for Gemini TTS (e.g., "Speak in a cheerful, upbeat tone with a slight British accent")
+    /// Gemini TTS supports natural language prompts to control style, accent, pace, and tone
+    var geminiVoiceDirection: String = ""
 
     // MARK: - OpenAI TTS Settings
     var openaiVoice: OpenAITTSVoice = .alloy
@@ -1444,6 +1651,32 @@ struct TTSSettings: Codable, Equatable {
     var openaiVoiceInstructions: String = ""
     /// Speed multiplier (0.25 to 4.0, default 1.0)
     var openaiSpeed: Double = 1.0
+
+    // MARK: - Computed Properties for Quality Tier
+
+    /// Get the appropriate ElevenLabs model based on quality tier
+    var effectiveElevenLabsModel: TTSModel {
+        switch qualityTier {
+        case .standard: return .flashV25
+        case .high: return model
+        }
+    }
+
+    /// Get the appropriate Gemini model based on quality tier
+    var effectiveGeminiModel: GeminiTTSModel {
+        switch qualityTier {
+        case .standard: return .flash
+        case .high: return geminiModel
+        }
+    }
+
+    /// Get the appropriate OpenAI model based on quality tier
+    var effectiveOpenAIModel: OpenAITTSModel {
+        switch qualityTier {
+        case .standard: return .tts1
+        case .high: return openaiModel
+        }
+    }
 }
 
 enum TTSModel: String, Codable, CaseIterable, Identifiable {

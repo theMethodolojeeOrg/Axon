@@ -18,6 +18,8 @@ struct TTSSettingsView: View {
 
             providerSection
 
+            qualitySection
+
             ttsTextSection
 
             switch viewModel.settings.ttsSettings.provider {
@@ -27,6 +29,68 @@ struct TTSSettingsView: View {
                 geminiSection
             case .openai:
                 openaiSection
+            }
+        }
+    }
+
+    // MARK: - Quality Tier
+
+    private var qualitySection: some View {
+        UnifiedSettingsSection(title: "Quality & Cost") {
+            VStack(spacing: 12) {
+                SettingsCard(padding: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Quality Tier")
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        HStack(spacing: 8) {
+                            ForEach(TTSQualityTier.allCases) { tier in
+                                Button {
+                                    Task { await viewModel.updateTTSSetting(\.qualityTier, tier) }
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: tier.icon)
+                                            .font(.system(size: 14))
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(tier.displayName)
+                                                .font(AppTypography.bodySmall(.medium))
+                                            Text(tier.description)
+                                                .font(AppTypography.labelSmall())
+                                                .foregroundColor(AppColors.textSecondary)
+                                        }
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(viewModel.settings.ttsSettings.qualityTier == tier
+                                                  ? AppColors.signalMercury.opacity(0.15)
+                                                  : AppColors.substrateSecondary)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(viewModel.settings.ttsSettings.qualityTier == tier
+                                                            ? AppColors.signalMercury
+                                                            : AppColors.glassBorder, lineWidth: 1)
+                                            )
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundColor(viewModel.settings.ttsSettings.qualityTier == tier
+                                                 ? AppColors.signalMercury
+                                                 : AppColors.textPrimary)
+                            }
+                        }
+
+                        HStack(spacing: 6) {
+                            Image(systemName: "info.circle")
+                            Text("Standard uses faster/cheaper models (Flash, TTS-1). High Quality uses best models available.")
+                                .font(AppTypography.labelSmall())
+                        }
+                        .foregroundColor(AppColors.textTertiary)
+                    }
+                }
             }
         }
     }
@@ -242,11 +306,28 @@ struct TTSSettingsView: View {
         }
     }
 
+    // MARK: - Voice Filtering
+
+    private var filteredGeminiVoices: [GeminiTTSVoice] {
+        if let filter = viewModel.settings.ttsSettings.voiceGenderFilter {
+            return GeminiTTSVoice.voices(for: filter)
+        }
+        return GeminiTTSVoice.allCases
+    }
+
+    private var filteredOpenAIVoices: [OpenAITTSVoice] {
+        if let filter = viewModel.settings.ttsSettings.voiceGenderFilter {
+            return OpenAITTSVoice.voices(for: filter)
+        }
+        return OpenAITTSVoice.allCases
+    }
+
     // MARK: - Gemini
 
     private var geminiSection: some View {
         UnifiedSettingsSection(title: "Gemini") {
             VStack(alignment: .leading, spacing: 12) {
+                // Status card
                 SettingsCard(padding: 12) {
                     HStack(spacing: 12) {
                         Image(systemName: viewModel.isGeminiTTSConfigured ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
@@ -257,7 +338,7 @@ struct TTSSettingsView: View {
                                 .font(AppTypography.bodyMedium(.medium))
                                 .foregroundColor(AppColors.textPrimary)
 
-                            Text("Gemini TTS outputs 24kHz WAV audio. Uses your Gemini API key.")
+                            Text("Gemini TTS outputs 24kHz audio. Supports controllable speech styles.")
                                 .font(AppTypography.labelSmall())
                                 .foregroundColor(AppColors.textSecondary)
                         }
@@ -266,36 +347,150 @@ struct TTSSettingsView: View {
                     }
                 }
 
+                // Model picker
                 SettingsCard(padding: 12) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Voice")
+                        Text("Model")
                             .font(AppTypography.labelMedium())
                             .foregroundColor(AppColors.textSecondary)
 
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                            ForEach(GeminiTTSVoice.allCases) { voice in
-                                GeminiVoiceCard(
-                                    voice: voice,
-                                    isSelected: viewModel.settings.ttsSettings.geminiVoice == voice,
-                                    isConfigured: viewModel.isGeminiTTSConfigured,
-                                    settings: viewModel.settings,
-                                    onSelect: {
-                                        Task { await viewModel.updateTTSSetting(\.geminiVoice, voice) }
+                        StyledMenuPicker(
+                            icon: "cpu",
+                            title: viewModel.settings.ttsSettings.geminiModel.displayName,
+                            selection: Binding(
+                                get: { viewModel.settings.ttsSettings.geminiModel.rawValue },
+                                set: { newValue in
+                                    if let model = GeminiTTSModel(rawValue: newValue) {
+                                        Task { await viewModel.updateTTSSetting(\.geminiModel, model) }
                                     }
+                                }
+                            )
+                        ) {
+                            #if os(macOS)
+                            ForEach(GeminiTTSModel.allCases) { model in
+                                MenuButtonItem(
+                                    id: model.rawValue,
+                                    label: "\(model.displayName) - \(model.description)",
+                                    isSelected: viewModel.settings.ttsSettings.geminiModel == model
+                                ) {
+                                    Task { await viewModel.updateTTSSetting(\.geminiModel, model) }
+                                }
+                            }
+                            #else
+                            ForEach(GeminiTTSModel.allCases) { model in
+                                Text("\(model.displayName) - \(model.description)").tag(model.rawValue)
+                            }
+                            #endif
+                        }
+                        .disabled(!viewModel.isGeminiTTSConfigured)
+                    }
+                }
+
+                // Voice picker (scrollable grid for 30 voices)
+                SettingsCard(padding: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Voice")
+                                .font(AppTypography.labelMedium())
+                                .foregroundColor(AppColors.textSecondary)
+
+                            Spacer()
+
+                            // Gender filter
+                            HStack(spacing: 4) {
+                                GenderFilterButton(
+                                    label: "All",
+                                    isSelected: viewModel.settings.ttsSettings.voiceGenderFilter == nil,
+                                    action: { Task { await viewModel.updateTTSSetting(\.voiceGenderFilter, nil) } }
                                 )
-                                .disabled(!viewModel.isGeminiTTSConfigured)
+                                GenderFilterButton(
+                                    label: "♀",
+                                    isSelected: viewModel.settings.ttsSettings.voiceGenderFilter == .female,
+                                    action: { Task { await viewModel.updateTTSSetting(\.voiceGenderFilter, .female) } }
+                                )
+                                GenderFilterButton(
+                                    label: "♂",
+                                    isSelected: viewModel.settings.ttsSettings.voiceGenderFilter == .male,
+                                    action: { Task { await viewModel.updateTTSSetting(\.voiceGenderFilter, .male) } }
+                                )
                             }
                         }
 
-                        if !viewModel.isGeminiTTSConfigured {
-                            HStack(spacing: 6) {
-                                Image(systemName: "info.circle")
-                                Text("Add your Gemini API key in Settings → API Keys to enable Gemini TTS.")
-                                    .font(AppTypography.labelSmall())
+                        ScrollView {
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                                ForEach(filteredGeminiVoices) { voice in
+                                    GeminiVoiceCard(
+                                        voice: voice,
+                                        isSelected: viewModel.settings.ttsSettings.geminiVoice == voice,
+                                        isConfigured: viewModel.isGeminiTTSConfigured,
+                                        settings: viewModel.settings,
+                                        onSelect: {
+                                            Task { await viewModel.updateTTSSetting(\.geminiVoice, voice) }
+                                        }
+                                    )
+                                    .disabled(!viewModel.isGeminiTTSConfigured)
+                                }
                             }
-                            .foregroundColor(AppColors.textTertiary)
                         }
+                        .frame(maxHeight: 300)
                     }
+                }
+
+                // Voice direction/style instructions
+                SettingsCard(padding: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Voice Direction")
+                                .font(AppTypography.labelMedium())
+                                .foregroundColor(AppColors.textSecondary)
+
+                            Spacer()
+
+                            Text("Optional")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textTertiary)
+                        }
+
+                        TextField(
+                            "e.g., Speak cheerfully with a slight British accent",
+                            text: Binding(
+                                get: { viewModel.settings.ttsSettings.geminiVoiceDirection },
+                                set: { newValue in
+                                    Task { await viewModel.updateTTSSetting(\.geminiVoiceDirection, newValue) }
+                                }
+                            ),
+                            axis: .vertical
+                        )
+                        .textFieldStyle(.plain)
+                        .padding(10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(AppColors.substrateSecondary)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                                )
+                        )
+                        .lineLimit(2...4)
+                        .disabled(!viewModel.isGeminiTTSConfigured)
+
+                        HStack(spacing: 6) {
+                            Image(systemName: "info.circle")
+                            Text("Control style, accent, pace, and tone using natural language. Leave empty for default voice.")
+                                .font(AppTypography.labelSmall())
+                        }
+                        .foregroundColor(AppColors.textTertiary)
+                    }
+                }
+                .disabled(!viewModel.isGeminiTTSConfigured)
+
+                if !viewModel.isGeminiTTSConfigured {
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle")
+                        Text("Add your Gemini API key in Settings → API Keys to enable Gemini TTS.")
+                            .font(AppTypography.labelSmall())
+                    }
+                    .foregroundColor(AppColors.textTertiary)
                 }
             }
         }
@@ -368,12 +563,35 @@ struct TTSSettingsView: View {
                 // Voice picker (grid layout like Gemini)
                 SettingsCard(padding: 12) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Voice")
-                            .font(AppTypography.labelMedium())
-                            .foregroundColor(AppColors.textSecondary)
+                        HStack {
+                            Text("Voice")
+                                .font(AppTypography.labelMedium())
+                                .foregroundColor(AppColors.textSecondary)
+
+                            Spacer()
+
+                            // Gender filter
+                            HStack(spacing: 4) {
+                                GenderFilterButton(
+                                    label: "All",
+                                    isSelected: viewModel.settings.ttsSettings.voiceGenderFilter == nil,
+                                    action: { Task { await viewModel.updateTTSSetting(\.voiceGenderFilter, nil) } }
+                                )
+                                GenderFilterButton(
+                                    label: "♀",
+                                    isSelected: viewModel.settings.ttsSettings.voiceGenderFilter == .female,
+                                    action: { Task { await viewModel.updateTTSSetting(\.voiceGenderFilter, .female) } }
+                                )
+                                GenderFilterButton(
+                                    label: "♂",
+                                    isSelected: viewModel.settings.ttsSettings.voiceGenderFilter == .male,
+                                    action: { Task { await viewModel.updateTTSSetting(\.voiceGenderFilter, .male) } }
+                                )
+                            }
+                        }
 
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                            ForEach(OpenAITTSVoice.allCases) { voice in
+                            ForEach(filteredOpenAIVoices) { voice in
                                 OpenAIVoiceCard(
                                     voice: voice,
                                     isSelected: viewModel.settings.ttsSettings.openaiVoice == voice,
@@ -753,6 +971,29 @@ struct GeminiVoiceCard: View {
                             .stroke(isSelected ? AppColors.signalMercury : AppColors.glassBorder, lineWidth: 1)
                     )
             )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Gender Filter Button
+
+private struct GenderFilterButton: View {
+    let label: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(AppTypography.labelSmall())
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isSelected ? AppColors.signalMercury.opacity(0.2) : Color.clear)
+                )
+                .foregroundColor(isSelected ? AppColors.signalMercury : AppColors.textSecondary)
         }
         .buttonStyle(.plain)
     }

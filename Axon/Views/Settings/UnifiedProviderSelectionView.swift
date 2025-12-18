@@ -9,12 +9,72 @@ import SwiftUI
 
 /// Extension to SettingsViewModel for unified provider/model handling
 extension SettingsViewModel {
+    // MARK: - Provider/Model availability (API key gating)
+
+    /// Whether a built-in provider should be selectable based on API key configuration.
+    /// - Always visible: on-device providers (Apple Intelligence, local MLX)
+    /// - Cloud providers: only visible if an API key is configured
+    func isBuiltInProviderSelectable(_ provider: AIProvider) -> Bool {
+        switch provider {
+        case .appleFoundation, .localMLX:
+            return true
+        default:
+            // For all cloud providers, only show if user has configured the API key.
+            // AIProvider raw values match APIProvider raw values for these cases.
+            guard let apiProvider = APIProvider(rawValue: provider.rawValue) else {
+                return false
+            }
+            return isAPIKeyConfigured(apiProvider)
+        }
+    }
+
+    /// Whether a custom provider should be selectable.
+    /// Option A: hide custom providers unless configured.
+    func isCustomProviderSelectable(_ providerId: UUID) -> Bool {
+        isCustomProviderConfigured(providerId)
+    }
+
     /// Get all providers (built-in + custom) as unified list
     func allUnifiedProviders() -> [UnifiedProvider] {
         var providers: [UnifiedProvider] = AIProvider.allCases.map { .builtIn($0) }
         providers.append(contentsOf: settings.customProviders.map { .custom($0) })
         return providers
     }
+
+    /// Providers filtered for selection in UI.
+    func selectableUnifiedProviders() -> [UnifiedProvider] {
+        allUnifiedProviders().filter { provider in
+            switch provider {
+            case .builtIn(let p):
+                return isBuiltInProviderSelectable(p)
+            case .custom(let config):
+                return isCustomProviderSelectable(config.id)
+            }
+        }
+    }
+
+    /// Models for a provider (currently just a passthrough; exists for symmetry).
+    func selectableModels(for provider: UnifiedProvider, customProviderIndex: Int? = nil) -> [UnifiedModel] {
+        provider.availableModels(customProviderIndex: customProviderIndex)
+    }
+
+    /// Best-effort fallback provider when the current selection becomes unavailable.
+    func fallbackUnifiedProvider() -> UnifiedProvider? {
+        // 1) Prefer Apple Intelligence when available on this OS
+        if AIProvider.appleFoundation.isAvailable {
+            return .builtIn(.appleFoundation)
+        }
+
+        // 2) Prefer local MLX when available (physical device)
+        if AIProvider.localMLX.isAvailable {
+            return .builtIn(.localMLX)
+        }
+
+        // 3) Otherwise first selectable provider (configured cloud/custom)
+        return selectableUnifiedProviders().first
+    }
+
+    // MARK: - Current selections
 
     /// Get currently selected unified provider
     func currentUnifiedProvider() -> UnifiedProvider? {
@@ -43,6 +103,8 @@ extension SettingsViewModel {
 
         return nil
     }
+
+    // MARK: - Selection helpers
 
     /// Select a unified provider
     func selectUnifiedProvider(_ provider: UnifiedProvider) async {

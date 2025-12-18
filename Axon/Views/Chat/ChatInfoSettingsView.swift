@@ -122,8 +122,13 @@ struct ChatInfoSettingsView: View {
     private var mainContent: some View {
         // MARK: - Provider Selection
         ChatInfoSection(title: "AI Provider") {
-            let allProviders = settingsViewModel.allUnifiedProviders()
-            let currentProvider = selectedProvider ?? settingsViewModel.currentUnifiedProvider()
+            let allProviders = settingsViewModel.selectableUnifiedProviders()
+            let currentProvider = (selectedProvider ?? settingsViewModel.currentUnifiedProvider()).flatMap { provider in
+                if allProviders.contains(where: { $0.id == provider.id }) {
+                    return provider
+                }
+                return settingsViewModel.fallbackUnifiedProvider()
+            } ?? settingsViewModel.fallbackUnifiedProvider()
             let isProviderChangeAllowed = sovereigntyService.isProviderChangeAllowed()
             let providerRestrictionReason = sovereigntyService.providerChangeRestrictionReason()
 
@@ -152,7 +157,7 @@ struct ChatInfoSettingsView: View {
             ) {
                 #if os(macOS)
                 Section("Built-in Providers") {
-                    ForEach(AIProvider.allCases) { provider in
+                    ForEach(AIProvider.allCases.filter { settingsViewModel.isBuiltInProviderSelectable($0) }) { provider in
                         MenuButtonItem(
                             id: "builtin_\(provider.rawValue)",
                             label: provider.displayName,
@@ -163,9 +168,10 @@ struct ChatInfoSettingsView: View {
                     }
                 }
 
-                if !settingsViewModel.settings.customProviders.isEmpty {
+                let selectableCustomProviders = settingsViewModel.settings.customProviders.filter { settingsViewModel.isCustomProviderSelectable($0.id) }
+                if !selectableCustomProviders.isEmpty {
                     Section("Custom Providers") {
-                        ForEach(settingsViewModel.settings.customProviders) { provider in
+                        ForEach(selectableCustomProviders) { provider in
                             MenuButtonItem(
                                 id: "custom_\(provider.id.uuidString)",
                                 label: provider.providerName,
@@ -178,14 +184,15 @@ struct ChatInfoSettingsView: View {
                 }
                 #else
                 Section("Built-in Providers") {
-                    ForEach(AIProvider.allCases) { provider in
+                    ForEach(AIProvider.allCases.filter { settingsViewModel.isBuiltInProviderSelectable($0) }) { provider in
                         Text(provider.displayName).tag("builtin_\(provider.rawValue)")
                     }
                 }
 
-                if !settingsViewModel.settings.customProviders.isEmpty {
+                let selectableCustomProviders = settingsViewModel.settings.customProviders.filter { settingsViewModel.isCustomProviderSelectable($0.id) }
+                if !selectableCustomProviders.isEmpty {
                     Section("Custom Providers") {
-                        ForEach(settingsViewModel.settings.customProviders) { provider in
+                        ForEach(selectableCustomProviders) { provider in
                             Text(provider.providerName).tag("custom_\(provider.id.uuidString)")
                         }
                     }

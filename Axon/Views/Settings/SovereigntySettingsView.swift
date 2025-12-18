@@ -190,21 +190,20 @@ struct SovereigntySettingsView: View {
                     iconColor: AppColors.signalMercury,
                     isOn: Binding(
                         get: { viewModel.settings.sovereigntySettings.enabled },
-                        set: { viewModel.settings.sovereigntySettings.enabled = $0 }
+                        set: { newValue in
+                            Task {
+                                var updated = viewModel.settings.sovereigntySettings
+                                updated.enabled = newValue
+                                await viewModel.updateSetting(\.sovereigntySettings, updated)
+                            }
+                        }
                     )
                 )
 
                 Divider().background(AppColors.divider)
 
                 // Consent Provider
-                SettingsRow(
-                    icon: "brain.head.profile",
-                    title: "Consent Provider",
-                    subtitle: viewModel.settings.sovereigntySettings.consentProvider.displayName,
-                    iconColor: .purple
-                ) {
-                    // Could open a picker sheet
-                }
+                consentProviderPicker
 
                 Divider().background(AppColors.divider)
 
@@ -216,7 +215,13 @@ struct SovereigntySettingsView: View {
                     iconColor: .blue,
                     isOn: Binding(
                         get: { viewModel.settings.sovereigntySettings.requireBiometricForAllActions },
-                        set: { viewModel.settings.sovereigntySettings.requireBiometricForAllActions = $0 }
+                        set: { newValue in
+                            Task {
+                                var updated = viewModel.settings.sovereigntySettings
+                                updated.requireBiometricForAllActions = newValue
+                                await viewModel.updateSetting(\.sovereigntySettings, updated)
+                            }
+                        }
                     )
                 )
 
@@ -230,7 +235,13 @@ struct SovereigntySettingsView: View {
                     iconColor: .orange,
                     isOn: Binding(
                         get: { viewModel.settings.sovereigntySettings.showDetailedReasoning },
-                        set: { viewModel.settings.sovereigntySettings.showDetailedReasoning = $0 }
+                        set: { newValue in
+                            Task {
+                                var updated = viewModel.settings.sovereigntySettings
+                                updated.showDetailedReasoning = newValue
+                                await viewModel.updateSetting(\.sovereigntySettings, updated)
+                            }
+                        }
                     )
                 )
 
@@ -244,7 +255,13 @@ struct SovereigntySettingsView: View {
                     iconColor: .green,
                     isOn: Binding(
                         get: { viewModel.settings.sovereigntySettings.auditLoggingEnabled },
-                        set: { viewModel.settings.sovereigntySettings.auditLoggingEnabled = $0 }
+                        set: { newValue in
+                            Task {
+                                var updated = viewModel.settings.sovereigntySettings
+                                updated.auditLoggingEnabled = newValue
+                                await viewModel.updateSetting(\.sovereigntySettings, updated)
+                            }
+                        }
                     )
                 )
             }
@@ -531,6 +548,60 @@ struct SovereigntySettingsView: View {
             return ("Setup", { showingCovenantNegotiation = true })
         }
         return nil
+    }
+
+    // MARK: - Consent Provider Picker
+
+    private var consentProviderPicker: some View {
+        let allProviders = viewModel.selectableUnifiedProviders()
+        let currentProvider = viewModel.settings.sovereigntySettings.consentProvider
+
+        return StyledMenuPicker(
+            icon: "brain.head.profile",
+            title: currentProvider.displayName,
+            selection: Binding(
+                get: { "builtin_\(currentProvider.rawValue)" },
+                set: { newProviderId in
+                    guard let builtInProviderRaw = newProviderId.replacingOccurrences(of: "builtin_", with: "") as String?,
+                          let newProvider = AIProvider(rawValue: builtInProviderRaw) else {
+                        return
+                    }
+
+                    Task {
+                        var updated = viewModel.settings.sovereigntySettings
+                        updated.consentProvider = newProvider
+                        updated.consentProviderHasBeenSetByUser = true
+                        updated.consentModel = "" // reset to provider default when switching
+                        await viewModel.updateSetting(\.sovereigntySettings, updated)
+                    }
+                }
+            )
+        ) {
+            Section("Built-in Providers") {
+                ForEach(AIProvider.allCases.filter { viewModel.isBuiltInProviderSelectable($0) }) { provider in
+                    #if os(macOS)
+                    MenuButtonItem(
+                        id: "builtin_\(provider.rawValue)",
+                        label: provider.displayName,
+                        isSelected: provider == currentProvider
+                    ) {
+                        Task {
+                            var updated = viewModel.settings.sovereigntySettings
+                            updated.consentProvider = provider
+                            updated.consentProviderHasBeenSetByUser = true
+                            updated.consentModel = ""
+                            await viewModel.updateSetting(\.sovereigntySettings, updated)
+                        }
+                    }
+                    #else
+                    Text(provider.displayName).tag("builtin_\(provider.rawValue)")
+                    #endif
+                }
+            }
+
+            // Intentionally do NOT allow custom providers for consent yet.
+            // (The consent pipeline uses AIProvider and assumes built-in provider semantics.)
+        }
     }
 }
 

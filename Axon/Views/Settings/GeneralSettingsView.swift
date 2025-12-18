@@ -48,8 +48,14 @@ struct GeneralSettingsView: View {
             // MARK: - AI Provider Section
 
             GeneralSettingsSection(title: "AI Provider") {
-                let allProviders = viewModel.allUnifiedProviders()
-                let currentProvider = viewModel.currentUnifiedProvider()
+                let allProviders = viewModel.selectableUnifiedProviders()
+                let currentProvider = viewModel.currentUnifiedProvider().flatMap { provider in
+                    // If current provider isn't selectable anymore (e.g. key removed), fallback.
+                    if allProviders.contains(where: { $0.id == provider.id }) {
+                        return provider
+                    }
+                    return viewModel.fallbackUnifiedProvider()
+                } ?? viewModel.fallbackUnifiedProvider()
                 let isProviderChangeAllowed = sovereigntyService.isProviderChangeAllowed()
                 let providerRestrictionReason = sovereigntyService.providerChangeRestrictionReason()
 
@@ -82,7 +88,7 @@ struct GeneralSettingsView: View {
                 ) {
                     #if os(macOS)
                     Section("Built-in Providers") {
-                        ForEach(AIProvider.allCases) { provider in
+                        ForEach(AIProvider.allCases.filter { viewModel.isBuiltInProviderSelectable($0) }) { provider in
                             MenuButtonItem(
                                 id: "builtin_\(provider.rawValue)",
                                 label: provider.displayName,
@@ -95,9 +101,10 @@ struct GeneralSettingsView: View {
                         }
                     }
 
-                    if !viewModel.settings.customProviders.isEmpty {
+                    let selectableCustomProviders = viewModel.settings.customProviders.filter { viewModel.isCustomProviderSelectable($0.id) }
+                    if !selectableCustomProviders.isEmpty {
                         Section("Custom Providers") {
-                            ForEach(viewModel.settings.customProviders) { provider in
+                            ForEach(selectableCustomProviders) { provider in
                                 MenuButtonItem(
                                     id: "custom_\(provider.id.uuidString)",
                                     label: provider.providerName,
@@ -112,14 +119,15 @@ struct GeneralSettingsView: View {
                     }
                     #else
                     Section("Built-in Providers") {
-                        ForEach(AIProvider.allCases) { provider in
+                        ForEach(AIProvider.allCases.filter { viewModel.isBuiltInProviderSelectable($0) }) { provider in
                             Text(provider.displayName).tag("builtin_\(provider.rawValue)")
                         }
                     }
 
-                    if !viewModel.settings.customProviders.isEmpty {
+                    let selectableCustomProviders = viewModel.settings.customProviders.filter { viewModel.isCustomProviderSelectable($0.id) }
+                    if !selectableCustomProviders.isEmpty {
                         Section("Custom Providers") {
-                            ForEach(viewModel.settings.customProviders) { provider in
+                            ForEach(selectableCustomProviders) { provider in
                                 Text(provider.providerName).tag("custom_\(provider.id.uuidString)")
                             }
                         }
