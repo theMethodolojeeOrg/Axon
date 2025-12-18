@@ -2,7 +2,7 @@
 //  TTSSettingsView.swift
 //  Axon
 //
-//  Text-to-Speech settings with provider selection (ElevenLabs vs Gemini)
+//  Text-to-Speech settings with provider selection (ElevenLabs, Gemini, OpenAI)
 //
 
 import SwiftUI
@@ -20,10 +20,13 @@ struct TTSSettingsView: View {
 
             ttsTextSection
 
-            if viewModel.settings.ttsSettings.provider == .elevenlabs {
+            switch viewModel.settings.ttsSettings.provider {
+            case .elevenlabs:
                 elevenLabsSection
-            } else {
+            case .gemini:
                 geminiSection
+            case .openai:
+                openaiSection
             }
         }
     }
@@ -55,6 +58,19 @@ struct TTSSettingsView: View {
                         status: viewModel.isGeminiTTSConfigured ? .configured : .notConfigured,
                         onSelect: {
                             Task { await viewModel.updateTTSSetting(\.provider, .gemini) }
+                        }
+                    )
+
+                    Divider().background(AppColors.divider)
+
+                    ProviderRow(
+                        title: TTSProvider.openai.displayName,
+                        subtitle: TTSProvider.openai.description,
+                        icon: TTSProvider.openai.icon,
+                        isSelected: viewModel.settings.ttsSettings.provider == .openai,
+                        status: viewModel.isOpenAITTSConfigured ? .configured : .notConfigured,
+                        onSelect: {
+                            Task { await viewModel.updateTTSSetting(\.provider, .openai) }
                         }
                     )
                 }
@@ -136,50 +152,7 @@ struct TTSSettingsView: View {
                 }
 
                 // Voice picker
-                SettingsCard(padding: 12) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Voice")
-                            .font(AppTypography.labelMedium())
-                            .foregroundColor(AppColors.textSecondary)
-
-                        StyledMenuPicker(
-                            icon: "waveform",
-                            title: viewModel.settings.ttsSettings.selectedVoiceName ?? "Select a voice",
-                            selection: Binding(
-                                get: { viewModel.settings.ttsSettings.selectedVoiceId ?? "" },
-                                set: { newId in
-                                    let voice = viewModel.availableVoices.first { $0.id == newId }
-                                    Task { await viewModel.updateSelectedVoice(id: voice?.id, name: voice?.name) }
-                                }
-                            )
-                        ) {
-                            #if os(macOS)
-                            if viewModel.availableVoices.isEmpty {
-                                Text("No voices found")
-                            } else {
-                                ForEach(viewModel.availableVoices) { voice in
-                                    MenuButtonItem(
-                                        id: voice.id,
-                                        label: voice.name,
-                                        isSelected: viewModel.settings.ttsSettings.selectedVoiceId == voice.id
-                                    ) {
-                                        Task { await viewModel.updateSelectedVoice(id: voice.id, name: voice.name) }
-                                    }
-                                }
-                            }
-                            #else
-                            if viewModel.availableVoices.isEmpty {
-                                Text("No voices found").tag("")
-                            } else {
-                                ForEach(viewModel.availableVoices) { voice in
-                                    Text(voice.name).tag(voice.id)
-                                }
-                            }
-                            #endif
-                        }
-                        .disabled(!viewModel.isTTSConfigured)
-                    }
-                }
+                ElevenLabsVoicePickerCard(viewModel: viewModel)
 
                 // Model picker
                 SettingsCard(padding: 12) {
@@ -304,6 +277,8 @@ struct TTSSettingsView: View {
                                 GeminiVoiceCard(
                                     voice: voice,
                                     isSelected: viewModel.settings.ttsSettings.geminiVoice == voice,
+                                    isConfigured: viewModel.isGeminiTTSConfigured,
+                                    settings: viewModel.settings,
                                     onSelect: {
                                         Task { await viewModel.updateTTSSetting(\.geminiVoice, voice) }
                                     }
@@ -321,6 +296,202 @@ struct TTSSettingsView: View {
                             .foregroundColor(AppColors.textTertiary)
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // MARK: - OpenAI
+
+    private var openaiSection: some View {
+        UnifiedSettingsSection(title: "OpenAI") {
+            VStack(alignment: .leading, spacing: 12) {
+                // Status card
+                SettingsCard(padding: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: viewModel.isOpenAITTSConfigured ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                            .foregroundColor(viewModel.isOpenAITTSConfigured ? AppColors.accentSuccess : AppColors.accentWarning)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(viewModel.isOpenAITTSConfigured ? "OpenAI API Key Configured" : "OpenAI API Key Required")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Text("OpenAI TTS outputs MP3 audio. Uses your OpenAI API key.")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+
+                        Spacer()
+                    }
+                }
+
+                // Model picker
+                SettingsCard(padding: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Model")
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        StyledMenuPicker(
+                            icon: "cpu",
+                            title: viewModel.settings.ttsSettings.openaiModel.displayName,
+                            selection: Binding(
+                                get: { viewModel.settings.ttsSettings.openaiModel.rawValue },
+                                set: { newValue in
+                                    if let model = OpenAITTSModel(rawValue: newValue) {
+                                        Task { await viewModel.updateTTSSetting(\.openaiModel, model) }
+                                    }
+                                }
+                            )
+                        ) {
+                            #if os(macOS)
+                            ForEach(OpenAITTSModel.allCases) { model in
+                                MenuButtonItem(
+                                    id: model.rawValue,
+                                    label: "\(model.displayName) - \(model.description)",
+                                    isSelected: viewModel.settings.ttsSettings.openaiModel == model
+                                ) {
+                                    Task { await viewModel.updateTTSSetting(\.openaiModel, model) }
+                                }
+                            }
+                            #else
+                            ForEach(OpenAITTSModel.allCases) { model in
+                                Text("\(model.displayName) - \(model.description)").tag(model.rawValue)
+                            }
+                            #endif
+                        }
+                        .disabled(!viewModel.isOpenAITTSConfigured)
+                    }
+                }
+
+                // Voice picker (grid layout like Gemini)
+                SettingsCard(padding: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Voice")
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                            ForEach(OpenAITTSVoice.allCases) { voice in
+                                OpenAIVoiceCard(
+                                    voice: voice,
+                                    isSelected: viewModel.settings.ttsSettings.openaiVoice == voice,
+                                    isConfigured: viewModel.isOpenAITTSConfigured,
+                                    settings: viewModel.settings,
+                                    onSelect: {
+                                        Task { await viewModel.updateTTSSetting(\.openaiVoice, voice) }
+                                    }
+                                )
+                                .disabled(!viewModel.isOpenAITTSConfigured)
+                            }
+                        }
+                    }
+                }
+
+                // Speed slider
+                SettingsCard(padding: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Speed")
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Speech Rate")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textPrimary)
+                                Spacer()
+                                Text(String(format: "%.2fx", viewModel.settings.ttsSettings.openaiSpeed))
+                                    .font(AppTypography.bodySmall(.medium))
+                                    .foregroundColor(AppColors.signalMercury)
+                            }
+                            Slider(
+                                value: Binding(
+                                    get: { viewModel.settings.ttsSettings.openaiSpeed },
+                                    set: { newValue in
+                                        Task { await viewModel.updateTTSSetting(\.openaiSpeed, newValue) }
+                                    }
+                                ),
+                                in: 0.25...4.0,
+                                step: 0.25
+                            )
+                            .tint(AppColors.signalMercury)
+
+                            HStack {
+                                Text("0.25x")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                                Spacer()
+                                Text("1.0x")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                                Spacer()
+                                Text("4.0x")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                            }
+                        }
+                    }
+                }
+                .disabled(!viewModel.isOpenAITTSConfigured)
+
+                // Voice instructions (only for gpt-4o-mini-tts)
+                if viewModel.settings.ttsSettings.openaiModel.supportsInstructions {
+                    SettingsCard(padding: 12) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Voice Instructions")
+                                    .font(AppTypography.labelMedium())
+                                    .foregroundColor(AppColors.textSecondary)
+
+                                Spacer()
+
+                                Text("GPT-4o Mini TTS only")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                            }
+
+                            TextField(
+                                "e.g., Speak in a cheerful and positive tone",
+                                text: Binding(
+                                    get: { viewModel.settings.ttsSettings.openaiVoiceInstructions },
+                                    set: { newValue in
+                                        Task { await viewModel.updateTTSSetting(\.openaiVoiceInstructions, newValue) }
+                                    }
+                                ),
+                                axis: .vertical
+                            )
+                            .textFieldStyle(.plain)
+                            .padding(10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(AppColors.substrateSecondary)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(AppColors.glassBorder, lineWidth: 1)
+                                    )
+                            )
+                            .lineLimit(2...4)
+
+                            HStack(spacing: 6) {
+                                Image(systemName: "info.circle")
+                                Text("Control accent, emotional range, intonation, speed, tone, and more.")
+                                    .font(AppTypography.labelSmall())
+                            }
+                            .foregroundColor(AppColors.textTertiary)
+                        }
+                    }
+                    .disabled(!viewModel.isOpenAITTSConfigured)
+                }
+
+                if !viewModel.isOpenAITTSConfigured {
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle")
+                        Text("Add your OpenAI API key in Settings → API Keys to enable OpenAI TTS.")
+                            .font(AppTypography.labelSmall())
+                    }
+                    .foregroundColor(AppColors.textTertiary)
                 }
             }
         }
@@ -382,12 +553,133 @@ private struct ProviderRow: View {
     }
 }
 
-// MARK: - Gemini Voice Card (kept, but now lives in-card)
+// MARK: - ElevenLabs Voice Picker Card
+
+private struct ElevenLabsVoicePickerCard: View {
+    @ObservedObject var viewModel: SettingsViewModel
+    @StateObject private var ttsService = TTSPlaybackService.shared
+    @State private var previewError: String?
+
+    private var isPreviewingCurrentVoice: Bool {
+        guard let voiceId = viewModel.settings.ttsSettings.selectedVoiceId else { return false }
+        return ttsService.currentMessageId == "preview_elevenlabs_\(voiceId)"
+    }
+
+    var body: some View {
+        SettingsCard(padding: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Voice")
+                    .font(AppTypography.labelMedium())
+                    .foregroundColor(AppColors.textSecondary)
+
+                HStack(spacing: 8) {
+                    StyledMenuPicker(
+                        icon: "waveform",
+                        title: viewModel.settings.ttsSettings.selectedVoiceName ?? "Select a voice",
+                        selection: Binding(
+                            get: { viewModel.settings.ttsSettings.selectedVoiceId ?? "" },
+                            set: { newId in
+                                let voice = viewModel.availableVoices.first { $0.id == newId }
+                                Task { await viewModel.updateSelectedVoice(id: voice?.id, name: voice?.name) }
+                            }
+                        )
+                    ) {
+                        #if os(macOS)
+                        if viewModel.availableVoices.isEmpty {
+                            Text("No voices found")
+                        } else {
+                            ForEach(viewModel.availableVoices) { voice in
+                                MenuButtonItem(
+                                    id: voice.id,
+                                    label: voice.name,
+                                    isSelected: viewModel.settings.ttsSettings.selectedVoiceId == voice.id
+                                ) {
+                                    Task { await viewModel.updateSelectedVoice(id: voice.id, name: voice.name) }
+                                }
+                            }
+                        }
+                        #else
+                        if viewModel.availableVoices.isEmpty {
+                            Text("No voices found").tag("")
+                        } else {
+                            ForEach(viewModel.availableVoices) { voice in
+                                Text(voice.name).tag(voice.id)
+                            }
+                        }
+                        #endif
+                    }
+                    .disabled(!viewModel.isTTSConfigured)
+
+                    // Preview button
+                    if viewModel.isTTSConfigured,
+                       let voiceId = viewModel.settings.ttsSettings.selectedVoiceId,
+                       let voiceName = viewModel.settings.ttsSettings.selectedVoiceName {
+                        Button {
+                            if isPreviewingCurrentVoice && (ttsService.isPlaying || ttsService.isGenerating) {
+                                ttsService.stop()
+                            } else {
+                                Task {
+                                    do {
+                                        previewError = nil
+                                        try await ttsService.previewElevenLabsVoice(
+                                            voiceId: voiceId,
+                                            voiceName: voiceName,
+                                            settings: viewModel.settings
+                                        )
+                                    } catch {
+                                        previewError = error.localizedDescription
+                                    }
+                                }
+                            }
+                        } label: {
+                            Group {
+                                if isPreviewingCurrentVoice && ttsService.isGenerating {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                        .frame(width: 20, height: 20)
+                                } else if isPreviewingCurrentVoice && ttsService.isPlaying {
+                                    Image(systemName: "stop.fill")
+                                        .font(.system(size: 14))
+                                } else {
+                                    Image(systemName: "play.fill")
+                                        .font(.system(size: 14))
+                                }
+                            }
+                            .foregroundColor(AppColors.signalMercury)
+                            .frame(width: 36, height: 36)
+                            .background(AppColors.signalMercury.opacity(0.15))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if let error = previewError {
+                    Text(error)
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.accentWarning)
+                        .lineLimit(2)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Gemini Voice Card
 
 struct GeminiVoiceCard: View {
     let voice: GeminiTTSVoice
     let isSelected: Bool
+    let isConfigured: Bool
+    let settings: AppSettings
     let onSelect: () -> Void
+
+    @StateObject private var ttsService = TTSPlaybackService.shared
+    @State private var previewError: String?
+
+    private var isPreviewingThisVoice: Bool {
+        ttsService.currentMessageId == "preview_gemini_\(voice.rawValue)"
+    }
 
     var body: some View {
         Button(action: onSelect) {
@@ -397,6 +689,44 @@ struct GeminiVoiceCard: View {
                         .font(AppTypography.bodyMedium(.medium))
                         .foregroundColor(AppColors.textPrimary)
                     Spacer()
+
+                    // Preview button
+                    if isConfigured {
+                        Button {
+                            if isPreviewingThisVoice && (ttsService.isPlaying || ttsService.isGenerating) {
+                                ttsService.stop()
+                            } else {
+                                Task {
+                                    do {
+                                        previewError = nil
+                                        try await ttsService.previewGeminiVoice(voice, settings: settings)
+                                    } catch {
+                                        previewError = error.localizedDescription
+                                    }
+                                }
+                            }
+                        } label: {
+                            Group {
+                                if isPreviewingThisVoice && ttsService.isGenerating {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                        .frame(width: 20, height: 20)
+                                } else if isPreviewingThisVoice && ttsService.isPlaying {
+                                    Image(systemName: "stop.fill")
+                                        .font(.system(size: 12))
+                                } else {
+                                    Image(systemName: "play.fill")
+                                        .font(.system(size: 12))
+                                }
+                            }
+                            .foregroundColor(AppColors.signalMercury)
+                            .frame(width: 28, height: 28)
+                            .background(AppColors.signalMercury.opacity(0.15))
+                            .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(AppColors.signalMercury)
@@ -406,6 +736,106 @@ struct GeminiVoiceCard: View {
                 Text(voice.toneDescription)
                     .font(AppTypography.labelSmall())
                     .foregroundColor(AppColors.textSecondary)
+
+                if let error = previewError {
+                    Text(error)
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.accentWarning)
+                        .lineLimit(2)
+                }
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(isSelected ? AppColors.signalMercury : AppColors.glassBorder, lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - OpenAI Voice Card
+
+struct OpenAIVoiceCard: View {
+    let voice: OpenAITTSVoice
+    let isSelected: Bool
+    let isConfigured: Bool
+    let settings: AppSettings
+    let onSelect: () -> Void
+
+    @StateObject private var ttsService = TTSPlaybackService.shared
+    @State private var previewError: String?
+
+    private var isPreviewingThisVoice: Bool {
+        ttsService.currentMessageId == "preview_openai_\(voice.rawValue)"
+    }
+
+    var body: some View {
+        Button(action: onSelect) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(voice.displayName)
+                        .font(AppTypography.bodyMedium(.medium))
+                        .foregroundColor(AppColors.textPrimary)
+                    Spacer()
+
+                    // Preview button
+                    if isConfigured {
+                        Button {
+                            if isPreviewingThisVoice && (ttsService.isPlaying || ttsService.isGenerating) {
+                                ttsService.stop()
+                            } else {
+                                Task {
+                                    do {
+                                        previewError = nil
+                                        try await ttsService.previewOpenAIVoice(voice, settings: settings)
+                                    } catch {
+                                        previewError = error.localizedDescription
+                                    }
+                                }
+                            }
+                        } label: {
+                            Group {
+                                if isPreviewingThisVoice && ttsService.isGenerating {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                        .frame(width: 20, height: 20)
+                                } else if isPreviewingThisVoice && ttsService.isPlaying {
+                                    Image(systemName: "stop.fill")
+                                        .font(.system(size: 12))
+                                } else {
+                                    Image(systemName: "play.fill")
+                                        .font(.system(size: 12))
+                                }
+                            }
+                            .foregroundColor(AppColors.signalMercury)
+                            .frame(width: 28, height: 28)
+                            .background(AppColors.signalMercury.opacity(0.15))
+                            .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(AppColors.signalMercury)
+                    }
+                }
+
+                Text(voice.toneDescription)
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(AppColors.textSecondary)
+
+                if let error = previewError {
+                    Text(error)
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.accentWarning)
+                        .lineLimit(2)
+                }
             }
             .padding(12)
             .background(

@@ -13,6 +13,7 @@ struct ChatInfoSettingsView: View {
     @StateObject private var settingsViewModel = SettingsViewModel()
     @StateObject private var conversationService = ConversationService.shared
     @StateObject private var costService = CostService.shared
+    @ObservedObject private var sovereigntyService = SovereigntyService.shared
     #if os(macOS)
     @ObservedObject private var bridgeServer = BridgeServer.shared
     #else
@@ -25,8 +26,14 @@ struct ChatInfoSettingsView: View {
     @State private var selectedModel: UnifiedModel?
     @State private var estimatedTokens: Int = 0
 
-    // Track enabled tools locally for immediate UI update
+    // Whether this conversation has custom overrides (vs using defaults)
+    @State private var hasCustomOverrides: Bool = false
+
+    // Track enabled tools locally for this conversation (per-chat override)
     @State private var localEnabledTools: Set<String> = []
+
+    // Whether tool settings have been customized for this conversation
+    @State private var hasCustomToolOverrides: Bool = false
 
     // iOS Remote Mode connection state
     #if !os(macOS)
@@ -117,6 +124,21 @@ struct ChatInfoSettingsView: View {
         ChatInfoSection(title: "AI Provider") {
             let allProviders = settingsViewModel.allUnifiedProviders()
             let currentProvider = selectedProvider ?? settingsViewModel.currentUnifiedProvider()
+            let isProviderChangeAllowed = sovereigntyService.isProviderChangeAllowed()
+            let providerRestrictionReason = sovereigntyService.providerChangeRestrictionReason()
+
+            // Show restriction banner if provider changes are restricted by covenant
+            if !isProviderChangeAllowed, let reason = providerRestrictionReason {
+                CovenantRestrictionBanner(
+                    icon: "lock.shield",
+                    message: reason,
+                    actionLabel: "Renegotiate",
+                    action: {
+                        // Provider changes require renegotiation with the AI
+                        // The user should go through the sovereignty settings to renegotiate
+                    }
+                )
+            }
 
             StyledMenuPicker(
                 icon: currentProvider?.isCustom == true ? "server.rack" : "cpu.fill",
@@ -170,6 +192,8 @@ struct ChatInfoSettingsView: View {
                 }
                 #endif
             }
+            .disabled(!isProviderChangeAllowed)
+            .opacity(isProviderChangeAllowed ? 1.0 : 0.6)
         }
 
         // MARK: - Model Selection
@@ -679,28 +703,66 @@ struct ChatInfoSettingsView: View {
     }
 
     private func loadEnabledTools() {
-        localEnabledTools = settingsViewModel.settings.toolSettings.enabledToolIds
+        // Check for per-conversation tool overrides first
+        let key = "conversation_overrides_\(conversation.id)"
+        if let data = UserDefaults.standard.data(forKey: key),
+           let overrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data),
+           let toolOverrides = overrides.enabledToolIds {
+            // Use per-conversation tool settings
+            hasCustomToolOverrides = true
+            localEnabledTools = toolOverrides
+        } else {
+            // Fall back to global defaults
+            hasCustomToolOverrides = false
+            localEnabledTools = settingsViewModel.settings.toolSettings.enabledToolIds
+        }
     }
 
     private func toggleTool(_ tool: ToolId, enabled: Bool) {
+        // Update local state immediately for UI
         if enabled {
             localEnabledTools.insert(tool.rawValue)
-            settingsViewModel.settings.toolSettings.enableTool(tool)
         } else {
             localEnabledTools.remove(tool.rawValue)
-            settingsViewModel.settings.toolSettings.disableTool(tool)
         }
-        // Persist the updated settings
-        try? SettingsStorage.shared.saveSettings(settingsViewModel.settings)
+
+        // Mark that we now have custom tool overrides for this conversation
+        hasCustomToolOverrides = true
+
+        // Save as per-conversation override (does NOT modify global settings)
+        saveToolOverrides()
+    }
+
+    private func saveToolOverrides() {
+        // Load existing overrides or create new ones
+        let key = "conversation_overrides_\(conversation.id)"
+        var overrides: ConversationOverrides
+
+        if let data = UserDefaults.standard.data(forKey: key),
+           let existingOverrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data) {
+            overrides = existingOverrides
+        } else {
+            overrides = ConversationOverrides()
+        }
+
+        // Update tool settings
+        overrides.enabledToolIds = localEnabledTools
+
+        // Persist
+        if let data = try? JSONEncoder().encode(overrides) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
     }
 
     private func loadConversationOverrides() {
-        // Load per-conversation overrides from UserDefaults
+        // Check for per-conversation overrides in UserDefaults
         let key = "conversation_overrides_\(conversation.id)"
         if let data = UserDefaults.standard.data(forKey: key),
            let overrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data) {
 
-            // Restore provider
+            hasCustomOverrides = true
+
+            // Restore provider from override
             if let customProviderId = overrides.customProviderId,
                let customProvider = settingsViewModel.settings.customProviders.first(where: { $0.id == customProviderId }) {
                 selectedProvider = .custom(customProvider)
@@ -708,7 +770,7 @@ struct ChatInfoSettingsView: View {
                 selectedProvider = .builtIn(builtInProvider)
             }
 
-            // Restore model
+            // Restore model from override
             if let provider = selectedProvider {
                 let providerIndex = settingsViewModel.settings.customProviders.firstIndex(where: {
                     if case .custom(let config) = provider {
@@ -734,6 +796,11 @@ struct ChatInfoSettingsView: View {
                     })
                 }
             }
+        } else {
+            // No overrides exist - initialize from global defaults
+            hasCustomOverrides = false
+            selectedProvider = settingsViewModel.currentUnifiedProvider()
+            selectedModel = settingsViewModel.currentUnifiedModel()
         }
     }
 
@@ -781,7 +848,7 @@ struct ChatInfoSettingsView: View {
 // MARK: - Conversation Overrides Model
 
 struct ConversationOverrides: Codable {
-    // Identifiers
+    // Provider/Model Identifiers
     var builtInProvider: String?
     var customProviderId: UUID?
     var builtInModel: String?
@@ -790,6 +857,10 @@ struct ConversationOverrides: Codable {
     // Human-friendly metadata (optional)
     var providerDisplayName: String?
     var modelDisplayName: String?
+
+    // Per-conversation tool settings
+    // When nil, use global defaults. When set, these override for this conversation only.
+    var enabledToolIds: Set<String>?
 }
 
 // MARK: - Chat Info Section Component

@@ -334,6 +334,10 @@ class SettingsViewModel: ObservableObject {
         isAPIKeyConfigured(.gemini)
     }
 
+    var isOpenAITTSConfigured: Bool {
+        isAPIKeyConfigured(.openai)
+    }
+
     // MARK: - Current Model
 
     var currentModel: AIModel? {

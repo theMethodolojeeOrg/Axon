@@ -221,80 +221,52 @@ struct GeneralSettingsView: View {
                     )
                 }
             }
-            // MARK: - Device Mode Section
+            // MARK: - Data Management
 
-            DeviceModeSection(viewModel: viewModel)
+            GeneralSettingsSection(title: "Data Management") {
+                NavigationLink {
+                    DataManagementView(viewModel: viewModel)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 20))
+                            .foregroundColor(AppColors.signalMercury)
+                            .frame(width: 32)
 
-            // MARK: - Settings Sync
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Customize Data Distribution")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
 
-            GeneralSettingsSection(title: "Settings Sync") {
-                HStack(spacing: 12) {
-                    Image(systemName: viewModel.settings.deviceModeConfig.cloudSyncProvider.icon)
-                        .foregroundColor(AppColors.signalMercury)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Provider: \(viewModel.settings.deviceModeConfig.cloudSyncProvider.displayName)")
-                            .font(AppTypography.bodyMedium(.medium))
-                            .foregroundColor(AppColors.textPrimary)
-
-                        Text("Auto-sync: \(intervalLabel(seconds: viewModel.settings.deviceModeConfig.settingsSyncIntervalSeconds))")
-                            .font(AppTypography.labelSmall())
-                            .foregroundColor(AppColors.textSecondary)
-                    }
-
-                    Spacer()
-                }
-                .padding()
-                .background(AppColors.substrateSecondary)
-                .cornerRadius(8)
-            }
-
-            // MARK: - iCloud Data Sync
-
-            if viewModel.settings.deviceModeConfig.cloudSyncProvider == .iCloud {
-                GeneralSettingsSection(title: "iCloud Data Sync") {
-                    VStack(spacing: 12) {
-                        HStack(spacing: 10) {
-                            Image(systemName: PersistenceController.shared.isCloudKitEnabled ? "checkmark.icloud" : "icloud.slash")
-                                .foregroundColor(PersistenceController.shared.isCloudKitEnabled ? AppColors.accentSuccess : AppColors.accentWarning)
-
-                            Text(PersistenceController.shared.isCloudKitEnabled
-                                 ? "CloudKit store is enabled"
-                                 : "CloudKit store is disabled (restart required)")
-                                .font(AppTypography.bodySmall())
+                            Text(dataManagementSummary)
+                                .font(AppTypography.labelSmall())
                                 .foregroundColor(AppColors.textSecondary)
-
-                            Spacer()
                         }
 
-                        Button {
-                            Task {
-                                await AutoSyncOrchestrator.shared.pullNow()
-                                // Force reload of local conversations after a pull
-                                _ = try? await ConversationService.shared.listConversations()
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: "arrow.down.circle")
-                                Text("Sync From iCloud")
-                                    .font(AppTypography.bodyMedium(.medium))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(AppColors.signalMercury)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                        }
-                        .disabled(!PersistenceController.shared.isCloudKitEnabled)
+                        Spacer()
 
-                        Text("Tip: If you just switched to iCloud sync, fully quit and relaunch Axon once so the CloudKit-backed store can initialize.")
-                            .font(AppTypography.labelSmall())
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14))
                             .foregroundColor(AppColors.textTertiary)
-                            .multilineTextAlignment(.leading)
                     }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(AppColors.substrateSecondary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(AppColors.glassBorder, lineWidth: 1)
+                            )
+                    )
                 }
+                .buttonStyle(PlainButtonStyle())
             }
         }
+    }
+
+    private var dataManagementSummary: String {
+        let config = viewModel.settings.deviceModeConfig
+        return "\(config.cloudSyncProvider.displayName) · \(config.dataStorage.displayName) · \(config.aiProcessing.displayName) AI"
     }
 
     private func themeIcon(_ theme: Theme) -> String {
@@ -303,19 +275,6 @@ struct GeneralSettingsView: View {
         case .light: return "sun.max.fill"
         case .auto: return "circle.lefthalf.filled"
         }
-    }
-
-    private func intervalLabel(seconds: Int) -> String {
-        let s = max(15, seconds)
-        if s < 60 {
-            return "every \(s)s"
-        }
-        if s % 60 == 0 {
-            return "every \(s / 60) min"
-        }
-        let minutes = s / 60
-        let remainder = s % 60
-        return "every \(minutes)m \(remainder)s"
     }
 
     private var supportedProviders: [AIProvider] {
@@ -679,309 +638,6 @@ struct SettingsOptionRow: View {
 }
 
 // SettingsToggleRow moved to SharedUIElements.swift
-
-// MARK: - Device Mode Section
-
-struct DeviceModeSection: View {
-    @ObservedObject var viewModel: SettingsViewModel
-    @State private var showConfigSheet = false
-    @StateObject private var conversationService = ConversationService.shared
-
-    var body: some View {
-        GeneralSettingsSection(title: "Device Mode") {
-            VStack(spacing: 16) {
-                // Main mode toggle
-                DeviceModeToggle(
-                    selectedMode: Binding(
-                        get: { viewModel.settings.deviceMode },
-                        set: { newMode in
-                            Task {
-                                await viewModel.updateSetting(\.deviceMode, newMode)
-
-                                // Sync the legacy toggle for backwards compatibility
-                                let useOnDevice = (newMode == .onDevice && viewModel.settings.deviceModeConfig.aiProcessing == .onDevice)
-                                await viewModel.updateSetting(\.useOnDeviceOrchestration, useOnDevice)
-                            }
-                        }
-                    )
-                )
-
-                // Config button (only shown in On-Device mode)
-                if viewModel.settings.deviceMode == .onDevice {
-                    Button(action: { showConfigSheet = true }) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 16))
-                                .foregroundColor(AppColors.signalMercury)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Configure On-Device Settings")
-                                    .font(AppTypography.bodyMedium())
-                                    .foregroundColor(AppColors.textPrimary)
-
-                                Text(configSummary)
-                                    .font(AppTypography.labelSmall())
-                                    .foregroundColor(AppColors.textSecondary)
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 14))
-                                .foregroundColor(AppColors.textTertiary)
-                        }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(AppColors.substrateSecondary)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(AppColors.glassBorder, lineWidth: 1)
-                                )
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-
-                // Sync status indicator
-                if viewModel.settings.deviceModeConfig.showSyncStatus {
-                    SyncStatusIndicator()
-                }
-            }
-        }
-        .sheet(isPresented: $showConfigSheet) {
-            DeviceModeConfigSheet(viewModel: viewModel)
-        }
-    }
-
-    private var configSummary: String {
-        let config = viewModel.settings.deviceModeConfig
-        var parts: [String] = []
-
-        parts.append(config.dataStorage.displayName)
-        parts.append(config.aiProcessing.displayName + " AI")
-        parts.append(config.memoryStorage.displayName)
-
-        return parts.joined(separator: " · ")
-    }
-}
-
-// MARK: - Device Mode Toggle
-
-private struct DeviceModeToggle: View {
-    @Binding var selectedMode: DeviceMode
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(DeviceMode.allCases) { mode in
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selectedMode = mode
-                    }
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: mode.icon)
-                            .font(.system(size: 16))
-
-                        Text(mode.displayName)
-                            .font(AppTypography.bodyMedium(.medium))
-                    }
-                    .foregroundColor(selectedMode == mode ? .white : AppColors.textSecondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(selectedMode == mode ? AppColors.signalMercury : Color.clear)
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-        }
-        .padding(4)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(AppColors.substrateSecondary)
-        )
-    }
-}
-
-// MARK: - Sync Status Indicator
-
-private struct SyncStatusIndicator: View {
-    @StateObject private var conversationService = ConversationService.shared
-    @StateObject private var cloudKitSync = CloudKitSyncService.shared
-    
-    // Check if backend is configured
-    private var isBackendConfigured: Bool {
-        APIClient.shared.isBackendConfigured
-    }
-    
-    // Check if using iCloud sync
-    private var isUsingiCloudSync: Bool {
-        let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
-        return settings.deviceModeConfig.cloudSyncProvider == .iCloud
-    }
-
-    var body: some View {
-        // Only show status indicator when there's something to show
-        if shouldShowIndicator {
-            HStack(spacing: 12) {
-                // Status icon
-                ZStack {
-                    Circle()
-                        .fill(statusColor.opacity(0.2))
-                        .frame(width: 32, height: 32)
-
-                    if conversationService.isSyncing || cloudKitSync.isSyncing {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: statusColor))
-                            .scaleEffect(0.8)
-                    } else {
-                        Image(systemName: statusIcon)
-                            .font(.system(size: 14))
-                            .foregroundColor(statusColor)
-                    }
-                }
-
-                // Status text
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(statusTitle)
-                        .font(AppTypography.labelMedium())
-                        .foregroundColor(AppColors.textPrimary)
-
-                    Text(statusSubtitle)
-                        .font(AppTypography.labelSmall())
-                        .foregroundColor(AppColors.textSecondary)
-                }
-
-                Spacer()
-
-                // Sync button - context-aware
-                if showSyncButton {
-                    Button(action: {
-                        Task {
-                            if isBackendConfigured {
-                                // Backend mode: sync pending operations to API
-                                await conversationService.syncPendingOperations()
-                            } else if isUsingiCloudSync {
-                                // iCloud-only mode: trigger CloudKit sync
-                                await AutoSyncOrchestrator.shared.pullNow()
-                                // Clear any stale pending operations
-                                await conversationService.syncPendingOperations()
-                            }
-                        }
-                    }) {
-                        Text("Sync")
-                            .font(AppTypography.labelSmall())
-                            .foregroundColor(AppColors.signalMercury)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(AppColors.signalMercury, lineWidth: 1)
-                            )
-                    }
-                }
-            }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(statusColor.opacity(0.08))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(statusColor.opacity(0.2), lineWidth: 1)
-                    )
-            )
-        }
-    }
-    
-    private var shouldShowIndicator: Bool {
-        // Show if syncing
-        if conversationService.isSyncing || cloudKitSync.isSyncing {
-            return true
-        }
-        // Show if offline
-        if conversationService.isOfflineMode {
-            return true
-        }
-        // Show if there are pending operations AND a backend is configured
-        if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
-            return true
-        }
-        // Show CloudKit errors if using iCloud
-        if isUsingiCloudSync && cloudKitSync.syncError != nil {
-            return true
-        }
-        return false
-    }
-    
-    private var showSyncButton: Bool {
-        let isSyncing = conversationService.isSyncing || cloudKitSync.isSyncing
-        if isSyncing { return false }
-        
-        // Show sync button if there are pending operations with backend
-        if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
-            return true
-        }
-        // Show sync button for iCloud errors
-        if isUsingiCloudSync && cloudKitSync.syncError != nil {
-            return true
-        }
-        return false
-    }
-
-    private var statusColor: Color {
-        if conversationService.isSyncing || cloudKitSync.isSyncing {
-            return AppColors.signalMercury
-        } else if conversationService.isOfflineMode {
-            return AppColors.accentWarning
-        } else if isUsingiCloudSync && cloudKitSync.syncError != nil {
-            return AppColors.accentWarning
-        } else if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
-            return AppColors.accentWarning
-        }
-        return AppColors.accentSuccess
-    }
-
-    private var statusIcon: String {
-        if conversationService.isOfflineMode {
-            return "wifi.slash"
-        } else if isUsingiCloudSync && cloudKitSync.syncError != nil {
-            return "exclamationmark.icloud"
-        } else if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
-            return "exclamationmark.arrow.triangle.2.circlepath"
-        }
-        return "checkmark.circle"
-    }
-
-    private var statusTitle: String {
-        if conversationService.isSyncing || cloudKitSync.isSyncing {
-            return "Syncing..."
-        } else if conversationService.isOfflineMode {
-            return "Offline Mode"
-        } else if isUsingiCloudSync && cloudKitSync.syncError != nil {
-            return "iCloud Sync Issue"
-        } else if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
-            return "Pending Sync"
-        }
-        return "Synced"
-    }
-
-    private var statusSubtitle: String {
-        if conversationService.isSyncing {
-            return "Uploading changes..."
-        } else if cloudKitSync.isSyncing {
-            return "Syncing with iCloud..."
-        } else if conversationService.isOfflineMode {
-            return "Changes will sync when connected"
-        } else if isUsingiCloudSync, let error = cloudKitSync.syncError {
-            return error
-        } else if conversationService.pendingOperationsCount > 0 && isBackendConfigured {
-            return "\(conversationService.pendingOperationsCount) operations pending"
-        }
-        return "All changes saved"
-    }
-}
 
 // MARK: - Preview
 

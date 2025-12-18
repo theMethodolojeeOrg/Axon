@@ -27,6 +27,34 @@ struct SlashCommandResult {
     let success: Bool
 }
 
+/// A suggestion item for the slash command autocomplete menu
+struct SlashCommandSuggestion: Identifiable, Equatable {
+    let id: String
+    let command: String        // The command text (e.g., "tool", "tools")
+    let displayName: String    // Display name (e.g., "Tool Details")
+    let description: String    // Brief description
+    let icon: String           // SF Symbol name
+    let hasSubmenu: Bool       // Whether this command has a submenu (e.g., tool names)
+
+    static func == (lhs: SlashCommandSuggestion, rhs: SlashCommandSuggestion) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
+/// A tool suggestion for the /tool submenu
+struct ToolSuggestion: Identifiable, Equatable {
+    let id: String
+    let toolId: String
+    let displayName: String
+    let description: String
+    let icon: String
+    let category: String
+
+    static func == (lhs: ToolSuggestion, rhs: ToolSuggestion) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
 // MARK: - Slash Command Parser
 
 /// Parser for slash commands in user messages
@@ -332,4 +360,139 @@ class SlashCommandParser {
                    normalizedQuery.contains(displayName)
         }
     }
+
+    // MARK: - Autocomplete Suggestions
+
+    /// All available slash commands
+    static let availableCommands: [SlashCommandSuggestion] = [
+        SlashCommandSuggestion(
+            id: "tool",
+            command: "tool",
+            displayName: "Tool Details",
+            description: "Show details for a specific tool",
+            icon: "wrench.and.screwdriver",
+            hasSubmenu: true
+        ),
+        SlashCommandSuggestion(
+            id: "tools",
+            command: "tools",
+            displayName: "List Tools",
+            description: "Show all available tools",
+            icon: "list.bullet",
+            hasSubmenu: false
+        ),
+        SlashCommandSuggestion(
+            id: "help",
+            command: "help",
+            displayName: "Help",
+            description: "Show slash command help",
+            icon: "questionmark.circle",
+            hasSubmenu: false
+        )
+    ]
+
+    /// Get command suggestions filtered by the current input
+    /// - Parameter input: The current text input (e.g., "/to" or "/tool goo")
+    /// - Returns: Filtered list of command suggestions
+    func getCommandSuggestions(for input: String) -> [SlashCommandSuggestion] {
+        let trimmed = input.trimmingCharacters(in: .whitespaces)
+
+        // Must start with /
+        guard trimmed.hasPrefix("/") else { return [] }
+
+        // Extract the command part (everything after / before space)
+        let afterSlash = String(trimmed.dropFirst())
+        let commandPart = afterSlash.split(separator: " ", maxSplits: 1).first.map(String.init) ?? afterSlash
+
+        // If there's a space, user is past the command selection phase
+        if afterSlash.contains(" ") {
+            return []
+        }
+
+        // Filter commands that match the typed text
+        let query = commandPart.lowercased()
+        if query.isEmpty {
+            return Self.availableCommands
+        }
+
+        return Self.availableCommands.filter { suggestion in
+            suggestion.command.lowercased().hasPrefix(query) ||
+            suggestion.displayName.lowercased().contains(query)
+        }
+    }
+
+    /// Get tool suggestions for the /tool submenu
+    /// - Parameter filter: Optional filter text for the tool name
+    /// - Returns: Filtered list of tool suggestions
+    func getToolSuggestions(filter: String = "") -> [ToolSuggestion] {
+        let settings = SettingsStorage.shared.loadSettingsOrDefault()
+        let normalizedFilter = filter.lowercased().trimmingCharacters(in: .whitespaces)
+
+        // Get all tools (prioritize enabled ones)
+        var suggestions: [ToolSuggestion] = []
+
+        for tool in ToolId.allCases {
+            let isEnabled = settings.toolSettings.isToolEnabled(tool)
+            let toolId = tool.rawValue.lowercased()
+            let displayName = tool.displayName.lowercased()
+
+            // Filter if there's a search term
+            if !normalizedFilter.isEmpty {
+                guard toolId.contains(normalizedFilter) ||
+                      displayName.contains(normalizedFilter) ||
+                      tool.category.displayName.lowercased().contains(normalizedFilter) else {
+                    continue
+                }
+            }
+
+            suggestions.append(ToolSuggestion(
+                id: tool.rawValue,
+                toolId: tool.rawValue,
+                displayName: tool.displayName,
+                description: tool.description,
+                icon: tool.icon,
+                category: tool.category.displayName
+            ))
+        }
+
+        // Sort: enabled tools first, then alphabetically
+        return suggestions.sorted { lhs, rhs in
+            let lhsEnabled = settings.toolSettings.enabledToolIds.contains(lhs.toolId)
+            let rhsEnabled = settings.toolSettings.enabledToolIds.contains(rhs.toolId)
+
+            if lhsEnabled != rhsEnabled {
+                return lhsEnabled
+            }
+            return lhs.displayName < rhs.displayName
+        }
+    }
+
+    /// Determine what state the autocomplete menu should be in
+    /// - Parameter input: Current text input
+    /// - Returns: The menu state (hidden, showingCommands, showingTools)
+    func getMenuState(for input: String) -> SlashMenuState {
+        let trimmed = input.trimmingCharacters(in: .whitespaces)
+
+        guard trimmed.hasPrefix("/") else {
+            return .hidden
+        }
+
+        let afterSlash = String(trimmed.dropFirst())
+
+        // Check if we're in the tool submenu phase
+        if afterSlash.lowercased().hasPrefix("tool ") {
+            let toolFilter = String(afterSlash.dropFirst(5)) // Remove "tool "
+            return .showingTools(filter: toolFilter)
+        }
+
+        // Otherwise show command suggestions
+        return .showingCommands
+    }
+}
+
+/// State of the slash command autocomplete menu
+enum SlashMenuState: Equatable {
+    case hidden
+    case showingCommands
+    case showingTools(filter: String)
 }

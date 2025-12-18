@@ -11,8 +11,6 @@ import SwiftUI
 @main
 struct AxonLiveActivityBundle: WidgetBundle {
     var body: some Widget {
-        AxonLiveActivity()
-        AxonLiveActivityControl()
-        AxonLiveActivityLiveActivity()
+        HeartbeatLiveActivity()
     }
 }

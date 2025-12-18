@@ -29,6 +29,9 @@ final class AutoSyncOrchestrator: ObservableObject {
     private var periodicTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
+    // Reentrancy guard to prevent concurrent syncs
+    private var isPulling = false
+
     // Status
     @Published private(set) var lastPullAt: Date?
     @Published private(set) var lastPullError: String?
@@ -144,6 +147,15 @@ final class AutoSyncOrchestrator: ObservableObject {
     }
 
     private func performPull(reason: String) async {
+        // Reentrancy guard: prevent concurrent syncs from overlapping
+        // Multiple triggers (app active, periodic, manual) can fire simultaneously
+        guard !isPulling else {
+            print("[AutoSyncOrchestrator] ⏭️ Skipping pull (\(reason)) - sync already in progress")
+            return
+        }
+        isPulling = true
+        defer { isPulling = false }
+
         let provider = settingsVM.settings.deviceModeConfig.cloudSyncProvider
         guard provider == .iCloud else {
             return

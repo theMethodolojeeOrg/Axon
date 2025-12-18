@@ -58,7 +58,7 @@ struct ToolCallProgress: Sendable {
 // MARK: - Live Tool Call
 
 /// Live tool call displayed inline during streaming
-struct LiveToolCall: Identifiable, Sendable, Equatable {
+struct LiveToolCall: Identifiable, Sendable, Equatable, Codable {
     let id: String
     let name: String
     let displayName: String
@@ -192,7 +192,7 @@ struct StreamingToolSource: Codable, Sendable, Equatable, Identifiable {
 // MARK: - Context Debug Info
 
 /// Detailed breakdown of context window usage for debugging
-struct ContextDebugInfo: Sendable, Codable {
+struct ContextDebugInfo: Sendable, Codable, Equatable {
     /// Base system prompt token estimate
     let systemPromptTokens: Int
 

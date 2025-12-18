@@ -21,6 +21,10 @@ struct AppSettings: Codable, Equatable, Sendable {
 
     var showArtifactsByDefault: Bool = true
     var enableKeyboardShortcuts: Bool = true
+
+    /// Legacy flag - use `deviceModeConfig.aiProcessing` instead
+    /// Kept for backward compatibility during migration
+    @available(*, deprecated, message: "Use deviceModeConfig.aiProcessing instead")
     var useOnDeviceOrchestration: Bool = false
 
     // Account
@@ -59,8 +63,14 @@ struct AppSettings: Codable, Equatable, Sendable {
     var hideContentInAppSwitcher: Bool = true       // Blur content in app switcher
 
     // Device Mode (On-Device vs Cloud)
-    var deviceMode: DeviceMode = .onDevice          // Default: device-first, cloud is opt-in
-    var deviceModeConfig: DeviceModeConfig = DeviceModeConfig()  // Granular settings
+    /// Legacy toggle - deviceModeConfig is now the single source of truth
+    /// Kept for backward compatibility during migration
+    @available(*, deprecated, message: "Use deviceModeConfig directly - this toggle is no longer used")
+    var deviceMode: DeviceMode = .onDevice
+
+    /// Unified data management configuration - this is the single source of truth
+    /// for all data storage, sync, and AI processing settings
+    var deviceModeConfig: DeviceModeConfig = DeviceModeConfig()
 
     // Conversations
     var archiveRetentionDays: Int = 30
@@ -197,16 +207,21 @@ enum DeviceMode: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Granular configuration for On-Device mode
+/// Unified data management configuration
+/// This is the single source of truth for all data storage, sync, and AI processing settings.
+/// The legacy DeviceMode toggle and useOnDeviceOrchestration flag are deprecated.
 struct DeviceModeConfig: Codable, Equatable, Sendable {
     /// How conversation data is stored
+    /// Default: localFirst - works offline, syncs when connected
     var dataStorage: DataStorageMode = .localFirst
 
     /// Where AI orchestration (prompt routing, tool calls) runs
-    var aiProcessing: AIProcessingMode = .onDevice  // Default: direct to providers
+    /// Default: onDevice - direct API calls to providers (no backend needed)
+    var aiProcessing: AIProcessingMode = .onDevice
 
     /// How memory/learning data is handled
-    var memoryStorage: MemoryStorageMode = .localOnly  // Default: local memory
+    /// Default: cloudSync - memories sync across devices for seamless experience
+    var memoryStorage: MemoryStorageMode = .cloudSync
 
     /// Cloud sync provider (when sync is enabled)
     /// Default: iCloud for seamless cross-device sync on Apple platforms
@@ -1275,6 +1290,7 @@ enum APIProvider: String, CaseIterable, Identifiable {
 enum TTSProvider: String, Codable, CaseIterable, Identifiable {
     case elevenlabs = "elevenlabs"
     case gemini = "gemini"
+    case openai = "openai"
 
     var id: String { rawValue }
 
@@ -1282,6 +1298,7 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .elevenlabs: return "ElevenLabs"
         case .gemini: return "Gemini"
+        case .openai: return "OpenAI"
         }
     }
 
@@ -1289,6 +1306,7 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .elevenlabs: return "High-quality voices with fine-tuned controls"
         case .gemini: return "Google's TTS with expressive voices"
+        case .openai: return "Promptable TTS with natural voices"
         }
     }
 
@@ -1296,6 +1314,7 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .elevenlabs: return "waveform"
         case .gemini: return "sparkles"
+        case .openai: return "brain.head.profile"
         }
     }
 }
@@ -1328,6 +1347,71 @@ enum GeminiTTSVoice: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// OpenAI TTS voice options (11 built-in voices)
+enum OpenAITTSVoice: String, Codable, CaseIterable, Identifiable {
+    case alloy = "alloy"
+    case ash = "ash"
+    case ballad = "ballad"
+    case coral = "coral"
+    case echo = "echo"
+    case fable = "fable"
+    case nova = "nova"
+    case onyx = "onyx"
+    case sage = "sage"
+    case shimmer = "shimmer"
+
+    var id: String { rawValue }
+    var displayName: String { rawValue.capitalized }
+
+    var toneDescription: String {
+        switch self {
+        case .alloy: return "Neutral, balanced"
+        case .ash: return "Warm, confident"
+        case .ballad: return "Soft, expressive"
+        case .coral: return "Clear, friendly"
+        case .echo: return "Measured, composed"
+        case .fable: return "Expressive, storytelling"
+        case .nova: return "Bright, upbeat"
+        case .onyx: return "Deep, authoritative"
+        case .sage: return "Calm, thoughtful"
+        case .shimmer: return "Light, airy"
+        }
+    }
+}
+
+/// OpenAI TTS model options
+enum OpenAITTSModel: String, Codable, CaseIterable, Identifiable {
+    case gpt4oMiniTTS = "gpt-4o-mini-tts"
+    case tts1 = "tts-1"
+    case tts1HD = "tts-1-hd"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .gpt4oMiniTTS: return "GPT-4o Mini TTS"
+        case .tts1: return "TTS-1"
+        case .tts1HD: return "TTS-1 HD"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .gpt4oMiniTTS: return "Newest, promptable voice control"
+        case .tts1: return "Fast, lower latency"
+        case .tts1HD: return "Higher quality audio"
+        }
+    }
+
+    /// Whether this model supports the instructions parameter
+    var supportsInstructions: Bool {
+        switch self {
+        case .gpt4oMiniTTS: return true
+        case .tts1, .tts1HD: return false
+        }
+    }
+}
+
 struct TTSSettings: Codable, Equatable {
     /// Active TTS provider
     var provider: TTSProvider = .elevenlabs
@@ -1352,6 +1436,14 @@ struct TTSSettings: Codable, Equatable {
 
     // MARK: - Gemini TTS Settings
     var geminiVoice: GeminiTTSVoice = .puck
+
+    // MARK: - OpenAI TTS Settings
+    var openaiVoice: OpenAITTSVoice = .alloy
+    var openaiModel: OpenAITTSModel = .gpt4oMiniTTS
+    /// Voice instructions for GPT-4o Mini TTS (e.g., "Speak in a cheerful tone")
+    var openaiVoiceInstructions: String = ""
+    /// Speed multiplier (0.25 to 4.0, default 1.0)
+    var openaiSpeed: Double = 1.0
 }
 
 enum TTSModel: String, Codable, CaseIterable, Identifiable {
@@ -1465,6 +1557,40 @@ struct ToolSettings: Codable, Equatable, Sendable {
             enabledToolIds.insert(tool.rawValue)
         }
     }
+
+    /// Enable all tools in a category
+    mutating func enableCategory(_ category: ToolCategory) {
+        let tools = ToolId.tools(for: category)
+        for tool in tools {
+            enableTool(tool)
+        }
+    }
+
+    /// Disable all tools in a category
+    mutating func disableCategory(_ category: ToolCategory) {
+        let tools = ToolId.tools(for: category)
+        for tool in tools {
+            disableTool(tool)
+        }
+    }
+
+    /// Check if all tools in a category are enabled
+    func isCategoryFullyEnabled(_ category: ToolCategory) -> Bool {
+        let tools = ToolId.tools(for: category)
+        return tools.allSatisfy { isToolEnabled($0) }
+    }
+
+    /// Check if any tools in a category are enabled
+    func isCategoryPartiallyEnabled(_ category: ToolCategory) -> Bool {
+        let tools = ToolId.tools(for: category)
+        return tools.contains { isToolEnabled($0) }
+    }
+
+    /// Count of enabled tools in a category
+    func enabledCountForCategory(_ category: ToolCategory) -> Int {
+        let tools = ToolId.tools(for: category)
+        return tools.filter { isToolEnabled($0) }.count
+    }
 }
 
 // MARK: - Heartbeat Settings
@@ -1527,11 +1653,73 @@ struct HeartbeatSettings: Codable, Equatable, Sendable {
     var maxToolCalls: Int = 0
     var allowBackground: Bool = false
     var allowNotifications: Bool = true
+    var liveActivityEnabled: Bool = true
     var quietHours: TimeRestrictions? = nil
     var deliveryProfiles: [HeartbeatDeliveryProfile] = HeartbeatDeliveryProfile.defaultProfiles
 
     func profile(for id: String) -> HeartbeatDeliveryProfile? {
         deliveryProfiles.first { $0.id == id }
+    }
+}
+
+/// Categories for organizing tools in the UI
+enum ToolCategory: String, CaseIterable, Identifiable, Sendable {
+    case geminiTools = "gemini_tools"
+    case memoryReflection = "memory_reflection"
+    case internalThread = "internal_thread"
+    case heartbeat = "heartbeat"
+    case coSovereignty = "co_sovereignty"
+    case systemState = "system_state"
+    case multiDevice = "multi_device"
+    case systemControl = "system_control"
+    case toolDiscovery = "tool_discovery"
+    case debugging = "debugging"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .geminiTools: return "Gemini Tools"
+        case .memoryReflection: return "Memory & Reflection"
+        case .internalThread: return "Internal Thread"
+        case .heartbeat: return "Heartbeat"
+        case .coSovereignty: return "Co-Sovereignty"
+        case .systemState: return "System State"
+        case .multiDevice: return "Multi-Device Presence"
+        case .systemControl: return "System Control"
+        case .toolDiscovery: return "Tool Discovery"
+        case .debugging: return "Debugging"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .geminiTools: return "Google-powered tools for search, code execution, and maps"
+        case .memoryReflection: return "Create memories and reflect on conversations"
+        case .internalThread: return "AI's private workspace for notes and context"
+        case .heartbeat: return "Scheduled check-ins and notifications"
+        case .coSovereignty: return "Covenant-based trust and permissions"
+        case .systemState: return "Query and modify system configuration"
+        case .multiDevice: return "Cross-device presence and handoff"
+        case .systemControl: return "Notifications and persistence control"
+        case .toolDiscovery: return "Discover and query available tools"
+        case .debugging: return "Debug VS Code bridge and connections"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .geminiTools: return "globe"
+        case .memoryReflection: return "brain.head.profile"
+        case .internalThread: return "doc.text"
+        case .heartbeat: return "heart.circle"
+        case .coSovereignty: return "doc.badge.gearshape"
+        case .systemState: return "gearshape.2"
+        case .multiDevice: return "iphone.and.arrow.forward"
+        case .systemControl: return "slider.horizontal.3"
+        case .toolDiscovery: return "list.bullet"
+        case .debugging: return "ladybug"
+        }
     }
 }
 
@@ -1810,6 +1998,46 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
     /// Group tools by provider
     static func tools(for provider: ToolProvider) -> [ToolId] {
         allCases.filter { $0.provider == provider }
+    }
+
+    /// Tool category for organizational purposes
+    var category: ToolCategory {
+        switch self {
+        case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
+            return .geminiTools
+        case .createMemory, .conversationSearch, .reflectOnConversation:
+            return .memoryReflection
+        case .agentStateAppend, .agentStateQuery, .agentStateClear:
+            return .internalThread
+        case .heartbeatConfigure, .heartbeatRunOnce, .heartbeatSetDeliveryProfile, .heartbeatUpdateProfile:
+            return .heartbeat
+        case .queryCovenant, .proposeCovenantChange:
+            return .coSovereignty
+        case .querySystemState, .changeSystemState:
+            return .systemState
+        case .queryDevicePresence, .requestDeviceSwitch, .setPresenceIntent, .saveStateCheckpoint:
+            return .multiDevice
+        case .notifyUser, .persistenceDisable:
+            return .systemControl
+        case .listTools, .getToolDetails:
+            return .toolDiscovery
+        case .debugBridge:
+            return .debugging
+        }
+    }
+
+    /// Group tools by category
+    static func toolsByCategory() -> [ToolCategory: [ToolId]] {
+        var grouped: [ToolCategory: [ToolId]] = [:]
+        for tool in allCases {
+            grouped[tool.category, default: []].append(tool)
+        }
+        return grouped
+    }
+
+    /// Get tools for a specific category
+    static func tools(for category: ToolCategory) -> [ToolId] {
+        allCases.filter { $0.category == category }
     }
 }
 

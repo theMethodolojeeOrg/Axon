@@ -415,6 +415,7 @@ class ConversationSyncManager: ObservableObject {
     }
 
     func saveMessagesToCoreData(_ messages: [Message], conversationId: String) async throws {
+        print("[ConversationSyncManager] 💾 Saving \(messages.count) messages to Core Data for conversation: \(conversationId)")
         let context = persistence.newBackgroundContext()
 
         try await context.perform {
@@ -426,9 +427,11 @@ class ConversationSyncManager: ObservableObject {
                 if let existing = try context.fetch(fetchRequest).first {
                     // Update existing
                     entity = existing
+                    print("[ConversationSyncManager]   - Updating existing message: \(message.id)")
                 } else {
                     // Create new
                     entity = MessageEntity(context: context)
+                    print("[ConversationSyncManager]   - Creating new message: \(message.id)")
                 }
 
                 // Populate entity from message
@@ -472,9 +475,33 @@ class ConversationSyncManager: ObservableObject {
                 } else {
                     entity.memoryOperationsJSON = nil
                 }
+
+                // Serialize reasoning text if present
+                entity.reasoningText = message.reasoning
+
+                // Serialize context debug info to JSON if present
+                if let contextDebugInfo = message.contextDebugInfo {
+                    if let data = try? JSONEncoder().encode(contextDebugInfo),
+                       let json = String(data: data, encoding: .utf8) {
+                        entity.contextDebugJSON = json
+                    }
+                } else {
+                    entity.contextDebugJSON = nil
+                }
+
+                // Serialize live tool calls to JSON if present
+                if let liveToolCalls = message.liveToolCalls, !liveToolCalls.isEmpty {
+                    if let data = try? JSONEncoder().encode(liveToolCalls),
+                       let json = String(data: data, encoding: .utf8) {
+                        entity.liveToolCallsJSON = json
+                    }
+                } else {
+                    entity.liveToolCallsJSON = nil
+                }
             }
 
             try self.persistence.saveContext(context)
+            print("[ConversationSyncManager] ✅ Successfully saved \(messages.count) messages to Core Data")
         }
     }
 
@@ -518,6 +545,23 @@ class ConversationSyncManager: ObservableObject {
                     memoryOperations = try? JSONDecoder().decode([MessageMemoryOperation].self, from: data)
                 }
 
+                // Deserialize reasoning text
+                let reasoning = entity.reasoningText
+
+                // Deserialize context debug info from JSON if present
+                var contextDebugInfo: ContextDebugInfo? = nil
+                if let json = entity.contextDebugJSON,
+                   let data = json.data(using: .utf8) {
+                    contextDebugInfo = try? JSONDecoder().decode(ContextDebugInfo.self, from: data)
+                }
+
+                // Deserialize live tool calls from JSON if present
+                var liveToolCalls: [LiveToolCall]? = nil
+                if let json = entity.liveToolCallsJSON,
+                   let data = json.data(using: .utf8) {
+                    liveToolCalls = try? JSONDecoder().decode([LiveToolCall].self, from: data)
+                }
+
                 return Message(
                     id: id,
                     conversationId: conversationId,
@@ -532,7 +576,10 @@ class ConversationSyncManager: ObservableObject {
                     providerName: entity.providerName,
                     attachments: attachments,
                     groundingSources: groundingSources,
-                    memoryOperations: memoryOperations
+                    memoryOperations: memoryOperations,
+                    reasoning: reasoning,
+                    contextDebugInfo: contextDebugInfo,
+                    liveToolCalls: liveToolCalls
                 )
             }
         } catch {

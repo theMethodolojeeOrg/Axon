@@ -21,13 +21,17 @@ struct SettingsView: View {
         // Success/Error Messages
         .overlay(alignment: .top) {
             if let successMessage = viewModel.successMessage {
-                SuccessToast(message: successMessage)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                SuccessToast(message: successMessage) {
+                    viewModel.successMessage = nil
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
 
             if let errorMessage = viewModel.error {
-                ErrorToast(message: errorMessage)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                ErrorToast(message: errorMessage) {
+                    viewModel.error = nil
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .animation(AppAnimations.standardEasing, value: viewModel.successMessage != nil)
@@ -39,6 +43,10 @@ struct SettingsView: View {
 
 struct SuccessToast: View {
     let message: String
+    let onDismiss: () -> Void
+
+    @State private var offset: CGFloat = 0
+    @GestureState private var dragOffset: CGFloat = 0
 
     var body: some View {
         HStack(spacing: 12) {
@@ -48,8 +56,22 @@ struct SuccessToast: View {
             Text(message)
                 .font(AppTypography.bodyMedium())
                 .foregroundColor(AppColors.textPrimary)
+                .lineLimit(3)
 
             Spacer()
+
+            Button(action: {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    onDismiss()
+                }
+            }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppColors.textSecondary)
+                    .padding(6)
+                    .background(Circle().fill(AppColors.substrateTertiary))
+            }
+            .buttonStyle(.plain)
         }
         .padding()
         .background(
@@ -58,11 +80,37 @@ struct SuccessToast: View {
                 .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
         )
         .padding()
+        .offset(x: offset + dragOffset)
+        .gesture(
+            DragGesture()
+                .updating($dragOffset) { value, state, _ in
+                    state = value.translation.width
+                }
+                .onEnded { value in
+                    let threshold: CGFloat = 100
+                    if abs(value.translation.width) > threshold {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            offset = value.translation.width > 0 ? 500 : -500
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            onDismiss()
+                        }
+                    } else {
+                        withAnimation(.spring()) {
+                            offset = 0
+                        }
+                    }
+                }
+        )
     }
 }
 
 struct ErrorToast: View {
     let message: String
+    let onDismiss: () -> Void
+
+    @State private var offset: CGFloat = 0
+    @GestureState private var dragOffset: CGFloat = 0
 
     var body: some View {
         HStack(spacing: 12) {
@@ -72,8 +120,22 @@ struct ErrorToast: View {
             Text(message)
                 .font(AppTypography.bodyMedium())
                 .foregroundColor(AppColors.textPrimary)
+                .lineLimit(3)
 
             Spacer()
+
+            Button(action: {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    onDismiss()
+                }
+            }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppColors.textSecondary)
+                    .padding(6)
+                    .background(Circle().fill(AppColors.substrateTertiary))
+            }
+            .buttonStyle(.plain)
         }
         .padding()
         .background(
@@ -82,6 +144,28 @@ struct ErrorToast: View {
                 .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
         )
         .padding()
+        .offset(x: offset + dragOffset)
+        .gesture(
+            DragGesture()
+                .updating($dragOffset) { value, state, _ in
+                    state = value.translation.width
+                }
+                .onEnded { value in
+                    let threshold: CGFloat = 100
+                    if abs(value.translation.width) > threshold {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            offset = value.translation.width > 0 ? 500 : -500
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            onDismiss()
+                        }
+                    } else {
+                        withAnimation(.spring()) {
+                            offset = 0
+                        }
+                    }
+                }
+        )
     }
 }
 

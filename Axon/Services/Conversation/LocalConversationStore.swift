@@ -174,6 +174,25 @@ class LocalConversationStore: ObservableObject {
             }
         }
 
+        // Serialize reasoning text if present
+        entity.reasoningText = message.reasoning
+
+        // Serialize context debug info to JSON if present
+        if let contextDebugInfo = message.contextDebugInfo {
+            if let data = try? JSONEncoder().encode(contextDebugInfo),
+               let json = String(data: data, encoding: .utf8) {
+                entity.contextDebugJSON = json
+            }
+        }
+
+        // Serialize live tool calls to JSON if present
+        if let liveToolCalls = message.liveToolCalls, !liveToolCalls.isEmpty {
+            if let data = try? JSONEncoder().encode(liveToolCalls),
+               let json = String(data: data, encoding: .utf8) {
+                entity.liveToolCallsJSON = json
+            }
+        }
+
         // Update conversation message count
         let convFetch: NSFetchRequest<ConversationEntity> = ConversationEntity.fetchRequest()
         convFetch.predicate = NSPredicate(format: "id == %@", conversationId)
@@ -331,8 +350,11 @@ class LocalConversationStore: ObservableObject {
         fetchRequest.predicate = NSPredicate(format: "conversationId == %@", conversationId)
         fetchRequest.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: true)]
 
+        print("[LocalConversationStore] 📖 Loading messages for conversation: \(conversationId)")
+
         do {
             let entities = try context.fetch(fetchRequest)
+            print("[LocalConversationStore]   - Found \(entities.count) message entities in viewContext")
             return entities.compactMap { entity -> Message? in
                 guard let id = entity.id,
                       let conversationId = entity.conversationId,
@@ -363,6 +385,23 @@ class LocalConversationStore: ObservableObject {
                     memoryOperations = try? JSONDecoder().decode([MessageMemoryOperation].self, from: data)
                 }
 
+                // Deserialize reasoning text
+                let reasoning = entity.reasoningText
+
+                // Deserialize context debug info from JSON if present
+                var contextDebugInfo: ContextDebugInfo? = nil
+                if let json = entity.contextDebugJSON,
+                   let data = json.data(using: .utf8) {
+                    contextDebugInfo = try? JSONDecoder().decode(ContextDebugInfo.self, from: data)
+                }
+
+                // Deserialize live tool calls from JSON if present
+                var liveToolCalls: [LiveToolCall]? = nil
+                if let json = entity.liveToolCallsJSON,
+                   let data = json.data(using: .utf8) {
+                    liveToolCalls = try? JSONDecoder().decode([LiveToolCall].self, from: data)
+                }
+
                 return Message(
                     id: id,
                     conversationId: conversationId,
@@ -377,7 +416,10 @@ class LocalConversationStore: ObservableObject {
                     providerName: entity.providerName,
                     attachments: attachments,
                     groundingSources: groundingSources,
-                    memoryOperations: memoryOperations
+                    memoryOperations: memoryOperations,
+                    reasoning: reasoning,
+                    contextDebugInfo: contextDebugInfo,
+                    liveToolCalls: liveToolCalls
                 )
             }
         } catch {

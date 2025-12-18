@@ -230,6 +230,56 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
 
         return nil
     }
+
+    /// Check if data already has a valid WAV header
+    private func hasWAVHeader(_ data: Data) -> Bool {
+        guard data.count >= 12 else { return false }
+        let bytes = [UInt8](data.prefix(12))
+        return bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
+               bytes[8] == 0x57 && bytes[9] == 0x41 && bytes[10] == 0x56 && bytes[11] == 0x45
+    }
+
+    /// Wrap raw PCM audio data in a WAV header
+    /// Gemini TTS returns raw 24kHz 16-bit mono PCM, which needs WAV headers to play
+    private func wrapPCMInWAVHeader(_ pcmData: Data, sampleRate: Int = 24000, channels: Int = 1, bitsPerSample: Int = 16) -> Data {
+        var wavData = Data()
+
+        let byteRate = sampleRate * channels * bitsPerSample / 8
+        let blockAlign = channels * bitsPerSample / 8
+        let dataSize = pcmData.count
+        let chunkSize = 36 + dataSize
+
+        // RIFF header
+        wavData.append(contentsOf: "RIFF".utf8)
+        wavData.append(contentsOf: withUnsafeBytes(of: UInt32(chunkSize).littleEndian) { Array($0) })
+        wavData.append(contentsOf: "WAVE".utf8)
+
+        // fmt subchunk
+        wavData.append(contentsOf: "fmt ".utf8)
+        wavData.append(contentsOf: withUnsafeBytes(of: UInt32(16).littleEndian) { Array($0) }) // Subchunk1Size for PCM
+        wavData.append(contentsOf: withUnsafeBytes(of: UInt16(1).littleEndian) { Array($0) }) // AudioFormat (1 = PCM)
+        wavData.append(contentsOf: withUnsafeBytes(of: UInt16(channels).littleEndian) { Array($0) })
+        wavData.append(contentsOf: withUnsafeBytes(of: UInt32(sampleRate).littleEndian) { Array($0) })
+        wavData.append(contentsOf: withUnsafeBytes(of: UInt32(byteRate).littleEndian) { Array($0) })
+        wavData.append(contentsOf: withUnsafeBytes(of: UInt16(blockAlign).littleEndian) { Array($0) })
+        wavData.append(contentsOf: withUnsafeBytes(of: UInt16(bitsPerSample).littleEndian) { Array($0) })
+
+        // data subchunk
+        wavData.append(contentsOf: "data".utf8)
+        wavData.append(contentsOf: withUnsafeBytes(of: UInt32(dataSize).littleEndian) { Array($0) })
+        wavData.append(pcmData)
+
+        return wavData
+    }
+
+    /// Ensure audio data is in proper WAV format (wrap raw PCM if needed)
+    private func ensureWAVFormat(_ data: Data) -> Data {
+        if hasWAVHeader(data) {
+            return data
+        }
+        print("[TTSPlaybackService] Wrapping raw PCM in WAV header (\(data.count) bytes)")
+        return wrapPCMInWAVHeader(data)
+    }
     
     // MARK: - Persistence Helpers
     
@@ -327,7 +377,13 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
 
                 case .gemini:
                     audioData = try await generateGeminiAudio(text: processedText, settings: settings)
-                    audioFormat = .wav  // Gemini returns WAV format (24kHz)
+                    // Gemini returns raw PCM - ensure it has WAV headers
+                    audioData = ensureWAVFormat(audioData)
+                    audioFormat = .wav
+
+                case .openai:
+                    audioData = try await generateOpenAIAudio(text: processedText, settings: settings)
+                    audioFormat = .mp3  // OpenAI returns MP3 format
                 }
 
                 print("[TTSPlaybackService] Received audio data: \(audioData.count) bytes (format: \(audioFormat.rawValue))")
@@ -351,6 +407,9 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
                         case .gemini:
                             voiceId = settings.ttsSettings.geminiVoice.rawValue
                             voiceName = settings.ttsSettings.geminiVoice.displayName
+                        case .openai:
+                            voiceId = settings.ttsSettings.openaiVoice.rawValue
+                            voiceName = settings.ttsSettings.openaiVoice.displayName
                         }
 
                         Task {
@@ -448,6 +507,37 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         )
     }
 
+    // MARK: - OpenAI TTS
+
+    private func generateOpenAIAudio(text: String, settings: AppSettings) async throws -> Data {
+        // Get OpenAI API key from settings
+        guard let openaiKey = SettingsViewModel.shared.getAPIKey(.openai), !openaiKey.isEmpty else {
+            print("[TTSPlaybackService] Error: No OpenAI API key configured")
+            throw NSError(domain: "TTSPlaybackService", code: -1, userInfo: [NSLocalizedDescriptionKey: "OpenAI API key is required for OpenAI TTS. Please add your key in Settings > API Keys."])
+        }
+
+        let voice = settings.ttsSettings.openaiVoice
+        let model = settings.ttsSettings.openaiModel
+        let speed = settings.ttsSettings.openaiSpeed
+        let instructions = settings.ttsSettings.openaiVoiceInstructions
+
+        print("[TTSPlaybackService] Using OpenAI voice: \(voice.displayName) (\(voice.toneDescription))")
+        print("[TTSPlaybackService] Using OpenAI model: \(model.displayName)")
+        if !instructions.isEmpty && model.supportsInstructions {
+            print("[TTSPlaybackService] Voice instructions: \(instructions)")
+        }
+
+        print("[TTSPlaybackService] Requesting audio generation from OpenAI...")
+        return try await OpenAITTSService.shared.generateSpeech(
+            text: text,
+            voice: voice,
+            model: model,
+            speed: speed,
+            instructions: instructions.isEmpty ? nil : instructions,
+            apiKey: openaiKey
+        )
+    }
+
     func playGenerated(messageId: String, settings: AppSettings? = nil) async throws {
         guard let cached = getCachedAudio(for: messageId, settings: settings) else {
             print("[TTSPlaybackService] No cached audio for message: \(messageId)")
@@ -456,6 +546,144 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
 
         print("[TTSPlaybackService] Playing cached audio for message: \(messageId) (format: \(cached.format.rawValue))")
         try await playAudio(cached.data, messageId: messageId, format: cached.format)
+    }
+
+    // MARK: - Voice Preview
+
+    /// Generate preview text for a voice based on provider
+    static func previewText(for provider: TTSProvider, voiceName: String) -> String {
+        let firstName = voiceName.components(separatedBy: " ").first ?? voiceName
+        let companyName: String
+        switch provider {
+        case .elevenlabs:
+            companyName = "ElevenLabs"
+        case .gemini:
+            companyName = "Google"
+        case .openai:
+            companyName = "OpenAI"
+        }
+        return "Hey! I'm \(firstName) from \(companyName), the voice of Axon."
+    }
+
+    /// Preview an ElevenLabs voice
+    func previewElevenLabsVoice(voiceId: String, voiceName: String, settings: AppSettings) async throws {
+        print("[TTSPlaybackService] Previewing ElevenLabs voice: \(voiceName)")
+
+        stop() // Stop any current playback
+        isGenerating = true
+        currentMessageId = "preview_elevenlabs_\(voiceId)"
+
+        let previewText = Self.previewText(for: .elevenlabs, voiceName: voiceName)
+
+        do {
+            let audioData = try await generateElevenLabsAudioForPreview(
+                text: previewText,
+                voiceId: voiceId,
+                settings: settings
+            )
+            isGenerating = false
+            try await playAudio(audioData, messageId: currentMessageId, format: .mp3)
+        } catch {
+            isGenerating = false
+            throw error
+        }
+    }
+
+    /// Preview a Gemini voice
+    func previewGeminiVoice(_ voice: GeminiTTSVoice, settings: AppSettings) async throws {
+        print("[TTSPlaybackService] Previewing Gemini voice: \(voice.displayName)")
+
+        stop()
+        isGenerating = true
+        currentMessageId = "preview_gemini_\(voice.rawValue)"
+
+        let previewText = Self.previewText(for: .gemini, voiceName: voice.displayName)
+
+        do {
+            var audioData = try await generateGeminiAudioForPreview(text: previewText, voice: voice)
+            // Gemini returns raw PCM - ensure it has WAV headers
+            audioData = ensureWAVFormat(audioData)
+            isGenerating = false
+            try await playAudio(audioData, messageId: currentMessageId, format: .wav)
+        } catch {
+            isGenerating = false
+            throw error
+        }
+    }
+
+    /// Preview an OpenAI voice (uses voice instructions if model supports them)
+    func previewOpenAIVoice(_ voice: OpenAITTSVoice, settings: AppSettings) async throws {
+        print("[TTSPlaybackService] Previewing OpenAI voice: \(voice.displayName)")
+
+        stop()
+        isGenerating = true
+        currentMessageId = "preview_openai_\(voice.rawValue)"
+
+        let previewText = Self.previewText(for: .openai, voiceName: voice.displayName)
+
+        do {
+            let audioData = try await generateOpenAIAudioForPreview(
+                text: previewText,
+                voice: voice,
+                settings: settings
+            )
+            isGenerating = false
+            try await playAudio(audioData, messageId: currentMessageId, format: .mp3)
+        } catch {
+            isGenerating = false
+            throw error
+        }
+    }
+
+    // MARK: - Preview Audio Generation (no caching)
+
+    private func generateElevenLabsAudioForPreview(text: String, voiceId: String, settings: AppSettings) async throws -> Data {
+        let vs = settings.ttsSettings.voiceSettings
+        let payload = ElevenLabsService.VoiceSettingsPayload(
+            stability: vs.stability,
+            similarityBoost: vs.similarityBoost,
+            style: vs.style,
+            useSpeakerBoost: vs.useSpeakerBoost
+        )
+
+        return try await ElevenLabsService.shared.generateTTSBase64(
+            text: text,
+            voiceId: voiceId,
+            model: settings.ttsSettings.model.rawValue,
+            format: settings.ttsSettings.outputFormat.rawValue,
+            voiceSettings: payload
+        )
+    }
+
+    private func generateGeminiAudioForPreview(text: String, voice: GeminiTTSVoice) async throws -> Data {
+        guard let geminiKey = SettingsViewModel.shared.getAPIKey(.gemini), !geminiKey.isEmpty else {
+            throw NSError(domain: "TTSPlaybackService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Gemini API key is required for Gemini TTS preview."])
+        }
+
+        return try await GeminiTTSService.shared.generateSpeech(
+            text: text,
+            voice: GeminiTTSService.GeminiVoice(rawValue: voice.rawValue) ?? .puck,
+            apiKey: geminiKey
+        )
+    }
+
+    private func generateOpenAIAudioForPreview(text: String, voice: OpenAITTSVoice, settings: AppSettings) async throws -> Data {
+        guard let openaiKey = SettingsViewModel.shared.getAPIKey(.openai), !openaiKey.isEmpty else {
+            throw NSError(domain: "TTSPlaybackService", code: -1, userInfo: [NSLocalizedDescriptionKey: "OpenAI API key is required for OpenAI TTS preview."])
+        }
+
+        let model = settings.ttsSettings.openaiModel
+        let speed = settings.ttsSettings.openaiSpeed
+        let instructions = settings.ttsSettings.openaiVoiceInstructions
+
+        return try await OpenAITTSService.shared.generateSpeech(
+            text: text,
+            voice: voice,
+            model: model,
+            speed: speed,
+            instructions: model.supportsInstructions && !instructions.isEmpty ? instructions : nil,
+            apiKey: openaiKey
+        )
     }
 
     // MARK: - Text Preprocessing

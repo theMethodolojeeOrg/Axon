@@ -15,12 +15,14 @@ final class HeartbeatService: ObservableObject {
 
     @Published private(set) var lastHeartbeatAt: Date?
     @Published private(set) var lastHeartbeatSummary: String?
+    @Published private(set) var isRunning: Bool = false
 
     private let settingsViewModel = SettingsViewModel.shared
     private let orchestrator = OnDeviceConversationOrchestrator()
     private let agentStateService = AgentStateService.shared
     private let notificationService = NotificationService.shared
     private let sovereigntyService = SovereigntyService.shared
+    private let liveActivityService = LiveActivityService.shared
 
     private var heartbeatTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
@@ -53,6 +55,10 @@ final class HeartbeatService: ObservableObject {
     func stop() {
         heartbeatTask?.cancel()
         heartbeatTask = nil
+        isRunning = false
+        Task {
+            await liveActivityService.endHeartbeatActivity()
+        }
     }
 
     private func restartIfNeeded() {
@@ -62,19 +68,45 @@ final class HeartbeatService: ObservableObject {
         let settings = settingsViewModel.settings
         let heartbeat = settings.heartbeatSettings
         guard settings.internalThreadEnabled, heartbeat.enabled else {
+            isRunning = false
+            Task {
+                await liveActivityService.endHeartbeatActivity()
+            }
             return
         }
 
         if !isForeground && !heartbeat.allowBackground {
+            isRunning = false
+            Task {
+                await liveActivityService.endHeartbeatActivity()
+            }
             return
         }
 
         let interval = max(60, heartbeat.intervalSeconds)
+        let profileName = heartbeat.profile(for: heartbeat.deliveryProfileId)?.name ?? "Default"
+
+        // Start Live Activity
+        Task {
+            try? await liveActivityService.startHeartbeatActivity(
+                profileName: profileName,
+                intervalSeconds: interval
+            )
+        }
+
+        isRunning = true
         heartbeatTask = Task { [weak self] in
             guard let self else { return }
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(interval) * 1_000_000_000)
-                _ = await self.runOnce(reason: "scheduled")
+                let result = await self.runOnce(reason: "scheduled")
+
+                // Update Live Activity with result
+                let nextRunTime = Date().addingTimeInterval(Double(interval))
+                await self.liveActivityService.updateHeartbeatActivity(
+                    with: result,
+                    nextRunTime: nextRunTime
+                )
             }
         }
     }
@@ -91,6 +123,9 @@ final class HeartbeatService: ObservableObject {
         if let quietHours = heartbeat.quietHours, !quietHours.isCurrentTimeAllowed() {
             return .skipped("Quiet hours active.")
         }
+
+        // Signal Live Activity that we're running
+        await liveActivityService.markHeartbeatRunning()
 
         do {
             let modules = await buildContextModules(settings: settings)

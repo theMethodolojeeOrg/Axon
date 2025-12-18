@@ -565,6 +565,90 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         return prompt
     }
 
+    // MARK: - Minimal Tool Discovery Prompt
+
+    /// Generate a minimal system prompt that only exposes discovery tools (list_tools, get_tool_details)
+    /// This reduces context bloat by letting the AI discover tools on-demand rather than receiving all definitions upfront.
+    func generateMinimalToolSystemPrompt(enabledTools: Set<ToolId>, maxToolCalls: Int = 5) -> String {
+        guard !enabledTools.isEmpty else { return "" }
+
+        // Categorize enabled tools for the summary
+        let categories = categorizeEnabledTools(enabledTools)
+        let totalCount = enabledTools.count
+
+        var prompt = """
+
+        ## Tool Discovery System
+
+        You have access to \(totalCount) tool\(totalCount == 1 ? "" : "s") across the following categories:
+        """
+
+        // Sort categories for consistent output
+        for (category, count) in categories.sorted(by: { $0.key.displayName < $1.key.displayName }) {
+            prompt += "\n- **\(category.displayName)**: \(count) tool\(count == 1 ? "" : "s")"
+        }
+
+        prompt += """
+
+
+        **Tool Call Limit:** You may use up to \(maxToolCalls) tool call\(maxToolCalls == 1 ? "" : "s") per response.
+
+        To discover and use these tools, use the following discovery tools:
+
+        ### list_tools
+        Get a compact catalog of available tools. Returns tool IDs, names, providers, and brief descriptions.
+
+        **Query options:**
+        - `enabled` (default) - Show only enabled tools
+        - `all` - Show all tools (enabled and disabled)
+        - `builtin` - Show only built-in tools
+        - `dynamic` - Show only dynamic tools
+        - `bridge` - Show only VS Code bridge tools (if connected)
+
+        Example:
+        ```tool_request
+        {"tool": "list_tools", "query": "enabled"}
+        ```
+
+        ### get_tool_details
+        Fetch full details (usage instructions, parameters, examples) for a specific tool by its ID.
+
+        Example:
+        ```tool_request
+        {"tool": "get_tool_details", "query": "google_search"}
+        ```
+
+        **Workflow:** Use `list_tools` first to discover what's available, then use `get_tool_details` to get full usage instructions for any tool you want to use.
+
+        **Important:** Only request ONE tool at a time. Wait for results before continuing.
+
+        """
+
+        // Add dynamic tools section (these are compact by design)
+        prompt += dynamicToolConfig.generateSystemPromptSection()
+
+        // Add VS Code bridge tools if connected
+        if let workspace = BridgeToolExecutor.shared.workspaceInfo {
+            prompt += BridgeToolId.generateSystemPrompt(
+                workspaceName: workspace.name,
+                workspaceRoot: workspace.root
+            )
+        }
+
+        return prompt
+    }
+
+    /// Categorize enabled tools for the minimal prompt summary
+    private func categorizeEnabledTools(_ enabledTools: Set<ToolId>) -> [ToolCategory: Int] {
+        var categories: [ToolCategory: Int] = [:]
+
+        for tool in enabledTools {
+            categories[tool.category, default: 0] += 1
+        }
+
+        return categories
+    }
+
     // MARK: - Parse Tool Requests
 
     /// Parse tool requests from model response

@@ -78,76 +78,134 @@ struct SettingsTabView: View {
             Divider()
                 .background(AppColors.divider)
 
-            // Tab content
-            ScrollView {
-                Group {
-                    switch selectedTab {
-                    case .general:
-                        GeneralSettingsView(viewModel: viewModel)
-                    case .apiKeys:
-                        APIKeysSettingsView(viewModel: viewModel)
-                    case .models:
-                        ModelSyncSettingsView(viewModel: viewModel)
-                    case .custom:
-                        CustomProvidersSettingsView(viewModel: viewModel)
-                    case .tools:
-                        ToolSettingsView(viewModel: viewModel)
-                    case .dynamicTools:
-                        DynamicToolsSettingsView(viewModel: viewModel)
-                    case .memory:
-                        MemorySettingsView(viewModel: viewModel)
-                    case .sovereignty:
-                        SovereigntySettingsView(viewModel: viewModel)
-                    case .security:
-                        SecuritySettingsView(viewModel: viewModel)
-                    case .server:
-                        ServerSettingsView(viewModel: viewModel)
-                    case .backend:
-                        BackendSettingsView(viewModel: viewModel)
-                    case .tts:
-                        TTSSettingsView(viewModel: viewModel)
-                    case .archived:
-                        ArchivedConversationsSettingsView(viewModel: viewModel)
-                    case .developer:
-                        DeveloperSettingsView(viewModel: viewModel)
+            // Tab content - wrapped in NavigationStack for sub-navigation (e.g., DataManagementView)
+            NavigationStack {
+                ScrollView {
+                    Group {
+                        switch selectedTab {
+                        case .general:
+                            GeneralSettingsView(viewModel: viewModel)
+                        case .apiKeys:
+                            APIKeysSettingsView(viewModel: viewModel)
+                        case .models:
+                            ModelSyncSettingsView(viewModel: viewModel)
+                        case .custom:
+                            CustomProvidersSettingsView(viewModel: viewModel)
+                        case .tools:
+                            ToolSettingsView(viewModel: viewModel)
+                        case .dynamicTools:
+                            DynamicToolsSettingsView(viewModel: viewModel)
+                        case .memory:
+                            MemorySettingsView(viewModel: viewModel)
+                        case .sovereignty:
+                            SovereigntySettingsView(viewModel: viewModel)
+                        case .security:
+                            SecuritySettingsView(viewModel: viewModel)
+                        case .server:
+                            ServerSettingsView(viewModel: viewModel)
+                        case .backend:
+                            BackendSettingsView(viewModel: viewModel)
+                        case .tts:
+                            TTSSettingsView(viewModel: viewModel)
+                        case .archived:
+                            ArchivedConversationsSettingsView(viewModel: viewModel)
+                        case .developer:
+                            DeveloperSettingsView(viewModel: viewModel)
+                        }
                     }
+                    .padding()
                 }
-                .padding()
+                .background(AppColors.substratePrimary)
             }
-            .background(AppColors.substratePrimary)
 
             // Success/Error messages
             if let successMessage = viewModel.successMessage {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(AppColors.accentSuccess)
-                    Text(successMessage)
-                        .font(AppTypography.bodySmall())
-                        .foregroundColor(AppColors.textPrimary)
-                }
-                .padding()
-                .background(AppColors.accentSuccess.opacity(0.2))
-                .cornerRadius(8)
-                .padding()
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                DismissableBanner(
+                    message: successMessage,
+                    icon: "checkmark.circle.fill",
+                    color: AppColors.accentSuccess,
+                    onDismiss: { viewModel.successMessage = nil }
+                )
             }
 
             if let error = viewModel.error {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(AppColors.accentError)
-                    Text(error)
-                        .font(AppTypography.bodySmall())
-                        .foregroundColor(AppColors.textPrimary)
-                }
-                .padding()
-                .background(AppColors.accentError.opacity(0.2))
-                .cornerRadius(8)
-                .padding()
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                DismissableBanner(
+                    message: error,
+                    icon: "exclamationmark.triangle.fill",
+                    color: AppColors.accentError,
+                    onDismiss: { viewModel.error = nil }
+                )
             }
         }
         .background(AppColors.substratePrimary)
+    }
+}
+
+// MARK: - Dismissable Banner
+
+struct DismissableBanner: View {
+    let message: String
+    let icon: String
+    let color: Color
+    let onDismiss: () -> Void
+
+    @State private var offset: CGFloat = 0
+    @GestureState private var dragOffset: CGFloat = 0
+
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundColor(color)
+            Text(message)
+                .font(AppTypography.bodySmall())
+                .foregroundColor(AppColors.textPrimary)
+                .lineLimit(3)
+
+            Spacer()
+
+            // Dismiss button (X) for Mac/pointer devices
+            Button(action: {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    onDismiss()
+                }
+            }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppColors.textSecondary)
+                    .padding(6)
+                    .background(Circle().fill(AppColors.substrateTertiary))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding()
+        .background(color.opacity(0.2))
+        .cornerRadius(8)
+        .padding()
+        .offset(x: offset + dragOffset)
+        .gesture(
+            DragGesture()
+                .updating($dragOffset) { value, state, _ in
+                    // Allow dragging in either direction
+                    state = value.translation.width
+                }
+                .onEnded { value in
+                    // Dismiss if dragged far enough in either direction
+                    let threshold: CGFloat = 100
+                    if abs(value.translation.width) > threshold {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            offset = value.translation.width > 0 ? 500 : -500
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            onDismiss()
+                        }
+                    } else {
+                        withAnimation(.spring()) {
+                            offset = 0
+                        }
+                    }
+                }
+        )
+        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 }
 

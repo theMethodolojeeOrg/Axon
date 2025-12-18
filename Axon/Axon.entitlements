@@ -24,5 +24,9 @@
 	<true/>
 	<key>com.apple.developer.kernel.increased-memory-limit</key>
 	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.e2a0f78c018434b3.Axon</string>
+	</array>
 </dict>
 </plist>

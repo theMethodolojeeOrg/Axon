@@ -7,6 +7,7 @@
 
 import SwiftUI
 import PhotosUI
+import Combine
 import UniformTypeIdentifiers
 
 #if canImport(UIKit)
@@ -286,6 +287,11 @@ struct MessageInputBar: View {
     @State private var showAudioImporter = false
     @State private var showAnyFileImporter = false
 
+    // Slash Command Menu
+    @State private var slashMenuState: SlashMenuState = .hidden
+    @State private var commandSuggestions: [SlashCommandSuggestion] = []
+    @State private var toolSuggestions: [ToolSuggestion] = []
+
     // VS Code Bridge
     @ObservedObject private var bridgeServer = BridgeServer.shared
 
@@ -368,47 +374,117 @@ struct MessageInputBar: View {
         onStop?()
     }
 
+    // MARK: - Slash Command Menu
+
+    private func updateSlashMenuState(for input: String) {
+        withAnimation(.easeOut(duration: 0.15)) {
+            slashMenuState = SlashCommandParser.shared.getMenuState(for: input)
+
+            switch slashMenuState {
+            case .hidden:
+                commandSuggestions = []
+                toolSuggestions = []
+            case .showingCommands:
+                commandSuggestions = SlashCommandParser.shared.getCommandSuggestions(for: input)
+                toolSuggestions = []
+            case .showingTools(let filter):
+                commandSuggestions = []
+                toolSuggestions = SlashCommandParser.shared.getToolSuggestions(filter: filter)
+            }
+        }
+    }
+
+    private func handleCommandSelection(_ suggestion: SlashCommandSuggestion) {
+        if suggestion.hasSubmenu {
+            // For commands with submenus (like /tool), insert the command with a space
+            text = "/\(suggestion.command) "
+        } else {
+            // For direct commands, insert and send immediately
+            text = "/\(suggestion.command)"
+            dismissSlashMenu()
+        }
+    }
+
+    private func handleToolSelection(_ tool: ToolSuggestion) {
+        // Insert the full /tool command with the selected tool ID
+        text = "/tool \(tool.toolId)"
+        dismissSlashMenu()
+    }
+
+    private func dismissSlashMenu() {
+        withAnimation(.easeOut(duration: 0.15)) {
+            slashMenuState = .hidden
+            commandSuggestions = []
+            toolSuggestions = []
+        }
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Attachments Preview
-            if !attachments.isEmpty {
-                attachmentsPreview
+        ZStack(alignment: .bottom) {
+            // Slash Command Menu (appears above input)
+            if slashMenuState != .hidden {
+                VStack {
+                    Spacer()
+                    SlashCommandMenu(
+                        menuState: slashMenuState,
+                        commandSuggestions: commandSuggestions,
+                        toolSuggestions: toolSuggestions,
+                        onSelectCommand: handleCommandSelection,
+                        onSelectTool: handleToolSelection,
+                        onDismiss: dismissSlashMenu
+                    )
+                    .padding(.horizontal)
+                    .padding(.bottom, 70) // Position above input bar
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                .zIndex(1)
             }
 
-            // Main input bar
-            HStack(alignment: .center, spacing: 8) {
-                let capability = attachmentCapability
-
-                // VS Code Bridge Toggle (macOS only)
-                #if os(macOS)
-                bridgeButton
-                #endif
-
-                // Attachment Button
-                if capability.images || capability.documents || capability.video || capability.audio {
-                    attachmentMenu(capability: capability)
+            // Main content
+            VStack(spacing: 0) {
+                // Attachments Preview
+                if !attachments.isEmpty {
+                    attachmentsPreview
                 }
 
-                // Text input area
-                textInputArea
+                // Main input bar
+                HStack(alignment: .center, spacing: 8) {
+                    let capability = attachmentCapability
 
-                // Send button
-                sendButton
+                    // VS Code Bridge Toggle (macOS only)
+                    #if os(macOS)
+                    bridgeButton
+                    #endif
+
+                    // Attachment Button
+                    if capability.images || capability.documents || capability.video || capability.audio {
+                        attachmentMenu(capability: capability)
+                    }
+
+                    // Text input area
+                    textInputArea
+
+                    // Send button
+                    sendButton
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 22)
+                        .fill(AppColors.substrateSecondary.opacity(0.85))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 22)
+                                .stroke(AppColors.glassBorder, lineWidth: 0.5)
+                        )
+                )
+                .background(.ultraThinMaterial.opacity(0.4))
+                .clipShape(RoundedRectangle(cornerRadius: 22))
+                .padding(.horizontal)
+                .padding(.bottom, 8)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 22)
-                    .fill(AppColors.substrateSecondary.opacity(0.85))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22)
-                            .stroke(AppColors.glassBorder, lineWidth: 0.5)
-                    )
-            )
-            .background(.ultraThinMaterial.opacity(0.4))
-            .clipShape(RoundedRectangle(cornerRadius: 22))
-            .padding(.horizontal)
-            .padding(.bottom, 8)
+        }
+        .onChange(of: text) { newText in
+            updateSlashMenuState(for: newText)
         }
         .onChange(of: selectedItem) { newItem in
             handlePhotoSelection(newItem)
@@ -571,22 +647,27 @@ struct MessageInputBar: View {
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
     }
     
+    /// Whether the current input is a slash command
+    private var isSlashCommand: Bool {
+        text.trimmingCharacters(in: .whitespaces).hasPrefix("/")
+    }
+
     @ViewBuilder
     private var textInputArea: some View {
         ZStack(alignment: .leading) {
-            // Placeholder
+            // Placeholder with slash command hint
             if text.isEmpty {
-                Text("Type a message...")
+                Text("Message or /tool...")
                     .font(.system(size: 15))
                     .foregroundColor(AppColors.textSecondary.opacity(0.6))
                     .padding(.leading, 4)
                     .allowsHitTesting(false)
             }
-            
+
             // Custom text editor with Enter handling
             ChatTextEditor(
                 text: $text,
-                placeholder: "Type a message...",
+                placeholder: "Message or /tool...",
                 isDisabled: isLoading,
                 maxHeight: inputMaxHeight,
                 dynamicHeight: $inputHeight,
@@ -600,6 +681,12 @@ struct MessageInputBar: View {
             RoundedRectangle(cornerRadius: 16)
                 .fill(AppColors.substrateTertiary.opacity(0.4))
         )
+        .overlay(
+            // Visual indicator when typing a slash command
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(isSlashCommand ? AppColors.signalMercury.opacity(0.6) : Color.clear, lineWidth: 1.5)
+        )
+        .animation(.easeInOut(duration: 0.15), value: isSlashCommand)
     }
     
     @ViewBuilder

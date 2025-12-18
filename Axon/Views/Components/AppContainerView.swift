@@ -348,6 +348,7 @@ struct ChatContainerView: View {
     @State private var messageText = ""
     @State private var selectedAttachments: [MessageAttachment] = []
     @State private var draftSaveTask: Task<Void, Never>?
+    @State private var messageLoadTask: Task<Void, Never>?  // Track message loading to prevent races
     // Tools are now controlled via Settings > Tools tab
     // This computed property reflects the enabled tools from settings
     @State private var isLoading = false
@@ -502,19 +503,30 @@ struct ChatContainerView: View {
             }
         }
         .task(id: conversation?.id) {
+            // Cancel any in-flight message load to prevent race conditions
+            // This fixes the issue where switching conversations quickly could cause
+            // stale data from a previous load to overwrite the current conversation's messages
+            messageLoadTask?.cancel()
+
             if let conversation = conversation {
                 isInputFocused = false
                 // Set conversation for session-based approvals
                 toolApprovalService.setCurrentConversation(UUID(uuidString: conversation.id) ?? UUID())
-                
+
                 // Load draft for this conversation
                 loadDraft(for: conversation.id)
-                
-                await loadMessages(for: conversation)
+
+                // Create a cancellable task for message loading
+                messageLoadTask = Task {
+                    // Check for cancellation before starting
+                    guard !Task.isCancelled else { return }
+                    await loadMessages(for: conversation)
+                }
+                await messageLoadTask?.value
             } else {
                 conversationService.clearCurrentConversation()
                 conversationService.messages = []
-                
+
                 // Load "New Chat" draft if exists
                 loadDraft(for: DraftMessageService.newChatDraftKey)
             }
@@ -800,6 +812,12 @@ struct ChatContainerView: View {
     private func sendMessage() {
         guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty || !selectedAttachments.isEmpty else { return }
 
+        // Check for slash commands first (only if no attachments)
+        if SlashCommandParser.shared.isSlashCommand(messageText) && selectedAttachments.isEmpty {
+            handleSlashCommand()
+            return
+        }
+
         let content = messageText
         let attachments = selectedAttachments
 
@@ -845,10 +863,22 @@ struct ChatContainerView: View {
                     draftService.transferNewChatDraft(to: conv.id)
                 }
 
-                // Get enabled tools from settings
-                let enabledTools: [String] = settings.toolSettings.toolsEnabled
-                    ? Array(settings.toolSettings.enabledToolIds)
-                    : []
+                // Get enabled tools - check for per-conversation overrides first
+                let enabledTools: [String] = {
+                    guard settings.toolSettings.toolsEnabled else { return [] }
+
+                    // Check for per-conversation tool overrides
+                    let overridesKey = "conversation_overrides_\(conv.id)"
+                    if let data = UserDefaults.standard.data(forKey: overridesKey),
+                       let overrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data),
+                       let toolOverrides = overrides.enabledToolIds {
+                        // Use per-conversation tool settings
+                        return Array(toolOverrides)
+                    }
+
+                    // Fall back to global tool settings
+                    return Array(settings.toolSettings.enabledToolIds)
+                }()
 
                 if shouldStream {
                     // Use real streaming with inline tool visibility
@@ -886,6 +916,66 @@ struct ChatContainerView: View {
         }
     }
 
+    /// Handle slash command input (e.g., /tool google_search)
+    private func handleSlashCommand() {
+        let commandText = messageText
+        let command = SlashCommandParser.shared.parse(commandText)
+
+        // Clear input
+        messageText = ""
+        selectedAttachments = []
+
+        // Dismiss keyboard
+        #if canImport(UIKit)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        #elseif canImport(AppKit)
+        NSApp.keyWindow?.makeFirstResponder(nil)
+        #endif
+        isInputFocused = false
+
+        Task {
+            // Execute the slash command
+            let result = await SlashCommandParser.shared.execute(command)
+
+            // Add messages to the conversation
+            guard let conv = conversation else {
+                // For slash commands in "new chat" mode, just show a temporary message
+                // We'll create a system-level display without persisting
+                let systemMessage = Message(
+                    conversationId: "temp",
+                    role: .assistant,
+                    content: result.resultText,
+                    modelName: "System",
+                    providerName: "internal"
+                )
+                conversationService.messages.append(systemMessage)
+                return
+            }
+
+            // Create user message showing the command
+            let userMessage = Message(
+                conversationId: conv.id,
+                role: .user,
+                content: result.displayText
+            )
+            conversationService.messages.append(userMessage)
+
+            // Create system response with command result
+            let systemMessage = Message(
+                conversationId: conv.id,
+                role: .assistant,
+                content: result.resultText,
+                modelName: "System",
+                providerName: "internal"
+            )
+            conversationService.messages.append(systemMessage)
+
+            // Persist messages via LocalConversationStore
+            // Slash command results are ephemeral context - they help the AI but don't need permanent storage
+            // If persistence is desired, use LocalConversationStore.shared.saveLocalMessage()
+        }
+    }
+
     /// Send message with real streaming and inline tool visibility
     private func sendMessageWithStreaming(
         conversationId: String,
@@ -901,6 +991,12 @@ struct ChatContainerView: View {
             attachments: attachments.isEmpty ? nil : attachments
         )
         conversationService.messages.append(userMessage)
+
+        // Save user message to Core Data immediately
+        // This ensures messages persist even if streaming is interrupted
+        let syncManager = ConversationSyncManager.shared
+        try await syncManager.saveMessagesToCoreData([userMessage], conversationId: conversationId)
+        print("[ChatContainer] 💾 Saved user message to Core Data")
 
         // Create placeholder assistant message
         let assistantId = UUID().uuidString
@@ -1068,6 +1164,9 @@ struct ChatContainerView: View {
         modelName: String,
         providerName: String?
     ) {
+        // Retrieve context debug info from state
+        let contextDebugInfo = contextDebugInfos[assistantId]
+
         // Update the placeholder message with final content
         if let index = conversationService.messages.firstIndex(where: { $0.id == assistantId }) {
             let finalMessage = Message(
@@ -1080,9 +1179,23 @@ struct ChatContainerView: View {
                 providerName: providerName,
                 groundingSources: sources.isEmpty ? nil : sources,
                 memoryOperations: memoryOps.isEmpty ? nil : memoryOps,
-                reasoning: reasoning
+                reasoning: reasoning,
+                contextDebugInfo: contextDebugInfo,
+                liveToolCalls: toolCalls.isEmpty ? nil : toolCalls
             )
             conversationService.messages[index] = finalMessage
+
+            // Save assistant message to Core Data
+            // This is critical for message persistence when using streaming
+            Task {
+                do {
+                    let syncManager = ConversationSyncManager.shared
+                    try await syncManager.saveMessagesToCoreData([finalMessage], conversationId: conversationId)
+                    print("[ChatContainer] 💾 Saved assistant message to Core Data")
+                } catch {
+                    print("[ChatContainer] ❌ Failed to save assistant message to Core Data: \(error)")
+                }
+            }
 
             // Record usage
             recordUsage(for: finalMessage, inputContent: "")
@@ -1098,6 +1211,7 @@ struct ChatContainerView: View {
             streamedContent.removeValue(forKey: messageId)
             streamedReasoning.removeValue(forKey: messageId)
             liveToolCalls.removeValue(forKey: messageId)
+            contextDebugInfos.removeValue(forKey: messageId)
         }
         streamingMessageId = nil
     }

@@ -185,18 +185,19 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         let hasFilteredTools = !filteredGeminiTools.isEmpty
 
         // Use tool proxy for non-Gemini providers (Claude, GPT, Grok) with tools enabled
+        // Uses minimal discovery-based prompt to reduce context bloat - AI discovers tools via list_tools/get_tool_details
         let useToolProxy = hasGeminiTools && !isGeminiProvider
         if useToolProxy {
             let enabledToolIds = Set(requestedGeminiTools.compactMap { ToolId(rawValue: $0) })
             let maxToolCalls = await MainActor.run {
                 SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
             }
-            let toolPrompt = await ToolProxyService.shared.generateToolSystemPrompt(
+            let toolPrompt = await ToolProxyService.shared.generateMinimalToolSystemPrompt(
                 enabledTools: enabledToolIds,
                 maxToolCalls: maxToolCalls
             )
             systemPrompt = (systemPrompt ?? "") + toolPrompt
-            print("[OnDeviceOrchestrator] Tool proxy mode (non-Gemini provider): injected tool prompt for \(enabledToolIds.count) tools (max \(maxToolCalls) calls)")
+            print("[OnDeviceOrchestrator] Tool proxy mode (discovery-based): injected minimal tool prompt for \(enabledToolIds.count) tools (max \(maxToolCalls) calls)")
         }
 
         // Log if any tools were filtered out for Gemini 3
@@ -474,13 +475,14 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var toolPromptTokens = 0
 
         // Use tool proxy for non-Gemini providers
+        // Uses minimal discovery-based prompt to reduce context bloat
         let useToolProxy = hasGeminiTools && !isGeminiProvider
         if useToolProxy {
             let enabledToolIds = Set(requestedGeminiTools.compactMap { ToolId(rawValue: $0) })
             let maxToolCalls = await MainActor.run {
                 SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
             }
-            let toolPrompt = await ToolProxyService.shared.generateToolSystemPrompt(
+            let toolPrompt = await ToolProxyService.shared.generateMinimalToolSystemPrompt(
                 enabledTools: enabledToolIds,
                 maxToolCalls: maxToolCalls
             )

@@ -25,6 +25,8 @@ struct Message: Codable, Identifiable, Equatable {
     let reasoning: String?  // Chain-of-thought / thinking tokens from reasoning models
     let editHistory: [MessageEdit]?  // Version history for edited messages
     let currentVersion: Int?  // Which version is currently displayed (0 = original)
+    let contextDebugInfo: ContextDebugInfo?  // Token usage breakdown for this message
+    let liveToolCalls: [LiveToolCall]?  // Rich tool call details with state/timing/request/result
 
     // Computed property to check if message has been edited
     var isEdited: Bool {
@@ -49,6 +51,8 @@ struct Message: Codable, Identifiable, Equatable {
         case reasoning
         case editHistory
         case currentVersion
+        case contextDebugInfo
+        case liveToolCalls
     }
 
     init(
@@ -68,7 +72,9 @@ struct Message: Codable, Identifiable, Equatable {
         memoryOperations: [MessageMemoryOperation]? = nil,
         reasoning: String? = nil,
         editHistory: [MessageEdit]? = nil,
-        currentVersion: Int? = nil
+        currentVersion: Int? = nil,
+        contextDebugInfo: ContextDebugInfo? = nil,
+        liveToolCalls: [LiveToolCall]? = nil
     ) {
         self.id = id
         self.conversationId = conversationId
@@ -87,6 +93,8 @@ struct Message: Codable, Identifiable, Equatable {
         self.reasoning = reasoning
         self.editHistory = editHistory
         self.currentVersion = currentVersion
+        self.contextDebugInfo = contextDebugInfo
+        self.liveToolCalls = liveToolCalls
     }
 
     // Custom decoder to handle timestamp conversion from milliseconds
@@ -151,6 +159,8 @@ struct Message: Codable, Identifiable, Equatable {
         reasoning = try container.decodeIfPresent(String.self, forKey: .reasoning)
         editHistory = try container.decodeIfPresent([MessageEdit].self, forKey: .editHistory)
         currentVersion = try container.decodeIfPresent(Int.self, forKey: .currentVersion)
+        contextDebugInfo = try container.decodeIfPresent(ContextDebugInfo.self, forKey: .contextDebugInfo)
+        liveToolCalls = try container.decodeIfPresent([LiveToolCall].self, forKey: .liveToolCalls)
     }
 
     // Custom encoder to convert timestamp back to milliseconds
@@ -177,6 +187,8 @@ struct Message: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(reasoning, forKey: .reasoning)
         try container.encodeIfPresent(editHistory, forKey: .editHistory)
         try container.encodeIfPresent(currentVersion, forKey: .currentVersion)
+        try container.encodeIfPresent(contextDebugInfo, forKey: .contextDebugInfo)
+        try container.encodeIfPresent(liveToolCalls, forKey: .liveToolCalls)
     }
 }
 

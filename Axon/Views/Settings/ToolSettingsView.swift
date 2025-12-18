@@ -94,14 +94,31 @@ struct ToolSettingsView: View {
                     .padding(.top, 8)
                 }
 
-                // Built-in Tools Section
+                // Built-in Tools Section (organized by category accordions)
                 SettingsSection(title: "Built-in Tools") {
-                    VStack(spacing: 0) {
-                        ForEach(ToolId.tools(for: .internal)) { tool in
-                            ToolToggleRow(
-                                tool: tool,
-                                isEnabled: viewModel.settings.toolSettings.enabledToolIds.contains(tool.rawValue),
-                                onToggle: { enabled in
+                    VStack(spacing: 12) {
+                        // Get all internal tool categories (excluding geminiTools since that's separate)
+                        let internalCategories = ToolCategory.allCases.filter { category in
+                            category != .geminiTools && !ToolId.tools(for: category).isEmpty
+                        }
+
+                        ForEach(internalCategories) { category in
+                            ToolCategoryAccordion(
+                                category: category,
+                                tools: ToolId.tools(for: category),
+                                toolSettings: viewModel.settings.toolSettings,
+                                onCategoryToggle: { enabled in
+                                    Task {
+                                        var updated = viewModel.settings.toolSettings
+                                        if enabled {
+                                            updated.enableCategory(category)
+                                        } else {
+                                            updated.disableCategory(category)
+                                        }
+                                        await viewModel.updateSetting(\.toolSettings, updated)
+                                    }
+                                },
+                                onToolToggle: { tool, enabled in
                                     Task {
                                         var updated = viewModel.settings.toolSettings
                                         if enabled {
@@ -115,9 +132,6 @@ struct ToolSettingsView: View {
                             )
                         }
                     }
-                    .padding()
-                    .background(AppColors.substrateSecondary)
-                    .cornerRadius(8)
                 }
 
                 #if os(macOS)
@@ -616,6 +630,153 @@ struct VSCodeBridgeSection: View {
     }
 }
 #endif
+
+// MARK: - Tool Category Accordion
+
+/// 3-state toggle state for category headers
+enum CategoryToggleState {
+    case allEnabled
+    case partiallyEnabled
+    case allDisabled
+}
+
+/// Accordion component for organizing tools by category
+struct ToolCategoryAccordion: View {
+    let category: ToolCategory
+    let tools: [ToolId]
+    let toolSettings: ToolSettings
+    let onCategoryToggle: (Bool) -> Void
+    let onToolToggle: (ToolId, Bool) -> Void
+
+    @State private var isExpanded = false
+
+    private var categoryState: CategoryToggleState {
+        if toolSettings.isCategoryFullyEnabled(category) {
+            return .allEnabled
+        } else if toolSettings.isCategoryPartiallyEnabled(category) {
+            return .partiallyEnabled
+        } else {
+            return .allDisabled
+        }
+    }
+
+    private var enabledCount: Int {
+        toolSettings.enabledCountForCategory(category)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Accordion Header
+            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() } }) {
+                HStack(spacing: 12) {
+                    // Category toggle (3-state)
+                    CategoryToggleButton(
+                        state: categoryState,
+                        onToggle: {
+                            let shouldEnable = categoryState != .allEnabled
+                            onCategoryToggle(shouldEnable)
+                        }
+                    )
+
+                    // Category icon
+                    Image(systemName: category.icon)
+                        .font(.system(size: 20))
+                        .foregroundColor(categoryState != .allDisabled ? AppColors.signalMercury : AppColors.textTertiary)
+                        .frame(width: 28)
+
+                    // Category info
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(category.displayName)
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+
+                            // Show enabled count
+                            Text("\(enabledCount)/\(tools.count)")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textTertiary)
+                        }
+
+                        Text(category.description)
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textSecondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    // Expand/collapse chevron
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppColors.textTertiary)
+                }
+                .padding()
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
+
+            // Expanded tool list
+            if isExpanded {
+                VStack(spacing: 0) {
+                    ForEach(tools) { tool in
+                        ToolToggleRow(
+                            tool: tool,
+                            isEnabled: toolSettings.isToolEnabled(tool),
+                            onToggle: { enabled in onToolToggle(tool, enabled) }
+                        )
+                        .padding(.horizontal)
+
+                        if tool != tools.last {
+                            Divider()
+                                .background(AppColors.divider)
+                                .padding(.leading, 60)
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+                .background(AppColors.substrateTertiary.opacity(0.5))
+                .cornerRadius(8)
+                .padding(.top, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+}
+
+/// 3-state toggle button for category headers
+struct CategoryToggleButton: View {
+    let state: CategoryToggleState
+    let onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(backgroundColor)
+                    .frame(width: 24, height: 24)
+
+                if state != .allDisabled {
+                    Image(systemName: state == .allEnabled ? "checkmark" : "minus")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var backgroundColor: Color {
+        switch state {
+        case .allEnabled:
+            return AppColors.signalLichen
+        case .partiallyEnabled:
+            return AppColors.signalCopper
+        case .allDisabled:
+            return AppColors.textDisabled.opacity(0.3)
+        }
+    }
+}
 
 // MARK: - Preview
 
