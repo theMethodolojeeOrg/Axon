@@ -116,6 +116,47 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
                FileManager.default.fileExists(atPath: audioFileURL(for: key, format: .m4a).path)
     }
 
+    /// Get the currently playing audio data and format for saving/exporting
+    /// Returns nil if no audio is currently loaded
+    func getCurrentAudioForExport() -> (data: Data, format: TTSAudioFormat, suggestedFilename: String)? {
+        guard let messageId = currentMessageId else { return nil }
+
+        // Check memory cache first
+        if let data = audioCache[messageId] {
+            let format = audioFormatCache[messageId] ?? .mp3
+            let filename = generateFilename(for: messageId, format: format)
+            return (data, format, filename)
+        }
+
+        // Try all formats on disk
+        for format in [TTSAudioFormat.mp3, .wav, .m4a] {
+            if let data = loadAudioFromDisk(for: messageId, format: format) {
+                let filename = generateFilename(for: messageId, format: format)
+                return (data, format, filename)
+            }
+        }
+
+        return nil
+    }
+
+    private func generateFilename(for messageId: String, format: TTSAudioFormat) -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
+        let timestamp = dateFormatter.string(from: Date())
+
+        // Clean up messageId for filename (remove preview_ prefix if present)
+        var cleanId = messageId
+        if cleanId.hasPrefix("preview_") {
+            cleanId = String(cleanId.dropFirst("preview_".count))
+        }
+        // Truncate if too long
+        if cleanId.count > 20 {
+            cleanId = String(cleanId.prefix(20))
+        }
+
+        return "Axon_TTS_\(timestamp).\(format.rawValue)"
+    }
+
     /// Check if audio is available (locally or remotely via CloudKit).
     /// This is an async version that checks the sync service.
     func hasAudioAvailable(for messageId: String, settings: AppSettings) async -> Bool {

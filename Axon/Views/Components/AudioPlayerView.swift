@@ -6,9 +6,17 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 struct AudioPlayerView: View {
     @ObservedObject var ttsService: TTSPlaybackService
+    @State private var showingSaveSuccess = false
+    @State private var saveError: String?
 
     var body: some View {
         VStack {
@@ -113,20 +121,37 @@ struct AudioPlayerView: View {
                         }
                     }
 
-                    // Close button (available during loading and playback)
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            ttsService.stop()
+                    // Action buttons (save and close)
+                    HStack(spacing: 8) {
+                        // Save/Download button (only when not generating)
+                        if !ttsService.isGenerating {
+                            Button(action: saveAudio) {
+                                Image(systemName: showingSaveSuccess ? "checkmark" : "square.and.arrow.down")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(showingSaveSuccess ? AppColors.accentSuccess : AppColors.textSecondary)
+                                    .padding(8)
+                                    .background(AppColors.textTertiary.opacity(0.1))
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+                            .disabled(showingSaveSuccess)
                         }
-                    }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(AppColors.textSecondary)
-                            .padding(8)
-                            .background(AppColors.textTertiary.opacity(0.1))
-                            .clipShape(Circle())
+
+                        // Close button (available during loading and playback)
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                ttsService.stop()
+                            }
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(AppColors.textSecondary)
+                                .padding(8)
+                                .background(AppColors.textTertiary.opacity(0.1))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(ScaleButtonStyle())
                     }
-                    .buttonStyle(ScaleButtonStyle())
                 }
                 .padding(16)
                 .background(.ultraThinMaterial)
@@ -154,6 +179,91 @@ struct AudioPlayerView: View {
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
+
+    private func saveAudio() {
+        guard let audioExport = ttsService.getCurrentAudioForExport() else {
+            saveError = "No audio available to save"
+            return
+        }
+
+        #if os(iOS)
+        saveAudioiOS(data: audioExport.data, filename: audioExport.suggestedFilename)
+        #elseif os(macOS)
+        saveAudioMacOS(data: audioExport.data, filename: audioExport.suggestedFilename)
+        #endif
+    }
+
+    #if os(iOS)
+    private func saveAudioiOS(data: Data, filename: String) {
+        // Create a temporary file for sharing
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+
+        do {
+            try data.write(to: tempURL)
+
+            // Present share sheet
+            let activityVC = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+
+            // Find the key window scene
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let rootViewController = windowScene.windows.first?.rootViewController {
+                // Handle iPad popover
+                if let popover = activityVC.popoverPresentationController {
+                    popover.sourceView = rootViewController.view
+                    popover.sourceRect = CGRect(x: rootViewController.view.bounds.midX, y: rootViewController.view.bounds.midY, width: 0, height: 0)
+                    popover.permittedArrowDirections = []
+                }
+
+                rootViewController.present(activityVC, animated: true) {
+                    // Show success feedback
+                    withAnimation {
+                        showingSaveSuccess = true
+                    }
+                    // Reset after delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation {
+                            showingSaveSuccess = false
+                        }
+                    }
+                }
+            }
+        } catch {
+            saveError = "Failed to save audio: \(error.localizedDescription)"
+        }
+    }
+    #endif
+
+    #if os(macOS)
+    private func saveAudioMacOS(data: Data, filename: String) {
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [.audio]
+        savePanel.nameFieldStringValue = filename
+        savePanel.title = "Save Audio File"
+        savePanel.message = "Choose where to save the TTS audio file"
+
+        savePanel.begin { response in
+            if response == .OK, let url = savePanel.url {
+                do {
+                    try data.write(to: url)
+                    DispatchQueue.main.async {
+                        withAnimation {
+                            showingSaveSuccess = true
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            withAnimation {
+                                showingSaveSuccess = false
+                            }
+                        }
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        saveError = "Failed to save: \(error.localizedDescription)"
+                    }
+                }
+            }
+        }
+    }
+    #endif
 }
 
 struct ScaleButtonStyle: ButtonStyle {
