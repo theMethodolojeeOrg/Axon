@@ -529,6 +529,23 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
+    /// Map AIProvider to APIProvider for key storage and low-level service calls
+    var apiProvider: APIProvider? {
+        switch self {
+        case .anthropic: return .anthropic
+        case .openai: return .openai
+        case .gemini: return .gemini
+        case .xai: return .xai
+        case .perplexity: return .perplexity
+        case .deepseek: return .deepseek
+        case .zai: return .zai
+        case .minimax: return .minimax
+        case .mistral: return .mistral
+        case .appleFoundation, .localMLX:
+            return nil
+        }
+    }
+
     var displayName: String {
         switch self {
         case .anthropic: return "Anthropic (Claude)"

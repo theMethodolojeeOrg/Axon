@@ -148,14 +148,14 @@ struct MemorySettingsView: View {
             SettingsSection(title: "Memory Types") {
                 VStack(spacing: 12) {
                     MemoryTypeInfo(
-                        icon: "brain.head.profile",
+                        icon: "person.fill",
                         title: "Allocentric",
                         description: "Knowledge about you: preferences, facts, relationships, context",
                         color: AppColors.signalMercury
                     )
 
                     MemoryTypeInfo(
-                        icon: "person.fill",
+                        icon: "brain.head.profile",
                         title: "Egoic",
                         description: "What works for the AI: procedures, insights, learnings",
                         color: AppColors.signalLichen

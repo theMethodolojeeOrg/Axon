@@ -354,7 +354,8 @@ struct MessageInputBar: View {
             [.googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch].contains($0)
         }
         let mediaProxyEnabled = settings.toolSettings.experimentalFeaturesEnabled && settings.toolSettings.mediaProxyEnabled
-        let canProxyMedia = geminiToolsEnabled && mediaProxyEnabled && settings.geminiKey != nil
+        let geminiKey = try? APIKeysStorage.shared.getAPIKey(for: .gemini)
+        let canProxyMedia = geminiToolsEnabled && mediaProxyEnabled && geminiKey != nil && !geminiKey!.isEmpty
 
         switch providerString {
         case "anthropic":
@@ -560,7 +561,7 @@ struct MessageInputBar: View {
         }
         .fileImporter(
             isPresented: $showAudioImporter,
-            allowedContentTypes: [.audio, .mp3, .wav, .aiff, .mpeg4Audio, .appleLosslessAudio],
+            allowedContentTypes: [.audio, .mp3, .wav, .aiff, .mpeg4Audio],
             allowsMultipleSelection: false
         ) { result in
             handleFileImport(result, type: .audio)

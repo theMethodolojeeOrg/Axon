@@ -176,8 +176,8 @@ enum MemoryType: String, Codable, CaseIterable {
 
     var icon: String {
         switch self {
-        case .allocentric: return "brain.head.profile"
-        case .egoic: return "person.fill"
+        case .allocentric: return "person.fill"
+        case .egoic: return "brain.head.profile"
         case .fact: return "lightbulb.fill"
         case .procedure: return "list.bullet"
         case .context: return "bubble.left.and.bubble.right.fill"

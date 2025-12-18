@@ -197,24 +197,6 @@ extension AgentOrchestratorService {
     /// Check if a provider has a valid API key configured
     func isProviderConfigured(_ provider: AIProvider) -> Bool {
         switch provider {
-        case .anthropic:
-            return (try? apiKeysStorage.getAPIKey(for: .anthropic))?.isEmpty == false
-        case .openai:
-            return (try? apiKeysStorage.getAPIKey(for: .openai))?.isEmpty == false
-        case .gemini:
-            return (try? apiKeysStorage.getAPIKey(for: .gemini))?.isEmpty == false
-        case .xai:
-            return (try? apiKeysStorage.getAPIKey(for: .xai))?.isEmpty == false
-        case .deepseek:
-            return (try? apiKeysStorage.getAPIKey(for: .deepseek))?.isEmpty == false
-        case .minimax:
-            return (try? apiKeysStorage.getAPIKey(for: .minimax))?.isEmpty == false
-        case .perplexity:
-            return (try? apiKeysStorage.getAPIKey(for: .perplexity))?.isEmpty == false
-        case .mistral:
-            return (try? apiKeysStorage.getAPIKey(for: .mistral))?.isEmpty == false
-        case .zai:
-            return (try? apiKeysStorage.getAPIKey(for: .zai))?.isEmpty == false
         case .appleFoundation:
             #if canImport(FoundationModels)
             return true
@@ -228,6 +210,11 @@ extension AgentOrchestratorService {
             #else
             return true
             #endif
+        default:
+            if let apiProvider = provider.apiProvider {
+                return (try? apiKeysStorage.getAPIKey(for: apiProvider))?.isEmpty == false
+            }
+            return false
         }
     }
 

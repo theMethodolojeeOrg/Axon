@@ -57,7 +57,8 @@ export class BridgeLogService {
     }
 
     private entries: BridgeLogEntry[] = [];
-    private maxEntries = 500;
+    private maxEntries = 100; // Reduced from 500 to save memory
+    private readonly MAX_PAYLOAD_LENGTH = 1024 * 10; // 10KB truncation limit
 
     private output: vscode.OutputChannel;
 
@@ -167,6 +168,9 @@ export class BridgeLogService {
         let isValid = true;
         let validationErrors: string[] = [];
 
+        // Truncate raw string if too long for initial storage (though we might parse it first)
+        // We actually need to parse it to check validity, but we shouldn't store the massive raw string if valid.
+
         try {
             const obj = JSON.parse(raw) as any;
 
@@ -181,10 +185,18 @@ export class BridgeLogService {
                 messageType = obj.id !== undefined ? 'request' : 'notification';
             }
 
+            // Create pretty JSON but truncate if needed
             try {
-                prettyJSON = JSON.stringify(obj, Object.keys(obj).sort(), 2);
+                // If the object is too big, we truncate the specific fields that are likely large
+                if (raw.length > this.MAX_PAYLOAD_LENGTH) {
+                    prettyJSON = this.truncateObjectForDisplay(obj);
+                } else {
+                    prettyJSON = JSON.stringify(obj, Object.keys(obj).sort(), 2);
+                }
             } catch {
-                // ignore
+                prettyJSON = raw.length > this.MAX_PAYLOAD_LENGTH
+                    ? raw.substring(0, this.MAX_PAYLOAD_LENGTH) + '... [TRUNCATED]'
+                    : raw;
             }
 
             validationErrors = this.validateJSONRPC(obj);
@@ -194,7 +206,15 @@ export class BridgeLogService {
         } catch (e) {
             isValid = false;
             validationErrors = ['Invalid JSON: Unable to parse'];
+            prettyJSON = raw.length > this.MAX_PAYLOAD_LENGTH
+                ? raw.substring(0, this.MAX_PAYLOAD_LENGTH) + '... [TRUNCATED]'
+                : raw;
         }
+
+        // Also truncate the stored rawJSON to save memory
+        const storedRaw = raw.length > this.MAX_PAYLOAD_LENGTH
+            ? raw.substring(0, this.MAX_PAYLOAD_LENGTH) + '... [TRUNCATED]'
+            : raw;
 
         return {
             id,
@@ -203,11 +223,24 @@ export class BridgeLogService {
             messageType,
             method,
             requestId,
-            rawJSON: raw,
+            rawJSON: storedRaw,
             prettyJSON,
             isValid,
             validationErrors,
         };
+    }
+
+    private truncateObjectForDisplay(obj: any): string {
+        // Deep clone-ish via stringify to avoid mutating original, but that's expensive for huge objects.
+        // Instead, we just carefully stringify or use a replacer.
+        // A simple replacer that truncates string values > 1KB
+
+        return JSON.stringify(obj, (key, value) => {
+            if (typeof value === 'string' && value.length > 500) {
+                return value.substring(0, 500) + `... [TRUNCATED ${value.length - 500} chars]`;
+            }
+            return value;
+        }, 2);
     }
 
     private validateJSONRPC(obj: any): string[] {

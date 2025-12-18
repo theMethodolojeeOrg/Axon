@@ -219,26 +219,23 @@ struct ProgressiveLoadingBar: View {
     @State private var stripeOffset: CGFloat = 0
     
     var body: some View {
-        TimelineView(.animation) { timeline in
-            let progress = calculateProgress(at: timeline.date)
-            
+        // Drive updates periodically to refresh progress and stripe animation.
+        TimelineView(.periodic(from: .now, by: 1.0)) { timeline in
+            let _ = timeline.date // force usage to keep the timeline active
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     // Background track
                     Capsule()
                         .fill(Color.secondary.opacity(0.2))
-                    
                     // Progress fill (signalLichenDark)
                     Capsule()
                         .fill(AppColors.signalLichenDark)
-                        .frame(width: geo.size.width * progress)
+                        .frame(width: geo.size.width * calculateProgress(at: Date()))
                         .overlay(
                             // Animated stripes (signalLichenLight)
-                            GeometryReader { innerGeo in
-                                stripePattern
-                                    .offset(x: stripeOffset)
-                                    .mask(Capsule())
-                            }
+                            stripePattern
+                                .offset(x: stripeOffset)
+                                .mask(Capsule())
                         )
                 }
             }
@@ -252,12 +249,11 @@ struct ProgressiveLoadingBar: View {
     
     private var stripePattern: some View {
         HStack(spacing: 0) {
-            ForEach(0..<20) { _ in
+            ForEach(0..<20, id: \.self) { _ in
                 Rectangle()
                     .fill(AppColors.signalLichenLight.opacity(0.3))
                     .frame(width: 20)
                     .skewed()
-                
                 Rectangle()
                     .fill(Color.clear)
                     .frame(width: 20)
@@ -275,15 +271,9 @@ struct ProgressiveLoadingBar: View {
 
 extension View {
     func skewed() -> some View {
-        self.visualEffect { content, proxy in
-            content.distortEffect(
-                .init(functionName: "skew", bundle: .main),
-                maxSampleOffset: .zero
-            )
-        }
-        // Fallback for older iOS or if shader not available
-        .rotationEffect(.degrees(-20))
-        .scaleEffect(x: 1.5)
+        self
+            .rotationEffect(.degrees(-15))
+            .scaleEffect(x: 1.3, y: 1.0)
     }
 }
 
@@ -553,7 +543,7 @@ struct ExpandedBottomView: View {
 
 // MARK: - Preview Provider
 
-#Preview("Lock Screen", as: .content, using: HeartbeatActivityAttributes(
+#Preview("Lock Screen", as: .dynamicIsland(.expanded), using: HeartbeatActivityAttributes(
     profileName: "Balanced",
     intervalSeconds: 3600
 )) {
@@ -604,3 +594,4 @@ struct ExpandedBottomView: View {
         moodReason: "Winding down"
     )
 }
+

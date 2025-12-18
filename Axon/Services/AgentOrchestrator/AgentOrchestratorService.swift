@@ -22,32 +22,32 @@ import os.log
 final class AgentOrchestratorService: ObservableObject {
     static let shared = AgentOrchestratorService()
 
-    // MARK: - Dependencies
+    // MARK: - Dependencies (internal for extension access)
 
-    private let sovereigntyService = SovereigntyService.shared
-    private let apiKeysStorage = APIKeysStorage.shared
-    private let settingsViewModel = SettingsViewModel.shared
-    private let costService = CostService.shared
-    private let liveActivityService = LiveActivityService.shared
+    let sovereigntyService = SovereigntyService.shared
+    let apiKeysStorage = APIKeysStorage.shared
+    let settingsViewModel = SettingsViewModel.shared
+    let costService = CostService.shared
+    let liveActivityService = LiveActivityService.shared
 
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Axon", category: "AgentOrchestrator")
+    let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Axon", category: "AgentOrchestrator")
 
-    // MARK: - Published State
+    // MARK: - Published State (internal(set) for extension access)
 
     /// Active jobs (not yet terminal)
-    @Published private(set) var activeJobs: [SubAgentJob] = []
+    @Published internal var activeJobs: [SubAgentJob] = []
 
     /// Completed/terminated jobs (recent history)
-    @Published private(set) var completedJobs: [SubAgentJob] = []
+    @Published internal var completedJobs: [SubAgentJob] = []
 
     /// Memory silos indexed by ID
-    @Published private(set) var silos: [String: SubAgentMemorySilo] = [:]
+    @Published internal var silos: [String: SubAgentMemorySilo] = [:]
 
     /// Model task affinities for intelligent selection
-    @Published private(set) var modelAffinities: [ModelTaskAffinity] = []
+    @Published internal var modelAffinities: [ModelTaskAffinity] = []
 
     /// Currently executing job ID (if any)
-    @Published private(set) var executingJobId: String?
+    @Published internal var executingJobId: String?
 
     // MARK: - Storage Keys
 
@@ -466,9 +466,9 @@ final class AgentOrchestratorService: ObservableObject {
         return nil
     }
 
-    // MARK: - Internal Helpers
+    // MARK: - Internal Helpers (internal for extension access)
 
-    private func updateJob(_ job: SubAgentJob) {
+    func updateJob(_ job: SubAgentJob) {
         if let index = activeJobs.firstIndex(where: { $0.id == job.id }) {
             activeJobs[index] = job
         }
@@ -480,7 +480,7 @@ final class AgentOrchestratorService: ObservableObject {
         }
     }
 
-    private func moveToCompleted(_ job: SubAgentJob) {
+    func moveToCompleted(_ job: SubAgentJob) {
         activeJobs.removeAll { $0.id == job.id }
         completedJobs.insert(job, at: 0)
 

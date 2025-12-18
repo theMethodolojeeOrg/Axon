@@ -3,7 +3,7 @@
 //  Axon
 //
 //  Shared ActivityAttributes model for sub-agent job Live Activity.
-//  This file must be added to both the main app and widget extension targets.
+//  This file must be added to the AxonLiveActivity widget extension target.
 //
 //  **Architectural Commandment #5**: The Mercury Pulse.
 //  A sub-agent in the field is a living process - the Dynamic Island
@@ -155,35 +155,3 @@ struct SubAgentProgress: Codable, Hashable {
         "\(Int(fraction * 100))%"
     }
 }
-
-// MARK: - Conversion Helpers
-
-#if os(iOS)
-extension SubAgentActivityRole {
-    /// Convert from main app's SubAgentRole
-    init(from role: SubAgentRole) {
-        switch role {
-        case .scout: self = .scout
-        case .mechanic: self = .mechanic
-        case .designer: self = .designer
-        }
-    }
-}
-
-extension SubAgentActivityState {
-    /// Convert from main app's SubAgentJobState
-    init(from state: SubAgentJobState) {
-        switch state {
-        case .proposed: self = .proposed
-        case .approved: self = .approved
-        case .running: self = .running
-        case .awaitingInput: self = .awaitingInput
-        case .completed: self = .completed
-        case .failed: self = .failed
-        case .terminated: self = .terminated
-        case .expired: self = .terminated  // Treat expired as terminated for display
-        case .rejected: self = .terminated  // Treat rejected as terminated for display
-        }
-    }
-}
-#endif

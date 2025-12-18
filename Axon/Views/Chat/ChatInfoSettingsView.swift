@@ -890,6 +890,7 @@ struct ConversationOverrides: Codable {
     var customProviderId: UUID?
     var builtInModel: String?
     var customModelId: UUID?
+    var model: String?
 
     // Human-friendly metadata (optional)
     var providerDisplayName: String?

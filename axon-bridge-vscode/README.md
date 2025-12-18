@@ -4,18 +4,19 @@ Connect VS Code to [Axon](https://axon.app) AI assistant for AI-powered coding a
 
 ## Current Release
 
-**Version 0.2.2** - Released December 17, 2025 at 09:14 PM
+**Version 0.2.3** - Released December 18, 2025 at 11:30 PM
 
-**Filename:** `axon-bridge-0.2.2_12172025_at_0914PM.vsix`
+**Filename:** `axon-bridge-0.2.3_12182025_at_1130PM.vsix`
 
 ### Changes in this release:
+- docs: bump version to 0.2.2 and update release information
 - docs: update version to 0.2.1 and add release information
 - Initial commit: Axon Bridge VS Code Extension
 - Initial commit: Axon Bridge VS Code Extension
 
 ### Download
 - [Download Latest VSIX](https://github.com/theMethodolojeeOrg/Axon/raw/main/axon-bridge-vscode/releases/latest/axon-bridge-latest.vsix)
-- [Download This Version](https://github.com/theMethodolojeeOrg/Axon/raw/main/axon-bridge-vscode/releases/2025-12-17/axon-bridge-0.2.2_12172025_at_0914PM.vsix)
+- [Download This Version](https://github.com/theMethodolojeeOrg/Axon/raw/main/axon-bridge-vscode/releases/2025-12-18/axon-bridge-0.2.3_12182025_at_1130PM.vsix)
 
 ---
 

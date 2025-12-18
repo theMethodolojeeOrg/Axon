@@ -67,7 +67,7 @@ extension AgentOrchestratorService {
         // Transition to running
         job = job.started()
         job = job.transitioning(to: .running, reason: "Execution started")
-        updateActiveJob(job)
+        updateJob(job)
 
         logger.info("Executing job \(jobId.prefix(8)) - role: \(job.role.rawValue)")
 
@@ -157,7 +157,7 @@ extension AgentOrchestratorService {
                 )
             }
 
-            updateActiveJob(job)
+            updateJob(job)
             executingJobId = nil
 
             logger.info("Job \(jobId.prefix(8)) execution completed - state: \(job.state.rawValue)")
@@ -178,7 +178,7 @@ extension AgentOrchestratorService {
                 errorMessage: error.localizedDescription
             ))
 
-            updateActiveJob(job)
+            updateJob(job)
 
             // Record failure for affinity (if we know the model)
             if let provider = job.provider ?? job.executedProvider,
@@ -761,7 +761,10 @@ extension AgentOrchestratorService {
     // MARK: - Helpers
 
     private func getAPIKey(for provider: AIProvider) throws -> String? {
-        try apiKeysStorage.getAPIKey(for: provider)
+        guard let apiProvider = provider.apiProvider else {
+            return nil
+        }
+        return try apiKeysStorage.getAPIKey(for: apiProvider)
     }
 
     private func estimateTokens(_ text: String) -> Int {
@@ -770,17 +773,18 @@ extension AgentOrchestratorService {
     }
 
     func calculateCost(provider: AIProvider, model: String, usage: SubAgentTokenUsage) -> Double {
-        // Use CostService for accurate pricing
-        let pricing = costService.getPricing(for: model)
-        let inputCost = Double(usage.inputTokens) * pricing.inputPricePerMillion / 1_000_000
-        let outputCost = Double(usage.outputTokens) * pricing.outputPricePerMillion / 1_000_000
-        return inputCost + outputCost
-    }
-
-    private func updateActiveJob(_ job: SubAgentJob) {
-        if let index = activeJobs.firstIndex(where: { $0.id == job.id }) {
-            activeJobs[index] = job
+        // Get pricing from ModelConfigurationService or PricingRegistry
+        let pricing: ModelPricing
+        if let jsonPricing = ModelConfigurationService.shared.pricing(for: model) {
+            pricing = jsonPricing
+        } else {
+            let canonical = PricingKeyResolver.canonicalKey(for: model) ?? PricingKeyResolver.defaultKey(for: provider)
+            pricing = PricingRegistry.price(for: canonical, usedContextTokens: nil, inputIsAudio: false)
         }
+
+        let inputCost = Double(usage.inputTokens) * pricing.inputPerMTokUSD / 1_000_000
+        let outputCost = Double(usage.outputTokens) * pricing.outputPerMTokUSD / 1_000_000
+        return inputCost + outputCost
     }
 }
 

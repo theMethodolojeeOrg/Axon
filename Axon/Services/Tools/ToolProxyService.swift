@@ -595,6 +595,126 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
                 """
 
+            case .spawnScout:
+                prompt += """
+
+                ### spawn_scout
+                Spawn a Scout sub-agent for read-only reconnaissance and exploration. Scouts are fast, cheap, and cannot modify anything. Results go to an isolated silo (not your main memory).
+
+                **Use for:** Exploring codebases, gathering information, mapping directory structures, finding patterns.
+
+                **Format:**
+                ```tool_request
+                {"tool": "spawn_scout", "query": "{\\"task\\":\\"Explore the authentication module and map all entry points\\",\\"context_tags\\":[\\"auth\\",\\"security\\"],\\"model_tier\\":\\"fast\\"}"}
+                ```
+
+                **Fields:**
+                - `task`: Description of what the scout should explore
+                - `context_tags`: Tags for memory injection (optional)
+                - `model_tier`: "fast" (default), "balanced", or "capable"
+
+                """
+
+            case .spawnMechanic:
+                prompt += """
+
+                ### spawn_mechanic
+                Spawn a Mechanic sub-agent with read+write capabilities. Mechanics can execute code, make file modifications, and perform actions. Results go to an isolated silo.
+
+                **Use for:** Bug fixes, code modifications, file operations, executing commands.
+
+                **Note:** Spawning a Mechanic requires user approval.
+
+                **Format:**
+                ```tool_request
+                {"tool": "spawn_mechanic", "query": "{\\"task\\":\\"Fix the null pointer exception in UserService.swift line 42\\",\\"context_tags\\":[\\"bugfix\\",\\"UserService\\"],\\"model_tier\\":\\"balanced\\"}"}
+                ```
+
+                **Fields:**
+                - `task`: Description of what the mechanic should do
+                - `context_tags`: Tags for memory injection (optional)
+                - `model_tier`: "fast", "balanced" (default), or "capable"
+
+                """
+
+            case .spawnDesigner:
+                prompt += """
+
+                ### spawn_designer
+                Spawn a Designer sub-agent for meta-reasoning and task decomposition. Designers analyze complex tasks and may recommend spawning additional agents. Results go to an isolated silo.
+
+                **Use for:** Breaking down complex tasks, architectural planning, strategy development.
+
+                **Note:** If a Designer needs a Scout or Mechanic, it will recommend this in its silo output. Only you (Axon) can spawn additional agents.
+
+                **Format:**
+                ```tool_request
+                {"tool": "spawn_designer", "query": "{\\"task\\":\\"Design the implementation strategy for adding OAuth2 support\\",\\"context_tags\\":[\\"architecture\\",\\"auth\\"],\\"model_tier\\":\\"capable\\"}"}
+                ```
+
+                **Fields:**
+                - `task`: Description of what the designer should plan
+                - `context_tags`: Tags for memory injection (optional)
+                - `model_tier`: "fast", "balanced", or "capable" (default)
+
+                """
+
+            case .queryJobStatus:
+                prompt += """
+
+                ### query_job_status
+                Query the status of active and completed sub-agent jobs. View job states, progress, and silo summaries.
+
+                **Format:**
+                ```tool_request
+                {"tool": "query_job_status", "query": "all"}
+                ```
+
+                **Query options:**
+                - `all`: List all jobs (active and recent completed)
+                - `active`: Only currently running jobs
+                - `completed`: Only completed jobs
+                - `{job_id}`: Get detailed status of a specific job
+
+                """
+
+            case .acceptJobResult:
+                prompt += """
+
+                ### accept_job_result
+                Accept and integrate a sub-agent's job result. This generates a completion attestation and optionally promotes silo contents.
+
+                **Format:**
+                ```tool_request
+                {"tool": "accept_job_result", "query": "{\\"job_id\\":\\"job-123\\",\\"reasoning\\":\\"Scout found the critical files\\",\\"quality_score\\":0.9,\\"promote_to_memory\\":false}"}
+                ```
+
+                **Fields:**
+                - `job_id`: The job to accept
+                - `reasoning`: Your reasoning for accepting
+                - `quality_score`: 0.0-1.0 rating of result quality
+                - `promote_to_memory`: Whether to promote key silo entries to your memory (default: false)
+
+                """
+
+            case .terminateJob:
+                prompt += """
+
+                ### terminate_job
+                Terminate a running sub-agent job. The job will be marked as terminated and partial results may be available in its silo.
+
+                **Note:** This tool requires user approval.
+
+                **Format:**
+                ```tool_request
+                {"tool": "terminate_job", "query": "{\\"job_id\\":\\"job-123\\",\\"reason\\":\\"Task is no longer relevant\\"}"}
+                ```
+
+                **Fields:**
+                - `job_id`: The job to terminate
+                - `reason`: Why you're terminating the job
+
+                """
             }
         }
 
@@ -2249,6 +2369,19 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             text += "```tool_request\n{\"tool\":\"openai_image_gen\",\"query\":\"{\\\"prompt\\\":\\\"A futuristic city\\\",\\\"size\\\":\\\"1792x1024\\\",\\\"quality\\\":\\\"high\\\"}\"}\n```\n"
         case .openaiDeepResearch:
             text += "```tool_request\n{\"tool\":\"openai_deep_research\",\"query\":\"Comprehensive analysis of quantum computing progress in 2025\"}\n```\n"
+        case .spawnScout:
+            text += "```tool_request\n{\"tool\":\"spawn_scout\",\"query\":\"{\\\"task\\\":\\\"Explore the auth module\\\",\\\"context_tags\\\":[\\\"auth\\\"],\\\"model_tier\\\":\\\"fast\\\"}\"}\n```\n"
+        case .spawnMechanic:
+            text += "```tool_request\n{\"tool\":\"spawn_mechanic\",\"query\":\"{\\\"task\\\":\\\"Fix the null check in UserService.swift\\\",\\\"context_tags\\\":[\\\"bugfix\\\"],\\\"model_tier\\\":\\\"balanced\\\"}\"}\n```\n"
+        case .spawnDesigner:
+            text += "```tool_request\n{\"tool\":\"spawn_designer\",\"query\":\"{\\\"task\\\":\\\"Plan OAuth2 implementation strategy\\\",\\\"context_tags\\\":[\\\"architecture\\\"],\\\"model_tier\\\":\\\"capable\\\"}\"}\n```\n"
+        case .queryJobStatus:
+            text += "```tool_request\n{\"tool\":\"query_job_status\",\"query\":\"all\"}\n```\n"
+            text += "```tool_request\n{\"tool\":\"query_job_status\",\"query\":\"job-123\"}\n```\n"
+        case .acceptJobResult:
+            text += "```tool_request\n{\"tool\":\"accept_job_result\",\"query\":\"{\\\"job_id\\\":\\\"job-123\\\",\\\"reasoning\\\":\\\"Scout found the files\\\",\\\"quality_score\\\":0.9}\"}\n```\n"
+        case .terminateJob:
+            text += "```tool_request\n{\"tool\":\"terminate_job\",\"query\":\"{\\\"job_id\\\":\\\"job-123\\\",\\\"reason\\\":\\\"No longer needed\\\"}\"}\n```\n"
         }
 
         return text
