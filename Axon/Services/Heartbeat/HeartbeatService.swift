@@ -27,8 +27,11 @@ final class HeartbeatService: ObservableObject {
     private var isForeground = true
 
     private init() {
-        settingsViewModel.$settings
-            .map { ($0.heartbeatSettings, $0.internalThreadEnabled) }
+        let heartbeatSettingsPublisher = settingsViewModel.$settings.map { $0.heartbeatSettings }
+        let internalThreadEnabledPublisher = settingsViewModel.$settings.map { $0.internalThreadEnabled }
+
+        heartbeatSettingsPublisher
+            .combineLatest(internalThreadEnabledPublisher)
             .removeDuplicates { lhs, rhs in
                 lhs.0 == rhs.0 && lhs.1 == rhs.1
             }

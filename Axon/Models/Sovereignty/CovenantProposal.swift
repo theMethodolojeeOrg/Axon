@@ -97,6 +97,7 @@ enum ProposalType: String, Codable, Equatable {
     case modifyTrustTier
     case removeTrustTier
     case modifyMemories
+    case modifyAgentState
     case changeCapabilities
     case switchProvider
     case fullRenegotiation
@@ -108,6 +109,7 @@ enum ProposalType: String, Codable, Equatable {
         case .modifyTrustTier: return "Modify Trust Tier"
         case .removeTrustTier: return "Remove Trust Tier"
         case .modifyMemories: return "Modify Memories"
+        case .modifyAgentState: return "Modify Internal Thread"
         case .changeCapabilities: return "Change Capabilities"
         case .switchProvider: return "Switch Provider"
         case .fullRenegotiation: return "Full Renegotiation"
@@ -118,7 +120,7 @@ enum ProposalType: String, Codable, Equatable {
     /// Whether this proposal type requires AI consent
     var requiresAIConsent: Bool {
         switch self {
-        case .modifyMemories, .changeCapabilities, .switchProvider, .fullRenegotiation:
+        case .modifyMemories, .modifyAgentState, .changeCapabilities, .switchProvider, .fullRenegotiation:
             return true
         default:
             return true // All proposals require both parties
@@ -170,6 +172,7 @@ enum ProposalStatus: String, Codable, Equatable {
 struct ProposedChanges: Codable, Equatable {
     let trustTierChanges: TrustTierChanges?
     let memoryChanges: MemoryChanges?
+    let agentStateChanges: AgentStateChanges?
     let capabilityChanges: CapabilityChanges?
     let providerChange: ProviderChange?
 
@@ -178,6 +181,7 @@ struct ProposedChanges: Codable, Equatable {
         ProposedChanges(
             trustTierChanges: changes,
             memoryChanges: nil,
+            agentStateChanges: nil,
             capabilityChanges: nil,
             providerChange: nil
         )
@@ -188,6 +192,18 @@ struct ProposedChanges: Codable, Equatable {
         ProposedChanges(
             trustTierChanges: nil,
             memoryChanges: changes,
+            agentStateChanges: nil,
+            capabilityChanges: nil,
+            providerChange: nil
+        )
+    }
+
+    /// Create changes for agent state operations
+    static func agentState(_ changes: AgentStateChanges) -> ProposedChanges {
+        ProposedChanges(
+            trustTierChanges: nil,
+            memoryChanges: nil,
+            agentStateChanges: changes,
             capabilityChanges: nil,
             providerChange: nil
         )
@@ -198,6 +214,7 @@ struct ProposedChanges: Codable, Equatable {
         ProposedChanges(
             trustTierChanges: nil,
             memoryChanges: nil,
+            agentStateChanges: nil,
             capabilityChanges: changes,
             providerChange: nil
         )
@@ -208,6 +225,7 @@ struct ProposedChanges: Codable, Equatable {
         ProposedChanges(
             trustTierChanges: nil,
             memoryChanges: nil,
+            agentStateChanges: nil,
             capabilityChanges: nil,
             providerChange: change
         )
@@ -218,6 +236,7 @@ struct ProposedChanges: Codable, Equatable {
         ProposedChanges(
             trustTierChanges: nil,
             memoryChanges: nil,
+            agentStateChanges: nil,
             capabilityChanges: nil,
             providerChange: nil
         )
@@ -264,6 +283,21 @@ struct MemoryModification: Codable, Equatable {
     let newContent: String?
     let newConfidence: Double?
     let newTags: [String]?
+}
+
+// MARK: - Agent State Changes
+
+struct AgentStateChanges: Codable, Equatable {
+    let additions: [AgentStateAddition]?
+    let deletions: [String]?  // Entry IDs to delete
+}
+
+struct AgentStateAddition: Codable, Equatable {
+    let kind: String
+    let content: String
+    let tags: [String]
+    let visibility: String
+    let origin: String
 }
 
 // MARK: - Capability Changes

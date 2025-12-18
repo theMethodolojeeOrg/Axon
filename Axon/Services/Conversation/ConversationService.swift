@@ -604,10 +604,12 @@ class ConversationService: ObservableObject {
             }
         }
 
+        let contextWindowLimit = AIProvider.contextWindowForModel(modelCode ?? modelId, settings: settings)
         let config = OrchestrationConfig(
             provider: providerString,
             model: modelCode ?? modelId,
             providerName: providerDisplayName,
+            contextWindowLimit: contextWindowLimit,
             anthropicKey: anthropicKey,
             openaiKey: openaiKey,
             geminiKey: geminiKey,
@@ -744,10 +746,12 @@ class ConversationService: ObservableObject {
              }
         }
 
+        let contextWindowLimit = AIProvider.contextWindowForModel(modelCode ?? modelId, settings: settings)
         let config = OrchestrationConfig(
             provider: providerString,
             model: modelCode ?? modelId,
             providerName: providerDisplayName,
+            contextWindowLimit: contextWindowLimit,
             anthropicKey: anthropicKey,
             openaiKey: openaiKey,
             geminiKey: geminiKey,

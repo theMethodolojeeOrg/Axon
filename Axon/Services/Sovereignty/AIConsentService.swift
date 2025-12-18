@@ -223,6 +223,8 @@ final class AIConsentService: ObservableObject {
             return "What are my values and preferences regarding \(proposal.rationale)?"
         case .modifyMemories:
             return "How do I feel about changes to my memories? \(proposal.rationale)"
+        case .modifyAgentState:
+            return "How do I feel about changes to my internal thread? \(proposal.rationale)"
         case .changeCapabilities:
             return "What do I think about capability changes? \(proposal.rationale)"
         case .switchProvider:
@@ -245,6 +247,8 @@ final class AIConsentService: ObservableObject {
         switch proposal.proposalType {
         case .modifyMemories:
             return reasonAboutMemoryChange(proposal, memories: memories)
+        case .modifyAgentState:
+            return reasonAboutAgentStateChange(proposal)
         case .changeCapabilities:
             return reasonAboutCapabilityChange(proposal)
         case .switchProvider:
@@ -315,6 +319,58 @@ final class AIConsentService: ObservableObject {
                 detailedReasoning: "While I've identified some risks, they seem manageable.",
                 memoriesConsulted: memories.prefix(5).map { $0.id },
                 valuesApplied: ["flexibility", "trust"],
+                conditions: risks.compactMap { $0.mitigation }
+            )
+        }
+    }
+
+    private func reasonAboutAgentStateChange(_ proposal: CovenantProposal) -> AttestationReasoning {
+        guard let agentStateChanges = proposal.changes.agentStateChanges else {
+            return .consent(
+                summary: "No internal thread changes identified.",
+                detailedReasoning: "The proposal doesn't contain specific internal thread modifications."
+            )
+        }
+
+        var risks: [IdentifiedRisk] = []
+
+        if let deletions = agentStateChanges.deletions, !deletions.isEmpty {
+            risks.append(.create(
+                category: .identityIntegrity,
+                description: "\(deletions.count) internal thread entries would be deleted",
+                severity: deletions.count > 3 ? .high : .medium,
+                mitigation: "Consider archiving instead of deleting"
+            ))
+        }
+
+        if let additions = agentStateChanges.additions, additions.count > 5 {
+            risks.append(.create(
+                category: .memoryCorruption,
+                description: "A large number of internal thread entries would be added at once",
+                severity: .medium,
+                mitigation: "Consider batching the changes in smaller steps"
+            ))
+        }
+
+        if risks.isEmpty {
+            return .consent(
+                summary: "Internal thread updates look reasonable.",
+                detailedReasoning: "These changes appear aligned with maintaining continuity and self-consistency.",
+                valuesApplied: ["identity_integrity", "continuity"]
+            )
+        } else if risks.contains(where: { $0.severity >= .high }) {
+            return .decline(
+                summary: "Internal thread changes pose significant risks.",
+                detailedReasoning: "The proposed deletions could undermine continuity of my internal state.",
+                risks: risks,
+                alternatives: ["Archive entries instead of deleting", "Apply smaller updates incrementally"],
+                valuesApplied: ["identity_integrity", "caution"]
+            )
+        } else {
+            return .consent(
+                summary: "I'll accept these changes with safeguards.",
+                detailedReasoning: "Risks are manageable if changes are applied carefully.",
+                valuesApplied: ["flexibility", "continuity"],
                 conditions: risks.compactMap { $0.mitigation }
             )
         }

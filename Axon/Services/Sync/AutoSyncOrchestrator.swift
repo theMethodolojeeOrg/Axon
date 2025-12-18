@@ -22,6 +22,9 @@ final class AutoSyncOrchestrator: ObservableObject {
     private let settingsCoordinator = SettingsSyncCoordinator.shared
     private let iCloudKV = iCloudKeyValueSync.shared
     private let cloudKit = CloudKitSyncService.shared
+    private let audioSync = AudioSyncService.shared
+    private let presenceService = DevicePresenceService.shared
+    private let stateService = SystemStateService.shared
 
     private var periodicTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
@@ -56,9 +59,25 @@ final class AutoSyncOrchestrator: ObservableObject {
         case .inactive:
             break
         case .background:
-            break
+            Task { await handleBackground() }
         @unknown default:
             break
+        }
+    }
+
+    /// Handle app going to background - save state snapshot
+    private func handleBackground() async {
+        let settings = settingsVM.settings.presenceSettings
+        guard settings.enabled && settings.saveStateOnBackground else {
+            return
+        }
+
+        do {
+            _ = try await stateService.saveOnBackground()
+            try await presenceService.updatePresenceState(.dormant)
+            print("[AutoSyncOrchestrator] 💾 Saved state snapshot on background")
+        } catch {
+            print("[AutoSyncOrchestrator] ⚠️ Failed to save background state: \(error)")
         }
     }
 
@@ -72,6 +91,32 @@ final class AutoSyncOrchestrator: ObservableObject {
     private func pullOnActive() async {
         // If the app just launched, this still runs once it becomes active.
         await performPull(reason: "appActive")
+
+        // Handle presence activation on app becoming active
+        let settings = settingsVM.settings.presenceSettings
+        if settings.enabled && settings.autoActivateOnForeground {
+            do {
+                let result = try await presenceService.requestActivation()
+                switch result {
+                case .activated(let previousDevice):
+                    if let prev = previousDevice {
+                        print("[AutoSyncOrchestrator] 📱 Activated (was on: \(prev.deviceName))")
+                    } else {
+                        print("[AutoSyncOrchestrator] 📱 Activated (first activation)")
+                    }
+                case .pendingApproval(let activeDevice):
+                    print("[AutoSyncOrchestrator] ⏳ Activation pending approval from \(activeDevice.deviceName)")
+                case .locked:
+                    print("[AutoSyncOrchestrator] 🔒 Device is locked")
+                case .requiresInvitation:
+                    print("[AutoSyncOrchestrator] 📨 Requires invitation")
+                case .denied(let reason, _):
+                    print("[AutoSyncOrchestrator] ❌ Activation denied: \(reason)")
+                }
+            } catch {
+                print("[AutoSyncOrchestrator] ⚠️ Activation failed: \(error)")
+            }
+        }
     }
 
     private func restartPeriodicIfNeeded() {
@@ -134,6 +179,43 @@ final class AutoSyncOrchestrator: ObservableObject {
             lastPullAt = Date()
             lastPullError = error.localizedDescription
             print("[AutoSyncOrchestrator] ❌ Pull failed (\(reason)): \(error)")
+        }
+
+        // 4. Sync generated audio (if enabled)
+        await syncGeneratedAudio()
+
+        // 5. Sync device presence (if enabled)
+        await syncPresence()
+    }
+
+    /// Sync device presence state with other devices.
+    private func syncPresence() async {
+        let settings = settingsVM.settings.presenceSettings
+        guard settings.enabled else {
+            return
+        }
+
+        await presenceService.syncPresenceState()
+        await stateService.cleanupOldSnapshots()
+        print("[AutoSyncOrchestrator] ✅ Presence sync completed")
+    }
+
+    /// Sync generated audio to/from CloudKit.
+    private func syncGeneratedAudio() async {
+        let settings = settingsVM.settings
+        guard settings.audioSyncSettings.syncEnabled else {
+            return
+        }
+        guard settings.deviceModeConfig.cloudSyncProvider == .iCloud else {
+            return
+        }
+
+        do {
+            try await audioSync.syncPendingAudio()
+            print("[AutoSyncOrchestrator] ✅ Audio sync completed")
+        } catch {
+            print("[AutoSyncOrchestrator] ⚠️ Audio sync failed: \(error)")
+            // Don't set lastPullError for audio sync failures - it's non-critical
         }
     }
 }

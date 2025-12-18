@@ -10,6 +10,7 @@ import MarkdownUI
 
 enum MainView {
     case chat
+    case internalThread
     case memory
     case settings
 }
@@ -169,6 +170,8 @@ struct AppContainerView: View {
                             selectedConversation = conv
                         }
                     )
+                case .internalThread:
+                    InternalThreadView()
                 case .memory:
                     MemoryView()
                 case .settings:
@@ -260,6 +263,8 @@ struct AppContainerView: View {
             return "New Chat"
         case .memory:
             return "Memory"
+        case .internalThread:
+            return "Internal Thread"
         case .settings:
             return "Settings"
         }
@@ -361,6 +366,7 @@ struct ChatContainerView: View {
     @State private var streamedContent: [String: String] = [:]
     @State private var streamedReasoning: [String: String] = [:]
     @State private var liveToolCalls: [String: [LiveToolCall]] = [:]
+    @State private var contextDebugInfos: [String: ContextDebugInfo] = [:]  // Debug info per message
     @State private var useRealStreaming: Bool = true  // Toggle for streaming vs pseudo-streaming
 
     // VS Code bridge connection banner
@@ -693,7 +699,8 @@ struct ChatContainerView: View {
                                             }
                                         },
                                         liveToolCalls: liveToolCalls[message.id],
-                                        streamingReasoning: streamedReasoning[message.id]
+                                        streamingReasoning: streamedReasoning[message.id],
+                                        contextDebugInfo: contextDebugInfos[message.id]
                                     )
                                 }
 
@@ -946,10 +953,12 @@ struct ChatContainerView: View {
         }
 
         // Build orchestration config
+        let contextWindowLimit = AIProvider.contextWindowForModel(modelId, settings: settings)
         let config = OrchestrationConfig(
             provider: providerString,
             model: modelId,
             providerName: providerDisplayName,
+            contextWindowLimit: contextWindowLimit,
             anthropicKey: anthropicKey,
             openaiKey: openaiKey,
             geminiKey: geminiKey,
@@ -1020,6 +1029,10 @@ struct ChatContainerView: View {
                     finalReasoning = completion.reasoning ?? ""
                     finalSources = completion.groundingSources
                     finalMemoryOps = completion.memoryOperations
+                    // Store context debug info if available
+                    if let debugInfo = completion.contextDebugInfo {
+                        contextDebugInfos[assistantId] = debugInfo
+                    }
 
                 case .error(let error):
                     print("[ChatContainer] Streaming error: \(error.localizedDescription)")

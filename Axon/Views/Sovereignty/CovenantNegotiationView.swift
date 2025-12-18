@@ -274,6 +274,10 @@ struct ProposalDetailCard: View {
                 MemoryChangesSection(changes: memoryChanges)
             }
 
+            if let agentStateChanges = proposal.changes.agentStateChanges {
+                AgentStateChangesSection(changes: agentStateChanges)
+            }
+
             if let providerChange = proposal.changes.providerChange {
                 ProviderChangeSection(change: providerChange)
             }
@@ -306,6 +310,8 @@ struct ProposalDetailCard: View {
             return "shield.slash"
         case .modifyMemories:
             return "brain"
+        case .modifyAgentState:
+            return "note.text"
         case .changeCapabilities:
             return "gearshape.2"
         case .switchProvider:
@@ -643,6 +649,26 @@ struct MemoryChangesSection: View {
 
             if let deletions = changes.deletions, !deletions.isEmpty {
                 Text("Deleting \(deletions.count) memory(ies)")
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+        }
+    }
+}
+
+struct AgentStateChangesSection: View {
+    let changes: AgentStateChanges
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let additions = changes.additions, !additions.isEmpty {
+                Text("Adding \(additions.count) internal thread entr\(additions.count == 1 ? "y" : "ies")")
+                    .font(.caption)
+                    .foregroundColor(.green)
+            }
+
+            if let deletions = changes.deletions, !deletions.isEmpty {
+                Text("Deleting \(deletions.count) internal thread entr\(deletions.count == 1 ? "y" : "ies")")
                     .font(.caption)
                     .foregroundColor(.red)
             }

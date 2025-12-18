@@ -25,6 +25,34 @@ struct ProviderResponse {
     }
 }
 
+/// Token estimation for context debugging
+/// Uses ~4 characters per token as a rough estimate (reasonable for English text)
+struct TokenEstimator {
+    static let charsPerToken: Double = 4.0
+
+    static func estimate(_ text: String) -> Int {
+        max(1, Int(Double(text.count) / charsPerToken))
+    }
+
+    static func estimate(_ texts: [String]) -> Int {
+        texts.reduce(0) { $0 + estimate($1) }
+    }
+}
+
+/// Result from building epistemic system prompt, including debug info
+struct EpistemicPromptResult {
+    let systemPrompt: String?
+    let usedMemories: [Memory]
+
+    // Debug info components (only populated when debug enabled)
+    let basePromptTokens: Int
+    let memoriesCount: Int
+    let memoriesTokens: Int
+    let factsCount: Int
+    let factsTokens: Int
+    let summaryTokens: Int
+}
+
 class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
     // MARK: - Services
@@ -141,13 +169,15 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             hasMemoryTool: enabledTools.contains(ToolId.createMemory.rawValue),
             userName: userName
         )
-        var (systemPrompt, usedMemories) = await buildEpistemicSystemPrompt(
+        let epistemicResult = await buildEpistemicSystemPrompt(
             base: basePrompt,
             messages: mergedMessages,
             userQuery: content,
             correlationId: correlationId,
             userName: userName
         )
+        var systemPrompt = epistemicResult.systemPrompt
+        let usedMemories = epistemicResult.usedMemories
 
         // Filter tools based on model capabilities
         // Gemini 3 supports most tools but NOT google_maps
@@ -427,16 +457,21 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             hasMemoryTool: enabledTools.contains(ToolId.createMemory.rawValue),
             userName: userName
         )
-        var (systemPrompt, usedMemories) = await buildEpistemicSystemPrompt(
+        let epistemicResult = await buildEpistemicSystemPrompt(
             base: basePrompt,
             messages: mergedMessages,
             userQuery: content,
             correlationId: correlationId,
             userName: userName
         )
+        var systemPrompt = epistemicResult.systemPrompt
+        let usedMemories = epistemicResult.usedMemories
 
         // Filter tools for model
         let filteredGeminiTools = filterToolsForModel(requestedGeminiTools, model: config.model)
+
+        // Track tool prompt tokens for debug
+        var toolPromptTokens = 0
 
         // Use tool proxy for non-Gemini providers
         let useToolProxy = hasGeminiTools && !isGeminiProvider
@@ -450,6 +485,37 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 maxToolCalls: maxToolCalls
             )
             systemPrompt = (systemPrompt ?? "") + toolPrompt
+            toolPromptTokens = TokenEstimator.estimate(toolPrompt)
+        }
+
+        // Check if chat debug is enabled
+        let chatDebugEnabled = await MainActor.run {
+            SettingsViewModel.shared.settings.toolSettings.chatDebugEnabled
+        }
+
+        // Build context debug info if enabled
+        var contextDebugInfo: ContextDebugInfo? = nil
+        if chatDebugEnabled {
+            let messagesTokens = mergedMessages
+                .filter { $0.role != .system }
+                .reduce(0) { $0 + TokenEstimator.estimate($1.content) }
+
+            contextDebugInfo = ContextDebugInfo(
+                systemPromptTokens: epistemicResult.basePromptTokens,
+                memoriesCount: epistemicResult.memoriesCount,
+                memoriesTokens: epistemicResult.memoriesTokens,
+                factsCount: epistemicResult.factsCount,
+                factsTokens: epistemicResult.factsTokens,
+                summaryTokens: epistemicResult.summaryTokens,
+                toolPromptTokens: toolPromptTokens,
+                messagesTokens: messagesTokens,
+                contextWindowLimit: config.contextWindowLimit,
+                modelName: config.model
+            )
+
+            // Log debug info
+            print("[ContextDebug] Total: \(contextDebugInfo!.totalTokens) / \(config.contextWindowLimit) (\(Int(contextDebugInfo!.usagePercentage * 100))%)")
+            print("[ContextDebug] Breakdown - System: \(epistemicResult.basePromptTokens), Memories: \(epistemicResult.memoriesTokens) (\(epistemicResult.memoriesCount)), Facts: \(epistemicResult.factsTokens) (\(epistemicResult.factsCount)), Summary: \(epistemicResult.summaryTokens), Tools: \(toolPromptTokens), Messages: \(messagesTokens)")
         }
 
         // Check if provider supports streaming
@@ -554,7 +620,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             }
         }
 
-        // Emit final completion
+        // Emit final completion with debug info
         continuation.yield(.completion(StreamingCompletion(
             fullContent: accumulatedContent,
             reasoning: accumulatedReasoning.isEmpty ? nil : accumulatedReasoning,
@@ -563,7 +629,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             memoryOperations: collectedMemoryOperations,
             tokens: nil,
             modelName: config.model,
-            providerName: config.providerName
+            providerName: config.providerName,
+            contextDebugInfo: contextDebugInfo
         )))
     }
 
@@ -1303,7 +1370,15 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         userQuery: String,
         correlationId: String,
         userName: String? = nil
-    ) async -> (String?, [Memory]) {
+    ) async -> EpistemicPromptResult {
+        // Track debug info
+        let basePromptTokens = TokenEstimator.estimate(base)
+        var memoriesCount = 0
+        var memoriesTokens = 0
+        var factsCount = 0
+        var factsTokens = 0
+        var summaryTokens = 0
+
         // Get system messages
         let systemMessages = messages
             .filter { $0.role == .system }
@@ -1318,6 +1393,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
         // Inject salient memories if available
         var usedMemories: [Memory] = []
+        var memoryInjectionBlock = ""
         if !memories.isEmpty {
             let injection = await salienceService.injectSalient(
                 conversation: messages,
@@ -1328,8 +1404,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             )
 
             if !injection.isEmpty {
-                promptParts.append(injection.injectionBlock)
+                memoryInjectionBlock = injection.injectionBlock
+                promptParts.append(memoryInjectionBlock)
                 usedMemories = injection.selectedMemories.map { $0.memory }
+                memoriesCount = usedMemories.count
+                memoriesTokens = TokenEstimator.estimate(memoryInjectionBlock)
             }
         }
 
@@ -1343,7 +1422,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         if let summary = recentSummary,
            summary.conversationId != currentConversationId {
             // Only inject if this is a different conversation than the summarized one
-            promptParts.append(summary.formattedForInjection())
+            let summaryBlock = summary.formattedForInjection()
+            promptParts.append(summaryBlock)
+            summaryTokens += TokenEstimator.estimate(summaryBlock)
             print("[Epistemic] Injected recent conversation summary from '\(summary.title)'")
         }
 
@@ -1362,8 +1443,17 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 }
 
                 promptParts.append(contextBlock)
+                factsCount = searchResults.count
+                factsTokens = TokenEstimator.estimate(contextBlock)
                 print("[Epistemic] Injected \(searchResults.count) relevant conversation results for query")
             }
+        }
+
+        // 3. Inject device presence context if enabled
+        let presenceContext = await getPresenceContext()
+        if let presenceBlock = presenceContext {
+            promptParts.append(presenceBlock)
+            print("[Epistemic] Injected device presence context")
         }
 
         let combined = promptParts
@@ -1371,7 +1461,16 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             .filter { !$0.isEmpty }
             .joined(separator: "\n\n")
 
-        return (combined.isEmpty ? nil : combined, usedMemories)
+        return EpistemicPromptResult(
+            systemPrompt: combined.isEmpty ? nil : combined,
+            usedMemories: usedMemories,
+            basePromptTokens: basePromptTokens,
+            memoriesCount: memoriesCount,
+            memoriesTokens: memoriesTokens,
+            factsCount: factsCount,
+            factsTokens: factsTokens,
+            summaryTokens: summaryTokens
+        )
     }
 
     /// Get user's display name for personalization
@@ -1390,6 +1489,17 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     @MainActor
     private func getConversationSearchService() -> ConversationSearchService {
         return ConversationSearchService.shared
+    }
+
+    /// Get device presence context for prompt injection
+    @MainActor
+    private func getPresenceContext() -> String? {
+        let settings = SettingsViewModel.shared.settings.presenceSettings
+        guard settings.enabled && settings.injectPresenceContext else {
+            return nil
+        }
+
+        return DevicePresenceService.shared.generatePresencePromptContext()
     }
 
     /// Load memories for injection (async wrapper for MemoryService)

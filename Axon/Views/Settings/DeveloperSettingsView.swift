@@ -185,6 +185,62 @@ struct DeveloperSettingsView: View {
                 .cornerRadius(8)
             }
 
+            // Chat Debug Section
+            SettingsSection(title: "Chat Debug") {
+                VStack(spacing: 0) {
+                    // Chat Debug Toggle
+                    HStack {
+                        Image(systemName: viewModel.settings.toolSettings.chatDebugEnabled ? "ant.fill" : "ant")
+                            .foregroundColor(viewModel.settings.toolSettings.chatDebugEnabled ? AppColors.signalMercury : AppColors.textSecondary)
+                            .frame(width: 32)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Context Debug Mode")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Text(viewModel.settings.toolSettings.chatDebugEnabled ? "Showing token breakdown in chat" : "Show detailed context info per message")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(viewModel.settings.toolSettings.chatDebugEnabled ? AppColors.signalMercury : AppColors.textTertiary)
+                        }
+
+                        Spacer()
+
+                        Toggle("", isOn: Binding(
+                            get: { viewModel.settings.toolSettings.chatDebugEnabled },
+                            set: { newValue in
+                                viewModel.settings.toolSettings.chatDebugEnabled = newValue
+                                try? SettingsStorage.shared.saveSettings(viewModel.settings)
+                            }
+                        ))
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                        .tint(AppColors.signalMercury)
+                    }
+                    .padding()
+
+                    Divider()
+                        .background(AppColors.divider)
+
+                    // Info about what debug mode shows
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("When enabled, each assistant message shows:")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            DebugInfoRow(icon: "doc.text", text: "System prompt size")
+                            DebugInfoRow(icon: "brain.head.profile", text: "Injected memories count & tokens")
+                            DebugInfoRow(icon: "clock.arrow.circlepath", text: "Conversation summary tokens")
+                            DebugInfoRow(icon: "wrench.and.screwdriver", text: "Tool prompt tokens")
+                            DebugInfoRow(icon: "sum", text: "Total context vs model limit")
+                        }
+                    }
+                    .padding()
+                }
+                .cornerRadius(8)
+            }
+
             // What Gets Reset Section
             SettingsSection(title: "What Happens") {
                 VStack(alignment: .leading, spacing: 12) {
@@ -421,6 +477,26 @@ struct ResetInfoRow: View {
             Text(text)
                 .font(AppTypography.bodySmall())
                 .foregroundColor(AppColors.textSecondary)
+
+            Spacer()
+        }
+    }
+}
+
+struct DebugInfoRow: View {
+    let icon: String
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 12))
+                .foregroundColor(AppColors.signalMercury)
+                .frame(width: 16)
+
+            Text(text)
+                .font(AppTypography.labelSmall())
+                .foregroundColor(AppColors.textTertiary)
 
             Spacer()
         }

@@ -413,7 +413,7 @@ final class ToolApprovalService: ObservableObject {
 
         case .failed(let error):
             state = .awaitingApproval(pending)
-            logger.error("Biometric authentication failed: \(error.localizedDescription ?? "Unknown")")
+            logger.error("Biometric authentication failed: \(error.localizedDescription)")
         }
     }
 
@@ -490,7 +490,7 @@ final class ToolApprovalService: ObservableObject {
 
         case .failed(let error):
             state = .awaitingApproval(pending)
-            logger.error("Biometric authentication failed: \(error.localizedDescription ?? "Unknown")")
+            logger.error("Biometric authentication failed: \(error.localizedDescription)")
         }
     }
 

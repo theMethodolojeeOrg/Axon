@@ -318,6 +318,14 @@ struct SidebarView: View {
                 }
 
                 NavigationButton(
+                    icon: "note.text",
+                    title: "Thread",
+                    isSelected: currentView == .internalThread
+                ) {
+                    onNavigate(.internalThread)
+                }
+
+                NavigationButton(
                     icon: "brain.fill",
                     title: "Memory",
                     isSelected: currentView == .memory

@@ -327,7 +327,235 @@ struct MemorySettingsView: View {
                 .background(AppColors.substrateSecondary)
                 .cornerRadius(8)
             }
+
+            // Internal Thread
+            SettingsSection(title: "Internal Thread") {
+                VStack(spacing: 16) {
+                    Toggle(isOn: Binding(
+                        get: { viewModel.settings.internalThreadEnabled },
+                        set: { newValue in
+                            Task {
+                                await viewModel.updateSetting(\.internalThreadEnabled, newValue)
+                            }
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Enable Internal Thread")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Text("Allow the agent to persist its internal thread across sessions")
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                    }
+                    .tint(AppColors.signalMercury)
+
+                    Divider()
+                        .background(AppColors.divider)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Retention")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Spacer()
+
+                            Text(retentionLabel(days: viewModel.settings.internalThreadRetentionDays))
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.signalMercury)
+                        }
+
+                        Slider(
+                            value: Binding(
+                                get: { Double(viewModel.settings.internalThreadRetentionDays) },
+                                set: { newValue in
+                                    Task {
+                                        await viewModel.updateSetting(\.internalThreadRetentionDays, Int(newValue))
+                                    }
+                                }
+                            ),
+                            in: 0...365,
+                            step: 1
+                        )
+                        .tint(AppColors.signalMercury)
+
+                        Text("0 means keep indefinitely.")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+                }
+                .padding()
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
+            }
+
+            // Heartbeat
+            SettingsSection(title: "Heartbeat") {
+                VStack(spacing: 16) {
+                    Toggle(isOn: Binding(
+                        get: { viewModel.settings.heartbeatSettings.enabled },
+                        set: { newValue in
+                            Task {
+                                var heartbeat = viewModel.settings.heartbeatSettings
+                                heartbeat.enabled = newValue
+                                await viewModel.updateSetting(\.heartbeatSettings, heartbeat)
+                            }
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Enable Heartbeat")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Text("Run periodic internal check-ins and update the internal thread")
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                    }
+                    .tint(AppColors.signalMercury)
+
+                    if viewModel.settings.heartbeatSettings.enabled {
+                        Divider()
+                            .background(AppColors.divider)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Interval")
+                                    .font(AppTypography.bodyMedium())
+                                    .foregroundColor(AppColors.textPrimary)
+
+                                Spacer()
+
+                                Text(intervalLabel(seconds: viewModel.settings.heartbeatSettings.intervalSeconds))
+                                    .font(AppTypography.bodyMedium(.medium))
+                                    .foregroundColor(AppColors.signalMercury)
+                            }
+
+                            Slider(
+                                value: Binding(
+                                    get: { Double(viewModel.settings.heartbeatSettings.intervalSeconds) },
+                                    set: { newValue in
+                                        Task {
+                                            var heartbeat = viewModel.settings.heartbeatSettings
+                                            heartbeat.intervalSeconds = Int(newValue)
+                                            await viewModel.updateSetting(\.heartbeatSettings, heartbeat)
+                                        }
+                                    }
+                                ),
+                                in: 300...86400,
+                                step: 300
+                            )
+                            .tint(AppColors.signalMercury)
+                        }
+
+                        Divider()
+                            .background(AppColors.divider)
+
+                        HStack {
+                            Text("Delivery Profile")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Spacer()
+
+                            Picker("", selection: Binding(
+                                get: { viewModel.settings.heartbeatSettings.deliveryProfileId },
+                                set: { newValue in
+                                    Task {
+                                        var heartbeat = viewModel.settings.heartbeatSettings
+                                        heartbeat.deliveryProfileId = newValue
+                                        await viewModel.updateSetting(\.heartbeatSettings, heartbeat)
+                                    }
+                                }
+                            )) {
+                                ForEach(viewModel.settings.heartbeatSettings.deliveryProfiles, id: \.id) { profile in
+                                    Text(profile.name).tag(profile.id)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                        }
+
+                        Divider()
+                            .background(AppColors.divider)
+
+                        Toggle(isOn: Binding(
+                            get: { viewModel.settings.heartbeatSettings.allowNotifications },
+                            set: { newValue in
+                                Task {
+                                    var heartbeat = viewModel.settings.heartbeatSettings
+                                    heartbeat.allowNotifications = newValue
+                                    await viewModel.updateSetting(\.heartbeatSettings, heartbeat)
+                                }
+                            }
+                        )) {
+                            Text("Allow Heartbeat Notifications")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
+                        }
+                        .tint(AppColors.signalMercury)
+
+                        Toggle(isOn: Binding(
+                            get: { viewModel.settings.heartbeatSettings.allowBackground },
+                            set: { newValue in
+                                Task {
+                                    var heartbeat = viewModel.settings.heartbeatSettings
+                                    heartbeat.allowBackground = newValue
+                                    await viewModel.updateSetting(\.heartbeatSettings, heartbeat)
+                                }
+                            }
+                        )) {
+                            Text("Allow Background Heartbeat")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
+                        }
+                        .tint(AppColors.signalMercury)
+                    }
+                }
+                .padding()
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
+            }
+
+            // Notifications
+            SettingsSection(title: "Notifications") {
+                Toggle(isOn: Binding(
+                    get: { viewModel.settings.notificationsEnabled },
+                    set: { newValue in
+                        Task {
+                            await viewModel.updateSetting(\.notificationsEnabled, newValue)
+                        }
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Enable Notifications")
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Text("Allow the agent to send local notifications")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+                .tint(AppColors.signalMercury)
+                .padding()
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
+            }
         }
+    }
+
+    private func retentionLabel(days: Int) -> String {
+        days == 0 ? "Never" : "\(days)d"
+    }
+
+    private func intervalLabel(seconds: Int) -> String {
+        if seconds < 3600 {
+            return "\(max(1, seconds / 60))m"
+        }
+        let hours = Double(seconds) / 3600.0
+        return hours < 24 ? String(format: "%.1fh", hours) : String(format: "%.0fh", hours)
     }
 }
 

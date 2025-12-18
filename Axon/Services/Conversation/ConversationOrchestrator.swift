@@ -29,6 +29,7 @@ struct OrchestrationConfig {
     let provider: String
     let model: String
     let providerName: String
+    let contextWindowLimit: Int  // Model's context window size
     // API Keys
     let anthropicKey: String?
     let openaiKey: String?

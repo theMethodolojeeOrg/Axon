@@ -189,6 +189,68 @@ struct StreamingToolSource: Codable, Sendable, Equatable, Identifiable {
     }
 }
 
+// MARK: - Context Debug Info
+
+/// Detailed breakdown of context window usage for debugging
+struct ContextDebugInfo: Sendable, Codable {
+    /// Base system prompt token estimate
+    let systemPromptTokens: Int
+
+    /// Injected memories info
+    let memoriesCount: Int
+    let memoriesTokens: Int
+
+    /// Grounded facts from epistemic engine
+    let factsCount: Int
+    let factsTokens: Int
+
+    /// Conversation summary tokens
+    let summaryTokens: Int
+
+    /// Tool prompt tokens (when tools are enabled)
+    let toolPromptTokens: Int
+
+    /// Visible conversation messages tokens
+    let messagesTokens: Int
+
+    /// Total estimated tokens being sent
+    var totalTokens: Int {
+        systemPromptTokens + memoriesTokens + factsTokens + summaryTokens + toolPromptTokens + messagesTokens
+    }
+
+    /// Model's context window limit
+    let contextWindowLimit: Int
+
+    /// Model name for display
+    let modelName: String
+
+    /// Percentage of context used
+    var usagePercentage: Double {
+        guard contextWindowLimit > 0 else { return 0 }
+        return min(Double(totalTokens) / Double(contextWindowLimit), 1.0)
+    }
+
+    /// Whether we're approaching or exceeding the limit
+    var isNearLimit: Bool { usagePercentage > 0.8 }
+    var isOverLimit: Bool { totalTokens > contextWindowLimit }
+
+    /// Create empty debug info (when debug is disabled)
+    static var empty: ContextDebugInfo {
+        ContextDebugInfo(
+            systemPromptTokens: 0,
+            memoriesCount: 0,
+            memoriesTokens: 0,
+            factsCount: 0,
+            factsTokens: 0,
+            summaryTokens: 0,
+            toolPromptTokens: 0,
+            messagesTokens: 0,
+            contextWindowLimit: 0,
+            modelName: ""
+        )
+    }
+}
+
 // MARK: - Streaming Completion
 
 /// Final streaming completion with all metadata
@@ -201,6 +263,29 @@ struct StreamingCompletion: Sendable {
     let tokens: TokenUsage?
     let modelName: String?
     let providerName: String?
+    let contextDebugInfo: ContextDebugInfo?
+
+    init(
+        fullContent: String,
+        reasoning: String?,
+        toolCalls: [LiveToolCall],
+        groundingSources: [MessageGroundingSource],
+        memoryOperations: [MessageMemoryOperation],
+        tokens: TokenUsage?,
+        modelName: String?,
+        providerName: String?,
+        contextDebugInfo: ContextDebugInfo? = nil
+    ) {
+        self.fullContent = fullContent
+        self.reasoning = reasoning
+        self.toolCalls = toolCalls
+        self.groundingSources = groundingSources
+        self.memoryOperations = memoryOperations
+        self.tokens = tokens
+        self.modelName = modelName
+        self.providerName = providerName
+        self.contextDebugInfo = contextDebugInfo
+    }
 }
 
 // MARK: - Streaming Errors

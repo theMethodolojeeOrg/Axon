@@ -11,11 +11,13 @@ import Combine
 enum TTSAudioFormat: String {
     case mp3 = "mp3"
     case wav = "wav"
+    case m4a = "m4a"
 
     var fileTypeHint: String {
         switch self {
         case .mp3: return AVFileType.mp3.rawValue
         case .wav: return AVFileType.wav.rawValue
+        case .m4a: return AVFileType.m4a.rawValue
         }
     }
 }
@@ -108,9 +110,24 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
     func hasGeneratedAudio(for messageId: String, settings: AppSettings? = nil) -> Bool {
         let key = cacheKey(for: messageId, settings: settings)
         if audioCache[key] != nil { return true }
-        // Check both mp3 and wav formats on disk
+        // Check all formats on disk (mp3, wav, m4a)
         return FileManager.default.fileExists(atPath: audioFileURL(for: key, format: .mp3).path) ||
-               FileManager.default.fileExists(atPath: audioFileURL(for: key, format: .wav).path)
+               FileManager.default.fileExists(atPath: audioFileURL(for: key, format: .wav).path) ||
+               FileManager.default.fileExists(atPath: audioFileURL(for: key, format: .m4a).path)
+    }
+
+    /// Check if audio is available (locally or remotely via CloudKit).
+    /// This is an async version that checks the sync service.
+    func hasAudioAvailable(for messageId: String, settings: AppSettings) async -> Bool {
+        let key = cacheKey(for: messageId, settings: settings)
+
+        // Check local first
+        if hasGeneratedAudio(for: messageId, settings: settings) {
+            return true
+        }
+
+        // Check remote via AudioSyncService
+        return await AudioSyncService.shared.hasRemoteAudio(for: key)
     }
 
     private func cacheKey(for messageId: String, settings: AppSettings?) -> String {
@@ -147,14 +164,68 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
             return (data, format)
         }
 
-        // Check disk - try both formats
-        for format in [TTSAudioFormat.mp3, .wav] {
+        // Check disk - try all formats (mp3, wav, m4a)
+        for format in [TTSAudioFormat.mp3, .wav, .m4a] {
             if let data = loadAudioFromDisk(for: key, format: format) {
                 // Populate memory cache
                 audioCache[key] = data
                 audioFormatCache[key] = format
                 return (data, format)
             }
+        }
+
+        return nil
+    }
+
+    /// Try to fetch audio from CloudKit if available remotely but not locally.
+    /// Returns the audio data and format if found, nil otherwise.
+    private func fetchRemoteAudio(for messageId: String, settings: AppSettings) async -> (data: Data, format: TTSAudioFormat)? {
+        let key = cacheKey(for: messageId, settings: settings)
+
+        do {
+            if let audioData = try await AudioSyncService.shared.fetchRemoteAudio(for: key) {
+                // Determine format from the metadata (check Core Data for the format)
+                // For now, try to detect format from data or default to mp3
+                let format: TTSAudioFormat = detectAudioFormat(from: audioData) ?? .mp3
+
+                // Cache locally
+                audioCache[key] = audioData
+                audioFormatCache[key] = format
+                saveAudioToDisk(audioData, for: key, format: format)
+
+                print("[TTSPlaybackService] Fetched remote audio for: \(key)")
+                return (audioData, format)
+            }
+        } catch {
+            print("[TTSPlaybackService] Failed to fetch remote audio: \(error)")
+        }
+
+        return nil
+    }
+
+    /// Detect audio format from data by checking file signatures.
+    private func detectAudioFormat(from data: Data) -> TTSAudioFormat? {
+        guard data.count >= 12 else { return nil }
+
+        let bytes = [UInt8](data.prefix(12))
+
+        // Check for MP3 (ID3 tag or frame sync)
+        if bytes[0] == 0x49 && bytes[1] == 0x44 && bytes[2] == 0x33 { // "ID3"
+            return .mp3
+        }
+        if bytes[0] == 0xFF && (bytes[1] & 0xE0) == 0xE0 { // Frame sync
+            return .mp3
+        }
+
+        // Check for WAV ("RIFF" + "WAVE")
+        if bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
+           bytes[8] == 0x57 && bytes[9] == 0x41 && bytes[10] == 0x56 && bytes[11] == 0x45 {
+            return .wav
+        }
+
+        // Check for M4A/AAC ("ftyp" at offset 4)
+        if bytes[4] == 0x66 && bytes[5] == 0x74 && bytes[6] == 0x79 && bytes[7] == 0x70 {
+            return .m4a
         }
 
         return nil
@@ -211,7 +282,7 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         }
     }
 
-    func speak(text: String, settings: AppSettings, messageId: String? = nil) async throws {
+    func speak(text: String, settings: AppSettings, messageId: String? = nil, conversationId: String? = nil) async throws {
         print("[TTSPlaybackService] Starting TTS playback")
         print("[TTSPlaybackService] Text length (raw): \(text.count) characters")
         print("[TTSPlaybackService] Provider: \(settings.ttsSettings.provider.displayName)")
@@ -230,26 +301,77 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         generationToken = token
 
         do {
-            let audioData: Data
-            let audioFormat: TTSAudioFormat
+            var audioData: Data
+            var audioFormat: TTSAudioFormat
 
-            switch settings.ttsSettings.provider {
-            case .elevenlabs:
-                audioData = try await generateElevenLabsAudio(text: processedText, settings: settings)
-                audioFormat = .mp3
-
-            case .gemini:
-                audioData = try await generateGeminiAudio(text: processedText, settings: settings)
-                audioFormat = .wav  // Gemini returns WAV format (24kHz)
+            // Check if we have this audio cached locally first
+            if let messageId = messageId, let cached = getCachedAudio(for: messageId, settings: settings) {
+                print("[TTSPlaybackService] Found locally cached audio")
+                audioData = cached.data
+                audioFormat = cached.format
             }
+            // Check if audio is available remotely (CloudKit)
+            else if let messageId = messageId,
+                    settings.audioSyncSettings.syncEnabled,
+                    let remote = await fetchRemoteAudio(for: messageId, settings: settings) {
+                print("[TTSPlaybackService] Found remotely synced audio from CloudKit")
+                audioData = remote.data
+                audioFormat = remote.format
+            }
+            // Generate new audio
+            else {
+                switch settings.ttsSettings.provider {
+                case .elevenlabs:
+                    audioData = try await generateElevenLabsAudio(text: processedText, settings: settings)
+                    audioFormat = .mp3
 
-            print("[TTSPlaybackService] Received audio data: \(audioData.count) bytes (format: \(audioFormat.rawValue))")
+                case .gemini:
+                    audioData = try await generateGeminiAudio(text: processedText, settings: settings)
+                    audioFormat = .wav  // Gemini returns WAV format (24kHz)
+                }
 
-            // Cache the audio if we have a message ID.
-            // Cache key includes relevant preprocessing toggles so cache stays correct
-            // when the user flips settings.
-            if let messageId = messageId {
-                cacheAudio(audioData, for: messageId, format: audioFormat, settings: settings)
+                print("[TTSPlaybackService] Received audio data: \(audioData.count) bytes (format: \(audioFormat.rawValue))")
+
+                // Cache the audio if we have a message ID.
+                // Cache key includes relevant preprocessing toggles so cache stays correct
+                // when the user flips settings.
+                if let messageId = messageId {
+                    cacheAudio(audioData, for: messageId, format: audioFormat, settings: settings)
+
+                    // Save metadata to Core Data for cross-device sync
+                    if settings.audioSyncSettings.syncEnabled {
+                        let key = cacheKey(for: messageId, settings: settings)
+                        let voiceId: String?
+                        let voiceName: String?
+
+                        switch settings.ttsSettings.provider {
+                        case .elevenlabs:
+                            voiceId = settings.ttsSettings.selectedVoiceId
+                            voiceName = settings.ttsSettings.selectedVoiceName
+                        case .gemini:
+                            voiceId = settings.ttsSettings.geminiVoice.rawValue
+                            voiceName = settings.ttsSettings.geminiVoice.displayName
+                        }
+
+                        Task {
+                            do {
+                                try await AudioSyncService.shared.saveAudioMetadata(
+                                    messageId: messageId,
+                                    conversationId: conversationId ?? "",
+                                    provider: settings.ttsSettings.provider.rawValue,
+                                    voiceId: voiceId,
+                                    voiceName: voiceName,
+                                    format: audioFormat.rawValue,
+                                    cacheKey: key,
+                                    audioData: audioData,
+                                    duration: nil // Duration is calculated during playback
+                                )
+                            } catch {
+                                print("[TTSPlaybackService] Failed to save audio metadata: \(error)")
+                            }
+                        }
+                    }
+                }
             }
 
             // Switch UI from generating to playback

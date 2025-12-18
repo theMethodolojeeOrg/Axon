@@ -301,6 +301,9 @@ struct AssistantMessageView: View {
     /// Streaming reasoning content (nil when not streaming)
     var streamingReasoning: String? = nil
 
+    /// Context debug info (only populated when debug mode is enabled)
+    var contextDebugInfo: ContextDebugInfo? = nil
+
     @ObservedObject private var ttsService = TTSPlaybackService.shared
 
     private var textToRender: String {
@@ -370,6 +373,13 @@ struct AssistantMessageView: View {
             // Only show when not streaming
             if !isStreaming, let memOps = message.memoryOperations, !memOps.isEmpty {
                 MemoryOperationsView(operations: memOps)
+                    .padding(.top, 12)
+            }
+
+            // Context debug info (developer feature)
+            // Only show when not streaming and debug info is available
+            if !isStreaming, let debugInfo = contextDebugInfo {
+                ContextDebugView(debugInfo: debugInfo)
                     .padding(.top, 12)
             }
 

@@ -123,11 +123,16 @@ enum ActionCategory: String, Codable, CaseIterable, Equatable {
     case toolInvocation = "tool_invocation"
     case shellCommand = "shell_command"
     case memoryRecall = "memory_recall"
+    case agentStateRead = "agent_state_read"
+    case userNotify = "user_notify"
 
     // User → AI (require AI consent)
     case memoryAdd = "memory_add"
     case memoryModify = "memory_modify"
     case memoryDelete = "memory_delete"
+    case agentStateWrite = "agent_state_write"
+    case agentStateDelete = "agent_state_delete"
+    case heartbeatControl = "heartbeat_control"
     case capabilityEnable = "capability_enable"
     case capabilityDisable = "capability_disable"
     case providerSwitch = "provider_switch"
@@ -138,7 +143,8 @@ enum ActionCategory: String, Codable, CaseIterable, Equatable {
     var affectsWorld: Bool {
         switch self {
         case .fileRead, .fileWrite, .fileDelete,
-             .networkRequest, .toolInvocation, .shellCommand, .memoryRecall:
+             .networkRequest, .toolInvocation, .shellCommand, .memoryRecall,
+             .agentStateRead, .userNotify:
             return true
         default:
             return false
@@ -149,6 +155,7 @@ enum ActionCategory: String, Codable, CaseIterable, Equatable {
     var affectsAIIdentity: Bool {
         switch self {
         case .memoryAdd, .memoryModify, .memoryDelete,
+             .agentStateWrite, .agentStateDelete, .heartbeatControl,
              .capabilityEnable, .capabilityDisable,
              .providerSwitch, .systemPromptChange, .personalityAdjust:
             return true
@@ -167,9 +174,14 @@ enum ActionCategory: String, Codable, CaseIterable, Equatable {
         case .toolInvocation: return "Tool Invocation"
         case .shellCommand: return "Shell Commands"
         case .memoryRecall: return "Memory Recall"
+        case .agentStateRead: return "Read Internal Thread"
+        case .userNotify: return "User Notifications"
         case .memoryAdd: return "Add Memories"
         case .memoryModify: return "Modify Memories"
         case .memoryDelete: return "Delete Memories"
+        case .agentStateWrite: return "Write Internal Thread"
+        case .agentStateDelete: return "Delete Internal Thread"
+        case .heartbeatControl: return "Heartbeat Control"
         case .capabilityEnable: return "Enable Capabilities"
         case .capabilityDisable: return "Disable Capabilities"
         case .providerSwitch: return "Switch Provider"
@@ -188,9 +200,14 @@ enum ActionCategory: String, Codable, CaseIterable, Equatable {
         case .toolInvocation: return "wrench.and.screwdriver"
         case .shellCommand: return "terminal"
         case .memoryRecall: return "brain"
+        case .agentStateRead: return "doc.text.magnifyingglass"
+        case .userNotify: return "bell.badge"
         case .memoryAdd: return "plus.circle"
         case .memoryModify: return "pencil.circle"
         case .memoryDelete: return "minus.circle"
+        case .agentStateWrite: return "square.and.pencil"
+        case .agentStateDelete: return "trash"
+        case .heartbeatControl: return "heart.circle"
         case .capabilityEnable: return "checkmark.circle"
         case .capabilityDisable: return "xmark.circle"
         case .providerSwitch: return "arrow.triangle.2.circlepath"

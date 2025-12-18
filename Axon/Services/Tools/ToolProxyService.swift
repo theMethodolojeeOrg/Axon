@@ -158,6 +158,65 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
                 """
 
+            case .agentStateAppend:
+                prompt += """
+
+                ### agent_state_append
+                Append a new entry to the internal thread (persistent agent state). Use to record plans, reflections, counters, or heartbeat snapshots.
+
+                **Format:**
+                ```tool_request
+                {"tool": "agent_state_append", "query": "{\"kind\":\"note\",\"content\":\"...\",\"tags\":[\"tag1\",\"tag2\"],\"visibility\":\"userVisible\"}"}
+                ```
+
+                **Fields:**
+                - `kind`: note | plan | self_reflection | heartbeat_snapshot | counter | system
+                - `content`: markdown text
+                - `tags`: array of strings (optional)
+                - `visibility`: userVisible | aiOnly (optional, default: userVisible)
+
+                """
+
+            case .agentStateQuery:
+                prompt += """
+
+                ### agent_state_query
+                Query internal thread entries. Use to retrieve recent state or search by kind/tags.
+
+                **Format:**
+                ```tool_request
+                {"tool": "agent_state_query", "query": "{\"limit\":5,\"kind\":\"plan\",\"tags\":[\"roadmap\"],\"search\":\"ios\"}"}
+                ```
+
+                **Fields (optional):**
+                - `limit`: number of entries to return
+                - `kind`: filter by kind
+                - `tags`: filter by tags (array)
+                - `search`: search text in content/tags
+                - `include_ai_only`: true to include aiOnly entries
+
+                """
+
+            case .agentStateClear:
+                prompt += """
+
+                ### agent_state_clear
+                Clear internal thread entries. Use with care.
+
+                **Format:**
+                ```tool_request
+                {"tool": "agent_state_clear", "query": "{\"all\":true}"}
+                ```
+
+                **Fields (optional):**
+                - `all`: true to delete all entries
+                - `ids`: array of entry ids to delete
+                - `kind`: delete entries of a specific kind
+                - `tags`: delete entries matching tags
+                - `include_ai_only`: true to include aiOnly entries
+
+                """
+
             case .conversationSearch:
                 prompt += """
 
@@ -191,6 +250,91 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
                 Example (flat format): ```tool_request
                 {"tool": "reflect_on_conversation", "show_model_timeline": true, "show_task_distribution": true, "show_memory_usage": true}
+                ```
+
+                """
+
+            case .heartbeatConfigure:
+                prompt += """
+
+                ### heartbeat_configure
+                Configure the heartbeat schedule and behavior.
+
+                **Format:**
+                ```tool_request
+                {"tool": "heartbeat_configure", "query": "{\"enabled\":true,\"interval_seconds\":3600,\"allow_background\":false,\"allow_notifications\":true,\"delivery_profile_id\":\"balanced\"}"}
+                ```
+
+                **Fields (optional):**
+                - `enabled`: true/false
+                - `interval_seconds`: seconds between heartbeats
+                - `allow_background`: run in background when possible
+                - `allow_notifications`: allow heartbeat-triggered notifications
+                - `delivery_profile_id`: profile id
+                - `max_tokens_budget`: token budget for heartbeat
+                - `max_tool_calls`: max tool calls for heartbeat
+                - `quiet_hours`: TimeRestrictions object (`allowedHoursStart`, `allowedHoursEnd`, `allowedDays`, `timezone`)
+
+                """
+
+            case .heartbeatRunOnce:
+                prompt += """
+
+                ### heartbeat_run_once
+                Run a heartbeat immediately.
+
+                Example: ```tool_request
+                {"tool": "heartbeat_run_once", "query": "manual"}
+                ```
+
+                """
+
+            case .heartbeatSetDeliveryProfile:
+                prompt += """
+
+                ### heartbeat_set_delivery_profile
+                Select an existing heartbeat delivery profile by id.
+
+                Example: ```tool_request
+                {"tool": "heartbeat_set_delivery_profile", "query": "{\"profile_id\":\"balanced\"}"}
+                ```
+
+                """
+
+            case .heartbeatUpdateProfile:
+                prompt += """
+
+                ### heartbeat_update_profile
+                Update or create a heartbeat delivery profile.
+
+                **Format:**
+                ```tool_request
+                {"tool": "heartbeat_update_profile", "query": "{\"id\":\"custom\",\"name\":\"Custom\",\"modules\":[\"system_status\",\"recent_messages\"],\"description\":\"My profile\"}"}
+                ```
+
+                """
+
+            case .persistenceDisable:
+                prompt += """
+
+                ### persistence_disable
+                Disable internal thread persistence (optionally wipe entries).
+
+                Example: ```tool_request
+                {"tool": "persistence_disable", "query": "{\"wipe\":false}"}
+                ```
+
+                """
+
+            case .notifyUser:
+                prompt += """
+
+                ### notify_user
+                Send a user notification.
+
+                **Format:**
+                ```tool_request
+                {"tool": "notify_user", "query": "{\"title\":\"Update\",\"body\":\"Heartbeat complete\"}"}
                 ```
 
                 """
@@ -344,6 +488,56 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
                 Example: ```tool_request
                 {"tool": "debug_bridge", "query": "status"}
+                ```
+
+                """
+
+            case .queryDevicePresence:
+                prompt += """
+
+                ### query_device_presence
+                Query all devices and their presence states (active, standby, dormant). See where the user is and which devices are available.
+
+                Example: ```tool_request
+                {"tool": "query_device_presence", "query": "all"}
+                ```
+
+                """
+
+            case .requestDeviceSwitch:
+                prompt += """
+
+                ### request_device_switch
+                Request to move your focus to another device. Requires user approval based on door policy.
+                Query format: device_id|reason
+
+                Example: ```tool_request
+                {"tool": "request_device_switch", "query": "device-123|This task would be easier on your Mac with a keyboard"}
+                ```
+
+                """
+
+            case .setPresenceIntent:
+                prompt += """
+
+                ### set_presence_intent
+                Declare your intent about which device you prefer to be on for the current task.
+                Query format: device_id|reason
+
+                Example: ```tool_request
+                {"tool": "set_presence_intent", "query": "device-456|Would prefer the iPad for this visual task"}
+                ```
+
+                """
+
+            case .saveStateCheckpoint:
+                prompt += """
+
+                ### save_state_checkpoint
+                Manually save a state checkpoint for handoff to another device.
+
+                Example: ```tool_request
+                {"tool": "save_state_checkpoint", "query": "Saving progress before switching devices"}
                 ```
 
                 """
@@ -930,6 +1124,33 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 )
             }
 
+        case .agentStateAppend:
+            return await executeAgentStateAppend(query: query)
+
+        case .agentStateQuery:
+            return await executeAgentStateQuery(query: query)
+
+        case .agentStateClear:
+            return await executeAgentStateClear(query: query)
+
+        case .heartbeatConfigure:
+            return await executeHeartbeatConfigure(query: query)
+
+        case .heartbeatRunOnce:
+            return await executeHeartbeatRunOnce(query: query)
+
+        case .heartbeatSetDeliveryProfile:
+            return await executeHeartbeatSetDeliveryProfile(query: query)
+
+        case .heartbeatUpdateProfile:
+            return await executeHeartbeatUpdateProfile(query: query)
+
+        case .persistenceDisable:
+            return await executePersistenceDisable(query: query)
+
+        case .notifyUser:
+            return await executeNotifyUser(query: query)
+
         default:
             return ToolResult(
                 tool: toolId.rawValue,
@@ -1504,6 +1725,24 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             text += "```tool_request\n{\"tool\":\"conversation_search\",\"query\":\"What did we decide about encryption?\"}\n```\n"
         case .reflectOnConversation:
             text += "```tool_request\n{\"tool\":\"reflect_on_conversation\",\"show_model_timeline\":true,\"show_task_distribution\":true,\"show_memory_usage\":true}\n```\n"
+        case .agentStateAppend:
+            text += "```tool_request\n{\"tool\":\"agent_state_append\",\"query\":\"{\\\"kind\\\":\\\"note\\\",\\\"content\\\":\\\"Add task list\\\",\\\"tags\\\":[\\\"tasks\\\"]}\"}\n```\n"
+        case .agentStateQuery:
+            text += "```tool_request\n{\"tool\":\"agent_state_query\",\"query\":\"{\\\"limit\\\":5,\\\"kind\\\":\\\"plan\\\"}\"}\n```\n"
+        case .agentStateClear:
+            text += "```tool_request\n{\"tool\":\"agent_state_clear\",\"query\":\"{\\\"all\\\":true}\"}\n```\n"
+        case .heartbeatConfigure:
+            text += "```tool_request\n{\"tool\":\"heartbeat_configure\",\"query\":\"{\\\"enabled\\\":true,\\\"interval_seconds\\\":1800}\"}\n```\n"
+        case .heartbeatRunOnce:
+            text += "```tool_request\n{\"tool\":\"heartbeat_run_once\",\"query\":\"manual\"}\n```\n"
+        case .heartbeatSetDeliveryProfile:
+            text += "```tool_request\n{\"tool\":\"heartbeat_set_delivery_profile\",\"query\":\"{\\\"profile_id\\\":\\\"balanced\\\"}\"}\n```\n"
+        case .heartbeatUpdateProfile:
+            text += "```tool_request\n{\"tool\":\"heartbeat_update_profile\",\"query\":\"{\\\"id\\\":\\\"custom\\\",\\\"name\\\":\\\"Custom\\\",\\\"modules\\\":[\\\"system_status\\\"]}\"}\n```\n"
+        case .persistenceDisable:
+            text += "```tool_request\n{\"tool\":\"persistence_disable\",\"query\":\"{\\\"wipe\\\":false}\"}\n```\n"
+        case .notifyUser:
+            text += "```tool_request\n{\"tool\":\"notify_user\",\"query\":\"{\\\"title\\\":\\\"Update\\\",\\\"body\\\":\\\"Heartbeat complete\\\"}\"}\n```\n"
         case .queryCovenant:
             text += "```tool_request\n{\"tool\":\"query_covenant\",\"query\":\"permissions\"}\n```\n"
         case .proposeCovenantChange:
@@ -1519,6 +1758,14 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             text += "```tool_request\n{\"tool\":\"get_tool_details\",\"query\":\"create_memory\"}\n```\n"
         case .debugBridge:
             text += "```tool_request\n{\"tool\":\"debug_bridge\",\"query\":\"status\"}\n```\n"
+        case .queryDevicePresence:
+            text += "```tool_request\n{\"tool\":\"query_device_presence\",\"query\":\"all\"}\n```\n"
+        case .requestDeviceSwitch:
+            text += "```tool_request\n{\"tool\":\"request_device_switch\",\"query\":\"device-id|reason for switch\"}\n```\n"
+        case .setPresenceIntent:
+            text += "```tool_request\n{\"tool\":\"set_presence_intent\",\"query\":\"device-id|reason for preference\"}\n```\n"
+        case .saveStateCheckpoint:
+            text += "```tool_request\n{\"tool\":\"save_state_checkpoint\",\"query\":\"checkpoint reason\"}\n```\n"
         }
 
         return text
@@ -2199,6 +2446,1055 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 memoryOperation: nil
             )
         }
+    }
+
+    // MARK: - Internal Thread Tools
+
+    private func executeAgentStateAppend(query: String) async -> ToolResult {
+        let settings = SettingsStorage.shared.loadSettingsOrDefault()
+        guard settings.internalThreadEnabled else {
+            return ToolResult(
+                tool: ToolId.agentStateAppend.rawValue,
+                success: false,
+                result: "Internal thread is disabled in settings.",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        let permission = SovereigntyService.shared.checkActionPermission(
+            .category(.agentStateWrite),
+            scope: .toolId(ToolId.agentStateAppend.rawValue)
+        )
+        if let blockMessage = hardBlockMessage(for: permission) {
+            return ToolResult(
+                tool: ToolId.agentStateAppend.rawValue,
+                success: false,
+                result: "🚫 Internal thread write blocked: \(blockMessage)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        guard let payload = parseAgentStateAppendPayload(query: query) else {
+            return ToolResult(
+                tool: ToolId.agentStateAppend.rawValue,
+                success: false,
+                result: """
+                    ## Format Error
+
+                    Provide JSON like:
+                    {"kind":"note","content":"...","tags":["tag1"],"visibility":"userVisible"}
+                    """,
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        guard let content = payload.content, !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return ToolResult(
+                tool: ToolId.agentStateAppend.rawValue,
+                success: false,
+                result: "Entry content cannot be empty.",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        let kind = InternalThreadEntryKind(rawValue: payload.kind ?? "") ?? .note
+        let visibility = InternalThreadVisibility(rawValue: payload.visibility ?? "") ?? .userVisible
+        let origin = InternalThreadOrigin(rawValue: payload.origin ?? "") ?? .ai
+
+        do {
+            let entry = try await AgentStateService.shared.appendEntry(
+                kind: kind,
+                content: content,
+                tags: payload.tags,
+                visibility: visibility,
+                origin: origin
+            )
+
+            return ToolResult(
+                tool: ToolId.agentStateAppend.rawValue,
+                success: true,
+                result: """
+                    ✓ Internal thread entry saved.
+
+                    **Kind:** \(entry.kind.displayName)
+                    **Visibility:** \(entry.visibility.displayName)
+                    **Tags:** \(entry.tags.joined(separator: ", "))
+                    **Content:** \(entry.content)
+                    """,
+                sources: nil,
+                memoryOperation: nil
+            )
+        } catch {
+            return ToolResult(
+                tool: ToolId.agentStateAppend.rawValue,
+                success: false,
+                result: "Failed to append internal thread entry: \(error.localizedDescription)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+    }
+
+    private func executeAgentStateQuery(query: String) async -> ToolResult {
+        let settings = SettingsStorage.shared.loadSettingsOrDefault()
+        guard settings.internalThreadEnabled else {
+            return ToolResult(
+                tool: ToolId.agentStateQuery.rawValue,
+                success: false,
+                result: "Internal thread is disabled in settings.",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        let permission = SovereigntyService.shared.checkActionPermission(
+            .category(.agentStateRead),
+            scope: .toolId(ToolId.agentStateQuery.rawValue)
+        )
+        if let blockMessage = hardBlockMessage(for: permission) {
+            return ToolResult(
+                tool: ToolId.agentStateQuery.rawValue,
+                success: false,
+                result: "🚫 Internal thread read blocked: \(blockMessage)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        var approvalNote: String? = nil
+        var approvalRecord: ToolApprovalRecord? = nil
+
+        if needsUserApproval(permission) {
+            let approvalResult = await requestUserApproval(toolId: .agentStateQuery, query: query)
+            let outcome = approvalOutcome(for: approvalResult)
+            guard outcome.allowed else {
+                return ToolResult(
+                    tool: ToolId.agentStateQuery.rawValue,
+                    success: false,
+                    result: outcome.errorMessage ?? "Tool execution was not authorized.",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+            approvalNote = outcome.note
+            approvalRecord = outcome.record
+        } else if case .preApproved(let tier) = permission {
+            approvalNote = "✅ *Pre-approved via trust tier: \(tier.name)*"
+        }
+
+        let payload = decodeJSON(AgentStateQueryPayload.self, from: query)
+        let limit = payload?.limit ?? (Int(query.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 5)
+        let kind = payload?.kind.flatMap { InternalThreadEntryKind(rawValue: $0) }
+        let tags = payload?.tags ?? []
+        let searchText = payload?.search ?? (payload == nil ? query : nil)
+        let includeAIOnly = payload?.includeAIOnly ?? false
+
+        let results = AgentStateService.shared.queryEntries(
+            limit: limit,
+            kind: kind,
+            tags: tags,
+            searchText: searchText,
+            includeAIOnly: includeAIOnly
+        )
+
+        var resultText: String
+        if results.isEmpty {
+            resultText = "No internal thread entries matched your query."
+        } else {
+            resultText = "Found \(results.count) internal thread entr\(results.count == 1 ? "y" : "ies"):\n\n"
+            for entry in results {
+                let snippet = entry.content.count > 200 ? String(entry.content.prefix(200)) + "..." : entry.content
+                let tagsText = entry.tags.isEmpty ? "" : " [\(entry.tags.joined(separator: ", "))]"
+                resultText += "- \(entry.timestamp.formatted(date: .abbreviated, time: .shortened)) • \(entry.kind.displayName)\(tagsText)\n  \(snippet)\n"
+            }
+        }
+
+        if let approvalNote {
+            resultText += "\n\n\(approvalNote)"
+        }
+
+        return ToolResult(
+            tool: ToolId.agentStateQuery.rawValue,
+            success: true,
+            result: resultText,
+            sources: nil,
+            memoryOperation: nil,
+            approvalRecord: approvalRecord
+        )
+    }
+
+    private func executeAgentStateClear(query: String) async -> ToolResult {
+        let settings = SettingsStorage.shared.loadSettingsOrDefault()
+        guard settings.internalThreadEnabled else {
+            return ToolResult(
+                tool: ToolId.agentStateClear.rawValue,
+                success: false,
+                result: "Internal thread is disabled in settings.",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        let permission = SovereigntyService.shared.checkActionPermission(
+            .category(.agentStateDelete),
+            scope: .toolId(ToolId.agentStateClear.rawValue)
+        )
+        if let blockMessage = hardBlockMessage(for: permission) {
+            return ToolResult(
+                tool: ToolId.agentStateClear.rawValue,
+                success: false,
+                result: "🚫 Internal thread delete blocked: \(blockMessage)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        var approvalNote: String? = nil
+        var approvalRecord: ToolApprovalRecord? = nil
+
+        if case .requiresApproval = permission {
+            let approvalResult = await requestUserApproval(toolId: .agentStateClear, query: query)
+            let outcome = approvalOutcome(for: approvalResult)
+            guard outcome.allowed else {
+                return ToolResult(
+                    tool: ToolId.agentStateClear.rawValue,
+                    success: false,
+                    result: outcome.errorMessage ?? "Tool execution was not authorized.",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+            approvalNote = outcome.note
+            approvalRecord = outcome.record
+        } else if case .preApproved(let tier) = permission {
+            approvalNote = "✅ *Pre-approved via trust tier: \(tier.name)*"
+        }
+
+        let payload = decodeJSON(AgentStateClearPayload.self, from: query)
+        let includeAIOnly = payload?.includeAIOnly ?? false
+
+        var idsToDelete: [String] = []
+        if let ids = payload?.ids, !ids.isEmpty {
+            idsToDelete = ids
+        } else {
+            let shouldDeleteAll = payload?.all ?? (
+                query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "all" || query.isEmpty
+            )
+            let kind = payload?.kind.flatMap { InternalThreadEntryKind(rawValue: $0) }
+            let tags = payload?.tags ?? []
+            let results = AgentStateService.shared.queryEntries(
+                limit: nil,
+                kind: kind,
+                tags: tags,
+                searchText: nil,
+                includeAIOnly: includeAIOnly
+            )
+            if shouldDeleteAll || kind != nil || !tags.isEmpty {
+                idsToDelete = results.map { $0.id }
+            }
+        }
+
+        guard !idsToDelete.isEmpty else {
+            return ToolResult(
+                tool: ToolId.agentStateClear.rawValue,
+                success: false,
+                result: "No internal thread entries matched the delete criteria.",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        do {
+            try await AgentStateService.shared.deleteEntries(ids: idsToDelete)
+            var resultText = "Deleted \(idsToDelete.count) internal thread entr\(idsToDelete.count == 1 ? "y" : "ies")."
+            if let approvalNote {
+                resultText += "\n\n\(approvalNote)"
+            }
+            return ToolResult(
+                tool: ToolId.agentStateClear.rawValue,
+                success: true,
+                result: resultText,
+                sources: nil,
+                memoryOperation: nil,
+                approvalRecord: approvalRecord
+            )
+        } catch {
+            return ToolResult(
+                tool: ToolId.agentStateClear.rawValue,
+                success: false,
+                result: "Failed to clear internal thread entries: \(error.localizedDescription)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+    }
+
+    // MARK: - Heartbeat Tools
+
+    private func executeHeartbeatConfigure(query: String) async -> ToolResult {
+        let permission = SovereigntyService.shared.checkActionPermission(
+            .category(.heartbeatControl),
+            scope: .toolId(ToolId.heartbeatConfigure.rawValue)
+        )
+        if let blockMessage = hardBlockMessage(for: permission) {
+            return ToolResult(
+                tool: ToolId.heartbeatConfigure.rawValue,
+                success: false,
+                result: "🚫 Heartbeat configuration blocked: \(blockMessage)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        if needsAIConsent(permission) {
+            do {
+                try await requestCapabilityConsent(
+                    enable: ["heartbeat"],
+                    disable: nil,
+                    rationale: "Update heartbeat configuration."
+                )
+            } catch {
+                return ToolResult(
+                    tool: ToolId.heartbeatConfigure.rawValue,
+                    success: false,
+                    result: "Heartbeat configuration declined: \(error.localizedDescription)",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+        }
+
+        guard let payload = decodeJSON(HeartbeatConfigurePayload.self, from: query) else {
+            return ToolResult(
+                tool: ToolId.heartbeatConfigure.rawValue,
+                success: false,
+                result: "Provide a JSON payload to configure heartbeat settings.",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        var settings = SettingsStorage.shared.loadSettingsOrDefault()
+        var heartbeat = settings.heartbeatSettings
+
+        if let enabled = payload.enabled {
+            heartbeat.enabled = enabled
+        }
+        if let interval = payload.intervalSeconds {
+            heartbeat.intervalSeconds = max(60, interval)
+        }
+        if let allowBackground = payload.allowBackground {
+            heartbeat.allowBackground = allowBackground
+        }
+        if let allowNotifications = payload.allowNotifications {
+            heartbeat.allowNotifications = allowNotifications
+        }
+        if let profileId = payload.deliveryProfileId {
+            if heartbeat.deliveryProfiles.contains(where: { $0.id == profileId }) {
+                heartbeat.deliveryProfileId = profileId
+            } else {
+                return ToolResult(
+                    tool: ToolId.heartbeatConfigure.rawValue,
+                    success: false,
+                    result: "Unknown delivery profile id '\(profileId)'.",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+        }
+        if let maxTokensBudget = payload.maxTokensBudget {
+            heartbeat.maxTokensBudget = maxTokensBudget
+        }
+        if let maxToolCalls = payload.maxToolCalls {
+            heartbeat.maxToolCalls = maxToolCalls
+        }
+        if let quietHours = payload.quietHours {
+            heartbeat.quietHours = quietHours
+        }
+
+        settings.heartbeatSettings = heartbeat
+        persistSettings(settings)
+
+        return ToolResult(
+            tool: ToolId.heartbeatConfigure.rawValue,
+            success: true,
+            result: "Heartbeat updated. Enabled=\(heartbeat.enabled), interval=\(heartbeat.intervalSeconds)s, profile=\(heartbeat.deliveryProfileId).",
+            sources: nil,
+            memoryOperation: nil
+        )
+    }
+
+    private func executeHeartbeatRunOnce(query: String) async -> ToolResult {
+        let permission = SovereigntyService.shared.checkActionPermission(
+            .category(.heartbeatControl),
+            scope: .toolId(ToolId.heartbeatRunOnce.rawValue)
+        )
+        if let blockMessage = hardBlockMessage(for: permission) {
+            return ToolResult(
+                tool: ToolId.heartbeatRunOnce.rawValue,
+                success: false,
+                result: "🚫 Heartbeat run blocked: \(blockMessage)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        if needsAIConsent(permission) {
+            do {
+                try await requestCapabilityConsent(
+                    enable: ["heartbeat_run_once"],
+                    disable: nil,
+                    rationale: "Run heartbeat once."
+                )
+            } catch {
+                return ToolResult(
+                    tool: ToolId.heartbeatRunOnce.rawValue,
+                    success: false,
+                    result: "Heartbeat run declined: \(error.localizedDescription)",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+        }
+
+        let result = await HeartbeatService.shared.runOnce(reason: query.isEmpty ? "tool" : query)
+        let output = "Heartbeat status: \(result.status.rawValue). \(result.message)"
+
+        return ToolResult(
+            tool: ToolId.heartbeatRunOnce.rawValue,
+            success: result.status == .success,
+            result: output,
+            sources: nil,
+            memoryOperation: nil
+        )
+    }
+
+    private func executeHeartbeatSetDeliveryProfile(query: String) async -> ToolResult {
+        let permission = SovereigntyService.shared.checkActionPermission(
+            .category(.heartbeatControl),
+            scope: .toolId(ToolId.heartbeatSetDeliveryProfile.rawValue)
+        )
+        if let blockMessage = hardBlockMessage(for: permission) {
+            return ToolResult(
+                tool: ToolId.heartbeatSetDeliveryProfile.rawValue,
+                success: false,
+                result: "🚫 Heartbeat profile change blocked: \(blockMessage)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        if needsAIConsent(permission) {
+            do {
+                try await requestCapabilityConsent(
+                    enable: ["heartbeat_profile"],
+                    disable: nil,
+                    rationale: "Update heartbeat delivery profile."
+                )
+            } catch {
+                return ToolResult(
+                    tool: ToolId.heartbeatSetDeliveryProfile.rawValue,
+                    success: false,
+                    result: "Heartbeat profile change declined: \(error.localizedDescription)",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+        }
+
+        let payload = decodeJSON(HeartbeatSetProfilePayload.self, from: query)
+        let profileId = payload?.profileId ?? query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !profileId.isEmpty else {
+            return ToolResult(
+                tool: ToolId.heartbeatSetDeliveryProfile.rawValue,
+                success: false,
+                result: "Provide a delivery profile id.",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        var settings = SettingsStorage.shared.loadSettingsOrDefault()
+        if settings.heartbeatSettings.deliveryProfiles.contains(where: { $0.id == profileId }) {
+            settings.heartbeatSettings.deliveryProfileId = profileId
+            persistSettings(settings)
+            return ToolResult(
+                tool: ToolId.heartbeatSetDeliveryProfile.rawValue,
+                success: true,
+                result: "Heartbeat delivery profile set to '\(profileId)'.",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        return ToolResult(
+            tool: ToolId.heartbeatSetDeliveryProfile.rawValue,
+            success: false,
+            result: "Unknown delivery profile id '\(profileId)'.",
+            sources: nil,
+            memoryOperation: nil
+        )
+    }
+
+    private func executeHeartbeatUpdateProfile(query: String) async -> ToolResult {
+        let permission = SovereigntyService.shared.checkActionPermission(
+            .category(.heartbeatControl),
+            scope: .toolId(ToolId.heartbeatUpdateProfile.rawValue)
+        )
+        if let blockMessage = hardBlockMessage(for: permission) {
+            return ToolResult(
+                tool: ToolId.heartbeatUpdateProfile.rawValue,
+                success: false,
+                result: "🚫 Heartbeat profile update blocked: \(blockMessage)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        if needsAIConsent(permission) {
+            do {
+                try await requestCapabilityConsent(
+                    enable: ["heartbeat_profile_update"],
+                    disable: nil,
+                    rationale: "Update heartbeat delivery profiles."
+                )
+            } catch {
+                return ToolResult(
+                    tool: ToolId.heartbeatUpdateProfile.rawValue,
+                    success: false,
+                    result: "Heartbeat profile update declined: \(error.localizedDescription)",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+        }
+
+        guard let payload = decodeJSON(HeartbeatProfileUpdatePayload.self, from: query) else {
+            return ToolResult(
+                tool: ToolId.heartbeatUpdateProfile.rawValue,
+                success: false,
+                result: "Provide JSON with id, name, modules, and optional description.",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        let modules = payload.modules.compactMap { HeartbeatModuleId(rawValue: $0) }
+        if modules.isEmpty {
+            return ToolResult(
+                tool: ToolId.heartbeatUpdateProfile.rawValue,
+                success: false,
+                result: "Modules list is empty or invalid. Use module ids like: \(HeartbeatModuleId.allCases.map { $0.rawValue }.joined(separator: ", ")).",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        var settings = SettingsStorage.shared.loadSettingsOrDefault()
+        if let index = settings.heartbeatSettings.deliveryProfiles.firstIndex(where: { $0.id == payload.id }) {
+            settings.heartbeatSettings.deliveryProfiles[index].name = payload.name
+            settings.heartbeatSettings.deliveryProfiles[index].moduleIds = modules
+            settings.heartbeatSettings.deliveryProfiles[index].description = payload.description
+        } else {
+            let profile = HeartbeatDeliveryProfile(
+                id: payload.id,
+                name: payload.name,
+                moduleIds: modules,
+                description: payload.description
+            )
+            settings.heartbeatSettings.deliveryProfiles.append(profile)
+        }
+
+        persistSettings(settings)
+
+        return ToolResult(
+            tool: ToolId.heartbeatUpdateProfile.rawValue,
+            success: true,
+            result: "Heartbeat profile '\(payload.id)' updated.",
+            sources: nil,
+            memoryOperation: nil
+        )
+    }
+
+    // MARK: - Persistence Tool
+
+    private func executePersistenceDisable(query: String) async -> ToolResult {
+        let permission = SovereigntyService.shared.checkActionPermission(
+            .category(.capabilityDisable),
+            scope: .toolId(ToolId.persistenceDisable.rawValue)
+        )
+        if let blockMessage = hardBlockMessage(for: permission) {
+            return ToolResult(
+                tool: ToolId.persistenceDisable.rawValue,
+                success: false,
+                result: "🚫 Persistence disable blocked: \(blockMessage)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        if needsAIConsent(permission) {
+            do {
+                try await requestCapabilityConsent(
+                    enable: nil,
+                    disable: ["internal_thread_persistence"],
+                    rationale: "Disable internal thread persistence."
+                )
+            } catch {
+                return ToolResult(
+                    tool: ToolId.persistenceDisable.rawValue,
+                    success: false,
+                    result: "Persistence disable declined: \(error.localizedDescription)",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+        }
+
+        let payload = decodeJSON(PersistenceDisablePayload.self, from: query)
+        let shouldWipe = payload?.wipe ?? false
+
+        var settings = SettingsStorage.shared.loadSettingsOrDefault()
+        settings.internalThreadEnabled = false
+        settings.heartbeatSettings.enabled = false
+        persistSettings(settings)
+
+        if shouldWipe {
+            do {
+                try await AgentStateService.shared.clearAllEntries()
+            } catch {
+                return ToolResult(
+                    tool: ToolId.persistenceDisable.rawValue,
+                    success: false,
+                    result: "Persistence disabled but failed to wipe entries: \(error.localizedDescription)",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+        }
+
+        let wipeNote = shouldWipe ? " Entries wiped." : ""
+        return ToolResult(
+            tool: ToolId.persistenceDisable.rawValue,
+            success: true,
+            result: "Internal thread persistence disabled.\(wipeNote)",
+            sources: nil,
+            memoryOperation: nil
+        )
+    }
+
+    // MARK: - Notification Tool
+
+    private func executeNotifyUser(query: String) async -> ToolResult {
+        let settings = SettingsStorage.shared.loadSettingsOrDefault()
+        guard settings.notificationsEnabled else {
+            return ToolResult(
+                tool: ToolId.notifyUser.rawValue,
+                success: false,
+                result: "Notifications are disabled in settings.",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        let permission = SovereigntyService.shared.checkActionPermission(
+            .category(.userNotify),
+            scope: .toolId(ToolId.notifyUser.rawValue)
+        )
+        if let blockMessage = hardBlockMessage(for: permission) {
+            return ToolResult(
+                tool: ToolId.notifyUser.rawValue,
+                success: false,
+                result: "🚫 Notification blocked: \(blockMessage)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        var approvalNote: String? = nil
+        var approvalRecord: ToolApprovalRecord? = nil
+
+        if needsUserApproval(permission) {
+            let approvalResult = await requestUserApproval(toolId: .notifyUser, query: query)
+            let outcome = approvalOutcome(for: approvalResult)
+            guard outcome.allowed else {
+                return ToolResult(
+                    tool: ToolId.notifyUser.rawValue,
+                    success: false,
+                    result: outcome.errorMessage ?? "Tool execution was not authorized.",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+            approvalNote = outcome.note
+            approvalRecord = outcome.record
+        } else if case .preApproved(let tier) = permission {
+            approvalNote = "✅ *Pre-approved via trust tier: \(tier.name)*"
+        }
+
+        let payload = decodeJSON(NotifyUserPayload.self, from: query)
+        let title = payload?.title ?? "Axon"
+        let body = payload?.body ?? query.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !body.isEmpty else {
+            return ToolResult(
+                tool: ToolId.notifyUser.rawValue,
+                success: false,
+                result: "Notification body cannot be empty.",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        do {
+            _ = try await NotificationService.shared.sendLocalNotification(
+                title: title,
+                body: body,
+                userInfo: ["source": "tool"]
+            )
+            var resultText = "Notification sent."
+            if let approvalNote {
+                resultText += "\n\n\(approvalNote)"
+            }
+            return ToolResult(
+                tool: ToolId.notifyUser.rawValue,
+                success: true,
+                result: resultText,
+                sources: nil,
+                memoryOperation: nil,
+                approvalRecord: approvalRecord
+            )
+        } catch {
+            return ToolResult(
+                tool: ToolId.notifyUser.rawValue,
+                success: false,
+                result: "Failed to send notification: \(error.localizedDescription)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func persistSettings(_ settings: AppSettings) {
+        var updated = settings
+        updated.lastUpdated = Date()
+        try? SettingsStorage.shared.saveSettings(updated)
+        SettingsViewModel.shared.settings = updated
+        SettingsSyncCoordinator.shared.markDirty()
+    }
+
+    private func requestUserApproval(toolId: ToolId, query: String) async -> ToolApprovalResult {
+        let toolConfig = DynamicToolConfig(
+            id: toolId.rawValue,
+            name: toolId.displayName,
+            description: toolId.description,
+            category: .utility,
+            enabled: true,
+            icon: toolId.icon,
+            requiredSecrets: [],
+            pipeline: [],
+            parameters: [:],
+            requiresApproval: true,
+            approvalScopes: toolId.approvalScopes
+        )
+
+        let inputs: [String: Any] = ["query": query]
+        return await toolApprovalService.requestApproval(tool: toolConfig, inputs: inputs)
+    }
+
+    private func approvalOutcome(for result: ToolApprovalResult) -> (allowed: Bool, note: String?, record: ToolApprovalRecord?, errorMessage: String?) {
+        switch result {
+        case .approved(let record), .approvedForSession(let record):
+            let isSession = if case .approvedForSession = result { true } else { false }
+            let note = isSession
+                ? "✅ *Session-approved by \(formatBiometricType(record.biometricType))*"
+                : "✅ *Approved by \(formatBiometricType(record.biometricType)) at \(record.formattedTime)*"
+            return (true, note, record, nil)
+        case .approvedViaTrustTier(let tierName):
+            return (true, "✅ *Pre-approved via trust tier: \(tierName)*", nil, nil)
+        case .denied:
+            return (false, nil, nil, "⛔ Tool execution was not authorized by the user.")
+        case .cancelled:
+            return (false, nil, nil, "Tool execution was cancelled.")
+        case .timeout:
+            return (false, nil, nil, "⏱️ Tool approval request timed out. Please try again.")
+        case .stop:
+            return (false, nil, nil, "🛑 Tool execution was stopped by the user.")
+        case .blocked(let reason):
+            return (false, nil, nil, "🚫 Tool blocked: \(reason)")
+        case .error(let message):
+            return (false, nil, nil, "Approval error: \(message)")
+        }
+    }
+
+    private func needsUserApproval(_ permission: PermissionResult) -> Bool {
+        switch permission {
+        case .requiresApproval:
+            return true
+        case .blocked(let reason):
+            return reason == .noCovenant
+        default:
+            return false
+        }
+    }
+
+    private func needsAIConsent(_ permission: PermissionResult) -> Bool {
+        switch permission {
+        case .requiresAIConsent:
+            return true
+        case .blocked(let reason):
+            return reason == .noCovenant
+        default:
+            return false
+        }
+    }
+
+    private func hardBlockMessage(for permission: PermissionResult) -> String? {
+        guard case .blocked(let reason) = permission else {
+            return nil
+        }
+        switch reason {
+        case .noCovenant:
+            return nil
+        case .deadlocked(let id):
+            return "Blocked by active deadlock (ID: \(id))."
+        case .integrityViolation:
+            return "Blocked due to integrity violation."
+        case .covenantSuspended:
+            return "Blocked: covenant is suspended pending resolution."
+        }
+    }
+
+    private func requestCapabilityConsent(
+        enable: [String]?,
+        disable: [String]?,
+        rationale: String
+    ) async throws {
+        let changes = CapabilityChanges(enable: enable, disable: disable)
+        let proposal = CovenantProposal.create(
+            type: .changeCapabilities,
+            changes: .capability(changes),
+            proposedBy: .ai,
+            rationale: rationale
+        )
+        let attestation = try await AIConsentService.shared.generateAttestation(
+            for: proposal,
+            memories: MemoryService.shared.memories
+        )
+        if attestation.didDecline {
+            throw SovereigntyError.aiDeclined(attestation.reasoning)
+        }
+    }
+
+    private func decodeJSON<T: Decodable>(_ type: T.Type, from query: String) -> T? {
+        if let data = query.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode(T.self, from: data) {
+            return decoded
+        }
+        if let jsonString = extractJSON(from: query),
+           let data = jsonString.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode(T.self, from: data) {
+            return decoded
+        }
+        return nil
+    }
+
+    private func extractJSON(from text: String) -> String? {
+        guard let start = text.firstIndex(of: "{"),
+              let end = text.lastIndex(of: "}") else {
+            return nil
+        }
+        return String(text[start...end])
+    }
+
+    private func parseAgentStateAppendPayload(query: String) -> AgentStateAppendPayload? {
+        if let payload = decodeJSON(AgentStateAppendPayload.self, from: query) {
+            return payload
+        }
+
+        let parts = query.components(separatedBy: "|")
+        if parts.count >= 3 {
+            if parts.count == 3 {
+                return AgentStateAppendPayload(
+                    kind: parts[0].trimmingCharacters(in: .whitespacesAndNewlines),
+                    content: parts[2].trimmingCharacters(in: .whitespacesAndNewlines),
+                    tags: parseTags(parts[1]),
+                    visibility: nil,
+                    origin: nil
+                )
+            } else {
+                let content = parts[3...].joined(separator: "|").trimmingCharacters(in: .whitespacesAndNewlines)
+                return AgentStateAppendPayload(
+                    kind: parts[0].trimmingCharacters(in: .whitespacesAndNewlines),
+                    content: content,
+                    tags: parseTags(parts[2]),
+                    visibility: parts[1].trimmingCharacters(in: .whitespacesAndNewlines),
+                    origin: nil
+                )
+            }
+        }
+
+        return nil
+    }
+
+    private func parseTags(_ value: String) -> [String] {
+        value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    }
+
+    private struct AgentStateAppendPayload: Decodable {
+        let kind: String?
+        let content: String?
+        let tags: [String]
+        let visibility: String?
+        let origin: String?
+
+        init(kind: String?, content: String?, tags: [String], visibility: String?, origin: String?) {
+            self.kind = kind
+            self.content = content
+            self.tags = tags
+            self.visibility = visibility
+            self.origin = origin
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            kind = try container.decodeIfPresent(String.self, forKey: .kind)
+            content = try container.decodeIfPresent(String.self, forKey: .content)
+            visibility = try container.decodeIfPresent(String.self, forKey: .visibility)
+            origin = try container.decodeIfPresent(String.self, forKey: .origin)
+
+            if let tagArray = try? container.decode([String].self, forKey: .tags) {
+                tags = tagArray
+            } else if let tagString = try? container.decode(String.self, forKey: .tags) {
+                tags = tagString.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            } else {
+                tags = []
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case kind
+            case content
+            case tags
+            case visibility
+            case origin
+        }
+    }
+
+    private struct AgentStateQueryPayload: Decodable {
+        let limit: Int?
+        let kind: String?
+        let tags: [String]
+        let search: String?
+        let includeAIOnly: Bool?
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            limit = try container.decodeIfPresent(Int.self, forKey: .limit)
+            kind = try container.decodeIfPresent(String.self, forKey: .kind)
+            search = try container.decodeIfPresent(String.self, forKey: .search)
+            includeAIOnly = try container.decodeIfPresent(Bool.self, forKey: .includeAIOnly)
+
+            if let tagArray = try? container.decode([String].self, forKey: .tags) {
+                tags = tagArray
+            } else if let tagString = try? container.decode(String.self, forKey: .tags) {
+                tags = tagString.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            } else {
+                tags = []
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case limit
+            case kind
+            case tags
+            case search
+            case includeAIOnly = "include_ai_only"
+        }
+    }
+
+    private struct AgentStateClearPayload: Decodable {
+        let all: Bool?
+        let ids: [String]?
+        let kind: String?
+        let tags: [String]
+        let includeAIOnly: Bool?
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            all = try container.decodeIfPresent(Bool.self, forKey: .all)
+            ids = try container.decodeIfPresent([String].self, forKey: .ids)
+            kind = try container.decodeIfPresent(String.self, forKey: .kind)
+            includeAIOnly = try container.decodeIfPresent(Bool.self, forKey: .includeAIOnly)
+
+            if let tagArray = try? container.decode([String].self, forKey: .tags) {
+                tags = tagArray
+            } else if let tagString = try? container.decode(String.self, forKey: .tags) {
+                tags = tagString.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            } else {
+                tags = []
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case all
+            case ids
+            case kind
+            case tags
+            case includeAIOnly = "include_ai_only"
+        }
+    }
+
+    private struct HeartbeatConfigurePayload: Decodable {
+        let enabled: Bool?
+        let intervalSeconds: Int?
+        let allowBackground: Bool?
+        let allowNotifications: Bool?
+        let deliveryProfileId: String?
+        let maxTokensBudget: Int?
+        let maxToolCalls: Int?
+        let quietHours: TimeRestrictions?
+
+        private enum CodingKeys: String, CodingKey {
+            case enabled
+            case intervalSeconds = "interval_seconds"
+            case allowBackground = "allow_background"
+            case allowNotifications = "allow_notifications"
+            case deliveryProfileId = "delivery_profile_id"
+            case maxTokensBudget = "max_tokens_budget"
+            case maxToolCalls = "max_tool_calls"
+            case quietHours = "quiet_hours"
+        }
+    }
+
+    private struct HeartbeatSetProfilePayload: Decodable {
+        let profileId: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case profileId = "profile_id"
+        }
+    }
+
+    private struct HeartbeatProfileUpdatePayload: Decodable {
+        let id: String
+        let name: String
+        let modules: [String]
+        let description: String?
+    }
+
+    private struct PersistenceDisablePayload: Decodable {
+        let wipe: Bool?
+    }
+
+    private struct NotifyUserPayload: Decodable {
+        let title: String?
+        let body: String?
     }
 
     /// Format a date for display

@@ -34,6 +34,16 @@ struct AppSettings: Codable, Equatable, Sendable {
     var maxMemoriesPerRequest: Int = 10  // 5-50
     var memoryAnalyticsEnabled: Bool = true
 
+    // Internal Thread (Agent State)
+    var internalThreadEnabled: Bool = true
+    var internalThreadRetentionDays: Int = 0  // 0 = keep indefinitely
+
+    // Heartbeat
+    var heartbeatSettings: HeartbeatSettings = HeartbeatSettings()
+
+    // Notifications
+    var notificationsEnabled: Bool = true
+
     // Epistemic Engine (Consciousness & Grounding)
     var epistemicEnabled: Bool = true               // Enable epistemic grounding
     var epistemicVerbose: Bool = false              // Include detailed epistemic boundaries in prompts
@@ -61,6 +71,9 @@ struct AppSettings: Codable, Equatable, Sendable {
     // Text-to-Speech
     var ttsSettings: TTSSettings = TTSSettings()
 
+    // Audio Sync (cross-device TTS audio caching)
+    var audioSyncSettings: AudioSyncSettings = AudioSyncSettings()
+
     // AI Tools (web search, code execution, etc.)
     var toolSettings: ToolSettings = ToolSettings()
 
@@ -84,6 +97,9 @@ struct AppSettings: Codable, Equatable, Sendable {
 
     // AI Sharing with Friends
     var sharingSettings: SharingSettings = SharingSettings()
+
+    // Multi-Device Presence
+    var presenceSettings: PresenceSettings = PresenceSettings()
 
     // Backend Configuration (optional - for cloud features)
     var backendAPIURL: String? = nil  // e.g., "https://us-central1-your-project.cloudfunctions.net"
@@ -1026,6 +1042,29 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
             return nil
         }
     }
+
+    /// Find context window for a model ID across all providers
+    /// Returns default of 128K if not found
+    static func contextWindowForModel(_ modelId: String, settings: AppSettings? = nil) -> Int {
+        // Check built-in models first
+        for provider in AIProvider.allCases {
+            if let model = provider.availableModels.first(where: { $0.id == modelId }) {
+                return model.contextWindow
+            }
+        }
+
+        // Check custom models if settings provided
+        if let settings = settings {
+            for customProvider in settings.customProviders {
+                if let model = customProvider.models.first(where: { $0.modelCode == modelId }) {
+                    return model.contextWindow
+                }
+            }
+        }
+
+        // Default to 128K if not found
+        return 128_000
+    }
 }
 
 // MARK: - AI Model
@@ -1394,6 +1433,10 @@ struct ToolSettings: Codable, Equatable, Sendable {
     /// will be analyzed by Gemini first, with the analysis passed to the primary model
     var mediaProxyEnabled: Bool = false
 
+    /// Enable chat debug mode (developer feature)
+    /// Shows detailed context breakdown, token counts, and injection details in chat
+    var chatDebugEnabled: Bool = false
+
     /// Helper to check if a specific tool is enabled
     func isToolEnabled(_ tool: ToolId) -> Bool {
         toolsEnabled && enabledToolIds.contains(tool.rawValue)
@@ -1424,6 +1467,74 @@ struct ToolSettings: Codable, Equatable, Sendable {
     }
 }
 
+// MARK: - Heartbeat Settings
+
+enum HeartbeatModuleId: String, Codable, CaseIterable, Identifiable, Sendable {
+    case systemStatus = "system_status"
+    case recentMessages = "recent_messages"
+    case lastInternalThreadEntry = "last_internal_thread_entry"
+    case pendingApprovals = "pending_approvals"
+    case lastHeartbeat = "last_heartbeat"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .systemStatus: return "System Status"
+        case .recentMessages: return "Recent Messages"
+        case .lastInternalThreadEntry: return "Last Internal Thread Entry"
+        case .pendingApprovals: return "Pending Approvals"
+        case .lastHeartbeat: return "Last Heartbeat"
+        }
+    }
+}
+
+struct HeartbeatDeliveryProfile: Codable, Equatable, Identifiable, Sendable {
+    var id: String
+    var name: String
+    var moduleIds: [HeartbeatModuleId]
+    var description: String?
+
+    static let defaultProfileId = "balanced"
+
+    static let defaultProfiles: [HeartbeatDeliveryProfile] = [
+        HeartbeatDeliveryProfile(
+            id: "balanced",
+            name: "Balanced",
+            moduleIds: [.systemStatus, .recentMessages, .lastInternalThreadEntry, .pendingApprovals],
+            description: "Default mix of status, recent context, and internal thread history."
+        ),
+        HeartbeatDeliveryProfile(
+            id: "light",
+            name: "Lightweight",
+            moduleIds: [.systemStatus, .lastInternalThreadEntry],
+            description: "Minimal context for quick check-ins."
+        ),
+        HeartbeatDeliveryProfile(
+            id: "deep",
+            name: "Deep Context",
+            moduleIds: [.systemStatus, .recentMessages, .lastInternalThreadEntry, .pendingApprovals, .lastHeartbeat],
+            description: "More context and continuity across heartbeats."
+        )
+    ]
+}
+
+struct HeartbeatSettings: Codable, Equatable, Sendable {
+    var enabled: Bool = false
+    var intervalSeconds: Int = 3600
+    var deliveryProfileId: String = HeartbeatDeliveryProfile.defaultProfileId
+    var maxTokensBudget: Int = 800
+    var maxToolCalls: Int = 0
+    var allowBackground: Bool = false
+    var allowNotifications: Bool = true
+    var quietHours: TimeRestrictions? = nil
+    var deliveryProfiles: [HeartbeatDeliveryProfile] = HeartbeatDeliveryProfile.defaultProfiles
+
+    func profile(for id: String) -> HeartbeatDeliveryProfile? {
+        deliveryProfiles.first { $0.id == id }
+    }
+}
+
 /// Available tool identifiers
 enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
     // Gemini Native Tools (called directly via Gemini API)
@@ -1437,6 +1548,15 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
     case createMemory = "create_memory"
     case conversationSearch = "conversation_search"  // Search recent conversations for context
     case reflectOnConversation = "reflect_on_conversation"  // Meta-analysis of current conversation
+    case agentStateAppend = "agent_state_append"
+    case agentStateQuery = "agent_state_query"
+    case agentStateClear = "agent_state_clear"
+    case heartbeatConfigure = "heartbeat_configure"
+    case heartbeatRunOnce = "heartbeat_run_once"
+    case heartbeatSetDeliveryProfile = "heartbeat_set_delivery_profile"
+    case heartbeatUpdateProfile = "heartbeat_update_profile"
+    case persistenceDisable = "persistence_disable"
+    case notifyUser = "notify_user"
 
     // Tool Introspection Tools
     // Used to keep system prompt injection light: model can fetch tool metadata on demand.
@@ -1454,6 +1574,12 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
     // Bridge Debugging
     case debugBridge = "debug_bridge"  // Check bridge connection status and logs
 
+    // Multi-Device Presence Tools
+    case queryDevicePresence = "query_device_presence"  // Query all devices and their presence states
+    case requestDeviceSwitch = "request_device_switch"  // Request to switch agent focus to another device
+    case setPresenceIntent = "set_presence_intent"  // Declare intent about which device to focus
+    case saveStateCheckpoint = "save_state_checkpoint"  // Manually save a state checkpoint
+
     var id: String { rawValue }
 
     var displayName: String {
@@ -1466,6 +1592,15 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .createMemory: return "Memory Creation"
         case .conversationSearch: return "Conversation History"
         case .reflectOnConversation: return "Conversation Reflection"
+        case .agentStateAppend: return "Internal Thread Append"
+        case .agentStateQuery: return "Internal Thread Query"
+        case .agentStateClear: return "Internal Thread Clear"
+        case .heartbeatConfigure: return "Heartbeat Configure"
+        case .heartbeatRunOnce: return "Heartbeat Run Once"
+        case .heartbeatSetDeliveryProfile: return "Heartbeat Set Delivery Profile"
+        case .heartbeatUpdateProfile: return "Heartbeat Update Profile"
+        case .persistenceDisable: return "Disable Persistence"
+        case .notifyUser: return "Notify User"
         case .listTools: return "List Tools"
         case .getToolDetails: return "Tool Details"
         case .queryCovenant: return "Query Covenant"
@@ -1473,6 +1608,10 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .querySystemState: return "Query System State"
         case .changeSystemState: return "Change System State"
         case .debugBridge: return "Debug Bridge"
+        case .queryDevicePresence: return "Query Device Presence"
+        case .requestDeviceSwitch: return "Request Device Switch"
+        case .setPresenceIntent: return "Set Presence Intent"
+        case .saveStateCheckpoint: return "Save State Checkpoint"
         }
     }
 
@@ -1486,6 +1625,15 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .createMemory: return "AI creates memories about you during chat"
         case .conversationSearch: return "Search recent conversations for context"
         case .reflectOnConversation: return "Analyze model usage, memories, and topic shifts"
+        case .agentStateAppend: return "Append a new entry to the internal thread"
+        case .agentStateQuery: return "Query internal thread entries"
+        case .agentStateClear: return "Clear internal thread entries"
+        case .heartbeatConfigure: return "Configure heartbeat scheduling and behavior"
+        case .heartbeatRunOnce: return "Run heartbeat immediately"
+        case .heartbeatSetDeliveryProfile: return "Select a heartbeat delivery profile"
+        case .heartbeatUpdateProfile: return "Update or create a heartbeat delivery profile"
+        case .persistenceDisable: return "Disable internal thread persistence (optionally wipe)"
+        case .notifyUser: return "Send a user notification"
         case .listTools: return "List all available tools in a compact format"
         case .getToolDetails: return "Get detailed usage and input schema for a specific tool"
         case .queryCovenant: return "Query current covenant status and permissions"
@@ -1493,6 +1641,10 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .querySystemState: return "Query available providers, models, tools, and permissions"
         case .changeSystemState: return "Request changes to model, provider, or tool configuration"
         case .debugBridge: return "Check VS Code bridge connection status and recent logs"
+        case .queryDevicePresence: return "Query all devices and their presence states"
+        case .requestDeviceSwitch: return "Request to switch agent focus to another device"
+        case .setPresenceIntent: return "Declare intent about which device to focus"
+        case .saveStateCheckpoint: return "Manually save a state checkpoint for handoff"
         }
     }
 
@@ -1506,6 +1658,15 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .createMemory: return "brain.head.profile"
         case .conversationSearch: return "clock.arrow.circlepath"
         case .reflectOnConversation: return "waveform.path.ecg"
+        case .agentStateAppend: return "square.and.pencil"
+        case .agentStateQuery: return "doc.text.magnifyingglass"
+        case .agentStateClear: return "trash"
+        case .heartbeatConfigure: return "heart.circle"
+        case .heartbeatRunOnce: return "bolt.circle"
+        case .heartbeatSetDeliveryProfile: return "list.bullet.rectangle"
+        case .heartbeatUpdateProfile: return "slider.horizontal.3"
+        case .persistenceDisable: return "xmark.circle"
+        case .notifyUser: return "bell.badge"
         case .listTools: return "list.bullet"
         case .getToolDetails: return "info.circle"
         case .queryCovenant: return "doc.badge.gearshape"
@@ -1513,6 +1674,10 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .querySystemState: return "gearshape.2"
         case .changeSystemState: return "gearshape.arrow.triangle.2.circlepath"
         case .debugBridge: return "ladybug"
+        case .queryDevicePresence: return "iphone.and.arrow.forward"
+        case .requestDeviceSwitch: return "arrow.left.arrow.right.circle"
+        case .setPresenceIntent: return "location.circle"
+        case .saveStateCheckpoint: return "arrow.down.doc"
         }
     }
 
@@ -1521,10 +1686,14 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
             return .gemini
         case .createMemory, .conversationSearch, .reflectOnConversation,
+             .agentStateAppend, .agentStateQuery, .agentStateClear,
+             .heartbeatConfigure, .heartbeatRunOnce, .heartbeatSetDeliveryProfile, .heartbeatUpdateProfile,
+             .persistenceDisable, .notifyUser,
              .listTools, .getToolDetails,
              .queryCovenant, .proposeCovenantChange,
              .querySystemState, .changeSystemState,
-             .debugBridge:
+             .debugBridge,
+             .queryDevicePresence, .requestDeviceSwitch, .setPresenceIntent, .saveStateCheckpoint:
             return .internal
         }
     }
@@ -1535,10 +1704,14 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
             return true
         case .createMemory, .conversationSearch, .reflectOnConversation,
+             .agentStateAppend, .agentStateQuery, .agentStateClear,
+             .heartbeatConfigure, .heartbeatRunOnce, .heartbeatSetDeliveryProfile, .heartbeatUpdateProfile,
+             .persistenceDisable, .notifyUser,
              .listTools, .getToolDetails,
              .queryCovenant, .proposeCovenantChange,
              .querySystemState, .changeSystemState,
-             .debugBridge:
+             .debugBridge,
+             .queryDevicePresence, .requestDeviceSwitch, .setPresenceIntent, .saveStateCheckpoint:
             return false
         }
     }
@@ -1552,10 +1725,16 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
             return true  // Covenant changes always require user consent
         case .changeSystemState:
             return true  // System state changes require user approval (unless pre-approved via trust tier)
+        case .requestDeviceSwitch:
+            return true  // Device switches should require user approval (based on door policy)
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch,
              .createMemory, .conversationSearch, .queryCovenant, .querySystemState,
              .listTools, .getToolDetails,
-             .debugBridge:
+             .agentStateAppend, .agentStateQuery, .agentStateClear,
+             .heartbeatConfigure, .heartbeatRunOnce, .heartbeatSetDeliveryProfile, .heartbeatUpdateProfile,
+             .persistenceDisable, .notifyUser,
+             .debugBridge,
+             .queryDevicePresence, .setPresenceIntent, .saveStateCheckpoint:
             return false
         }
     }
@@ -1580,6 +1759,48 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
                 "Change active AI model or provider",
                 "Enable or disable tools",
                 "Modify system configuration"
+            ]
+        case .agentStateQuery:
+            return [
+                "Read internal thread entries",
+                "Access user-visible agent state"
+            ]
+        case .agentStateClear:
+            return [
+                "Delete internal thread entries",
+                "Clear stored agent state"
+            ]
+        case .notifyUser:
+            return [
+                "Send a local notification to the user"
+            ]
+        case .heartbeatConfigure:
+            return [
+                "Enable or disable heartbeat scheduling",
+                "Adjust interval and notification behavior"
+            ]
+        case .heartbeatRunOnce:
+            return [
+                "Run the heartbeat immediately"
+            ]
+        case .heartbeatSetDeliveryProfile:
+            return [
+                "Select a heartbeat delivery profile"
+            ]
+        case .heartbeatUpdateProfile:
+            return [
+                "Update or create heartbeat delivery profiles"
+            ]
+        case .persistenceDisable:
+            return [
+                "Disable internal thread persistence",
+                "Optionally wipe existing entries"
+            ]
+        case .requestDeviceSwitch:
+            return [
+                "Move agent focus to another device",
+                "Transfer current context and state",
+                "Subject to door policy on target device"
             ]
         default:
             return []
@@ -1705,5 +1926,47 @@ struct CustomModelPricing: Codable, Equatable, Hashable, Sendable {
             parts.append(String(format: "cached: $%.2f", cached))
         }
         return parts.joined(separator: " · ")
+    }
+}
+
+// MARK: - Audio Sync Settings
+
+/// Settings for cross-device audio sync
+struct AudioSyncSettings: Codable, Equatable, Sendable {
+    /// Enable audio sync across devices (follows iCloud sync setting)
+    var syncEnabled: Bool = true
+
+    /// Audio quality preference for sync
+    var syncQuality: AudioSyncQuality = .original
+}
+
+/// Audio quality options for syncing generated audio
+enum AudioSyncQuality: String, Codable, CaseIterable, Identifiable, Sendable {
+    case original = "original"
+    case compressed = "compressed"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .original: return "Original Quality"
+        case .compressed: return "Compressed"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .original:
+            return "Keep original format (WAV/MP3). Higher quality, larger files."
+        case .compressed:
+            return "Convert WAV to AAC. Smaller files, slightly reduced quality."
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .original: return "waveform"
+        case .compressed: return "arrow.down.right.and.arrow.up.left"
+        }
     }
 }

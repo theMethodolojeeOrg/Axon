@@ -257,6 +257,18 @@ struct MacSidebarContentView: View {
             .cornerRadius(8)
 
             Button {
+                onNavigate(.internalThread)
+            } label: {
+                Label("Internal Thread", systemImage: currentView == .internalThread ? "note.text" : "note.text")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(currentView == .internalThread ? AppColors.signalMercury.opacity(0.12) : Color.clear)
+            .cornerRadius(8)
+
+            Button {
                 onNavigate(.memory)
             } label: {
                 Label("Memory", systemImage: currentView == .memory ? "brain.fill" : "brain")

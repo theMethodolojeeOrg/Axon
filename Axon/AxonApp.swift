@@ -89,10 +89,12 @@ struct AxonApp: App {
             .onChange(of: scenePhase) { _, newPhase in
                 handleScenePhaseChange(newPhase)
                 AutoSyncOrchestrator.shared.handleScenePhaseChange(newPhase)
+                HeartbeatService.shared.handleScenePhaseChange(newPhase)
             }
             .onAppear {
                 // Start auto-sync orchestrator (iCloud pull on launch/foreground)
                 AutoSyncOrchestrator.shared.start()
+                HeartbeatService.shared.start()
 
                 // If app lock is disabled, mark as unlocked
                 if !settingsViewModel.settings.appLockEnabled {
