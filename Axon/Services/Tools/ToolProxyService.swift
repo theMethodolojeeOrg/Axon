@@ -542,6 +542,59 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
                 """
 
+            case .openaiWebSearch:
+                prompt += """
+
+                ### openai_web_search
+                Search the web for current information using OpenAI's search-enabled models. Returns results with citations.
+                Example: ```tool_request
+                {"tool": "openai_web_search", "query": "What are the latest developments in quantum computing?"}
+                ```
+
+                """
+
+            case .openaiImageGeneration:
+                prompt += """
+
+                ### openai_image_gen
+                Generate images using OpenAI's GPT Image models. Describe what you want to create.
+
+                **Options (optional JSON):**
+                - `size`: "1024x1024" (square), "1792x1024" (landscape), "1024x1792" (portrait), or "auto"
+                - `quality`: "auto", "low", "medium", "high"
+                - `n`: number of images (1-4)
+
+                Example (simple): ```tool_request
+                {"tool": "openai_image_gen", "query": "A serene Japanese garden with cherry blossoms at sunset"}
+                ```
+
+                Example (with options): ```tool_request
+                {"tool": "openai_image_gen", "query": "{\\"prompt\\":\\"A futuristic city skyline\\",\\"size\\":\\"1792x1024\\",\\"quality\\":\\"high\\"}"}
+                ```
+
+                """
+
+            case .openaiDeepResearch:
+                prompt += """
+
+                ### openai_deep_research
+                Perform comprehensive multi-step research on a topic. Uses reasoning models with web search to analyze multiple sources and synthesize findings.
+
+                **Note:** This tool requires user approval and may take several minutes to complete.
+
+                **Options (optional):**
+                - `effort`: "low", "medium" (default), "high" - controls depth of research
+
+                Example: ```tool_request
+                {"tool": "openai_deep_research", "query": "Comprehensive analysis of the current state of nuclear fusion research and timeline to commercial viability"}
+                ```
+
+                Example (with effort): ```tool_request
+                {"tool": "openai_deep_research", "query": "{\\"topic\\":\\"Impact of AI on healthcare diagnostics\\",\\"effort\\":\\"high\\"}"}
+                ```
+
+                """
+
             }
         }
 
@@ -651,31 +704,49 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     // MARK: - Parse Tool Requests
 
-    /// Parse tool requests from model response
+    /// Parse tool requests from model response (returns first match only - use parseAllToolRequests for multiple)
     func parseToolRequest(from response: String) -> ToolRequest? {
+        return parseAllToolRequests(from: response).first
+    }
+
+    /// Parse ALL tool requests from model response (handles back-to-back tool calls)
+    func parseAllToolRequests(from response: String) -> [ToolRequest] {
         let pattern = "```tool_request\\s*\\n?([\\s\\S]*?)\\n?```"
 
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []),
-              let match = regex.firstMatch(in: response, options: [], range: NSRange(response.startIndex..., in: response)),
-              let jsonRange = Range(match.range(at: 1), in: response) else {
-            return nil
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            return []
         }
 
-        let jsonString = String(response[jsonRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let matches = regex.matches(in: response, options: [], range: NSRange(response.startIndex..., in: response))
 
-        guard let data = jsonString.data(using: .utf8) else {
-            print("[ToolProxy] Failed to convert tool request to data: \(jsonString)")
-            return nil
+        var requests: [ToolRequest] = []
+
+        for match in matches {
+            guard let jsonRange = Range(match.range(at: 1), in: response) else {
+                continue
+            }
+
+            let jsonString = String(response[jsonRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard let data = jsonString.data(using: .utf8) else {
+                print("[ToolProxy] Failed to convert tool request to data: \(jsonString)")
+                continue
+            }
+
+            do {
+                let request = try JSONDecoder().decode(ToolRequest.self, from: data)
+                print("[ToolProxy] Parsed tool request: \(request.tool)")
+                requests.append(request)
+            } catch {
+                print("[ToolProxy] Failed to decode tool request: \(error). JSON: \(jsonString)")
+            }
         }
 
-        do {
-            let request = try JSONDecoder().decode(ToolRequest.self, from: data)
-            print("[ToolProxy] Parsed tool request: \(request.tool)")
-            return request
-        } catch {
-            print("[ToolProxy] Failed to decode tool request: \(error). JSON: \(jsonString)")
-            return nil
+        if requests.count > 1 {
+            print("[ToolProxy] Found \(requests.count) tool requests in single response")
         }
+
+        return requests
     }
 
     /// Detect "naked" memory format sent as plain text without proper tool_request wrapper
@@ -915,6 +986,19 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 )
             }
             return await executeInternalTool(toolId: toolId, query: request.query, context: conversationContext)
+        }
+
+        // Handle OpenAI tools
+        if toolId.provider == .openai {
+            // Check if this OpenAI tool requires approval
+            if toolId.requiresApproval {
+                return await executeOpenAIToolWithApproval(
+                    toolId: toolId,
+                    query: request.query,
+                    context: conversationContext
+                )
+            }
+            return await executeOpenAITool(toolId: toolId, query: request.query)
         }
 
         // Get location for Maps queries
@@ -1357,6 +1441,314 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 tool: toolId.rawValue,
                 success: false,
                 result: "🚫 Tool blocked: \(reason)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+    }
+
+    // MARK: - OpenAI Tool Execution
+
+    /// Execute an OpenAI tool (web search, image generation, deep research)
+    private func executeOpenAITool(toolId: ToolId, query: String) async -> ToolResult {
+        // Get OpenAI API key
+        guard let apiKey = try? APIKeysStorage.shared.getAPIKey(for: .openai), !apiKey.isEmpty else {
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: false,
+                result: "OpenAI API key not configured. Please add your API key in Settings > API Keys.",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        switch toolId {
+        case .openaiWebSearch:
+            return await executeOpenAIWebSearch(apiKey: apiKey, query: query)
+
+        case .openaiImageGeneration:
+            return await executeOpenAIImageGeneration(apiKey: apiKey, query: query)
+
+        case .openaiDeepResearch:
+            return await executeOpenAIDeepResearch(apiKey: apiKey, query: query)
+
+        default:
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: false,
+                result: "Unknown OpenAI tool: \(toolId.rawValue)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+    }
+
+    /// Execute an OpenAI tool that requires approval
+    private func executeOpenAIToolWithApproval(
+        toolId: ToolId,
+        query: String,
+        context: ToolConversationContext?
+    ) async -> ToolResult {
+        print("[ToolProxy] OpenAI tool '\(toolId.rawValue)' requires biometric approval")
+
+        // Create a DynamicToolConfig facade for the approval service
+        let toolConfig = DynamicToolConfig(
+            id: toolId.rawValue,
+            name: toolId.displayName,
+            description: toolId.description,
+            category: .utility,
+            enabled: true,
+            icon: toolId.icon,
+            requiredSecrets: ["openai_api_key"],
+            pipeline: [],
+            parameters: [:],
+            requiresApproval: true,
+            approvalScopes: toolId.approvalScopes
+        )
+
+        let inputs: [String: Any] = ["query": query]
+        let approvalResult = await toolApprovalService.requestApproval(tool: toolConfig, inputs: inputs)
+
+        switch approvalResult {
+        case .approved(let record), .approvedForSession(let record):
+            let isSession = if case .approvedForSession = approvalResult { true } else { false }
+            let approvalNote = isSession
+                ? "✅ *Session-approved by \(formatBiometricType(record.biometricType))*"
+                : "✅ *Approved by \(formatBiometricType(record.biometricType)) at \(record.formattedTime)*"
+            print("[ToolProxy] OpenAI tool '\(toolId.rawValue)' \(isSession ? "session-" : "")approved")
+
+            // Execute the OpenAI tool now that we have approval
+            var result = await executeOpenAITool(toolId: toolId, query: query)
+
+            // Append approval note to result
+            return ToolResult(
+                tool: result.tool,
+                success: result.success,
+                result: result.result + "\n\n\(approvalNote)",
+                sources: result.sources,
+                memoryOperation: result.memoryOperation,
+                approvalRecord: record
+            )
+
+        case .denied:
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: false,
+                result: "⛔ Tool execution was not authorized by the user.",
+                sources: nil,
+                memoryOperation: nil
+            )
+
+        case .cancelled:
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: false,
+                result: "Tool execution was cancelled.",
+                sources: nil,
+                memoryOperation: nil
+            )
+
+        case .timeout:
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: false,
+                result: "⏱️ Tool approval request timed out. Please try again.",
+                sources: nil,
+                memoryOperation: nil
+            )
+
+        case .stop:
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: false,
+                result: "🛑 Tool execution was stopped by the user.",
+                sources: nil,
+                memoryOperation: nil
+            )
+
+        case .error(let message):
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: false,
+                result: "Approval error: \(message)",
+                sources: nil,
+                memoryOperation: nil
+            )
+
+        case .approvedViaTrustTier(let tierName):
+            print("[ToolProxy] OpenAI tool '\(toolId.rawValue)' pre-approved via trust tier: \(tierName)")
+            var result = await executeOpenAITool(toolId: toolId, query: query)
+            return ToolResult(
+                tool: result.tool,
+                success: result.success,
+                result: result.result + "\n\n✅ *Pre-approved via trust tier: \(tierName)*",
+                sources: result.sources,
+                memoryOperation: result.memoryOperation
+            )
+
+        case .blocked(let reason):
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: false,
+                result: "🚫 Tool blocked: \(reason)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+    }
+
+    /// Execute OpenAI web search
+    private func executeOpenAIWebSearch(apiKey: String, query: String) async -> ToolResult {
+        do {
+            let response = try await OpenAIToolService.shared.webSearch(
+                apiKey: apiKey,
+                query: query
+            )
+
+            // Format citations as sources
+            let sources = response.citations.map { citation in
+                ToolResultSource(
+                    title: citation.title ?? "Source",
+                    url: citation.url
+                )
+            }
+
+            return ToolResult(
+                tool: ToolId.openaiWebSearch.rawValue,
+                success: true,
+                result: response.text + response.formattedCitations,
+                sources: sources.isEmpty ? nil : sources,
+                memoryOperation: nil
+            )
+        } catch {
+            return ToolResult(
+                tool: ToolId.openaiWebSearch.rawValue,
+                success: false,
+                result: "Web search failed: \(error.localizedDescription)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+    }
+
+    /// Execute OpenAI image generation
+    private func executeOpenAIImageGeneration(apiKey: String, query: String) async -> ToolResult {
+        // Parse query - can be simple text or JSON with options
+        var prompt = query
+        var size: ImageSize = .square1024
+        var quality: ImageQuality = .auto
+
+        if query.hasPrefix("{"),
+           let data = query.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            prompt = (json["prompt"] as? String) ?? query
+            if let sizeStr = json["size"] as? String, let s = ImageSize(rawValue: sizeStr) {
+                size = s
+            }
+            if let qualityStr = json["quality"] as? String, let q = ImageQuality(rawValue: qualityStr) {
+                quality = q
+            }
+        }
+
+        do {
+            let response = try await OpenAIToolService.shared.generateImage(
+                apiKey: apiKey,
+                prompt: prompt,
+                size: size,
+                quality: quality
+            )
+
+            guard let imageData = response.firstImage else {
+                return ToolResult(
+                    tool: ToolId.openaiImageGeneration.rawValue,
+                    success: false,
+                    result: "No image was generated.",
+                    sources: nil,
+                    memoryOperation: nil
+                )
+            }
+
+            // Build result with image URL or base64
+            var resultText = "**Image generated successfully**\n\n"
+            if let revisedPrompt = imageData.revisedPrompt {
+                resultText += "_Revised prompt:_ \(revisedPrompt)\n\n"
+            }
+
+            if let url = imageData.url {
+                resultText += "![Generated Image](\(url))\n\n[View full image](\(url))"
+            } else if let b64 = imageData.b64Json {
+                // For base64, we'll just indicate it was generated (the UI can handle displaying it)
+                resultText += "_Image data returned as base64 (length: \(b64.count) chars)_"
+            }
+
+            return ToolResult(
+                tool: ToolId.openaiImageGeneration.rawValue,
+                success: true,
+                result: resultText,
+                sources: nil,
+                memoryOperation: nil
+            )
+        } catch {
+            return ToolResult(
+                tool: ToolId.openaiImageGeneration.rawValue,
+                success: false,
+                result: "Image generation failed: \(error.localizedDescription)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+    }
+
+    /// Execute OpenAI deep research
+    private func executeOpenAIDeepResearch(apiKey: String, query: String) async -> ToolResult {
+        // Parse query - can be simple text or JSON with options
+        var topic = query
+        var effort: ReasoningEffort = .medium
+
+        if query.hasPrefix("{"),
+           let data = query.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            topic = (json["topic"] as? String) ?? query
+            if let effortStr = json["effort"] as? String, let e = ReasoningEffort(rawValue: effortStr) {
+                effort = e
+            }
+        }
+
+        do {
+            let response = try await OpenAIToolService.shared.deepResearch(
+                apiKey: apiKey,
+                query: topic,
+                reasoningEffort: effort
+            )
+
+            // Format citations as sources
+            let sources = response.citations.map { citation in
+                ToolResultSource(
+                    title: citation.title ?? "Source",
+                    url: citation.url
+                )
+            }
+
+            var resultText = response.text
+            if !response.citations.isEmpty {
+                resultText += "\n\n**Sources:**\n"
+                for citation in response.citations {
+                    resultText += "- [\(citation.title ?? citation.url)](\(citation.url))\n"
+                }
+            }
+
+            return ToolResult(
+                tool: ToolId.openaiDeepResearch.rawValue,
+                success: true,
+                result: resultText,
+                sources: sources.isEmpty ? nil : sources,
+                memoryOperation: nil
+            )
+        } catch {
+            return ToolResult(
+                tool: ToolId.openaiDeepResearch.rawValue,
+                success: false,
+                result: "Deep research failed: \(error.localizedDescription)",
                 sources: nil,
                 memoryOperation: nil
             )
@@ -1850,6 +2242,13 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             text += "```tool_request\n{\"tool\":\"set_presence_intent\",\"query\":\"device-id|reason for preference\"}\n```\n"
         case .saveStateCheckpoint:
             text += "```tool_request\n{\"tool\":\"save_state_checkpoint\",\"query\":\"checkpoint reason\"}\n```\n"
+        case .openaiWebSearch:
+            text += "```tool_request\n{\"tool\":\"openai_web_search\",\"query\":\"latest news on AI regulations\"}\n```\n"
+        case .openaiImageGeneration:
+            text += "```tool_request\n{\"tool\":\"openai_image_gen\",\"query\":\"A serene mountain landscape at sunset\"}\n```\n"
+            text += "```tool_request\n{\"tool\":\"openai_image_gen\",\"query\":\"{\\\"prompt\\\":\\\"A futuristic city\\\",\\\"size\\\":\\\"1792x1024\\\",\\\"quality\\\":\\\"high\\\"}\"}\n```\n"
+        case .openaiDeepResearch:
+            text += "```tool_request\n{\"tool\":\"openai_deep_research\",\"query\":\"Comprehensive analysis of quantum computing progress in 2025\"}\n```\n"
         }
 
         return text
@@ -3791,6 +4190,13 @@ struct ToolRequest: Decodable {
     let query: String
     /// Optional separate content field (for write_file when AI sends path and content separately)
     let separateContent: String?
+
+    /// Simple memberwise initializer for programmatic creation
+    init(tool: String, query: String, separateContent: String? = nil) {
+        self.tool = tool
+        self.query = query
+        self.separateContent = separateContent
+    }
 
     /// Custom decoder to accept multiple key names for the query field
     /// LLMs sometimes use "memory", "content", "input", etc. instead of "query"

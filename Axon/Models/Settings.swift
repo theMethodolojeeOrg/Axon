@@ -12,8 +12,8 @@ import Foundation
 struct AppSettings: Codable, Equatable, Sendable {
     // General
     var theme: Theme = .auto
-    var defaultProvider: AIProvider = .anthropic
-    var defaultModel: String = "claude-haiku-4-5-20251001"
+    var defaultProvider: AIProvider = .appleFoundation
+    var defaultModel: String = "apple-foundation-default"
 
     // Custom Provider Selection (when using custom providers)
     var selectedCustomProviderId: UUID? = nil
@@ -101,6 +101,7 @@ struct AppSettings: Codable, Equatable, Sendable {
 
     // Onboarding
     var hasCompletedOnboarding: Bool = false
+    var hasSeenFirstRunWelcome: Bool = false  // Welcome card after first AI response
 
     // Co-Sovereignty
     var sovereigntySettings: SovereigntySettings = SovereigntySettings()
@@ -1898,12 +1899,14 @@ struct HeartbeatSettings: Codable, Equatable, Sendable {
 /// Categories for organizing tools in the UI
 enum ToolCategory: String, CaseIterable, Identifiable, Sendable {
     case geminiTools = "gemini_tools"
+    case openaiTools = "openai_tools"
     case memoryReflection = "memory_reflection"
     case internalThread = "internal_thread"
     case heartbeat = "heartbeat"
     case coSovereignty = "co_sovereignty"
     case systemState = "system_state"
     case multiDevice = "multi_device"
+    case subAgentOrchestration = "sub_agent_orchestration"
     case systemControl = "system_control"
     case toolDiscovery = "tool_discovery"
     case debugging = "debugging"
@@ -1913,12 +1916,14 @@ enum ToolCategory: String, CaseIterable, Identifiable, Sendable {
     var displayName: String {
         switch self {
         case .geminiTools: return "Gemini Tools"
+        case .openaiTools: return "OpenAI Tools"
         case .memoryReflection: return "Memory & Reflection"
         case .internalThread: return "Internal Thread"
         case .heartbeat: return "Heartbeat"
         case .coSovereignty: return "Co-Sovereignty"
         case .systemState: return "System State"
         case .multiDevice: return "Multi-Device Presence"
+        case .subAgentOrchestration: return "Sub-Agent Orchestration"
         case .systemControl: return "System Control"
         case .toolDiscovery: return "Tool Discovery"
         case .debugging: return "Debugging"
@@ -1928,12 +1933,14 @@ enum ToolCategory: String, CaseIterable, Identifiable, Sendable {
     var description: String {
         switch self {
         case .geminiTools: return "Google-powered tools for search, code execution, and maps"
+        case .openaiTools: return "OpenAI-powered tools for web search, images, and research"
         case .memoryReflection: return "Create memories and reflect on conversations"
         case .internalThread: return "AI's private workspace for notes and context"
         case .heartbeat: return "Scheduled check-ins and notifications"
         case .coSovereignty: return "Covenant-based trust and permissions"
         case .systemState: return "Query and modify system configuration"
         case .multiDevice: return "Cross-device presence and handoff"
+        case .subAgentOrchestration: return "Spawn and manage sub-agents (scouts, mechanics, designers)"
         case .systemControl: return "Notifications and persistence control"
         case .toolDiscovery: return "Discover and query available tools"
         case .debugging: return "Debug VS Code bridge and connections"
@@ -1943,12 +1950,14 @@ enum ToolCategory: String, CaseIterable, Identifiable, Sendable {
     var icon: String {
         switch self {
         case .geminiTools: return "globe"
+        case .openaiTools: return "cpu"
         case .memoryReflection: return "brain.head.profile"
         case .internalThread: return "doc.text"
         case .heartbeat: return "heart.circle"
         case .coSovereignty: return "doc.badge.gearshape"
         case .systemState: return "gearshape.2"
         case .multiDevice: return "iphone.and.arrow.forward"
+        case .subAgentOrchestration: return "person.3.sequence"
         case .systemControl: return "slider.horizontal.3"
         case .toolDiscovery: return "list.bullet"
         case .debugging: return "ladybug"
@@ -1964,6 +1973,11 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
     case urlContext = "url_context"
     case googleMaps = "google_maps"
     case fileSearch = "file_search"  // RAG-based document search (Gemini 2.5+, 3.0+)
+
+    // OpenAI Native Tools (called directly via OpenAI API)
+    case openaiWebSearch = "openai_web_search"      // Web search via gpt-4o-search-preview
+    case openaiImageGeneration = "openai_image_gen" // Image generation via gpt-image-1
+    case openaiDeepResearch = "openai_deep_research" // Deep research via o3-deep-research
 
     // Built-in Tools
     case createMemory = "create_memory"
@@ -2001,6 +2015,14 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
     case setPresenceIntent = "set_presence_intent"  // Declare intent about which device to focus
     case saveStateCheckpoint = "save_state_checkpoint"  // Manually save a state checkpoint
 
+    // Sub-Agent Orchestration Tools
+    case spawnScout = "spawn_scout"                    // Spawn a Scout sub-agent (read-only reconnaissance)
+    case spawnMechanic = "spawn_mechanic"              // Spawn a Mechanic sub-agent (read+write execution)
+    case spawnDesigner = "spawn_designer"              // Spawn a Designer sub-agent (task decomposition)
+    case queryJobStatus = "query_job_status"           // Query status of active/completed sub-agent jobs
+    case acceptJobResult = "accept_job_result"         // Accept and integrate sub-agent job result
+    case terminateJob = "terminate_job"                // Terminate a running sub-agent job
+
     var id: String { rawValue }
 
     var displayName: String {
@@ -2010,6 +2032,9 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .urlContext: return "URL Context"
         case .googleMaps: return "Google Maps"
         case .fileSearch: return "File Search"
+        case .openaiWebSearch: return "Web Search"
+        case .openaiImageGeneration: return "Image Generation"
+        case .openaiDeepResearch: return "Deep Research"
         case .createMemory: return "Memory Creation"
         case .conversationSearch: return "Conversation History"
         case .reflectOnConversation: return "Conversation Reflection"
@@ -2033,6 +2058,12 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .requestDeviceSwitch: return "Request Device Switch"
         case .setPresenceIntent: return "Set Presence Intent"
         case .saveStateCheckpoint: return "Save State Checkpoint"
+        case .spawnScout: return "Spawn Scout"
+        case .spawnMechanic: return "Spawn Mechanic"
+        case .spawnDesigner: return "Spawn Designer"
+        case .queryJobStatus: return "Query Job Status"
+        case .acceptJobResult: return "Accept Job Result"
+        case .terminateJob: return "Terminate Job"
         }
     }
 
@@ -2043,6 +2074,9 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .urlContext: return "Fetch and analyze content from URLs"
         case .googleMaps: return "Location queries and place information"
         case .fileSearch: return "Search uploaded documents using semantic RAG"
+        case .openaiWebSearch: return "Real-time web search powered by OpenAI"
+        case .openaiImageGeneration: return "Generate and edit images with GPT Image"
+        case .openaiDeepResearch: return "Multi-step research with web search and analysis"
         case .createMemory: return "AI creates memories about you during chat"
         case .conversationSearch: return "Search recent conversations for context"
         case .reflectOnConversation: return "Analyze model usage, memories, and topic shifts"
@@ -2066,6 +2100,12 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .requestDeviceSwitch: return "Request to switch agent focus to another device"
         case .setPresenceIntent: return "Declare intent about which device to focus"
         case .saveStateCheckpoint: return "Manually save a state checkpoint for handoff"
+        case .spawnScout: return "Spawn a Scout for read-only reconnaissance and exploration"
+        case .spawnMechanic: return "Spawn a Mechanic for read+write code execution and fixes"
+        case .spawnDesigner: return "Spawn a Designer for task decomposition and planning"
+        case .queryJobStatus: return "Query status of active and completed sub-agent jobs"
+        case .acceptJobResult: return "Accept and integrate a sub-agent's job result"
+        case .terminateJob: return "Terminate a running sub-agent job"
         }
     }
 
@@ -2076,6 +2116,9 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .urlContext: return "link"
         case .googleMaps: return "map"
         case .fileSearch: return "doc.text.magnifyingglass"
+        case .openaiWebSearch: return "globe.americas"
+        case .openaiImageGeneration: return "photo.badge.plus"
+        case .openaiDeepResearch: return "text.book.closed"
         case .createMemory: return "brain.head.profile"
         case .conversationSearch: return "clock.arrow.circlepath"
         case .reflectOnConversation: return "waveform.path.ecg"
@@ -2099,6 +2142,12 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .requestDeviceSwitch: return "arrow.left.arrow.right.circle"
         case .setPresenceIntent: return "location.circle"
         case .saveStateCheckpoint: return "arrow.down.doc"
+        case .spawnScout: return "binoculars"
+        case .spawnMechanic: return "wrench.and.screwdriver"
+        case .spawnDesigner: return "square.and.pencil"
+        case .queryJobStatus: return "list.bullet.clipboard"
+        case .acceptJobResult: return "checkmark.seal"
+        case .terminateJob: return "stop.circle"
         }
     }
 
@@ -2106,6 +2155,8 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
             return .gemini
+        case .openaiWebSearch, .openaiImageGeneration, .openaiDeepResearch:
+            return .openai
         case .createMemory, .conversationSearch, .reflectOnConversation,
              .agentStateAppend, .agentStateQuery, .agentStateClear,
              .heartbeatConfigure, .heartbeatRunOnce, .heartbeatSetDeliveryProfile, .heartbeatUpdateProfile,
@@ -2114,7 +2165,8 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
              .queryCovenant, .proposeCovenantChange,
              .querySystemState, .changeSystemState,
              .debugBridge,
-             .queryDevicePresence, .requestDeviceSwitch, .setPresenceIntent, .saveStateCheckpoint:
+             .queryDevicePresence, .requestDeviceSwitch, .setPresenceIntent, .saveStateCheckpoint,
+             .spawnScout, .spawnMechanic, .spawnDesigner, .queryJobStatus, .acceptJobResult, .terminateJob:
             return .internal
         }
     }
@@ -2124,7 +2176,8 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
             return true
-        case .createMemory, .conversationSearch, .reflectOnConversation,
+        case .openaiWebSearch, .openaiImageGeneration, .openaiDeepResearch,
+             .createMemory, .conversationSearch, .reflectOnConversation,
              .agentStateAppend, .agentStateQuery, .agentStateClear,
              .heartbeatConfigure, .heartbeatRunOnce, .heartbeatSetDeliveryProfile, .heartbeatUpdateProfile,
              .persistenceDisable, .notifyUser,
@@ -2132,7 +2185,28 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
              .queryCovenant, .proposeCovenantChange,
              .querySystemState, .changeSystemState,
              .debugBridge,
-             .queryDevicePresence, .requestDeviceSwitch, .setPresenceIntent, .saveStateCheckpoint:
+             .queryDevicePresence, .requestDeviceSwitch, .setPresenceIntent, .saveStateCheckpoint,
+             .spawnScout, .spawnMechanic, .spawnDesigner, .queryJobStatus, .acceptJobResult, .terminateJob:
+            return false
+        }
+    }
+
+    /// Whether this tool requires an OpenAI API key
+    var requiresOpenAIKey: Bool {
+        switch self {
+        case .openaiWebSearch, .openaiImageGeneration, .openaiDeepResearch:
+            return true
+        case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch,
+             .createMemory, .conversationSearch, .reflectOnConversation,
+             .agentStateAppend, .agentStateQuery, .agentStateClear,
+             .heartbeatConfigure, .heartbeatRunOnce, .heartbeatSetDeliveryProfile, .heartbeatUpdateProfile,
+             .persistenceDisable, .notifyUser,
+             .listTools, .getToolDetails,
+             .queryCovenant, .proposeCovenantChange,
+             .querySystemState, .changeSystemState,
+             .debugBridge,
+             .queryDevicePresence, .requestDeviceSwitch, .setPresenceIntent, .saveStateCheckpoint,
+             .spawnScout, .spawnMechanic, .spawnDesigner, .queryJobStatus, .acceptJobResult, .terminateJob:
             return false
         }
     }
@@ -2148,14 +2222,22 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
             return true  // System state changes require user approval (unless pre-approved via trust tier)
         case .requestDeviceSwitch:
             return true  // Device switches should require user approval (based on door policy)
+        case .openaiDeepResearch:
+            return true  // Deep research can run for extended periods; user should be aware
+        case .spawnScout, .spawnMechanic, .spawnDesigner:
+            return true  // Sub-agent spawning requires user consent (job attestation gate)
+        case .terminateJob:
+            return true  // Terminating a running job should require user awareness
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch,
+             .openaiWebSearch, .openaiImageGeneration,
              .createMemory, .conversationSearch, .queryCovenant, .querySystemState,
              .listTools, .getToolDetails,
              .agentStateAppend, .agentStateQuery, .agentStateClear,
              .heartbeatConfigure, .heartbeatRunOnce, .heartbeatSetDeliveryProfile, .heartbeatUpdateProfile,
              .persistenceDisable, .notifyUser,
              .debugBridge,
-             .queryDevicePresence, .setPresenceIntent, .saveStateCheckpoint:
+             .queryDevicePresence, .setPresenceIntent, .saveStateCheckpoint,
+             .queryJobStatus, .acceptJobResult:
             return false
         }
     }
@@ -2223,6 +2305,36 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
                 "Transfer current context and state",
                 "Subject to door policy on target device"
             ]
+        case .openaiDeepResearch:
+            return [
+                "Perform multi-step web research (may take several minutes)",
+                "Browse and analyze multiple web sources",
+                "Synthesize findings into a comprehensive report"
+            ]
+        case .spawnScout:
+            return [
+                "Spawn a read-only Scout sub-agent",
+                "Scout will explore and gather information",
+                "Results go to an isolated silo (not main memory)"
+            ]
+        case .spawnMechanic:
+            return [
+                "Spawn a Mechanic sub-agent with read+write access",
+                "Mechanic can execute code and make changes",
+                "Results go to an isolated silo (not main memory)"
+            ]
+        case .spawnDesigner:
+            return [
+                "Spawn a Designer sub-agent for meta-reasoning",
+                "Designer will plan and decompose tasks",
+                "May recommend spawning additional agents"
+            ]
+        case .terminateJob:
+            return [
+                "Terminate a running sub-agent job",
+                "Job will be marked as terminated",
+                "Partial results may be available in silo"
+            ]
         default:
             return []
         }
@@ -2238,6 +2350,8 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
             return .geminiTools
+        case .openaiWebSearch, .openaiImageGeneration, .openaiDeepResearch:
+            return .openaiTools
         case .createMemory, .conversationSearch, .reflectOnConversation:
             return .memoryReflection
         case .agentStateAppend, .agentStateQuery, .agentStateClear:
@@ -2250,6 +2364,8 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
             return .systemState
         case .queryDevicePresence, .requestDeviceSwitch, .setPresenceIntent, .saveStateCheckpoint:
             return .multiDevice
+        case .spawnScout, .spawnMechanic, .spawnDesigner, .queryJobStatus, .acceptJobResult, .terminateJob:
+            return .subAgentOrchestration
         case .notifyUser, .persistenceDisable:
             return .systemControl
         case .listTools, .getToolDetails:

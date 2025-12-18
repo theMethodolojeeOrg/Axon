@@ -12,6 +12,8 @@ struct GeneralSettingsView: View {
     @ObservedObject var sovereigntyService = SovereigntyService.shared
     @Environment(\.colorScheme) var systemColorScheme
 
+    @State private var showingNegotiationSheet = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             // MARK: - Theme Section
@@ -66,8 +68,7 @@ struct GeneralSettingsView: View {
                         message: reason,
                         actionLabel: "Renegotiate",
                         action: {
-                            // Navigate to sovereignty settings
-                            // This would need a navigation coordinator in practice
+                            showingNegotiationSheet = true
                         }
                     )
                 }
@@ -269,6 +270,12 @@ struct GeneralSettingsView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
             }
+        }
+        .sheet(isPresented: $showingNegotiationSheet) {
+            CovenantNegotiationView(preselectedCategory: .providerChange)
+                #if os(macOS)
+                .frame(minWidth: 550, idealWidth: 650, minHeight: 600, idealHeight: 800)
+                #endif
         }
     }
 

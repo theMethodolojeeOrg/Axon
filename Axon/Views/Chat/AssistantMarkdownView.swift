@@ -30,11 +30,16 @@ struct AssistantMarkdownView: View {
                         .layoutPriority(1)
 
                 case .code(let language, let code):
-                    CodeBlockView(language: language, code: code) {
-                        Text(code)
-                            .font(.system(.body, design: .monospaced))
-                            .foregroundColor(AppColors.textPrimary)
-                            .textSelection(.enabled)
+                    // Special handling for tool_request blocks - show actionable UI
+                    if language?.lowercased() == "tool_request" {
+                        ToolRequestCodeBlockView(code: code)
+                    } else {
+                        CodeBlockView(language: language, code: code) {
+                            Text(code)
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundColor(AppColors.textPrimary)
+                                .textSelection(.enabled)
+                        }
                     }
                 }
             }

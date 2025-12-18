@@ -13,9 +13,12 @@ import Combine
 final class LiveActivityService: ObservableObject {
     static let shared = LiveActivityService()
 
+    #if os(iOS)
     @Published private(set) var currentActivity: Activity<HeartbeatActivityAttributes>?
-    @Published private(set) var isSupported: Bool = false
+    @Published private(set) var subAgentActivities: [String: Activity<SubAgentActivityAttributes>] = [:]
     @Published private(set) var authorizationStatus: ActivityAuthorizationInfo? = nil
+    #endif
+    @Published private(set) var isSupported: Bool = false
 
     private let settingsViewModel = SettingsViewModel.shared
 
@@ -69,7 +72,9 @@ final class LiveActivityService: ObservableObject {
         entrySummary: String?,
         entryKind: String?,
         entryTags: [String],
-        errorMessage: String?
+        errorMessage: String?,
+        moodIcon: HeartbeatMoodIcon? = nil,
+        moodReason: String? = nil
     ) async {
         #if os(iOS)
         guard let activity = currentActivity else { return }
@@ -81,7 +86,9 @@ final class LiveActivityService: ObservableObject {
             entrySummary: entrySummary?.truncated(to: 120),
             entryKind: entryKind,
             entryTags: Array(entryTags.prefix(3)),
-            errorMessage: errorMessage
+            errorMessage: errorMessage,
+            moodIcon: moodIcon,
+            moodReason: moodReason?.truncated(to: 50)
         )
 
         // Calculate stale date based on interval
@@ -94,7 +101,12 @@ final class LiveActivityService: ObservableObject {
     }
 
     /// Update with a HeartbeatRunResult directly
-    func updateHeartbeatActivity(with result: HeartbeatRunResult, nextRunTime: Date?) async {
+    func updateHeartbeatActivity(
+        with result: HeartbeatRunResult,
+        nextRunTime: Date?,
+        moodIcon: HeartbeatMoodIcon? = nil,
+        moodReason: String? = nil
+    ) async {
         #if os(iOS)
         let status: HeartbeatActivityStatus
         var entrySummary: String?
@@ -130,7 +142,9 @@ final class LiveActivityService: ObservableObject {
             entrySummary: entrySummary,
             entryKind: entryKind,
             entryTags: entryTags,
-            errorMessage: errorMessage
+            errorMessage: errorMessage,
+            moodIcon: moodIcon,
+            moodReason: moodReason
         )
         #endif
     }
@@ -149,7 +163,9 @@ final class LiveActivityService: ObservableObject {
             entrySummary: currentState.entrySummary,
             entryKind: currentState.entryKind,
             entryTags: currentState.entryTags,
-            errorMessage: nil
+            errorMessage: nil,
+            moodIcon: currentState.moodIcon,
+            moodReason: currentState.moodReason
         )
 
         await activity.update(
@@ -163,14 +179,20 @@ final class LiveActivityService: ObservableObject {
         #if os(iOS)
         guard let activity = currentActivity else { return }
 
+        let currentState = activity.content.state
+        
+        // If the activity is in an error state, clear the error before ending
+        // to prevent it from lingering on the lock screen in some iOS versions.
         let finalState = HeartbeatActivityAttributes.ContentState(
             status: .disabled,
-            lastRunTime: activity.content.state.lastRunTime,
+            lastRunTime: currentState.lastRunTime,
             nextRunTime: nil,
-            entrySummary: activity.content.state.entrySummary,
-            entryKind: activity.content.state.entryKind,
-            entryTags: activity.content.state.entryTags,
-            errorMessage: nil
+            entrySummary: currentState.entrySummary,
+            entryKind: currentState.entryKind,
+            entryTags: currentState.entryTags,
+            errorMessage: nil,
+            moodIcon: currentState.moodIcon,
+            moodReason: currentState.moodReason
         )
 
         await activity.end(
@@ -189,6 +211,138 @@ final class LiveActivityService: ObservableObject {
             await activity.end(dismissalPolicy: .immediate)
         }
         currentActivity = nil
+        #endif
+    }
+
+    // MARK: - Sub-Agent Live Activities
+
+    /// Start a Live Activity for a sub-agent job
+    func startSubAgentActivity(for job: SubAgentJob) async throws {
+        #if os(iOS)
+        guard isSupported else {
+            throw LiveActivityError.notSupported
+        }
+
+        // Check if activity already exists
+        if subAgentActivities[job.id] != nil {
+            return
+        }
+
+        let attributes = SubAgentActivityAttributes(
+            jobId: job.id,
+            role: SubAgentActivityRole(from: job.role),
+            taskPreview: String(job.task.prefix(100)),
+            contextTags: Array(job.contextInjectionTags.prefix(3))
+        )
+
+        let initialState = SubAgentActivityAttributes.ContentState(
+            state: SubAgentActivityState(from: job.state),
+            startedAt: job.startedAt,
+            elapsedSeconds: job.startedAt.map { Int(Date().timeIntervalSince($0)) } ?? 0,
+            progress: nil,
+            statusMessage: nil,
+            provider: job.executedProvider?.displayName ?? job.provider?.displayName,
+            model: job.executedModel ?? job.model
+        )
+
+        do {
+            let activity = try Activity.request(
+                attributes: attributes,
+                content: .init(state: initialState, staleDate: nil),
+                pushType: nil
+            )
+            subAgentActivities[job.id] = activity
+        } catch {
+            throw LiveActivityError.failedToStart(error.localizedDescription)
+        }
+        #endif
+    }
+
+    /// Update a sub-agent Live Activity
+    func updateSubAgentActivity(
+        jobId: String,
+        state: SubAgentJobState,
+        startedAt: Date?,
+        progress: SubAgentProgress? = nil,
+        statusMessage: String? = nil,
+        provider: String? = nil,
+        model: String? = nil
+    ) async {
+        #if os(iOS)
+        guard let activity = subAgentActivities[jobId] else { return }
+
+        let elapsedSeconds = startedAt.map { Int(Date().timeIntervalSince($0)) } ?? 0
+
+        let contentState = SubAgentActivityAttributes.ContentState(
+            state: SubAgentActivityState(from: state),
+            startedAt: startedAt,
+            elapsedSeconds: elapsedSeconds,
+            progress: progress,
+            statusMessage: statusMessage?.truncated(to: 80),
+            provider: provider,
+            model: model
+        )
+
+        // Set stale date for terminal states
+        let staleDate: Date? = state.isTerminal ? Date().addingTimeInterval(30) : nil
+
+        await activity.update(
+            ActivityContent(state: contentState, staleDate: staleDate)
+        )
+
+        // Auto-end after completion with delay
+        if state.isTerminal {
+            Task {
+                try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+                await endSubAgentActivity(jobId: jobId)
+            }
+        }
+        #endif
+    }
+
+    /// Update a sub-agent Live Activity directly from a job
+    func updateSubAgentActivity(with job: SubAgentJob, statusMessage: String? = nil) async {
+        #if os(iOS)
+        await updateSubAgentActivity(
+            jobId: job.id,
+            state: job.state,
+            startedAt: job.startedAt,
+            progress: nil,
+            statusMessage: statusMessage,
+            provider: job.executedProvider?.displayName ?? job.provider?.displayName,
+            model: job.executedModel ?? job.model
+        )
+        #endif
+    }
+
+    /// End a sub-agent Live Activity
+    func endSubAgentActivity(jobId: String, immediately: Bool = false) async {
+        #if os(iOS)
+        guard let activity = subAgentActivities[jobId] else { return }
+
+        let dismissalPolicy: ActivityUIDismissalPolicy = immediately ? .immediate : .after(Date().addingTimeInterval(5))
+
+        await activity.end(dismissalPolicy: dismissalPolicy)
+        subAgentActivities.removeValue(forKey: jobId)
+        #endif
+    }
+
+    /// End all sub-agent Live Activities
+    func endAllSubAgentActivities() async {
+        #if os(iOS)
+        for activity in Activity<SubAgentActivityAttributes>.activities {
+            await activity.end(dismissalPolicy: .immediate)
+        }
+        subAgentActivities.removeAll()
+        #endif
+    }
+
+    /// Get the number of active sub-agent activities
+    var activeSubAgentCount: Int {
+        #if os(iOS)
+        return subAgentActivities.count
+        #else
+        return 0
         #endif
     }
 

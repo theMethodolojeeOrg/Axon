@@ -26,6 +26,9 @@ struct ChatInfoSettingsView: View {
     @State private var selectedModel: UnifiedModel?
     @State private var estimatedTokens: Int = 0
 
+    // Negotiation sheet
+    @State private var showingNegotiationSheet = false
+
     // Whether this conversation has custom overrides (vs using defaults)
     @State private var hasCustomOverrides: Bool = false
 
@@ -139,8 +142,7 @@ struct ChatInfoSettingsView: View {
                     message: reason,
                     actionLabel: "Renegotiate",
                     action: {
-                        // Provider changes require renegotiation with the AI
-                        // The user should go through the sovereignty settings to renegotiate
+                        showingNegotiationSheet = true
                     }
                 )
             }
@@ -353,15 +355,37 @@ struct ChatInfoSettingsView: View {
 
         // MARK: - Tools Section
         ChatInfoSection(title: "Tools") {
-            VStack(spacing: 8) {
-                // Built-in tools
-                ForEach(ToolId.allCases) { tool in
-                    ChatInfoToolToggleRow(
-                        tool: tool,
-                        isEnabled: localEnabledTools.contains(tool.rawValue),
-                        onToggle: { enabled in
-                            toggleTool(tool, enabled: enabled)
-                        }
+            VStack(spacing: 16) {
+                // Gemini Tools
+                ChatInfoToolCategorySection(
+                    title: "Google (Gemini)",
+                    icon: "globe",
+                    tools: ToolId.tools(for: .gemini),
+                    enabledTools: localEnabledTools,
+                    onToggle: { tool, enabled in toggleTool(tool, enabled: enabled) }
+                )
+
+                // OpenAI Tools
+                ChatInfoToolCategorySection(
+                    title: "OpenAI",
+                    icon: "cpu",
+                    tools: ToolId.tools(for: .openai),
+                    enabledTools: localEnabledTools,
+                    onToggle: { tool, enabled in toggleTool(tool, enabled: enabled) }
+                )
+
+                // Internal Tools (grouped by category)
+                let internalCategories = ToolCategory.allCases.filter { category in
+                    category != .geminiTools && category != .openaiTools && !ToolId.tools(for: category).isEmpty
+                }
+
+                ForEach(internalCategories) { category in
+                    ChatInfoToolCategorySection(
+                        title: category.displayName,
+                        icon: category.icon,
+                        tools: ToolId.tools(for: category),
+                        enabledTools: localEnabledTools,
+                        onToggle: { tool, enabled in toggleTool(tool, enabled: enabled) }
                     )
                 }
 
@@ -434,6 +458,12 @@ struct ChatInfoSettingsView: View {
         .padding()
         .background(AppColors.signalMercury.opacity(0.1))
         .cornerRadius(8)
+        .sheet(isPresented: $showingNegotiationSheet) {
+            CovenantNegotiationView(preselectedCategory: .providerChange)
+                #if os(macOS)
+                .frame(minWidth: 550, idealWidth: 650, minHeight: 600, idealHeight: 800)
+                #endif
+        }
     }
 
     // MARK: - iOS Remote Bridge Section
@@ -883,6 +913,73 @@ struct ChatInfoSection<Content: View>: View {
                 .foregroundColor(AppColors.textPrimary)
 
             content
+        }
+    }
+}
+
+// MARK: - Chat Info Tool Category Section (collapsible category)
+
+struct ChatInfoToolCategorySection: View {
+    let title: String
+    let icon: String
+    let tools: [ToolId]
+    let enabledTools: Set<String>
+    let onToggle: (ToolId, Bool) -> Void
+
+    @State private var isExpanded: Bool = false
+
+    var body: some View {
+        if !tools.isEmpty {
+            VStack(spacing: 0) {
+                // Category Header (tappable to expand)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: icon)
+                            .font(.system(size: 16))
+                            .foregroundColor(AppColors.signalMercury)
+                            .frame(width: 24)
+
+                        Text(title)
+                            .font(AppTypography.bodySmall(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Spacer()
+
+                        // Show count of enabled tools
+                        let enabledCount = tools.filter { enabledTools.contains($0.rawValue) }.count
+                        Text("\(enabledCount)/\(tools.count)")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
+
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 12)
+                    .background(AppColors.substrateSecondary)
+                    .cornerRadius(isExpanded ? 8 : 8)
+                }
+                .buttonStyle(.plain)
+
+                // Expanded Tool List
+                if isExpanded {
+                    VStack(spacing: 1) {
+                        ForEach(tools) { tool in
+                            ChatInfoToolToggleRow(
+                                tool: tool,
+                                isEnabled: enabledTools.contains(tool.rawValue),
+                                onToggle: { enabled in onToggle(tool, enabled) }
+                            )
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+            }
         }
     }
 }

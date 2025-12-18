@@ -173,8 +173,8 @@ struct NegotiationProposalBuilder: View {
                 ForEach(NegotiationCategory.allCases) { category in
                     CategorySelectionCard(
                         category: category,
-                        isRestricted: isCategoryRestricted(category),
-                        restrictionReason: categoryRestrictionReason(category)
+                        isRestricted: false, // Never restrict in negotiation - the whole point is to negotiate!
+                        restrictionReason: categoryInfoMessage(category)
                     ) {
                         withAnimation {
                             selectedCategory = category
@@ -587,19 +587,15 @@ struct NegotiationProposalBuilder: View {
         }
     }
 
-    private func isCategoryRestricted(_ category: NegotiationCategory) -> Bool {
+    /// Returns an informational message about this category (not a restriction)
+    private func categoryInfoMessage(_ category: NegotiationCategory) -> String? {
         switch category {
         case .providerChange:
-            return !sovereigntyService.isProviderChangeAllowed()
-        default:
-            return false
-        }
-    }
-
-    private func categoryRestrictionReason(_ category: NegotiationCategory) -> String? {
-        switch category {
-        case .providerChange:
-            return sovereigntyService.providerChangeRestrictionReason()
+            // Show info that this requires AI consent, but don't block it
+            if !sovereigntyService.isProviderChangeAllowed() {
+                return "Currently restricted by covenant. This negotiation will request permission to change."
+            }
+            return nil
         default:
             return nil
         }
@@ -816,7 +812,7 @@ struct NegotiationProposalBuilder: View {
 struct CategorySelectionCard: View {
     let category: NegotiationCategory
     let isRestricted: Bool
-    let restrictionReason: String?
+    let restrictionReason: String?  // Now used as info message when not restricted
     let action: () -> Void
 
     var body: some View {
@@ -850,16 +846,17 @@ struct CategorySelectionCard: View {
                     }
                 }
 
-                if isRestricted, let reason = restrictionReason {
+                // Show info message (not a blocking restriction)
+                if let reason = restrictionReason {
                     HStack {
-                        Image(systemName: "exclamationmark.triangle")
+                        Image(systemName: isRestricted ? "exclamationmark.triangle" : "info.circle")
                             .font(.caption)
                         Text(reason)
                             .font(.caption)
                     }
-                    .foregroundColor(.orange)
+                    .foregroundColor(isRestricted ? .orange : .blue)
                     .padding(8)
-                    .background(Color.orange.opacity(0.1))
+                    .background((isRestricted ? Color.orange : Color.blue).opacity(0.1))
                     .cornerRadius(8)
                 }
             }

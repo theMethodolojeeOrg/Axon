@@ -79,6 +79,16 @@ enum CovenantStatus: String, Codable, Equatable {
     case renegotiating   // Active but with pending changes
     case suspended       // Deadlock - requires resolution
     case superseded      // Replaced by newer covenant
+
+    var displayName: String {
+        switch self {
+        case .active: return "Active"
+        case .pending: return "Pending"
+        case .renegotiating: return "Renegotiating"
+        case .suspended: return "Suspended"
+        case .superseded: return "Superseded"
+        }
+    }
 }
 
 // MARK: - Negotiation Event

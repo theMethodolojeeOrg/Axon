@@ -60,6 +60,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     private let predicateLogger = PredicateLogger.shared
     private let salienceService = SalienceService.shared
     private let learningLoopService = LearningLoopService.shared
+    private let agentStateService = AgentStateService.shared
+    // Lazy to avoid circular dependency: HeartbeatService creates OnDeviceConversationOrchestrator
+    private lazy var heartbeatService = HeartbeatService.shared
 
     // MARK: - State for Learning Loop
 
@@ -687,104 +690,124 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 }
             }
 
-            // Check for tool request in accumulated content
-            guard let toolRequest = await ToolProxyService.shared.parseToolRequest(from: iterationContent) else {
-                // No tool request - we're done
+            // Check for ALL tool requests in accumulated content (handles back-to-back tool calls)
+            let toolRequests = await ToolProxyService.shared.parseAllToolRequests(from: iterationContent)
+            guard !toolRequests.isEmpty else {
+                // No tool requests - we're done
                 break
             }
 
-            // Create and emit live tool call
-            let liveToolCall = LiveToolCall.create(name: toolRequest.tool, query: toolRequest.query)
-            collectedToolCalls.append(liveToolCall)
-            continuation.yield(.toolCallStart(liveToolCall))
+            // Collect all tool results to send back together
+            var allToolResults: [(request: ToolRequest, result: ToolResult, formattedResult: String)] = []
+            var hadFailure = false
 
-            // Execute tool
-            let startTime = Date()
-            let conversationContext = ToolConversationContext(
-                conversationId: conversationId,
-                messages: messages
-            )
+            // Process each tool request sequentially
+            for toolRequest in toolRequests {
+                // Create and emit live tool call
+                let liveToolCall = LiveToolCall.create(name: toolRequest.tool, query: toolRequest.query)
+                collectedToolCalls.append(liveToolCall)
+                continuation.yield(.toolCallStart(liveToolCall))
 
-            do {
-                let toolResult = try await ToolProxyService.shared.executeToolRequest(
-                    toolRequest,
-                    geminiApiKey: geminiKey,
-                    conversationContext: conversationContext
+                // Execute tool
+                let startTime = Date()
+                let conversationContext = ToolConversationContext(
+                    conversationId: conversationId,
+                    messages: messages
                 )
 
-                let duration = Date().timeIntervalSince(startTime)
+                do {
+                    let toolResult = try await ToolProxyService.shared.executeToolRequest(
+                        toolRequest,
+                        geminiApiKey: geminiKey,
+                        conversationContext: conversationContext
+                    )
 
-                // Build result
-                let result = ToolCallResult(
-                    success: true,
-                    output: toolResult.result,
-                    rawJSON: nil,
-                    sources: toolResult.sources?.map { StreamingToolSource(title: $0.title, url: $0.url) },
-                    memoryOperation: toolResult.memoryOperation,
-                    duration: duration
-                )
+                    let duration = Date().timeIntervalSince(startTime)
 
-                // Update collected data
-                if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
-                    collectedToolCalls[index].state = .success
-                    collectedToolCalls[index].result = result
-                    collectedToolCalls[index].completedAt = Date()
-                }
+                    // Build result
+                    let result = ToolCallResult(
+                        success: true,
+                        output: toolResult.result,
+                        rawJSON: nil,
+                        sources: toolResult.sources?.map { StreamingToolSource(title: $0.title, url: $0.url) },
+                        memoryOperation: toolResult.memoryOperation,
+                        duration: duration
+                    )
 
-                continuation.yield(.toolCallComplete(liveToolCall.id, result))
-
-                // Collect sources
-                if let sources = toolResult.sources {
-                    for source in sources {
-                        collectedSources.append(MessageGroundingSource(
-                            title: source.title,
-                            url: source.url,
-                            sourceType: toolRequest.tool == "google_maps" ? .maps : .web
-                        ))
+                    // Update collected data
+                    if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
+                        collectedToolCalls[index].state = .success
+                        collectedToolCalls[index].result = result
+                        collectedToolCalls[index].completedAt = Date()
                     }
-                }
 
-                // Collect memory operations
-                if let memOp = toolResult.memoryOperation {
-                    collectedMemoryOperations.append(memOp)
-                }
+                    continuation.yield(.toolCallComplete(liveToolCall.id, result))
 
-                // Prepare for next iteration
-                let cleanedResponse = await ToolProxyService.shared.removeToolRequest(from: iterationContent)
-                let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
+                    // Mark as executed for deduplication in UI
+                    ToolRequestTracker.shared.markExecuted(request: toolRequest, result: toolResult.result)
 
-                currentMessages = messages
-                if !cleanedResponse.isEmpty {
-                    currentMessages.append(Message(
-                        conversationId: conversationId,
-                        role: .assistant,
-                        content: cleanedResponse
-                    ))
+                    // Collect sources
+                    if let sources = toolResult.sources {
+                        for source in sources {
+                            collectedSources.append(MessageGroundingSource(
+                                title: source.title,
+                                url: source.url,
+                                sourceType: toolRequest.tool == "google_maps" ? .maps : .web
+                            ))
+                        }
+                    }
+
+                    // Collect memory operations
+                    if let memOp = toolResult.memoryOperation {
+                        collectedMemoryOperations.append(memOp)
+                    }
+
+                    // Store for combined response
+                    let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
+                    allToolResults.append((request: toolRequest, result: toolResult, formattedResult: formattedResult))
+
+                } catch {
+                    let duration = Date().timeIntervalSince(startTime)
+                    let result = ToolCallResult(
+                        success: false,
+                        output: "",
+                        duration: duration,
+                        errorMessage: error.localizedDescription
+                    )
+
+                    if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
+                        collectedToolCalls[index].state = .failure
+                        collectedToolCalls[index].result = result
+                        collectedToolCalls[index].completedAt = Date()
+                    }
+
+                    continuation.yield(.toolCallComplete(liveToolCall.id, result))
+                    hadFailure = true
+                    break
                 }
+            }
+
+            if hadFailure {
+                break
+            }
+
+            // Prepare for next iteration with all results combined
+            let cleanedResponse = await ToolProxyService.shared.removeToolRequest(from: iterationContent)
+            let combinedResults = allToolResults.map { $0.formattedResult }.joined(separator: "\n\n")
+
+            currentMessages = messages
+            if !cleanedResponse.isEmpty {
                 currentMessages.append(Message(
                     conversationId: conversationId,
-                    role: .user,
-                    content: formattedResult
+                    role: .assistant,
+                    content: cleanedResponse
                 ))
-
-            } catch {
-                let duration = Date().timeIntervalSince(startTime)
-                let result = ToolCallResult(
-                    success: false,
-                    output: "",
-                    duration: duration,
-                    errorMessage: error.localizedDescription
-                )
-
-                if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
-                    collectedToolCalls[index].state = .failure
-                    collectedToolCalls[index].result = result
-                    collectedToolCalls[index].completedAt = Date()
-                }
-
-                continuation.yield(.toolCallComplete(liveToolCall.id, result))
-                break
             }
+            currentMessages.append(Message(
+                conversationId: conversationId,
+                role: .user,
+                content: combinedResults
+            ))
 
             iteration += 1
         }
@@ -809,104 +832,125 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var iteration = 0
 
         while iteration < maxIterations {
-            guard let toolRequest = await ToolProxyService.shared.parseToolRequest(from: currentResponse) else {
+            // Parse ALL tool requests from the response (handles back-to-back tool calls)
+            let toolRequests = await ToolProxyService.shared.parseAllToolRequests(from: currentResponse)
+            guard !toolRequests.isEmpty else {
                 break
             }
 
-            // Create and emit live tool call
-            let liveToolCall = LiveToolCall.create(name: toolRequest.tool, query: toolRequest.query)
-            collectedToolCalls.append(liveToolCall)
-            continuation.yield(.toolCallStart(liveToolCall))
+            // Collect all tool results to send back together
+            var allToolResults: [(request: ToolRequest, result: ToolResult, formattedResult: String)] = []
+            var hadFailure = false
 
-            // Execute tool
-            let startTime = Date()
-            let conversationContext = ToolConversationContext(
-                conversationId: conversationId,
-                messages: messages
-            )
+            // Process each tool request sequentially
+            for toolRequest in toolRequests {
+                // Create and emit live tool call
+                let liveToolCall = LiveToolCall.create(name: toolRequest.tool, query: toolRequest.query)
+                collectedToolCalls.append(liveToolCall)
+                continuation.yield(.toolCallStart(liveToolCall))
 
-            do {
-                let toolResult = try await ToolProxyService.shared.executeToolRequest(
-                    toolRequest,
-                    geminiApiKey: geminiKey,
-                    conversationContext: conversationContext
+                // Execute tool
+                let startTime = Date()
+                let conversationContext = ToolConversationContext(
+                    conversationId: conversationId,
+                    messages: messages
                 )
 
-                let duration = Date().timeIntervalSince(startTime)
+                do {
+                    let toolResult = try await ToolProxyService.shared.executeToolRequest(
+                        toolRequest,
+                        geminiApiKey: geminiKey,
+                        conversationContext: conversationContext
+                    )
 
-                let result = ToolCallResult(
-                    success: true,
-                    output: toolResult.result,
-                    sources: toolResult.sources?.map { StreamingToolSource(title: $0.title, url: $0.url) },
-                    memoryOperation: toolResult.memoryOperation,
-                    duration: duration
-                )
+                    let duration = Date().timeIntervalSince(startTime)
 
-                if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
-                    collectedToolCalls[index].state = .success
-                    collectedToolCalls[index].result = result
-                    collectedToolCalls[index].completedAt = Date()
-                }
+                    let result = ToolCallResult(
+                        success: true,
+                        output: toolResult.result,
+                        sources: toolResult.sources?.map { StreamingToolSource(title: $0.title, url: $0.url) },
+                        memoryOperation: toolResult.memoryOperation,
+                        duration: duration
+                    )
 
-                continuation.yield(.toolCallComplete(liveToolCall.id, result))
-
-                // Collect sources and memory ops
-                if let sources = toolResult.sources {
-                    for source in sources {
-                        collectedSources.append(MessageGroundingSource(
-                            title: source.title,
-                            url: source.url,
-                            sourceType: toolRequest.tool == "google_maps" ? .maps : .web
-                        ))
+                    if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
+                        collectedToolCalls[index].state = .success
+                        collectedToolCalls[index].result = result
+                        collectedToolCalls[index].completedAt = Date()
                     }
+
+                    continuation.yield(.toolCallComplete(liveToolCall.id, result))
+
+                    // Mark as executed for deduplication in UI
+                    ToolRequestTracker.shared.markExecuted(request: toolRequest, result: toolResult.result)
+
+                    // Collect sources and memory ops
+                    if let sources = toolResult.sources {
+                        for source in sources {
+                            collectedSources.append(MessageGroundingSource(
+                                title: source.title,
+                                url: source.url,
+                                sourceType: toolRequest.tool == "google_maps" ? .maps : .web
+                            ))
+                        }
+                    }
+                    if let memOp = toolResult.memoryOperation {
+                        collectedMemoryOperations.append(memOp)
+                    }
+
+                    // Store for combined response
+                    let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
+                    allToolResults.append((request: toolRequest, result: toolResult, formattedResult: formattedResult))
+
+                } catch {
+                    let duration = Date().timeIntervalSince(startTime)
+                    let result = ToolCallResult(
+                        success: false,
+                        output: "",
+                        duration: duration,
+                        errorMessage: error.localizedDescription
+                    )
+
+                    if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
+                        collectedToolCalls[index].state = .failure
+                        collectedToolCalls[index].result = result
+                        collectedToolCalls[index].completedAt = Date()
+                    }
+
+                    continuation.yield(.toolCallComplete(liveToolCall.id, result))
+                    hadFailure = true
+                    break
                 }
-                if let memOp = toolResult.memoryOperation {
-                    collectedMemoryOperations.append(memOp)
-                }
+            }
 
-                // Get next response
-                let cleanedResponse = await ToolProxyService.shared.removeToolRequest(from: currentResponse)
-                let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
-
-                var updatedMessages = messages
-                if !cleanedResponse.isEmpty {
-                    updatedMessages.append(Message(conversationId: conversationId, role: .assistant, content: cleanedResponse))
-                }
-                updatedMessages.append(Message(conversationId: conversationId, role: .user, content: formattedResult))
-
-                let nextResponse = try await callProvider(
-                    provider: config.provider,
-                    config: config,
-                    system: systemPrompt,
-                    messages: updatedMessages
-                ).content
-
-                // Emit new content as streaming
-                let newContent = nextResponse
-                for char in newContent {
-                    continuation.yield(.textDelta(String(char)))
-                }
-                accumulatedContent += newContent
-                currentResponse = nextResponse
-
-            } catch {
-                let duration = Date().timeIntervalSince(startTime)
-                let result = ToolCallResult(
-                    success: false,
-                    output: "",
-                    duration: duration,
-                    errorMessage: error.localizedDescription
-                )
-
-                if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
-                    collectedToolCalls[index].state = .failure
-                    collectedToolCalls[index].result = result
-                    collectedToolCalls[index].completedAt = Date()
-                }
-
-                continuation.yield(.toolCallComplete(liveToolCall.id, result))
+            if hadFailure {
                 break
             }
+
+            // Get next response with all results combined
+            let cleanedResponse = await ToolProxyService.shared.removeToolRequest(from: currentResponse)
+            let combinedResults = allToolResults.map { $0.formattedResult }.joined(separator: "\n\n")
+
+            var updatedMessages = messages
+            if !cleanedResponse.isEmpty {
+                updatedMessages.append(Message(conversationId: conversationId, role: .assistant, content: cleanedResponse))
+            }
+            updatedMessages.append(Message(conversationId: conversationId, role: .user, content: combinedResults))
+
+            let nextResponse = try await callProvider(
+                provider: config.provider,
+                config: config,
+                system: systemPrompt,
+                messages: updatedMessages
+            ).content
+
+            // Emit new content as streaming
+            let newContent = nextResponse
+            for char in newContent {
+                continuation.yield(.textDelta(String(char)))
+            }
+            accumulatedContent += newContent
+            currentResponse = nextResponse
 
             iteration += 1
         }
@@ -945,8 +989,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var iteration = 0
 
         while iteration < maxIterations {
-            // Check for tool request in response
-            guard let toolRequest = await ToolProxyService.shared.parseToolRequest(from: currentResponse) else {
+            // Parse ALL tool requests from the response (handles back-to-back tool calls)
+            let toolRequests = await ToolProxyService.shared.parseAllToolRequests(from: currentResponse)
+            guard !toolRequests.isEmpty else {
                 // No proper tool request found - check for malformed memory attempts
 
                 // Check 1: Naked pipe-delimited format (allocentric|0.9|tags|content)
@@ -1036,55 +1081,68 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 break
             }
 
-            print("[OnDeviceOrchestrator] Tool request detected: \(toolRequest.tool) - \"\(toolRequest.query)\"")
-            toolUsed = true
+            // Collect all tool results to send back together
+            var allToolResults: [(request: ToolRequest, result: ToolResult, formattedResult: String)] = []
 
-            // Execute the tool via Gemini
-            // Provide conversation context for tools that need it (like reflect_on_conversation)
-            let conversationContext = ToolConversationContext(
-                conversationId: conversationId,
-                messages: messages
-            )
-            let toolResult = try await ToolProxyService.shared.executeToolRequest(
-                toolRequest,
-                geminiApiKey: geminiKey,
-                conversationContext: conversationContext
-            )
+            // Process each tool request sequentially
+            for toolRequest in toolRequests {
+                print("[OnDeviceOrchestrator] Tool request detected: \(toolRequest.tool) - \"\(toolRequest.query)\"")
+                toolUsed = true
 
-            // Collect grounding sources from tool result
-            if let sources = toolResult.sources {
-                for source in sources {
-                    let groundingSource = MessageGroundingSource(
-                        title: source.title,
-                        url: source.url,
-                        sourceType: toolRequest.tool == "google_maps" ? .maps : .web
-                    )
-                    collectedSources.append(groundingSource)
-                }
-            }
+                // Execute the tool via Gemini
+                // Provide conversation context for tools that need it (like reflect_on_conversation)
+                let conversationContext = ToolConversationContext(
+                    conversationId: conversationId,
+                    messages: messages
+                )
+                let toolResult = try await ToolProxyService.shared.executeToolRequest(
+                    toolRequest,
+                    geminiApiKey: geminiKey,
+                    conversationContext: conversationContext
+                )
 
-            // Collect memory operations from tool result
-            // If a successful operation has similar content to a previous failed one, replace it
-            if let memoryOp = toolResult.memoryOperation {
-                if memoryOp.success {
-                    // Remove any previous failed attempts with similar content (retry succeeded)
-                    collectedMemoryOperations.removeAll { existing in
-                        !existing.success && isSimilarMemoryContent(existing.content, memoryOp.content)
+                // Collect grounding sources from tool result
+                if let sources = toolResult.sources {
+                    for source in sources {
+                        let groundingSource = MessageGroundingSource(
+                            title: source.title,
+                            url: source.url,
+                            sourceType: toolRequest.tool == "google_maps" ? .maps : .web
+                        )
+                        collectedSources.append(groundingSource)
                     }
                 }
-                collectedMemoryOperations.append(memoryOp)
+
+                // Collect memory operations from tool result
+                // If a successful operation has similar content to a previous failed one, replace it
+                if let memoryOp = toolResult.memoryOperation {
+                    if memoryOp.success {
+                        // Remove any previous failed attempts with similar content (retry succeeded)
+                        collectedMemoryOperations.removeAll { existing in
+                            !existing.success && isSimilarMemoryContent(existing.content, memoryOp.content)
+                        }
+                    }
+                    collectedMemoryOperations.append(memoryOp)
+                }
+
+                // Mark as executed for deduplication in UI
+                if toolResult.success {
+                    ToolRequestTracker.shared.markExecuted(request: toolRequest, result: toolResult.result)
+                }
+
+                // Store for combined response
+                let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
+                allToolResults.append((request: toolRequest, result: toolResult, formattedResult: formattedResult))
             }
 
-            // Format tool result
-            let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
-
-            // Remove tool request from response and append result
+            // Remove all tool requests from response and combine all results
             let cleanedResponse = await ToolProxyService.shared.removeToolRequest(from: currentResponse)
+            let combinedResults = allToolResults.map { $0.formattedResult }.joined(separator: "\n\n")
 
-            // Build updated messages with tool result
+            // Build updated messages with all tool results
             var updatedMessages = messages
 
-            // Add assistant's partial response (before tool request)
+            // Add assistant's partial response (before tool requests)
             if !cleanedResponse.isEmpty {
                 updatedMessages.append(Message(
                     conversationId: conversationId,
@@ -1093,14 +1151,14 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 ))
             }
 
-            // Add tool result as a system/user message
+            // Add combined tool results as a system/user message
             updatedMessages.append(Message(
                 conversationId: conversationId,
                 role: .user,
-                content: formattedResult
+                content: combinedResults
             ))
 
-            print("[OnDeviceOrchestrator] Sending tool result back to \(config.provider)")
+            print("[OnDeviceOrchestrator] Sending \(allToolResults.count) tool result(s) back to \(config.provider)")
 
             // Call provider again with tool results
             currentResponse = try await callProvider(
@@ -1111,7 +1169,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             ).content
 
             // If we got a clean response with tool result incorporated, prepend the original context
-            if !cleanedResponse.isEmpty && !currentResponse.contains(formattedResult) {
+            if !cleanedResponse.isEmpty && !currentResponse.contains(combinedResults) {
                 currentResponse = cleanedResponse + "\n\n" + currentResponse
             }
 
@@ -1414,6 +1472,10 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             }
         }
 
+        // --- Internal Thread Context Injection (Heartbeat Transition) ---
+        // When the user interrupts the AI's "thinking time", bridge from its internal thread
+        await injectInternalThreadContext(into: &promptParts)
+
         // --- Temporal Context Injection ---
 
         // Get recent conversation summary for reuse
@@ -1502,6 +1564,85 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         }
 
         return DevicePresenceService.shared.generatePresencePromptContext()
+    }
+
+    /// Inject internal thread context when transitioning from heartbeat "thinking time" to conversation
+    /// This provides a smooth bridge from the AI's reflective state into the user's prompt
+    @MainActor
+    private func injectInternalThreadContext(into promptParts: inout [String]) {
+        let settings = SettingsViewModel.shared.settings
+
+        // Only inject if internal thread is enabled
+        guard settings.internalThreadEnabled else { return }
+
+        // Check if heartbeat is running or has recently run
+        let hasRecentHeartbeat = heartbeatService.lastHeartbeatAt.map {
+            Date().timeIntervalSince($0) < Double(settings.heartbeatSettings.intervalSeconds * 2)
+        } ?? false
+
+        guard hasRecentHeartbeat else { return }
+
+        // Get recent internal thread entries (last 3 for context)
+        let recentEntries = agentStateService.queryEntries(
+            limit: 3,
+            kind: nil,
+            tags: [],
+            searchText: nil,
+            includeAIOnly: true
+        )
+
+        guard !recentEntries.isEmpty else { return }
+
+        // Build the transition context block
+        var contextBlock = """
+        ## What I Was Just Thinking About
+
+        Before you reached out, I was in a reflective state. Here's what was on my mind:
+
+        """
+
+        for entry in recentEntries {
+            let timeAgo = formatTimeAgo(entry.timestamp)
+            let kindLabel = entry.kind.displayName
+
+            contextBlock += """
+            **\(kindLabel)** (\(timeAgo)):
+            \(entry.content)
+
+            """
+
+            // Include tags if present
+            if !entry.tags.isEmpty {
+                let tagString = entry.tags.map { "#\($0)" }.joined(separator: " ")
+                contextBlock += "_Tags: \(tagString)_\n\n"
+            }
+        }
+
+        contextBlock += """
+        ---
+        _This context helps me transition smoothly from my reflective state to our conversation. Feel free to ask about what I was thinking, or move on to something new._
+        """
+
+        promptParts.append(contextBlock)
+        print("[Epistemic] Injected internal thread context (\(recentEntries.count) entries) for heartbeat transition")
+    }
+
+    /// Format a timestamp as a relative time string (e.g., "5 minutes ago")
+    private func formatTimeAgo(_ date: Date) -> String {
+        let seconds = Int(Date().timeIntervalSince(date))
+
+        if seconds < 60 {
+            return "just now"
+        } else if seconds < 3600 {
+            let minutes = seconds / 60
+            return "\(minutes) minute\(minutes == 1 ? "" : "s") ago"
+        } else if seconds < 86400 {
+            let hours = seconds / 3600
+            return "\(hours) hour\(hours == 1 ? "" : "s") ago"
+        } else {
+            let days = seconds / 86400
+            return "\(days) day\(days == 1 ? "" : "s") ago"
+        }
     }
 
     /// Load memories for injection (async wrapper for MemoryService)
@@ -2364,7 +2505,16 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             let mimeType = resolvedMimeType(for: attachment)
 
             if let base64 = attachment.base64 {
+                // Check file size for inline data (Gemini limit is 20MB)
+                if let data = Data(base64Encoded: base64) {
+                    let fileSizeMB = Double(data.count) / (1024 * 1024)
+                    if fileSizeMB > 20 {
+                        print("[OnDeviceOrchestrator] Warning: Attachment '\(attachment.name ?? "unknown")' is \(String(format: "%.1f", fileSizeMB))MB, which exceeds Gemini's 20MB inline limit.")
+                    }
+                }
+
                 // Inline data for base64 encoded content
+                // Per Gemini docs: mime_type is crucial for ALL non-image files
                 parts.append([
                     "inline_data": [
                         "mime_type": mimeType,
@@ -2372,13 +2522,12 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     ]
                 ])
             } else if let url = attachment.url {
-                // File data for URLs - include mime_type for PDFs and other documents
+                // File data for URLs - include mime_type for all media types
+                // Per Gemini docs: mime_type is crucial for PDFs, audio, and video
                 var fileData: [String: Any] = ["file_uri": url]
 
-                // Per Gemini docs: mime_type is crucial for PDFs and non-image files
-                if attachment.type == .document || attachment.type == .audio || attachment.type == .video {
-                    fileData["mime_type"] = mimeType
-                }
+                // Always include mime_type for file_data to be safe
+                fileData["mime_type"] = mimeType
 
                 parts.append(["file_data": fileData])
             }

@@ -6,8 +6,9 @@
 //  This file must be added to both the main app and widget extension targets.
 //
 
-import ActivityKit
 import Foundation
+#if os(iOS)
+import ActivityKit
 
 struct HeartbeatActivityAttributes: ActivityAttributes {
     // Static context (set when activity starts, cannot change)
@@ -23,6 +24,8 @@ struct HeartbeatActivityAttributes: ActivityAttributes {
         let entryKind: String?
         let entryTags: [String]
         let errorMessage: String?
+        let moodIcon: HeartbeatMoodIcon?
+        let moodReason: String?
 
         static var idle: ContentState {
             ContentState(
@@ -32,11 +35,14 @@ struct HeartbeatActivityAttributes: ActivityAttributes {
                 entrySummary: nil,
                 entryKind: nil,
                 entryTags: [],
-                errorMessage: nil
+                errorMessage: nil,
+                moodIcon: nil,
+                moodReason: nil
             )
         }
     }
 }
+#endif
 
 enum HeartbeatActivityStatus: String, Codable, Hashable {
     case idle           // Waiting for next heartbeat
@@ -72,6 +78,69 @@ enum HeartbeatActivityStatus: String, Codable, Hashable {
         case .quietHours: return "purple"
         case .disabled: return "gray"
         case .error: return "red"
+        }
+    }
+}
+
+/// AI-selectable mood icons for the Live Activity
+/// The AI can pick one to subtly indicate why it started the heartbeat
+enum HeartbeatMoodIcon: String, Codable, Hashable, CaseIterable {
+    // Thinking / Processing
+    case thinking = "brain.head.profile"
+    case lightbulb = "lightbulb.fill"
+    case sparkles = "sparkles"
+
+    // Emotions / State
+    case happy = "face.smiling"
+    case curious = "questionmark.circle"
+    case focused = "eye"
+    case peaceful = "leaf.fill"
+    case energetic = "bolt.fill"
+
+    // Activities
+    case writing = "pencil.line"
+    case reading = "book.fill"
+    case organizing = "folder.fill"
+    case connecting = "link"
+    case searching = "magnifyingglass"
+
+    // Time-related
+    case waiting = "clock.fill"
+    case sunrise = "sunrise.fill"
+    case sunset = "sunset.fill"
+    case night = "moon.stars.fill"
+
+    // Abstract
+    case wave = "waveform.path"
+    case heart = "heart.fill"
+    case star = "star.fill"
+    case compass = "location.north.fill"
+
+    var sfSymbolName: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .thinking: return "Thinking"
+        case .lightbulb: return "Idea"
+        case .sparkles: return "Inspired"
+        case .happy: return "Happy"
+        case .curious: return "Curious"
+        case .focused: return "Focused"
+        case .peaceful: return "Peaceful"
+        case .energetic: return "Energetic"
+        case .writing: return "Writing"
+        case .reading: return "Reading"
+        case .organizing: return "Organizing"
+        case .connecting: return "Connecting"
+        case .searching: return "Searching"
+        case .waiting: return "Waiting"
+        case .sunrise: return "Morning"
+        case .sunset: return "Evening"
+        case .night: return "Night"
+        case .wave: return "Processing"
+        case .heart: return "Feeling"
+        case .star: return "Notable"
+        case .compass: return "Exploring"
         }
     }
 }

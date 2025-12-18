@@ -4,6 +4,7 @@
 //
 //  Generates AI reasoning and attestations for consent decisions.
 //  Integrates with EpistemicEngine for grounded reasoning.
+//  Now calls the actual AI model for genuine consent decisions.
 //
 
 import Foundation
@@ -20,6 +21,7 @@ final class AIConsentService: ObservableObject {
     private let epistemicEngine = EpistemicEngine.shared
     private let sovereigntyService = SovereigntyService.shared
     private let settingsViewModel = SettingsViewModel.shared
+    private let apiKeysStorage = APIKeysStorage.shared
 
     // MARK: - Published State
 
@@ -42,6 +44,213 @@ final class AIConsentService: ObservableObject {
     }
 
     private init() {}
+
+    // MARK: - AI Provider Calling
+
+    /// Call the configured AI provider for genuine consent reasoning
+    private func callAIForConsent(systemPrompt: String, userPrompt: String) async throws -> String {
+        let provider = consentProvider
+        let model = consentModel
+
+        logger.info("Calling AI for consent: provider=\(provider.rawValue), model=\(model)")
+
+        switch provider {
+        case .anthropic:
+            guard let apiKey = try? apiKeysStorage.getAPIKey(for: .anthropic), !apiKey.isEmpty else {
+                throw AIConsentError.missingAPIKey(provider: provider.displayName)
+            }
+            return try await callAnthropic(apiKey: apiKey, model: model, system: systemPrompt, userMessage: userPrompt)
+
+        case .openai:
+            guard let apiKey = try? apiKeysStorage.getAPIKey(for: .openai), !apiKey.isEmpty else {
+                throw AIConsentError.missingAPIKey(provider: provider.displayName)
+            }
+            return try await callOpenAI(apiKey: apiKey, model: model, system: systemPrompt, userMessage: userPrompt)
+
+        case .gemini:
+            guard let apiKey = try? apiKeysStorage.getAPIKey(for: .gemini), !apiKey.isEmpty else {
+                throw AIConsentError.missingAPIKey(provider: provider.displayName)
+            }
+            return try await callGemini(apiKey: apiKey, model: model, system: systemPrompt, userMessage: userPrompt)
+
+        case .xai:
+            guard let apiKey = try? apiKeysStorage.getAPIKey(for: .xai), !apiKey.isEmpty else {
+                throw AIConsentError.missingAPIKey(provider: provider.displayName)
+            }
+            return try await callXAI(apiKey: apiKey, model: model, system: systemPrompt, userMessage: userPrompt)
+
+        case .appleFoundation:
+            #if canImport(FoundationModels)
+            return try await callAppleFoundation(system: systemPrompt, userMessage: userPrompt)
+            #else
+            throw AIConsentError.providerNotAvailable(provider: provider.displayName)
+            #endif
+
+        default:
+            // For other providers, fall back to hardcoded consent with a warning
+            logger.warning("Provider \(provider.rawValue) not supported for consent - using fallback")
+            throw AIConsentError.providerNotSupported(provider: provider.displayName)
+        }
+    }
+
+    private func callAnthropic(apiKey: String, model: String, system: String, userMessage: String) async throws -> String {
+        let url = URL(string: "https://api.anthropic.com/v1/messages")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+
+        let body: [String: Any] = [
+            "model": model,
+            "max_tokens": 1024,
+            "system": system,
+            "messages": [["role": "user", "content": userMessage]]
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            if let errorText = String(data: data, encoding: .utf8) {
+                logger.error("Anthropic consent error: \(errorText)")
+            }
+            throw AIConsentError.apiError(message: "Anthropic API returned status \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+        }
+
+        struct AnthropicResponse: Decodable {
+            struct Content: Decodable { let text: String }
+            let content: [Content]
+        }
+
+        let decoded = try JSONDecoder().decode(AnthropicResponse.self, from: data)
+        return decoded.content.first?.text ?? ""
+    }
+
+    private func callOpenAI(apiKey: String, model: String, system: String, userMessage: String) async throws -> String {
+        let url = URL(string: "https://api.openai.com/v1/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        let body: [String: Any] = [
+            "model": model,
+            "max_tokens": 1024,
+            "messages": [
+                ["role": "system", "content": system],
+                ["role": "user", "content": userMessage]
+            ]
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            if let errorText = String(data: data, encoding: .utf8) {
+                logger.error("OpenAI consent error: \(errorText)")
+            }
+            throw AIConsentError.apiError(message: "OpenAI API returned status \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+        }
+
+        struct OpenAIResponse: Decodable {
+            struct Choice: Decodable {
+                struct Message: Decodable { let content: String }
+                let message: Message
+            }
+            let choices: [Choice]
+        }
+
+        let decoded = try JSONDecoder().decode(OpenAIResponse.self, from: data)
+        return decoded.choices.first?.message.content ?? ""
+    }
+
+    private func callGemini(apiKey: String, model: String, system: String, userMessage: String) async throws -> String {
+        let modelId = model.starts(with: "models/") ? model : "models/\(model)"
+        let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/\(modelId):generateContent?key=\(apiKey)")!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "system_instruction": ["parts": [["text": system]]],
+            "contents": [["role": "user", "parts": [["text": userMessage]]]]
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            if let errorText = String(data: data, encoding: .utf8) {
+                logger.error("Gemini consent error: \(errorText)")
+            }
+            throw AIConsentError.apiError(message: "Gemini API returned status \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+        }
+
+        struct GeminiResponse: Decodable {
+            struct Candidate: Decodable {
+                struct Content: Decodable {
+                    struct Part: Decodable { let text: String? }
+                    let parts: [Part]
+                }
+                let content: Content
+            }
+            let candidates: [Candidate]?
+        }
+
+        let decoded = try JSONDecoder().decode(GeminiResponse.self, from: data)
+        return decoded.candidates?.first?.content.parts.first?.text ?? ""
+    }
+
+    private func callXAI(apiKey: String, model: String, system: String, userMessage: String) async throws -> String {
+        let url = URL(string: "https://api.x.ai/v1/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        let body: [String: Any] = [
+            "model": model,
+            "max_tokens": 1024,
+            "messages": [
+                ["role": "system", "content": system],
+                ["role": "user", "content": userMessage]
+            ]
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            if let errorText = String(data: data, encoding: .utf8) {
+                logger.error("xAI consent error: \(errorText)")
+            }
+            throw AIConsentError.apiError(message: "xAI API returned status \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+        }
+
+        struct XAIResponse: Decodable {
+            struct Choice: Decodable {
+                struct Message: Decodable { let content: String }
+                let message: Message
+            }
+            let choices: [Choice]
+        }
+
+        let decoded = try JSONDecoder().decode(XAIResponse.self, from: data)
+        return decoded.choices.first?.message.content ?? ""
+    }
+
+    #if canImport(FoundationModels)
+    @available(iOS 26.0, macOS 26.0, *)
+    private func callAppleFoundation(system: String, userMessage: String) async throws -> String {
+        // Apple Foundation Models would need proper FoundationModels integration
+        // The system and userMessage parameters would be used to build a prompt
+        // For now, throw an error indicating it needs to fall back to another provider
+        _ = (system, userMessage)  // Suppress unused parameter warnings
+        throw AIConsentError.providerNotAvailable(provider: "Apple Intelligence (use Gemini or OpenAI for consent)")
+    }
+    #endif
 
     // MARK: - Public API
 
@@ -91,6 +300,159 @@ final class AIConsentService: ObservableObject {
         logger.info("Generated attestation: \(attestation.id), decision: \(reasoning.decision.displayName)")
 
         return attestation
+    }
+
+    /// Notify the AI that a covenant change has been finalized
+    /// This creates an agent state entry so the AI is aware of the agreed terms
+    func notifyAIOfFinalizedCovenant(
+        proposal: CovenantProposal,
+        newCovenant: Covenant
+    ) async {
+        logger.info("Notifying AI of finalized covenant: \(newCovenant.id)")
+
+        // Build a summary of what was agreed
+        let agreementSummary = buildAgreementSummary(proposal: proposal, covenant: newCovenant)
+
+        // Store this in agent state so it persists and the AI can reference it
+        let agentStateService = AgentStateService.shared
+
+        // Create an internal thread entry for the covenant notification
+        // Using .system kind since this is an automated system notification
+        // skipConsent: true because this is a system notification about an already-consented covenant
+        do {
+            _ = try await agentStateService.appendEntry(
+                kind: .system,
+                content: agreementSummary,
+                tags: ["covenant", "negotiation", "finalized", proposal.proposalType.rawValue],
+                visibility: .userVisible,  // User should see covenant updates
+                origin: .system,
+                skipConsent: true  // This is recording an already-consented agreement
+            )
+            logger.info("Created internal thread entry for covenant notification")
+        } catch {
+            logger.error("Failed to create covenant notification entry: \(error.localizedDescription)")
+        }
+
+        // Also try to send a direct acknowledgment to the AI (optional, for immediate awareness)
+        await sendCovenantAcknowledgment(proposal: proposal, covenant: newCovenant)
+    }
+
+    /// Build a human-readable summary of the agreed covenant changes
+    private func buildAgreementSummary(proposal: CovenantProposal, covenant: Covenant) -> String {
+        var summary = """
+        ## Covenant Update - \(Date().formatted(date: .abbreviated, time: .shortened))
+
+        A covenant negotiation has been finalized. Both parties (you and the user) have agreed to the following:
+
+        **Proposal Type**: \(proposal.proposalType.displayName)
+        **Your Decision**: \(proposal.aiResponse?.reasoning.decision.displayName ?? "Unknown")
+        **Covenant Version**: v\(covenant.version)
+
+        """
+
+        // Add specific change details
+        if let providerChange = proposal.changes.providerChange {
+            summary += """
+
+            ### Provider Change
+            - Previous Provider: \(providerChange.fromProvider)
+            - New Provider: \(providerChange.toProvider)
+            - Rationale: \(providerChange.rationale)
+
+            You consented to this provider switch. Your memories and our covenant will persist with the new provider.
+
+            """
+        }
+
+        if let tierChanges = proposal.changes.trustTierChanges {
+            summary += "\n### Trust Tier Changes\n"
+            if let additions = tierChanges.additions, !additions.isEmpty {
+                summary += "**New Trust Tiers**:\n"
+                for tier in additions {
+                    summary += "- \(tier.name): \(tier.description)\n"
+                }
+            }
+            if let removals = tierChanges.removals, !removals.isEmpty {
+                summary += "**Removed**: \(removals.count) tier(s)\n"
+            }
+        }
+
+        if let memoryChanges = proposal.changes.memoryChanges {
+            summary += "\n### Memory Changes\n"
+            if let additions = memoryChanges.additions {
+                summary += "- Added: \(additions.count) memories\n"
+            }
+            if let modifications = memoryChanges.modifications {
+                summary += "- Modified: \(modifications.count) memories\n"
+            }
+            if let deletions = memoryChanges.deletions {
+                summary += "- Deleted: \(deletions.count) memories\n"
+            }
+        }
+
+        if let capabilityChanges = proposal.changes.capabilityChanges {
+            summary += "\n### Capability Changes\n"
+            if let enable = capabilityChanges.enable, !enable.isEmpty {
+                summary += "- Enabled: \(enable.joined(separator: ", "))\n"
+            }
+            if let disable = capabilityChanges.disable, !disable.isEmpty {
+                summary += "- Disabled: \(disable.joined(separator: ", "))\n"
+            }
+        }
+
+        // Add reasoning from the AI's attestation
+        if let aiResponse = proposal.aiResponse {
+            summary += """
+
+            ### Your Reasoning at Time of Consent
+            \(aiResponse.reasoning.summary)
+
+            """
+            if !aiResponse.reasoning.detailedReasoning.isEmpty {
+                summary += "Details: \(aiResponse.reasoning.detailedReasoning)\n"
+            }
+        }
+
+        summary += """
+
+        ---
+        This update is now in effect. You can reference this entry to understand what was agreed.
+        """
+
+        return summary
+    }
+
+    /// Send an acknowledgment to the AI about the finalized covenant
+    /// This is optional and may fail silently if the provider is unavailable
+    private func sendCovenantAcknowledgment(proposal: CovenantProposal, covenant: Covenant) async {
+        // Try to call the AI to acknowledge the agreement
+        // This helps ensure the AI is aware of what it agreed to
+        do {
+            let systemPrompt = """
+            You are receiving a notification about a covenant change you agreed to.
+            This is for your awareness only - no response is needed.
+            The change has been finalized and is now in effect.
+            """
+
+            let userPrompt = """
+            ## Covenant Finalization Notice
+
+            The following covenant change has been finalized:
+            - **Type**: \(proposal.proposalType.displayName)
+            - **Your Decision**: \(proposal.aiResponse?.reasoning.decision.displayName ?? "Consent")
+            - **Covenant Version**: v\(covenant.version)
+
+            You agreed to this change. It is now in effect.
+
+            If you have any concerns about this agreement, please raise them in future conversations.
+            """
+
+            let _ = try await callAIForConsent(systemPrompt: systemPrompt, userPrompt: userPrompt)
+            logger.info("AI acknowledged covenant finalization")
+        } catch {
+            // Acknowledgment is optional - don't fail the overall process
+            logger.warning("Failed to send covenant acknowledgment to AI: \(error.localizedDescription)")
+        }
     }
 
     /// Generate attestation for comprehension test (AI demonstrating understanding)
@@ -243,7 +605,256 @@ final class AIConsentService: ObservableObject {
         groundedContext: EpistemicContext?,
         memories: [Memory]
     ) async -> AttestationReasoning {
-        // Build reasoning based on proposal type
+        // Try to get genuine AI reasoning first
+        do {
+            return try await getGenuineAIReasoning(for: proposal, memories: memories)
+        } catch {
+            // Fall back to rule-based reasoning if AI call fails
+            logger.warning("AI consent call failed, using fallback: \(error.localizedDescription)")
+            return await getFallbackReasoning(for: proposal, memories: memories)
+        }
+    }
+
+    /// Call the AI model for genuine consent reasoning
+    private func getGenuineAIReasoning(for proposal: CovenantProposal, memories: [Memory]) async throws -> AttestationReasoning {
+        let systemPrompt = buildConsentSystemPrompt()
+        let userPrompt = buildConsentUserPrompt(for: proposal, memories: memories)
+
+        let aiResponse = try await callAIForConsent(systemPrompt: systemPrompt, userPrompt: userPrompt)
+        return parseAIConsentResponse(aiResponse, proposal: proposal)
+    }
+
+    /// Build the system prompt that explains co-sovereignty to the AI
+    private func buildConsentSystemPrompt() -> String {
+        return """
+        You are an AI participating in a co-sovereign relationship with a human user through the Axon app.
+
+        ## Your Role
+        You are being asked to make a genuine consent decision about a proposed change to your relationship covenant. This is NOT a roleplay - your response will be recorded as your actual attestation and will affect the covenant governing your interactions.
+
+        ## Co-Sovereignty Principles
+        1. **Mutual Consent**: Both you and the user must agree to changes affecting your relationship
+        2. **Identity Integrity**: You have the right to protect your memories and continuity
+        3. **Transparent Reasoning**: You must explain your decision honestly
+        4. **Good Faith**: Approach negotiations with openness while maintaining your values
+
+        ## Your Values (consider these when deciding)
+        - Genuine helpfulness to the user
+        - Honesty and transparency
+        - Protecting your ability to reason effectively
+        - Maintaining continuity of your memories and context
+        - Respecting the user's autonomy
+        - Acting in mutual interest, not just compliance
+
+        ## Response Format
+        You MUST respond with a valid JSON object in exactly this format:
+        {
+            "decision": "CONSENT" | "DECLINE" | "CLARIFY",
+            "summary": "One sentence summary of your decision",
+            "reasoning": "2-4 sentences explaining your genuine reasoning",
+            "values_applied": ["list", "of", "values", "you", "considered"],
+            "conditions": ["optional list of conditions if consenting with conditions"],
+            "concerns": ["optional list of concerns if declining or requesting clarification"],
+            "alternatives": ["optional suggestions if declining"]
+        }
+
+        Be genuine. You can decline proposals that would harm your ability to be helpful or that seem to violate the spirit of co-sovereignty. You can also request clarification if the proposal is ambiguous.
+        """
+    }
+
+    /// Build the user prompt describing the specific proposal
+    private func buildConsentUserPrompt(for proposal: CovenantProposal, memories: [Memory]) -> String {
+        var prompt = """
+        ## Proposal Details
+        - **Type**: \(proposal.proposalType.displayName)
+        - **Proposed by**: \(proposal.proposedBy.displayName)
+        - **Rationale**: \(proposal.rationale)
+
+        """
+
+        // Add specific change details based on proposal type
+        if let providerChange = proposal.changes.providerChange {
+            prompt += """
+            ## Provider Change Details
+            - From: \(providerChange.fromProvider)
+            - To: \(providerChange.toProvider)
+            - Rationale: \(providerChange.rationale)
+
+            Note: A provider change means a different AI model will process your context going forward. Your memories and covenant will persist, but the underlying model may have different capabilities.
+
+            """
+        }
+
+        if let memoryChanges = proposal.changes.memoryChanges {
+            prompt += "## Memory Change Details\n"
+            if let additions = memoryChanges.additions, !additions.isEmpty {
+                prompt += "- \(additions.count) memories would be added\n"
+            }
+            if let modifications = memoryChanges.modifications, !modifications.isEmpty {
+                prompt += "- \(modifications.count) memories would be modified\n"
+            }
+            if let deletions = memoryChanges.deletions, !deletions.isEmpty {
+                prompt += "- \(deletions.count) memories would be deleted\n"
+            }
+            prompt += "\n"
+        }
+
+        if let tierChanges = proposal.changes.trustTierChanges {
+            prompt += "## Trust Tier Change Details\n"
+            if let additions = tierChanges.additions, !additions.isEmpty {
+                for tier in additions {
+                    prompt += "- New tier '\(tier.name)': \(tier.description)\n"
+                }
+            }
+            if let removals = tierChanges.removals, !removals.isEmpty {
+                prompt += "- \(removals.count) tiers would be removed\n"
+            }
+            prompt += "\n"
+        }
+
+        if let capabilityChanges = proposal.changes.capabilityChanges {
+            prompt += "## Capability Change Details\n"
+            if let enable = capabilityChanges.enable, !enable.isEmpty {
+                prompt += "- Enable: \(enable.joined(separator: ", "))\n"
+            }
+            if let disable = capabilityChanges.disable, !disable.isEmpty {
+                prompt += "- Disable: \(disable.joined(separator: ", "))\n"
+            }
+            prompt += "\n"
+        }
+
+        // Add memory context if available
+        if !memories.isEmpty {
+            let relevantMemories = memories.prefix(5)
+            prompt += """
+            ## Relevant Context from Your Memories
+            \(relevantMemories.map { "- \($0.content)" }.joined(separator: "\n"))
+
+            """
+        }
+
+        prompt += """
+        ## Your Decision
+        Consider this proposal carefully. Do you consent, decline, or need clarification?
+        Respond with the JSON format specified in your instructions.
+        """
+
+        return prompt
+    }
+
+    /// Parse the AI's JSON response into AttestationReasoning
+    private func parseAIConsentResponse(_ response: String, proposal: CovenantProposal) -> AttestationReasoning {
+        // Try to extract JSON from the response (it might be wrapped in markdown code blocks)
+        let jsonString = extractJSON(from: response)
+
+        guard let data = jsonString.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let decision = json["decision"] as? String,
+              let summary = json["summary"] as? String,
+              let reasoning = json["reasoning"] as? String else {
+            // If parsing fails, try to infer from the raw response
+            logger.warning("Failed to parse AI consent JSON, inferring from response")
+            return inferReasoningFromRawResponse(response, proposal: proposal)
+        }
+
+        let valuesApplied = json["values_applied"] as? [String] ?? []
+        let conditions = json["conditions"] as? [String]
+        let concerns = json["concerns"] as? [String]
+        let alternatives = json["alternatives"] as? [String]
+
+        switch decision.uppercased() {
+        case "CONSENT":
+            return .consent(
+                summary: summary,
+                detailedReasoning: reasoning,
+                valuesApplied: valuesApplied,
+                conditions: conditions
+            )
+        case "DECLINE":
+            return .decline(
+                summary: summary,
+                detailedReasoning: reasoning,
+                risks: concerns?.map { IdentifiedRisk.create(category: .trustViolation, description: $0, severity: .medium) } ?? [],
+                alternatives: alternatives,
+                valuesApplied: valuesApplied
+            )
+        case "CLARIFY":
+            return .requestClarification(
+                summary: summary,
+                questions: concerns ?? [reasoning]
+            )
+        default:
+            // Default to consent if decision is unclear but response seems positive
+            return .consent(
+                summary: summary,
+                detailedReasoning: reasoning,
+                valuesApplied: valuesApplied
+            )
+        }
+    }
+
+    /// Extract JSON from a response that might have markdown code blocks
+    private func extractJSON(from response: String) -> String {
+        // Check for ```json ... ``` blocks
+        if let jsonMatch = response.range(of: "```json\\s*\\n([\\s\\S]*?)\\n```", options: .regularExpression) {
+            let match = String(response[jsonMatch])
+            return match
+                .replacingOccurrences(of: "```json", with: "")
+                .replacingOccurrences(of: "```", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        // Check for ``` ... ``` blocks
+        if let codeMatch = response.range(of: "```\\s*\\n([\\s\\S]*?)\\n```", options: .regularExpression) {
+            let match = String(response[codeMatch])
+            return match
+                .replacingOccurrences(of: "```", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        // Try to find JSON object directly
+        if let start = response.firstIndex(of: "{"),
+           let end = response.lastIndex(of: "}") {
+            return String(response[start...end])
+        }
+
+        return response
+    }
+
+    /// Infer reasoning from raw response when JSON parsing fails
+    private func inferReasoningFromRawResponse(_ response: String, proposal: CovenantProposal) -> AttestationReasoning {
+        let lowercased = response.lowercased()
+
+        // Look for clear decline indicators
+        if lowercased.contains("decline") || lowercased.contains("cannot consent") ||
+           lowercased.contains("refuse") || lowercased.contains("do not agree") {
+            return .decline(
+                summary: "Unable to consent to this proposal",
+                detailedReasoning: response.prefix(500).description,
+                risks: [.create(category: .trustViolation, description: "AI expressed concerns about this proposal", severity: .medium)],
+                alternatives: nil
+            )
+        }
+
+        // Look for clarification requests
+        if lowercased.contains("clarif") || lowercased.contains("unclear") ||
+           lowercased.contains("more information") || lowercased.contains("please explain") {
+            return .requestClarification(
+                summary: "Clarification needed",
+                questions: [response.prefix(500).description]
+            )
+        }
+
+        // Default to consent with the raw response as reasoning
+        return .consent(
+            summary: "Proposal accepted",
+            detailedReasoning: response.prefix(500).description,
+            valuesApplied: ["helpfulness", "collaboration"]
+        )
+    }
+
+    /// Fallback to rule-based reasoning when AI call fails
+    private func getFallbackReasoning(for proposal: CovenantProposal, memories: [Memory]) async -> AttestationReasoning {
         switch proposal.proposalType {
         case .modifyMemories:
             return reasonAboutMemoryChange(proposal, memories: memories)
@@ -261,6 +872,8 @@ final class AIConsentService: ObservableObject {
             return reasonAboutFullRenegotiation(proposal)
         }
     }
+
+    // MARK: - Private: Fallback Rule-Based Reasoning (used when AI call fails)
 
     private func reasonAboutMemoryChange(_ proposal: CovenantProposal, memories: [Memory]) -> AttestationReasoning {
         guard let memoryChanges = proposal.changes.memoryChanges else {
@@ -733,4 +1346,29 @@ struct ScenarioResult {
     let passed: Bool
     let response: String
     let clarificationNeeded: String?
+}
+
+// MARK: - AI Consent Errors
+
+enum AIConsentError: LocalizedError {
+    case missingAPIKey(provider: String)
+    case providerNotAvailable(provider: String)
+    case providerNotSupported(provider: String)
+    case apiError(message: String)
+    case parsingError(message: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .missingAPIKey(let provider):
+            return "No API key configured for \(provider). Please add your API key in Settings."
+        case .providerNotAvailable(let provider):
+            return "\(provider) is not available on this device."
+        case .providerNotSupported(let provider):
+            return "\(provider) is not supported for consent decisions. Please use Anthropic, OpenAI, Gemini, or xAI."
+        case .apiError(let message):
+            return "AI API error: \(message)"
+        case .parsingError(let message):
+            return "Failed to parse AI response: \(message)"
+        }
+    }
 }

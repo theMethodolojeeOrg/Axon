@@ -376,6 +376,10 @@ struct ChatContainerView: View {
     @State private var bridgeWorkspaceName: String?
     #endif
 
+    // First-run welcome card state
+    @State private var showFirstRunWelcome = false
+    @ObservedObject private var settingsViewModel = SettingsViewModel.shared
+
     var body: some View {
         ZStack {
             AppColors.substratePrimary
@@ -538,6 +542,10 @@ struct ChatContainerView: View {
         .onChange(of: selectedAttachments) { oldValue, newValue in
             // Auto-save draft when attachments change
             saveDraftDebounced()
+        }
+        .onAppear {
+            // Show first-run welcome card if user hasn't seen it yet
+            showFirstRunWelcome = !settingsViewModel.settings.hasSeenFirstRunWelcome
         }
     }
 
@@ -714,6 +722,16 @@ struct ChatContainerView: View {
                                         streamingReasoning: streamedReasoning[message.id],
                                         contextDebugInfo: contextDebugInfos[message.id]
                                     )
+
+                                    // Show first-run welcome card after the first assistant response
+                                    if index == 1 && message.role == .assistant && showFirstRunWelcome {
+                                        FirstRunWelcomeCard(onDismiss: {
+                                            showFirstRunWelcome = false
+                                        })
+                                        .padding(.horizontal)
+                                        .padding(.top, 16)
+                                        .transition(.opacity.combined(with: .move(edge: .top)))
+                                    }
                                 }
 
                                 // Add separator after assistant messages (before next user message)

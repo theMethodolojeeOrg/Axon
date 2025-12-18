@@ -157,7 +157,16 @@ class GeminiToolService: ObservableObject {
             let mimeType = resolvedMimeType(for: attachment)
 
             if let base64 = attachment.base64 {
+                // Check file size for inline data (Gemini limit is 20MB)
+                if let data = Data(base64Encoded: base64) {
+                    let fileSizeMB = Double(data.count) / (1024 * 1024)
+                    if fileSizeMB > 20 {
+                        print("[GeminiToolService] Warning: Attachment '\(attachment.name ?? "unknown")' is \(String(format: "%.1f", fileSizeMB))MB, which exceeds Gemini's 20MB inline limit.")
+                    }
+                }
+
                 // Inline data for base64 encoded content (files <20MB)
+                // Per Gemini docs: mime_type is crucial for ALL non-image files
                 parts.append([
                     "inline_data": [
                         "mime_type": mimeType,
@@ -169,9 +178,8 @@ class GeminiToolService: ObservableObject {
                 // Per Gemini docs: mime_type is crucial for PDFs, audio, and video
                 var fileData: [String: Any] = ["file_uri": url]
 
-                if attachment.type == .document || attachment.type == .audio || attachment.type == .video {
-                    fileData["mime_type"] = mimeType
-                }
+                // Always include mime_type for file_data to be safe
+                fileData["mime_type"] = mimeType
 
                 parts.append(["file_data": fileData])
             }
@@ -229,6 +237,8 @@ class GeminiToolService: ObservableObject {
         "png": "image/png",
         "gif": "image/gif",
         "webp": "image/webp",
+        "heic": "image/heic",
+        "heif": "image/heif",
 
         // Video formats (Gemini supported)
         "mp4": "video/mp4",
@@ -242,6 +252,7 @@ class GeminiToolService: ObservableObject {
         "wmv": "video/wmv",
         "3gp": "video/3gpp",
         "3gpp": "video/3gpp",
+        "quicktime": "video/quicktime",
 
         // Audio formats (Gemini supported)
         "wav": "audio/wav",
@@ -253,11 +264,22 @@ class GeminiToolService: ObservableObject {
         "flac": "audio/flac",
         "m4a": "audio/aac",
         "mpga": "audio/mpeg",
+        "opus": "audio/opus",
 
         // Documents
         "pdf": "application/pdf",
         "txt": "text/plain",
         "text": "text/plain",
+        "html": "text/html",
+        "css": "text/css",
+        "js": "application/javascript",
+        "py": "text/x-python",
+        "swift": "text/x-swift",
+        "json": "application/json",
+        "xml": "application/xml",
+        "csv": "text/csv",
+        "md": "text/markdown",
+        "markdown": "text/markdown",
     ]
 
     private func parseToolResponse(_ response: GeminiAPIResponse) -> GeminiToolResponse {
@@ -469,4 +491,3 @@ enum GeminiToolError: LocalizedError {
         }
     }
 }
-

@@ -708,73 +708,138 @@ struct MessageSeparator: View {
 
 // MARK: - Streaming Content With Tools View
 
-/// Renders streaming content with inline tool calls
+/// Represents a segment of content - either text or a tool call placeholder
+private enum ContentSegment: Identifiable {
+    case text(String)
+    case toolPlaceholder(index: Int, toolName: String)
+
+    var id: String {
+        switch self {
+        case .text(let content):
+            return "text-\(content.hashValue)"
+        case .toolPlaceholder(let index, _):
+            return "tool-\(index)"
+        }
+    }
+}
+
+/// Renders streaming content with inline tool calls interleaved at their actual positions
 struct StreamingContentWithToolsView: View {
     let content: String
     let toolCalls: [LiveToolCall]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Render content up to first tool call marker
-            let (textBeforeTools, hasToolMarker) = extractTextBeforeTools()
+            let segments = parseContentSegments()
 
-            if !textBeforeTools.isEmpty {
-                AssistantMarkdownView(content: textBeforeTools)
-                    .codeArtifactHost()
-            }
+            ForEach(segments) { segment in
+                switch segment {
+                case .text(let text):
+                    if !text.isEmpty {
+                        AssistantMarkdownView(content: text)
+                            .codeArtifactHost()
+                    }
 
-            // Render inline tool calls
-            if !toolCalls.isEmpty {
-                InlineToolCallsView(toolCalls: toolCalls)
-            }
-
-            // If there's content after the tool request marker, render it
-            if hasToolMarker {
-                let textAfterTools = extractTextAfterTools()
-                if !textAfterTools.isEmpty {
-                    AssistantMarkdownView(content: textAfterTools)
-                        .codeArtifactHost()
+                case .toolPlaceholder(let index, let toolName):
+                    // Find the matching tool call by index or name
+                    if let toolCall = findToolCall(at: index, named: toolName) {
+                        InlineToolCallView(toolCall: toolCall)
+                    }
                 }
             }
+
+            // Show any remaining tool calls that weren't matched to placeholders
+            // (handles case where tool calls exist but no markers in content)
+            let unmatchedTools = toolCalls.enumerated().filter { index, _ in
+                !segments.contains { segment in
+                    if case .toolPlaceholder(let idx, _) = segment {
+                        return idx == index
+                    }
+                    return false
+                }
+            }.map { $0.element }
+
+            if !unmatchedTools.isEmpty && !hasAnyToolMarkers() {
+                InlineToolCallsView(toolCalls: unmatchedTools)
+            }
         }
     }
 
-    /// Extract text before any tool_request block
-    private func extractTextBeforeTools() -> (String, Bool) {
-        // Look for tool_request code block
-        let patterns = [
-            "```tool_request",
-            "```tool_request\n",
-            "```\ntool_request"
-        ]
+    /// Parse content into segments of text and tool placeholders
+    private func parseContentSegments() -> [ContentSegment] {
+        var segments: [ContentSegment] = []
+        var remaining = content
+        var toolIndex = 0
 
-        for pattern in patterns {
-            if let range = content.range(of: pattern) {
-                let before = String(content[..<range.lowerBound])
-                return (before.trimmingCharacters(in: .whitespacesAndNewlines), true)
+        let pattern = "```tool_request\\s*\\n?([\\s\\S]*?)\\n?```"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            // No regex, return content as single text segment
+            return [.text(content)]
+        }
+
+        while true {
+            let range = NSRange(remaining.startIndex..., in: remaining)
+            guard let match = regex.firstMatch(in: remaining, options: [], range: range) else {
+                // No more matches - add remaining text
+                let trimmed = remaining.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    segments.append(.text(trimmed))
+                }
+                break
+            }
+
+            // Extract text before this match
+            if let beforeRange = Range(NSRange(location: 0, length: match.range.location), in: remaining) {
+                let beforeText = String(remaining[beforeRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !beforeText.isEmpty {
+                    segments.append(.text(beforeText))
+                }
+            }
+
+            // Extract tool name from the JSON if possible
+            var toolName = ""
+            if let jsonRange = Range(match.range(at: 1), in: remaining) {
+                let jsonString = String(remaining[jsonRange])
+                if let data = jsonString.data(using: .utf8),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let name = json["tool"] as? String {
+                    toolName = name
+                }
+            }
+
+            // Add tool placeholder
+            segments.append(.toolPlaceholder(index: toolIndex, toolName: toolName))
+            toolIndex += 1
+
+            // Move past this match
+            if let matchRange = Range(match.range, in: remaining) {
+                remaining = String(remaining[matchRange.upperBound...])
+            } else {
+                break
             }
         }
 
-        // No tool marker found - return all content
-        return (content, false)
+        return segments
     }
 
-    /// Extract text after the tool_request block (if any)
-    private func extractTextAfterTools() -> String {
-        // Look for closing ``` after tool_request
-        guard let startRange = content.range(of: "```tool_request") else {
-            return ""
+    /// Find a tool call by index or matching name
+    private func findToolCall(at index: Int, named toolName: String) -> LiveToolCall? {
+        // First try exact index match
+        if index < toolCalls.count {
+            return toolCalls[index]
         }
 
-        let afterStart = content[startRange.upperBound...]
-
-        // Find the closing ```
-        guard let endRange = afterStart.range(of: "```") else {
-            return ""
+        // Fall back to name match
+        if !toolName.isEmpty {
+            return toolCalls.first { $0.name == toolName }
         }
 
-        let afterEnd = afterStart[endRange.upperBound...]
-        return String(afterEnd).trimmingCharacters(in: .whitespacesAndNewlines)
+        return nil
+    }
+
+    /// Check if content has any tool markers
+    private func hasAnyToolMarkers() -> Bool {
+        return content.contains("```tool_request")
     }
 }
 

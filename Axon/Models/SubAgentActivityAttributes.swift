@@ -2,8 +2,11 @@
 //  SubAgentActivityAttributes.swift
 //  Axon
 //
-//  Shared ActivityAttributes model for sub-agent job Live Activity.
-//  This file must be added to both the main app and widget extension targets.
+//  ActivityAttributes model for sub-agent job Live Activity.
+//
+//  NOTE: This file is for the main app target. A copy of the shared types
+//  exists in AxonLiveActivity/SubAgentActivityShared.swift for the widget extension.
+//  Both files define the same types - they compile into separate targets.
 //
 //  **Architectural Commandment #5**: The Mercury Pulse.
 //  A sub-agent in the field is a living process - the Dynamic Island
@@ -156,7 +159,7 @@ struct SubAgentProgress: Codable, Hashable {
     }
 }
 
-// MARK: - Conversion Helpers
+// MARK: - Conversion Helpers (Main App Only)
 
 #if os(iOS)
 extension SubAgentActivityRole {

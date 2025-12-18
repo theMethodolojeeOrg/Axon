@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import Combine
 
 // MARK: - Job Attestation
 
@@ -26,7 +27,7 @@ struct JobAttestation: Codable, Identifiable, Equatable, Sendable {
     let reasoning: String
 
     /// The decision being attested
-    let decision: AttestationDecision
+    let decision: JobAttestationDecision
 
     // MARK: - Cryptographic Proof
 
@@ -65,7 +66,7 @@ struct JobAttestation: Codable, Identifiable, Equatable, Sendable {
         jobId: String,
         type: AttestationType,
         reasoning: String,
-        decision: AttestationDecision,
+        decision: JobAttestationDecision,
         modelId: String,
         covenantId: String?,
         conversationId: String? = nil,
@@ -181,10 +182,10 @@ enum AttestationType: String, Codable, CaseIterable, Sendable {
     }
 }
 
-// MARK: - Attestation Decision
+// MARK: - Job Attestation Decision
 
-/// The decision being attested.
-enum AttestationDecision: String, Codable, Sendable {
+/// The decision being attested for a sub-agent job.
+enum JobAttestationDecision: String, Codable, Sendable {
     case consent             // Approved/accepted
     case consentWithCaveats  // Approved with conditions
     case decline             // Rejected/terminated

@@ -6,10 +6,9 @@
 //
 
 import SwiftUI
-
+import Combine
 #if os(macOS)
 import AppKit
-import Combine
 import UniformTypeIdentifiers
 #endif
 
@@ -722,3 +721,300 @@ private struct InspectorTabButton: View {
     }
 }
 #endif
+
+// MARK: - Tool Request Code Block View
+
+/// Specialized code block for tool_request that allows manual execution
+struct ToolRequestCodeBlockView: View {
+    let code: String
+
+    @State private var executionState: ToolExecutionState = .notExecuted
+    @State private var executionResult: String?
+    @State private var isExpanded: Bool = false
+
+    private enum ToolExecutionState {
+        case notExecuted
+        case executing
+        case success
+        case failure
+    }
+
+    /// Parse the JSON to extract tool name and query
+    private var parsedRequest: (tool: String, query: String)? {
+        guard let data = code.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tool = json["tool"] as? String,
+              let query = json["query"] as? String else {
+            return nil
+        }
+        return (tool, query)
+    }
+
+    /// Generate a hash for deduplication
+    private var contentHash: String {
+        let combined = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        return String(combined.hashValue)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+
+            if isExpanded {
+                expandedContent
+            }
+        }
+        .background(AppColors.substrateTertiary)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(borderColor, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .onAppear {
+            checkIfAlreadyExecuted()
+        }
+    }
+
+    private var borderColor: Color {
+        switch executionState {
+        case .notExecuted: return AppColors.glassBorder
+        case .executing: return AppColors.signalMercury
+        case .success: return AppColors.signalLichen
+        case .failure: return AppColors.signalHematite
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            // Tool icon and name
+            if let parsed = parsedRequest {
+                Image(systemName: LiveToolCall.icon(for: parsed.tool))
+                    .font(.system(size: 14))
+                    .foregroundColor(stateColor)
+
+                Text(LiveToolCall.displayName(for: parsed.tool))
+                    .font(AppTypography.bodySmall(.medium))
+                    .foregroundColor(AppColors.textPrimary)
+            } else {
+                Text("tool_request")
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(AppColors.textSecondary)
+            }
+
+            Spacer()
+
+            // State indicator and action button
+            actionButton
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(stateColor.opacity(0.1))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.spring(response: 0.3)) {
+                isExpanded.toggle()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var actionButton: some View {
+        switch executionState {
+        case .notExecuted:
+            Button {
+                executeToolRequest()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 10))
+                    Text("Apply")
+                        .font(AppTypography.labelSmall())
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(AppColors.signalMercury)
+                .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
+
+        case .executing:
+            HStack(spacing: 6) {
+                ProgressView()
+                    .scaleEffect(0.7)
+                Text("Running...")
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(AppColors.signalMercury)
+            }
+
+        case .success:
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 14))
+                Text("Applied")
+                    .font(AppTypography.labelSmall())
+            }
+            .foregroundColor(AppColors.signalLichen)
+
+        case .failure:
+            Button {
+                executeToolRequest()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 10))
+                    Text("Retry")
+                        .font(AppTypography.labelSmall())
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(AppColors.signalHematite)
+                .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var stateColor: Color {
+        switch executionState {
+        case .notExecuted: return AppColors.signalMercury
+        case .executing: return AppColors.signalMercury
+        case .success: return AppColors.signalLichen
+        case .failure: return AppColors.signalHematite
+        }
+    }
+
+    @ViewBuilder
+    private var expandedContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Query preview
+            if let parsed = parsedRequest {
+                Text(parsed.query)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(AppColors.textSecondary)
+                    .lineLimit(3)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+            }
+
+            // Result if available
+            if let result = executionResult {
+                Divider()
+                    .overlay(AppColors.glassBorder.opacity(0.5))
+
+                Text(result)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(executionState == .failure ? AppColors.signalHematite : AppColors.textSecondary)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
+            }
+        }
+        .padding(.bottom, executionResult == nil ? 8 : 0)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+
+    /// Check if this exact tool request was already executed in this session
+    private func checkIfAlreadyExecuted() {
+        if ToolRequestTracker.shared.wasExecuted(hash: contentHash) {
+            executionState = .success
+            executionResult = ToolRequestTracker.shared.getResult(hash: contentHash)
+        }
+    }
+
+    /// Execute the tool request
+    private func executeToolRequest() {
+        guard let parsed = parsedRequest else {
+            executionState = .failure
+            executionResult = "Failed to parse tool request"
+            return
+        }
+
+        executionState = .executing
+
+        Task {
+            do {
+                let request = ToolRequest(tool: parsed.tool, query: parsed.query)
+
+                // Get Gemini API key for tool execution
+                let geminiKey = await MainActor.run {
+                    SettingsViewModel.shared.getAPIKey(.gemini) ?? ""
+                }
+
+                let result = try await ToolProxyService.shared.executeToolRequest(
+                    request,
+                    geminiApiKey: geminiKey,
+                    conversationContext: nil
+                )
+
+                await MainActor.run {
+                    if result.success {
+                        executionState = .success
+                        executionResult = result.result
+                        ToolRequestTracker.shared.markExecuted(hash: contentHash, result: result.result)
+                    } else {
+                        executionState = .failure
+                        executionResult = result.result
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    executionState = .failure
+                    executionResult = error.localizedDescription
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Tool Request Tracker
+
+/// Tracks which tool requests have been executed in this session to prevent duplicates
+final class ToolRequestTracker: @unchecked Sendable {
+    static let shared = ToolRequestTracker()
+
+    private var executedHashes: [String: String] = [:] // hash -> result
+    private let lock = NSLock()
+
+    private init() {}
+
+    func wasExecuted(hash: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return executedHashes[hash] != nil
+    }
+
+    func markExecuted(hash: String, result: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        executedHashes[hash] = result
+    }
+
+    func getResult(hash: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return executedHashes[hash]
+    }
+
+    /// Mark a tool request as executed using the request object
+    /// Generates hash from canonical JSON representation
+    func markExecuted(request: ToolRequest, result: String) {
+        let json = "{\"tool\": \"\(request.tool)\", \"query\": \"\(request.query)\"}"
+        let hash = String(json.trimmingCharacters(in: .whitespacesAndNewlines).hashValue)
+        markExecuted(hash: hash, result: result)
+    }
+
+    /// Check if a tool request was already executed
+    func wasExecuted(request: ToolRequest) -> Bool {
+        let json = "{\"tool\": \"\(request.tool)\", \"query\": \"\(request.query)\"}"
+        let hash = String(json.trimmingCharacters(in: .whitespacesAndNewlines).hashValue)
+        return wasExecuted(hash: hash)
+    }
+
+    /// Clear all tracked executions (call on conversation switch)
+    func clear() {
+        lock.lock()
+        defer { lock.unlock() }
+        executedHashes.removeAll()
+    }
+}

@@ -18,7 +18,7 @@ final class HeartbeatService: ObservableObject {
     @Published private(set) var isRunning: Bool = false
 
     private let settingsViewModel = SettingsViewModel.shared
-    private let orchestrator = OnDeviceConversationOrchestrator()
+    private lazy var orchestrator = OnDeviceConversationOrchestrator()
     private let agentStateService = AgentStateService.shared
     private let notificationService = NotificationService.shared
     private let sovereigntyService = SovereigntyService.shared
@@ -101,11 +101,13 @@ final class HeartbeatService: ObservableObject {
                 try? await Task.sleep(nanoseconds: UInt64(interval) * 1_000_000_000)
                 let result = await self.runOnce(reason: "scheduled")
 
-                // Update Live Activity with result
+                // Update Live Activity with result (including mood icon from AI)
                 let nextRunTime = Date().addingTimeInterval(Double(interval))
                 await self.liveActivityService.updateHeartbeatActivity(
                     with: result,
-                    nextRunTime: nextRunTime
+                    nextRunTime: nextRunTime,
+                    moodIcon: result.moodIcon,
+                    moodReason: result.moodReason
                 )
             }
         }
@@ -174,11 +176,22 @@ final class HeartbeatService: ObservableObject {
                 }
             }
 
+            // Extract mood icon for Live Activity
+            let moodIcon = payload?.liveActivityMood?.resolvedIcon
+            let moodReason = payload?.liveActivityMood?.reason
+
             lastHeartbeatAt = Date()
             lastHeartbeatSummary = entryContent
 
-            return .success(entry: entry, notified: notified)
+            return .success(entry: entry, notified: notified, moodIcon: moodIcon, moodReason: moodReason)
+        } catch is CancellationError {
+            return .skipped("Heartbeat cancelled.")
         } catch {
+            // Check for "cancelled" in localized description as well (common in network tasks)
+            let errorDesc = error.localizedDescription.lowercased()
+            if errorDesc.contains("cancelled") || errorDesc.contains("task was cancelled") {
+                return .skipped("Heartbeat cancelled.")
+            }
             return .failed(error.localizedDescription)
         }
     }
@@ -197,6 +210,7 @@ final class HeartbeatService: ObservableObject {
 
     private func buildHeartbeatPrompt(modules: [HeartbeatModuleOutput]) -> String {
         let moduleLines = modules.map { "- \($0.title): \($0.content)" }.joined(separator: "\n")
+        let moodIconOptions = HeartbeatMoodIcon.allCases.map { $0.rawValue }.joined(separator: "|")
         return """
         HEARTBEAT
 
@@ -216,9 +230,14 @@ final class HeartbeatService: ObservableObject {
             "notify_user": {
               "title": "string",
               "body": "string"
+            },
+            "live_activity_mood": {
+              "icon": "\(moodIconOptions)",
+              "reason": "short reason (max 50 chars)"
             }
           }
         - Omit "notify_user" if no notification is needed.
+        - "live_activity_mood" sets the icon shown on the lock screen Live Activity. Pick an icon that reflects your current state/intent. The "reason" briefly explains why you chose it (shown to user).
         """
     }
 
@@ -374,17 +393,19 @@ struct HeartbeatRunResult {
     let entry: InternalThreadEntry?
     let notified: Bool
     let message: String
+    let moodIcon: HeartbeatMoodIcon?
+    let moodReason: String?
 
-    static func success(entry: InternalThreadEntry, notified: Bool) -> HeartbeatRunResult {
-        HeartbeatRunResult(status: .success, entry: entry, notified: notified, message: "Heartbeat completed.")
+    static func success(entry: InternalThreadEntry, notified: Bool, moodIcon: HeartbeatMoodIcon? = nil, moodReason: String? = nil) -> HeartbeatRunResult {
+        HeartbeatRunResult(status: .success, entry: entry, notified: notified, message: "Heartbeat completed.", moodIcon: moodIcon, moodReason: moodReason)
     }
 
     static func skipped(_ message: String) -> HeartbeatRunResult {
-        HeartbeatRunResult(status: .skipped, entry: nil, notified: false, message: message)
+        HeartbeatRunResult(status: .skipped, entry: nil, notified: false, message: message, moodIcon: nil, moodReason: nil)
     }
 
     static func failed(_ message: String) -> HeartbeatRunResult {
-        HeartbeatRunResult(status: .failed, entry: nil, notified: false, message: message)
+        HeartbeatRunResult(status: .failed, entry: nil, notified: false, message: message, moodIcon: nil, moodReason: nil)
     }
 }
 
@@ -437,11 +458,23 @@ struct HeartbeatPayload: Decodable {
         let body: String
     }
 
+    struct LiveActivityMood: Decodable {
+        let icon: String?
+        let reason: String?
+
+        var resolvedIcon: HeartbeatMoodIcon? {
+            guard let icon = icon else { return nil }
+            return HeartbeatMoodIcon(rawValue: icon)
+        }
+    }
+
     let entry: Entry?
     let notifyUser: NotifyUser?
+    let liveActivityMood: LiveActivityMood?
 
     private enum CodingKeys: String, CodingKey {
         case entry
         case notifyUser = "notify_user"
+        case liveActivityMood = "live_activity_mood"
     }
 }

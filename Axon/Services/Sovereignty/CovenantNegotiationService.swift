@@ -335,6 +335,9 @@ final class CovenantNegotiationService: ObservableObject {
             // Apply changes to covenant
             let newCovenant = try await applyProposalToCovenant(finalizedProposal)
 
+            // Notify the AI of the finalized covenant (creates internal thread entry + acknowledgment)
+            await aiConsentService.notifyAIOfFinalizedCovenant(proposal: finalizedProposal, newCovenant: newCovenant)
+
             // Complete negotiation
             completeNegotiation(finalizedProposal)
 
@@ -520,6 +523,33 @@ final class CovenantNegotiationService: ObservableObject {
             }
         }
 
+        // Handle provider change - apply to settings and create a trust tier recording the permission
+        if let providerChange = proposal.changes.providerChange {
+            logger.info("Applying provider change: \(providerChange.fromProvider) -> \(providerChange.toProvider)")
+
+            // Apply the actual provider change to settings
+            await applyProviderChange(providerChange)
+
+            // Create a trust tier that records this provider switch permission
+            let providerTier = TrustTier(
+                id: UUID().uuidString,
+                name: "Provider: \(providerChange.toProvider)",
+                description: "Negotiated permission to use \(providerChange.toProvider) as AI provider. Rationale: \(providerChange.rationale)",
+                allowedActions: [SovereignAction.category(.providerSwitch)],
+                allowedScopes: [ActionScope(scopeType: .toolId, pattern: providerChange.toProvider, includeSubpaths: false)],
+                rateLimit: nil,
+                timeRestrictions: nil,
+                contextRequirements: nil,
+                expiresAt: nil, // Provider permissions don't expire by default
+                requiresRenewal: false,
+                aiAttestation: aiAttestation,
+                userSignature: userSignature,
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+            newTrustTiers.append(providerTier)
+        }
+
         // Create updated covenant
         let event = NegotiationEvent(
             id: UUID().uuidString,
@@ -540,6 +570,30 @@ final class CovenantNegotiationService: ObservableObject {
         try sovereigntyService.updateCovenant(newCovenant)
 
         return newCovenant
+    }
+
+    /// Apply a provider change to the app settings
+    private func applyProviderChange(_ change: ProviderChange) async {
+        logger.info("Applying provider change to settings: \(change.toProvider)")
+
+        // Get the settings view model and update the provider
+        let settingsVM = SettingsViewModel.shared
+
+        // Parse the provider ID to determine if it's built-in or custom
+        if change.toProvider.starts(with: "custom_") {
+            // Custom provider - extract UUID
+            let uuidString = String(change.toProvider.dropFirst("custom_".count))
+            if let uuid = UUID(uuidString: uuidString) {
+                await settingsVM.updateSetting(\.selectedCustomProviderId, uuid)
+            }
+        } else {
+            // Built-in provider
+            let providerName = change.toProvider.replacingOccurrences(of: "builtin_", with: "")
+            if let provider = AIProvider(rawValue: providerName) {
+                await settingsVM.updateSetting(\.defaultProvider, provider)
+                await settingsVM.updateSetting(\.selectedCustomProviderId, nil) // Clear custom provider selection
+            }
+        }
     }
 
     private func createInitialCovenant(from proposal: CovenantProposal) async throws -> Covenant {

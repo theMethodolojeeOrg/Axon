@@ -94,12 +94,54 @@ struct ToolSettingsView: View {
                     .padding(.top, 8)
                 }
 
+                // OpenAI Tools Section
+                SettingsSection(title: "OpenAI Tools") {
+                    VStack(spacing: 0) {
+                        ForEach(ToolId.tools(for: .openai)) { tool in
+                            ToolToggleRow(
+                                tool: tool,
+                                isEnabled: viewModel.settings.toolSettings.enabledToolIds.contains(tool.rawValue),
+                                onToggle: { enabled in
+                                    Task {
+                                        var updated = viewModel.settings.toolSettings
+                                        if enabled {
+                                            updated.enableTool(tool)
+                                        } else {
+                                            updated.disableTool(tool)
+                                        }
+                                        await viewModel.updateSetting(\.toolSettings, updated)
+                                    }
+                                }
+                            )
+
+                            if tool != ToolId.tools(for: .openai).last {
+                                Divider()
+                                    .background(AppColors.divider)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(AppColors.substrateSecondary)
+                    .cornerRadius(8)
+
+                    // API key requirement notice
+                    HStack(spacing: 8) {
+                        Image(systemName: "key.fill")
+                            .font(.system(size: 12))
+                        Text("Requires OpenAI API key in Settings > API Keys")
+                            .font(AppTypography.labelSmall())
+                    }
+                    .foregroundColor(AppColors.textTertiary)
+                    .padding(.horizontal, 4)
+                    .padding(.top, 8)
+                }
+
                 // Built-in Tools Section (organized by category accordions)
                 SettingsSection(title: "Built-in Tools") {
                     VStack(spacing: 12) {
-                        // Get all internal tool categories (excluding geminiTools since that's separate)
+                        // Get all internal tool categories (excluding geminiTools and openaiTools since those are separate)
                         let internalCategories = ToolCategory.allCases.filter { category in
-                            category != .geminiTools && !ToolId.tools(for: category).isEmpty
+                            category != .geminiTools && category != .openaiTools && !ToolId.tools(for: category).isEmpty
                         }
 
                         ForEach(internalCategories) { category in

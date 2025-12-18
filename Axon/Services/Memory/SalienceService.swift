@@ -558,6 +558,33 @@ struct SalienceInjectionResult {
     }
 }
 
+/// Result of tag-filtered memory injection (for sub-agent context)
+struct TagFilteredInjectionResult {
+    let injectionBlock: String
+    let selectedMemories: [RankedMemory]
+    let tokenCount: Int
+    let totalCandidates: Int
+    let matchingCandidates: Int
+    let appliedTags: [String]
+
+    var isEmpty: Bool {
+        selectedMemories.isEmpty
+    }
+
+    /// Number of memories that didn't match any tags
+    var memoriesNotMatchingTags: Int {
+        totalCandidates - matchingCandidates
+    }
+
+    /// Summary for debugging/display
+    var summary: String {
+        if isEmpty {
+            return "No memories matched tags: \(appliedTags.joined(separator: ", "))"
+        }
+        return "\(selectedMemories.count) memories injected (\(tokenCount) tokens) from \(matchingCandidates) matches"
+    }
+}
+
 struct MemoryInjectionSettings {
     var maxMemories: Int
     var minSalienceThreshold: Double
@@ -601,6 +628,178 @@ struct MemoryInjectionSettings {
 // MARK: - Salience Service Extensions
 
 extension SalienceService {
+
+    // MARK: - Tag-Based Filtering (for Sub-Agent Context Injection)
+
+    /// Filter memories by tags for sub-agent context injection
+    /// Used by AgentOrchestratorService to inject tag-filtered memories into sub-agent contexts
+    ///
+    /// - Parameters:
+    ///   - memories: All available memories
+    ///   - tags: Tags to filter by (OR logic - memory must match at least one tag)
+    ///   - maxTokens: Maximum token budget for the injection
+    ///   - correlationId: Correlation ID for logging
+    /// - Returns: Filtered and ranked memories within token budget
+    func filterMemoriesByTags(
+        memories: [Memory],
+        tags: [String],
+        maxTokens: Int,
+        correlationId: String
+    ) -> TagFilteredInjectionResult {
+        guard !tags.isEmpty else {
+            return TagFilteredInjectionResult(
+                injectionBlock: "",
+                selectedMemories: [],
+                tokenCount: 0,
+                totalCandidates: memories.count,
+                matchingCandidates: 0,
+                appliedTags: []
+            )
+        }
+
+        // Normalize tags for matching
+        let normalizedTags = Set(tags.map { normalizeTag($0) })
+
+        // Filter memories that match any of the specified tags
+        let matchingMemories = memories.filter { memory in
+            let memoryTags = Set(memory.tags.map { normalizeTag($0) })
+            return !memoryTags.isDisjoint(with: normalizedTags)
+        }
+
+        guard !matchingMemories.isEmpty else {
+            return TagFilteredInjectionResult(
+                injectionBlock: "",
+                selectedMemories: [],
+                tokenCount: 0,
+                totalCandidates: memories.count,
+                matchingCandidates: 0,
+                appliedTags: tags
+            )
+        }
+
+        // Create a minimal context for ranking
+        let context = ConversationContext(
+            recentQuery: tags.joined(separator: " "),
+            topics: tags,
+            messageCount: 0,
+            mostRecentTimestamp: Date()
+        )
+
+        // Rank by salience
+        let rankedMemories = rankBySalience(
+            memories: matchingMemories,
+            context: context,
+            settings: .minimal
+        )
+
+        // Select within budget
+        let (selectedMemories, usedTokens) = selectWithinBudget(
+            rankedMemories: rankedMemories,
+            availableTokens: maxTokens,
+            settings: .minimal
+        )
+
+        // Format injection block
+        let injectionBlock = formatTagFilteredInjection(
+            memories: selectedMemories,
+            tags: tags
+        )
+
+        // Log predicate
+        predicateLogger.logSalienceInjection(
+            memoryCount: selectedMemories.count,
+            tokenCount: usedTokens,
+            correlationId: correlationId
+        )
+
+        return TagFilteredInjectionResult(
+            injectionBlock: injectionBlock,
+            selectedMemories: selectedMemories,
+            tokenCount: usedTokens,
+            totalCandidates: memories.count,
+            matchingCandidates: matchingMemories.count,
+            appliedTags: tags
+        )
+    }
+
+    /// Normalize a tag for consistent matching (matches AgentOrchestratorService.normalizeTag)
+    private func normalizeTag(_ tag: String) -> String {
+        tag.lowercased()
+            .trimmingCharacters(in: .whitespaces)
+            .replacingOccurrences(of: "#", with: "")
+            .replacingOccurrences(of: " ", with: "_")
+    }
+
+    /// Format injection block for tag-filtered memories
+    private func formatTagFilteredInjection(
+        memories: [RankedMemory],
+        tags: [String]
+    ) -> String {
+        guard !memories.isEmpty else { return "" }
+
+        var lines: [String] = []
+
+        lines.append("")
+        lines.append("## Relevant Context")
+        lines.append("*Memories filtered by tags: \(tags.joined(separator: ", "))*")
+        lines.append("")
+
+        // Group by type
+        let allocentricMemories = memories.filter {
+            $0.memory.type == .allocentric || $0.memory.type.toNewSchema == .allocentric
+        }
+        let egoicMemories = memories.filter {
+            $0.memory.type == .egoic || $0.memory.type.toNewSchema == .egoic
+        }
+        let otherMemories = memories.filter {
+            let type = $0.memory.type.toNewSchema
+            return type != .allocentric && type != .egoic
+        }
+
+        if !allocentricMemories.isEmpty {
+            lines.append("### Facts")
+            for ranked in allocentricMemories {
+                lines.append(formatTagFilteredMemoryLine(ranked))
+            }
+            lines.append("")
+        }
+
+        if !egoicMemories.isEmpty {
+            lines.append("### Patterns & Approaches")
+            for ranked in egoicMemories {
+                lines.append(formatTagFilteredMemoryLine(ranked))
+            }
+            lines.append("")
+        }
+
+        if !otherMemories.isEmpty {
+            lines.append("### Other")
+            for ranked in otherMemories {
+                lines.append(formatTagFilteredMemoryLine(ranked))
+            }
+            lines.append("")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private func formatTagFilteredMemoryLine(_ ranked: RankedMemory) -> String {
+        let memory = ranked.memory
+        var line = "- \(memory.content)"
+
+        // Show confidence for context
+        let conf = Int(memory.confidence * 100)
+        line += " *(conf: \(conf)%)*"
+
+        // Show matching tags
+        if !memory.tags.isEmpty {
+            line += " `[\(memory.tags.prefix(3).joined(separator: ", "))]`"
+        }
+
+        return line
+    }
+
+    // MARK: - Quick Injection
 
     /// Quick injection for simple cases
     func quickInject(

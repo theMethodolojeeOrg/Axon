@@ -65,7 +65,7 @@ struct SubAgentJob: Codable, Identifiable, Equatable, Sendable {
 
     // MARK: - Cost Tracking
 
-    var tokenUsage: TokenUsage?
+    var tokenUsage: SubAgentTokenUsage?
     var estimatedCostUSD: Double?
 
     /// Actual provider/model used (set after execution)
@@ -301,10 +301,10 @@ struct SpawnRecommendation: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
-// MARK: - Token Usage
+// MARK: - Sub-Agent Token Usage
 
-/// Token consumption for cost tracking.
-struct TokenUsage: Codable, Equatable, Sendable {
+/// Token consumption for sub-agent cost tracking.
+struct SubAgentTokenUsage: Codable, Equatable, Sendable {
     let inputTokens: Int
     let outputTokens: Int
     let cachedTokens: Int
@@ -374,7 +374,7 @@ extension SubAgentJob {
     func withExecutionMetadata(
         provider: AIProvider,
         model: String,
-        tokenUsage: TokenUsage,
+        tokenUsage: SubAgentTokenUsage,
         costUSD: Double
     ) -> SubAgentJob {
         var copy = self

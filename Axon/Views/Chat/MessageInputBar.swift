@@ -326,6 +326,7 @@ struct MessageInputBar: View {
     private var attachmentCapability: AttachmentCapability {
         let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
         var providerString = settings.defaultProvider.rawValue
+        var modelString = settings.defaultModel
 
         if let conversationId = conversationId {
             let overridesKey = "conversation_overrides_\(conversationId)"
@@ -337,6 +338,10 @@ struct MessageInputBar: View {
                 } else if let builtInProvider = overrides.builtInProvider {
                     providerString = builtInProvider
                 }
+                
+                if let overrideModel = overrides.model {
+                    modelString = overrideModel
+                }
             } else if settings.selectedCustomProviderId != nil {
                 providerString = "openai-compatible"
             }
@@ -344,19 +349,69 @@ struct MessageInputBar: View {
             providerString = "openai-compatible"
         }
 
+        // Check if Gemini tools are enabled - if so, we can proxy media through Gemini
+        let geminiToolsEnabled = settings.toolSettings.enabledTools.contains { 
+            [.googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch].contains($0)
+        }
+        let mediaProxyEnabled = settings.toolSettings.experimentalFeaturesEnabled && settings.toolSettings.mediaProxyEnabled
+        let canProxyMedia = geminiToolsEnabled && mediaProxyEnabled && settings.geminiKey != nil
+
         switch providerString {
         case "anthropic":
-            return AttachmentCapability(images: true, documents: true, video: false, audio: false, description: "Claude supports images and PDFs.")
+            // Claude 3.5/3.7 supports PDFs natively
+            let supportsVideoAudio = canProxyMedia
+            return AttachmentCapability(
+                images: true,
+                documents: true,
+                video: supportsVideoAudio,
+                audio: supportsVideoAudio,
+                description: supportsVideoAudio ? "Claude supports images and PDFs natively, and video/audio via Gemini proxy." : "Claude supports images and PDFs."
+            )
         case "gemini":
-            return AttachmentCapability(images: true, documents: true, video: true, audio: true, description: "Gemini supports images, documents, video, and audio.")
+            // Gemini 1.5+ supports everything
+            return AttachmentCapability(
+                images: true,
+                documents: true,
+                video: true,
+                audio: true,
+                description: "Gemini supports images, documents, video, and audio."
+            )
         case "openai":
-            return AttachmentCapability(images: true, documents: false, video: false, audio: false, description: "GPT supports images.")
+            // GPT-4o supports images and audio natively
+            let supportsVideo = canProxyMedia
+            return AttachmentCapability(
+                images: true,
+                documents: canProxyMedia,
+                video: supportsVideo,
+                audio: true,
+                description: supportsVideo ? "GPT supports images and audio natively, and video/docs via Gemini proxy." : "GPT supports images and audio."
+            )
         case "grok":
-            return AttachmentCapability(images: true, documents: false, video: false, audio: false, description: "Grok supports images only.")
+            let supportsAll = canProxyMedia
+            return AttachmentCapability(
+                images: true,
+                documents: supportsAll,
+                video: supportsAll,
+                audio: supportsAll,
+                description: supportsAll ? "Grok supports images natively, and other media via Gemini proxy." : "Grok supports images only."
+            )
         case "openai-compatible":
-            return AttachmentCapability(images: true, documents: false, video: false, audio: false, description: "Images supported; other formats depend on the provider.")
+            let supportsAll = canProxyMedia
+            return AttachmentCapability(
+                images: true,
+                documents: supportsAll,
+                video: supportsAll,
+                audio: supportsAll,
+                description: supportsAll ? "Images supported; other formats via Gemini proxy." : "Images supported; other formats depend on the provider."
+            )
         default:
-            return AttachmentCapability(images: true, documents: false, video: false, audio: false, description: "Images supported.")
+            return AttachmentCapability(
+                images: true,
+                documents: canProxyMedia,
+                video: canProxyMedia,
+                audio: canProxyMedia,
+                description: "Images supported."
+            )
         }
     }
     
@@ -491,21 +546,21 @@ struct MessageInputBar: View {
         }
         .fileImporter(
             isPresented: $showFileImporter,
-            allowedContentTypes: attachmentCapability.documents ? [.pdf, .text, .image, .item] : [.item],
+            allowedContentTypes: attachmentCapability.documents ? [.pdf, .text, .plainText, .rtf, .image, .item] : [.item],
             allowsMultipleSelection: false
         ) { result in
             handleFileImport(result, type: .document)
         }
         .fileImporter(
             isPresented: $showVideoImporter,
-            allowedContentTypes: [.movie, .video, .mpeg4Movie, .quickTimeMovie, .avi],
+            allowedContentTypes: [.movie, .video, .mpeg4Movie, .quickTimeMovie, .avi, .mpeg, .mpeg2Video],
             allowsMultipleSelection: false
         ) { result in
             handleFileImport(result, type: .video)
         }
         .fileImporter(
             isPresented: $showAudioImporter,
-            allowedContentTypes: [.audio, .mp3, .wav, .aiff, .mpeg4Audio],
+            allowedContentTypes: [.audio, .mp3, .wav, .aiff, .mpeg4Audio, .appleLosslessAudio],
             allowsMultipleSelection: false
         ) { result in
             handleFileImport(result, type: .audio)

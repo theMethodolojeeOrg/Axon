@@ -270,7 +270,7 @@ extension AgentOrchestratorService {
                 spawnRecommendations: parsed.spawnRecommendations.isEmpty ? nil : parsed.spawnRecommendations
             ),
             siloEntries: parsed.siloEntries,
-            tokenUsage: TokenUsage(
+            tokenUsage: SubAgentTokenUsage(
                 inputTokens: inputTokens,
                 outputTokens: outputTokens,
                 cachedTokens: 0
@@ -769,7 +769,7 @@ extension AgentOrchestratorService {
         max(1, text.count / 4)
     }
 
-    func calculateCost(provider: AIProvider, model: String, usage: TokenUsage) -> Double {
+    func calculateCost(provider: AIProvider, model: String, usage: SubAgentTokenUsage) -> Double {
         // Use CostService for accurate pricing
         let pricing = costService.getPricing(for: model)
         let inputCost = Double(usage.inputTokens) * pricing.inputPricePerMillion / 1_000_000
@@ -789,7 +789,7 @@ extension AgentOrchestratorService {
 struct SubAgentExecutionResult {
     let jobResult: SubAgentJobResult
     let siloEntries: [SiloEntry]
-    let tokenUsage: TokenUsage
+    let tokenUsage: SubAgentTokenUsage
     let latencyMs: Double
 }
 

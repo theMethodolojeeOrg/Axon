@@ -28,6 +28,7 @@ final class AgentOrchestratorService: ObservableObject {
     private let apiKeysStorage = APIKeysStorage.shared
     private let settingsViewModel = SettingsViewModel.shared
     private let costService = CostService.shared
+    private let liveActivityService = LiveActivityService.shared
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Axon", category: "AgentOrchestrator")
 
@@ -185,6 +186,9 @@ final class AgentOrchestratorService: ObservableObject {
 
         updateJob(job)
         logger.info("Job \(jobId.prefix(8)) approved by Axon")
+
+        // Start Live Activity for approved job
+        await startLiveActivity(for: job)
 
         return job
     }
@@ -469,6 +473,11 @@ final class AgentOrchestratorService: ObservableObject {
             activeJobs[index] = job
         }
         persistState()
+
+        // Update Live Activity
+        Task {
+            await updateLiveActivity(for: job)
+        }
     }
 
     private func moveToCompleted(_ job: SubAgentJob) {
@@ -481,6 +490,62 @@ final class AgentOrchestratorService: ObservableObject {
         }
 
         persistState()
+
+        // Update Live Activity with terminal state (will auto-dismiss)
+        Task {
+            await updateLiveActivity(for: job)
+        }
+    }
+
+    // MARK: - Live Activity Integration
+
+    /// Start a Live Activity when a job transitions to running
+    func startLiveActivity(for job: SubAgentJob) async {
+        do {
+            try await liveActivityService.startSubAgentActivity(for: job)
+            logger.info("Started Live Activity for job \(job.id.prefix(8))")
+        } catch {
+            logger.warning("Failed to start Live Activity: \(error.localizedDescription)")
+        }
+    }
+
+    /// Update Live Activity for job state changes
+    private func updateLiveActivity(for job: SubAgentJob, statusMessage: String? = nil) async {
+        await liveActivityService.updateSubAgentActivity(with: job, statusMessage: statusMessage)
+    }
+
+    /// End Live Activity for a job
+    func endLiveActivity(for jobId: String) async {
+        await liveActivityService.endSubAgentActivity(jobId: jobId)
+    }
+
+    /// Update Live Activity with progress
+    func updateLiveActivityProgress(
+        for jobId: String,
+        current: Int,
+        total: Int,
+        label: String? = nil,
+        statusMessage: String? = nil
+    ) async {
+        guard let job = getJob(jobId) else { return }
+
+        let progress = SubAgentProgress(current: current, total: total, label: label)
+
+        await liveActivityService.updateSubAgentActivity(
+            jobId: jobId,
+            state: job.state,
+            startedAt: job.startedAt,
+            progress: progress,
+            statusMessage: statusMessage,
+            provider: job.executedProvider?.displayName ?? job.provider?.displayName,
+            model: job.executedModel ?? job.model
+        )
+    }
+
+    /// Update Live Activity status message
+    func updateLiveActivityStatus(for jobId: String, message: String) async {
+        guard let job = getJob(jobId) else { return }
+        await updateLiveActivity(for: job, statusMessage: message)
     }
 
     /// Infer task type from job for affinity tracking
