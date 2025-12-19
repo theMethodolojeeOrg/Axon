@@ -416,7 +416,9 @@ private struct ImportShortcutSheet: View {
             .padding()
             .background(AppColors.substratePrimary)
             .navigationTitle("Import Shortcut")
+#if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+#endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -450,7 +452,9 @@ private struct AddCustomPortSheet: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(AppColors.substratePrimary)
             .navigationTitle("Add Custom Port")
+#if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+#endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -465,3 +469,4 @@ private struct AddCustomPortSheet: View {
 #Preview {
     IntentsSettingsView()
 }
+

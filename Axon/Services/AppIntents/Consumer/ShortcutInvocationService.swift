@@ -7,9 +7,13 @@
 //
 
 import Foundation
-import UIKit
+import SwiftUI
 import Combine
 import os.log
+
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Shortcut Invocation Service
 
@@ -256,11 +260,19 @@ final class ShortcutInvocationService: ObservableObject {
     // MARK: - URL Opening
 
     private func openUrl(_ url: URL) async -> Bool {
+        #if canImport(UIKit)
         return await withCheckedContinuation { continuation in
             UIApplication.shared.open(url, options: [:]) { success in
                 continuation.resume(returning: success)
             }
         }
+        #elseif canImport(AppKit)
+        // macOS fallback
+        return NSWorkspace.shared.open(url)
+        #else
+        // Unsupported platform
+        return false
+        #endif
     }
 
     // MARK: - Invocation History

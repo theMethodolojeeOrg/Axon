@@ -30,7 +30,7 @@
 		E26F3F8D2EF0D6B7000E55BD /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = E26F3F8C2EF0D6B7000E55BD /* MLXVLM */; };
 		E26F51F32EF3D441000E55BD /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E26F51F22EF3D441000E55BD /* WidgetKit.framework */; };
 		E26F51F52EF3D441000E55BD /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E26F51F42EF3D441000E55BD /* SwiftUI.framework */; };
-		E26F52042EF3D442000E55BD /* AxonLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E26F51F12EF3D441000E55BD /* AxonLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E26F52042EF3D442000E55BD /* AxonLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E26F51F12EF3D441000E55BD /* AxonLiveActivityExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		E273631A2EBD237F0031CFF7 /* FlyingFox in Frameworks */ = {isa = PBXBuildFile; productRef = E27363192EBD237F0031CFF7 /* FlyingFox */; };
 		E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */ = {isa = PBXBuildFile; productRef = E273631B2EBD237F0031CFF7 /* FlyingSocks */; };
 		E27FB5ED2ECD5E2F003C52BF /* Clibsodium in Frameworks */ = {isa = PBXBuildFile; productRef = E27FB5EC2ECD5E2F003C52BF /* Clibsodium */; };
@@ -506,6 +506,7 @@
 		};
 		E26F52032EF3D442000E55BD /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = E26F51F02EF3D441000E55BD /* AxonLiveActivityExtension */;
 			targetProxy = E26F52022EF3D442000E55BD /* PBXContainerItemProxy */;
 		};

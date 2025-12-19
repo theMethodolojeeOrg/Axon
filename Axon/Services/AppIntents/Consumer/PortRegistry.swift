@@ -5,9 +5,14 @@
 //  Registry of external app capabilities that Axon can invoke.
 //  Includes curated catalog and user-imported shortcuts.
 //
-
+#if canImport(UIKit)
+  import UIKit
+  #endif
+  #if canImport(AppKit)
+  import AppKit
+  #endif
 import Foundation
-import UIKit
+import SwiftUI
 import Combine
 import os.log
 
@@ -74,7 +79,14 @@ final class PortRegistry: ObservableObject {
     /// Check if an app is installed (by URL scheme)
     func isAppInstalled(scheme: String) -> Bool {
         guard let url = URL(string: "\(scheme)://") else { return false }
+        #if canImport(UIKit)
         return UIApplication.shared.canOpenURL(url)
+        #elseif canImport(AppKit)
+        // On macOS, check if any app can open the URL using NSWorkspace
+        return NSWorkspace.shared.urlForApplication(toOpen: url) != nil
+        #else
+        return false
+        #endif
     }
 
     /// Toggle a built-in port's enabled state
