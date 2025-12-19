@@ -13,7 +13,7 @@ import Combine
 
 /// Events emitted during streaming response generation
 enum StreamingEvent: Sendable {
-    /// Incremental text chunk from the AI response
+    /// Incremental text chunk from Axon's response
     case textDelta(String)
 
     /// Reasoning token delta (for reasoning models like DeepSeek, o1)

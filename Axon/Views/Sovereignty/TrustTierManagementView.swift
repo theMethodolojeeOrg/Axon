@@ -86,7 +86,7 @@ struct TrustTierManagementView: View {
                         .foregroundColor(.blue)
                 }
             } footer: {
-                Text("New trust tiers require negotiation and consent from both you and the AI.")
+                Text("New trust tiers require negotiation and consent from both you and Axon.")
                     .font(.caption)
             }
         }
@@ -491,7 +491,7 @@ struct TrustTierDetailSheet: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This will require re-negotiation. The AI must consent to removing this trust tier.")
+                Text("This will require re-negotiation. Axon must consent to removing this trust tier.")
             }
         }
     }
@@ -795,7 +795,7 @@ struct NewTrustTierSheet: View {
             } header: {
                 Text("Your Rationale")
             } footer: {
-                Text("The AI will consider your reasoning when deciding whether to consent.")
+                Text("Axon will consider your reasoning when deciding whether to consent.")
             }
         }
         #if os(macOS)
@@ -815,7 +815,7 @@ struct NewTrustTierSheet: View {
             Text("Requesting AI Consent...")
                 .font(.headline)
 
-            Text("The AI is reviewing your trust tier proposal and will provide its reasoning.")
+            Text("Axon is reviewing your trust tier proposal and will provide its reasoning.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -1096,7 +1096,7 @@ struct ModifyTrustTierSheet: View {
                 }
 
                 Section {
-                    Text("Modifications require AI consent. The AI will review your proposal and may accept, decline, or suggest alternatives.")
+                    Text("Modifications require AI consent. Axon will review your proposal and may accept, decline, or suggest alternatives.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

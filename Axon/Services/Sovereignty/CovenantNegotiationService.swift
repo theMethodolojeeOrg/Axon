@@ -335,7 +335,7 @@ final class CovenantNegotiationService: ObservableObject {
             // Apply changes to covenant
             let newCovenant = try await applyProposalToCovenant(finalizedProposal)
 
-            // Notify the AI of the finalized covenant (creates internal thread entry + acknowledgment)
+            // Notify Axon of the finalized covenant (creates internal thread entry + acknowledgment)
             await aiConsentService.notifyAIOfFinalizedCovenant(proposal: finalizedProposal, newCovenant: newCovenant)
 
             // Complete negotiation

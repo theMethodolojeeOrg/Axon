@@ -27,6 +27,7 @@ struct SettingsTabView: View {
         case memory = "Memory"
         case sovereignty = "Consent"
         case security = "Security"
+        case devices = "Devices"
         case server = "API Server"
         case backend = "Backend"
         case tts = "TTS"
@@ -47,6 +48,7 @@ struct SettingsTabView: View {
             case .memory: return "AxonLogoTemplate"
             case .sovereignty: return "shield.checkered"
             case .security: return "lock.shield.fill"
+            case .devices: return "laptopcomputer.and.iphone"
             case .server: return "network"
             case .backend: return "server.rack"
             case .tts: return "waveform.circle.fill"
@@ -105,6 +107,8 @@ struct SettingsTabView: View {
                             SovereigntySettingsView(viewModel: viewModel)
                         case .security:
                             SecuritySettingsView(viewModel: viewModel)
+                        case .devices:
+                            DevicesSettingsView(viewModel: viewModel)
                         case .server:
                             ServerSettingsView(viewModel: viewModel)
                         case .backend:

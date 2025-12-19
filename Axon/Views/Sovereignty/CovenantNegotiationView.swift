@@ -158,7 +158,7 @@ struct CovenantNegotiationView: View {
                     .font(.title2)
                     .fontWeight(.semibold)
 
-                Text("Your covenant with the AI is in effect. You can propose changes at any time.")
+                Text("Your covenant with Axon is in effect. You can propose changes at any time.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -223,7 +223,7 @@ struct CovenantNegotiationView: View {
                     .font(.title2)
                     .fontWeight(.bold)
 
-                Text("A covenant is a mutual agreement between you and the AI that defines the terms of your relationship. Both parties must consent to any changes.")
+                Text("A covenant is a mutual agreement between you and Axon that defines the terms of your relationship. Both parties must consent to any changes.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -871,7 +871,7 @@ struct CounterProposalSheet: View {
                 }
 
                 Section {
-                    Text("Counter-proposals require negotiation. The AI will consider your alternative and respond.")
+                    Text("Counter-proposals require negotiation. Axon will consider your alternative and respond.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -918,7 +918,7 @@ struct AIThinkingCard: View {
                 ProgressView()
             }
 
-            Text("The AI is reviewing your request and formulating its response. This may take a moment\(dots)")
+            Text("Axon is reviewing your request and formulating its response. This may take a moment\(dots)")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
@@ -964,11 +964,11 @@ struct UserResponseSection: View {
             if let aiResponse = proposal.aiResponse {
                 // Show what AI is asking for
                 if aiResponse.requestedClarification {
-                    Text("The AI is asking for clarification. Please respond:")
+                    Text("Axon is asking for clarification. Please respond:")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else if !aiResponse.didConsent && !aiResponse.didDecline {
-                    Text("The AI has questions about your proposal:")
+                    Text("Axon has questions about your proposal:")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -1011,7 +1011,7 @@ struct UserResponseSection: View {
         isSubmitting = true
 
         // Add dialogue to the negotiation
-        // In practice, this would trigger re-evaluation by the AI
+        // In practice, this would trigger re-evaluation by Axon
         Task {
             // The message is sent as part of the negotiation dialogue
             // For now, we just clear the field
@@ -1065,7 +1065,7 @@ struct QuickNegotiationButton: View {
         case .trustTier:
             return "Manage pre-approved action categories"
         case .memory:
-            return "Edit what the AI remembers about you"
+            return "Edit what Axon remembers about you"
         case .capabilities:
             return "Enable or disable AI features"
         case .agentState:

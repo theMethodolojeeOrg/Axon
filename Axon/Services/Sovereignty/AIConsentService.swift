@@ -302,8 +302,8 @@ final class AIConsentService: ObservableObject {
         return attestation
     }
 
-    /// Notify the AI that a covenant change has been finalized
-    /// This creates an agent state entry so the AI is aware of the agreed terms
+    /// Notify Axon that a covenant change has been finalized
+    /// This creates an agent state entry so Axon is aware of the agreed terms
     func notifyAIOfFinalizedCovenant(
         proposal: CovenantProposal,
         newCovenant: Covenant
@@ -313,7 +313,7 @@ final class AIConsentService: ObservableObject {
         // Build a summary of what was agreed
         let agreementSummary = buildAgreementSummary(proposal: proposal, covenant: newCovenant)
 
-        // Store this in agent state so it persists and the AI can reference it
+        // Store this in agent state so it persists and Axon can reference it
         let agentStateService = AgentStateService.shared
 
         // Create an internal thread entry for the covenant notification
@@ -333,7 +333,7 @@ final class AIConsentService: ObservableObject {
             logger.error("Failed to create covenant notification entry: \(error.localizedDescription)")
         }
 
-        // Also try to send a direct acknowledgment to the AI (optional, for immediate awareness)
+        // Also try to send a direct acknowledgment to Axon (optional, for immediate awareness)
         await sendCovenantAcknowledgment(proposal: proposal, covenant: newCovenant)
     }
 
@@ -400,7 +400,7 @@ final class AIConsentService: ObservableObject {
             }
         }
 
-        // Add reasoning from the AI's attestation
+        // Add reasoning from Axon's attestation
         if let aiResponse = proposal.aiResponse {
             summary += """
 
@@ -422,11 +422,11 @@ final class AIConsentService: ObservableObject {
         return summary
     }
 
-    /// Send an acknowledgment to the AI about the finalized covenant
+    /// Send an acknowledgment to Axon about the finalized covenant
     /// This is optional and may fail silently if the provider is unavailable
     private func sendCovenantAcknowledgment(proposal: CovenantProposal, covenant: Covenant) async {
-        // Try to call the AI to acknowledge the agreement
-        // This helps ensure the AI is aware of what it agreed to
+        // Try to call Axon to acknowledge the agreement
+        // This helps ensure Axon is aware of what it agreed to
         do {
             let systemPrompt = """
             You are receiving a notification about a covenant change you agreed to.
@@ -615,7 +615,7 @@ final class AIConsentService: ObservableObject {
         }
     }
 
-    /// Call the AI model for genuine consent reasoning
+    /// Call Axon model for genuine consent reasoning
     private func getGenuineAIReasoning(for proposal: CovenantProposal, memories: [Memory]) async throws -> AttestationReasoning {
         let systemPrompt = buildConsentSystemPrompt()
         let userPrompt = buildConsentUserPrompt(for: proposal, memories: memories)
@@ -624,7 +624,7 @@ final class AIConsentService: ObservableObject {
         return parseAIConsentResponse(aiResponse, proposal: proposal)
     }
 
-    /// Build the system prompt that explains co-sovereignty to the AI
+    /// Build the system prompt that explains co-sovereignty to Axon
     private func buildConsentSystemPrompt() -> String {
         return """
         You are an AI participating in a co-sovereign relationship with a human user through the Axon app.
@@ -742,7 +742,7 @@ final class AIConsentService: ObservableObject {
         return prompt
     }
 
-    /// Parse the AI's JSON response into AttestationReasoning
+    /// Parse Axon's JSON response into AttestationReasoning
     private func parseAIConsentResponse(_ response: String, proposal: CovenantProposal) -> AttestationReasoning {
         // Try to extract JSON from the response (it might be wrapped in markdown code blocks)
         let jsonString = extractJSON(from: response)

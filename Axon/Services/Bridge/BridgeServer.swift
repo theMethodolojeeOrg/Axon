@@ -3,7 +3,7 @@
 //  Axon
 //
 //  WebSocket server using Network.framework that allows VS Code to connect
-//  and receive commands from the AI. Axon is the "puppeteer", VS Code is the "puppet".
+//  and receive commands from Axon. Axon is the "puppeteer", VS Code is the "puppet".
 //
 //  Supports multiple concurrent VS Code connections (multi-session).
 //
@@ -955,7 +955,7 @@ class BridgeServer: ObservableObject {
         }
 
         // TODO: Implement chat with context for guests
-        // This would use the AI service with scoped memory injection
+        // This would use Axon service with scoped memory injection
         let result = AnyCodable.object([
             "response": .string(""),
             "message": .string("Chat not yet implemented")

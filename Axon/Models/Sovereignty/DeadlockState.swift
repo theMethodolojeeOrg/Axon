@@ -72,7 +72,7 @@ struct DeadlockState: Codable, Identifiable, Equatable {
         lastSpeaker == .ai || lastSpeaker == nil
     }
 
-    /// Whether it's the AI's turn to speak
+    /// Whether it's Axon's turn to speak
     var isAITurn: Bool {
         lastSpeaker == .user
     }
@@ -99,9 +99,9 @@ enum DeadlockTrigger: String, Codable, Equatable {
     var description: String {
         switch self {
         case .aiRefusedUserRequest:
-            return "The AI has declined a request you made. Dialogue is needed to reach understanding."
+            return "Axon has declined a request you made. Dialogue is needed to reach understanding."
         case .userRefusedAIAction:
-            return "You declined an action the AI requested. Dialogue is needed to reach understanding."
+            return "You declined an action Axon requested. Dialogue is needed to reach understanding."
         case .mutualDisagreement:
             return "Both parties have rejected each other's proposals. Dialogue is needed to find common ground."
         case .integrityViolation:

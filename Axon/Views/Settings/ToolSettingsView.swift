@@ -214,7 +214,7 @@ struct ToolSettingsView: View {
                             )
                             .tint(AppColors.signalMercury)
 
-                            Text("Maximum number of tool calls the AI can make in a single response")
+                            Text("Maximum number of tool calls Axon can make in a single response")
                                 .font(AppTypography.labelSmall())
                                 .foregroundColor(AppColors.textTertiary)
                         }

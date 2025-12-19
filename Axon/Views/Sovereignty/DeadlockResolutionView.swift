@@ -92,7 +92,7 @@ struct DeadlockResolutionView: View {
                 }
                 Button("Continue Dialogue", role: .cancel) {}
             } message: {
-                Text("Escalation does not resolve the deadlock. The only way forward is through genuine dialogue with the AI. Both parties must reach mutual understanding.")
+                Text("Escalation does not resolve the deadlock. The only way forward is through genuine dialogue with Axon. Both parties must reach mutual understanding.")
             }
         }
     }
@@ -246,7 +246,7 @@ struct DeadlockExplanationCard: View {
                     .font(.subheadline)
                     .fontWeight(.semibold)
 
-                Text("In co-sovereignty, neither party can unilaterally override the other. When you and the AI disagree, the only path forward is through genuine dialogue and mutual understanding.")
+                Text("In co-sovereignty, neither party can unilaterally override the other. When you and Axon disagree, the only path forward is through genuine dialogue and mutual understanding.")
                     .font(.caption)
                     .foregroundColor(.secondary)
 

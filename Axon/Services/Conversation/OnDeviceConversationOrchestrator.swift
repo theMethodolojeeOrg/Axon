@@ -1382,7 +1382,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         }
 
         // --- Internal Thread Context Injection (Heartbeat Transition) ---
-        // When the user interrupts the AI's "thinking time", bridge from its internal thread
+        // When the user interrupts Axon's "thinking time", bridge from its internal thread
         await injectInternalThreadContext(into: &promptParts)
 
         // --- Additional Context Injection ---
@@ -1514,7 +1514,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     }
 
     /// Inject internal thread context when transitioning from heartbeat "thinking time" to conversation
-    /// This provides a smooth bridge from the AI's reflective state into the user's prompt
+    /// This provides a smooth bridge from Axon's reflective state into the user's prompt
     @MainActor
     private func injectInternalThreadContext(into promptParts: inout [String]) {
         let settings = SettingsViewModel.shared.settings

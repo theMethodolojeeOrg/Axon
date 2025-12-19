@@ -26,7 +26,7 @@ enum MemoryTypeAppEnum: String, AppEnum {
             ),
             .egoic: DisplayRepresentation(
                 title: "Agent Learning",
-                subtitle: "Insights, learnings, and reflections by the AI",
+                subtitle: "Insights, learnings, and reflections by Axon",
                 image: .init(systemName: "brain.head.profile")
             )
         ]

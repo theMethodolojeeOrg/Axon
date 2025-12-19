@@ -5,7 +5,7 @@
 //  Provides meta-analysis of conversations: model timeline, task distribution,
 //  memory retrieval patterns, and topic pivot detection.
 //
-//  This enables both the AI and user to understand:
+//  This enables both Axon and user to understand:
 //  - Which models handled which messages
 //  - What each substrate was best at
 //  - Which memories were retrieved when

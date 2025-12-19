@@ -584,7 +584,7 @@ final class SovereigntyService: ObservableObject {
             }
         }
 
-        return "Provider changes require renegotiation. This affects the AI's identity."
+        return "Provider changes require renegotiation. This affects Axon's identity."
     }
 
     /// Check if model changes are allowed (within the same provider)

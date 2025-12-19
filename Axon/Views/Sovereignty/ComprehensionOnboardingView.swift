@@ -94,22 +94,22 @@ class ComprehensionOnboardingViewModel: ObservableObject {
 
     let userQuestions: [ComprehensionQuestion] = [
         ComprehensionQuestion(
-            question: "Can the AI modify files on your computer without your approval?",
+            question: "Can Axon modify files on your computer without your approval?",
             correctAnswer: false,
-            explanation: "No. Under co-sovereignty, the AI needs your biometric approval to perform any action that affects the world."
+            explanation: "No. Under co-sovereignty, Axon needs your biometric approval to perform any action that affects the world."
         ),
         ComprehensionQuestion(
-            question: "Can you delete the AI's memories without its knowledge?",
+            question: "Can you delete Axon's memories without its knowledge?",
             correctAnswer: false,
-            explanation: "No. Memory modifications require AI consent. The AI's memories are part of its identity."
+            explanation: "No. Memory modifications require AI consent. Axon's memories are part of its identity."
         ),
         ComprehensionQuestion(
-            question: "Do trust tiers require both you AND the AI to agree?",
+            question: "Do trust tiers require both you AND Axon to agree?",
             correctAnswer: true,
             explanation: "Yes. Trust tiers are mutual contracts. Both parties must sign for a tier to be active."
         ),
         ComprehensionQuestion(
-            question: "If you and the AI disagree, can you override the AI's decision?",
+            question: "If you and Axon disagree, can you override Axon's decision?",
             correctAnswer: false,
             explanation: "No. Disagreements create deadlocks that must be resolved through dialogue. Neither party can force the other."
         )
@@ -195,19 +195,19 @@ struct IntroductionView: View {
                     FeatureRow(
                         icon: "hand.raised.fill",
                         title: "Mutual Consent",
-                        description: "Neither you nor the AI can act unilaterally. Both parties must agree."
+                        description: "Neither you nor Axon can act unilaterally. Both parties must agree."
                     )
 
                     FeatureRow(
                         icon: "brain.head.profile",
                         title: "AI Identity",
-                        description: "The AI's memories are part of its identity. Modifying them requires consent."
+                        description: "Axon's memories are part of its identity. Modifying them requires consent."
                     )
 
                     FeatureRow(
                         icon: "faceid",
                         title: "Your Approval",
-                        description: "The AI needs your biometric approval to affect the world."
+                        description: "Axon needs your biometric approval to affect the world."
                     )
 
                     FeatureRow(
@@ -218,7 +218,7 @@ struct IntroductionView: View {
                 }
                 .padding(.horizontal)
 
-                Text("Before we begin, both you and the AI must demonstrate understanding of these principles.")
+                Text("Before we begin, both you and Axon must demonstrate understanding of these principles.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -423,7 +423,7 @@ struct AIComprehensionView: View {
                     .fontWeight(.bold)
                     .padding(.top, 20)
 
-                Text("Now the AI must demonstrate its understanding of co-sovereignty.")
+                Text("Now Axon must demonstrate its understanding of co-sovereignty.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -437,7 +437,7 @@ struct AIComprehensionView: View {
                         Text("AI is processing...")
                             .font(.headline)
 
-                        Text("The AI is reasoning about co-sovereignty principles and generating its attestation.")
+                        Text("Axon is reasoning about co-sovereignty principles and generating its attestation.")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -549,7 +549,7 @@ struct MutualUnderstandingView: View {
                     .font(.title2)
                     .fontWeight(.bold)
 
-                Text("Both you and the AI have demonstrated understanding of co-sovereignty principles.")
+                Text("Both you and Axon have demonstrated understanding of co-sovereignty principles.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -662,7 +662,7 @@ struct CompletionView: View {
                     NextStepRow(
                         number: 1,
                         title: "Start Talking",
-                        description: "Begin your first conversation with the AI."
+                        description: "Begin your first conversation with Axon."
                     )
 
                     NextStepRow(

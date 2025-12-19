@@ -2,7 +2,7 @@
 //  BridgeToolDefinitions.swift
 //  Axon
 //
-//  Defines the AI-facing tools for VS Code bridge operations.
+//  Defines Axon-facing tools for VS Code bridge operations.
 //  These tools become available when a VS Code workspace is connected.
 //
 

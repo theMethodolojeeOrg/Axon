@@ -466,7 +466,7 @@ struct SharingSettings: Codable, Equatable, Sendable {
     /// Whether to require biometric authentication for creating invitations
     var requireBiometricForInvitations: Bool = true
 
-    /// Whether the AI must also consent to sharing (joint consent model)
+    /// Whether Axon must also consent to sharing (joint consent model)
     var requireAIConsent: Bool = true
 
     /// Memory types that can be shared (by default, only egoic/learned patterns)

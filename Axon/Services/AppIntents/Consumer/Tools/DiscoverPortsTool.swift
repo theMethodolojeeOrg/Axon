@@ -3,7 +3,7 @@
 //  Axon
 //
 //  AI tool for discovering available external app ports.
-//  Allows the AI to list and search for apps it can invoke.
+//  Allows Axon to list and search for apps it can invoke.
 //
 
 import Foundation
@@ -11,7 +11,7 @@ import os.log
 
 // MARK: - Discover Ports Tool
 
-/// Tool for the AI to discover available external app ports
+/// Tool for Axon to discover available external app ports
 struct DiscoverPortsTool {
     static let toolId = "discover_ports"
     static let toolName = "Discover External App Ports"

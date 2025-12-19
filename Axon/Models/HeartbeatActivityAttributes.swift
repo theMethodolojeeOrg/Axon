@@ -82,8 +82,8 @@ enum HeartbeatActivityStatus: String, Codable, Hashable {
     }
 }
 
-/// AI-selectable mood icons for the Live Activity
-/// The AI can pick one to subtly indicate why it started the heartbeat
+/// Axon selectable mood icons for the Live Activity
+/// Axon can pick one to subtly indicate why it started the heartbeat
 enum HeartbeatMoodIcon: String, Codable, Hashable, CaseIterable {
     // Thinking / Processing
     case thinking = "brain.head.profile"

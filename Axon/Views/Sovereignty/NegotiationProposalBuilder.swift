@@ -51,7 +51,7 @@ enum NegotiationCategory: String, CaseIterable, Identifiable {
         case .memory:
             return "Add, edit, or delete AI memories about you"
         case .agentState:
-            return "Modify the AI's internal reflections and notes"
+            return "Modify Axon's internal reflections and notes"
         case .capabilities:
             return "Enable or disable specific AI capabilities"
         case .fullRenegotiation:
@@ -231,7 +231,7 @@ struct NegotiationProposalBuilder: View {
             } header: {
                 Text("Your Rationale")
             } footer: {
-                Text("The AI will consider your reasoning when deciding whether to consent. Be specific about why this change benefits both parties.")
+                Text("Axon will consider your reasoning when deciding whether to consent. Be specific about why this change benefits both parties.")
             }
 
             // Preview of what will be proposed
@@ -264,7 +264,7 @@ struct NegotiationProposalBuilder: View {
             }
 
             if !selectedProviderId.isEmpty {
-                Text("Switching providers affects the AI's capabilities and personality. The AI must consent to this change as it fundamentally affects its identity.")
+                Text("Switching providers affects Axon's capabilities and personality. Axon must consent to this change as it fundamentally affects its identity.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -429,7 +429,7 @@ struct NegotiationProposalBuilder: View {
                 }
             case .modify, .delete:
                 Section("Select Memories") {
-                    Text("Memory selection requires loading existing memories from the AI's context.")
+                    Text("Memory selection requires loading existing memories from Axon's context.")
                         .font(.caption)
                         .foregroundColor(.secondary)
 
@@ -444,11 +444,11 @@ struct NegotiationProposalBuilder: View {
 
     private var agentStateSection: some View {
         Section {
-            Text("Agent state modifications affect the AI's internal reflections, notes, and thought processes. These are private to the AI but can be negotiated.")
+            Text("Agent state modifications affect Axon's internal reflections, notes, and thought processes. These are private to Axon but can be negotiated.")
                 .font(.caption)
                 .foregroundColor(.secondary)
 
-            TextField("Describe what you'd like to change about the AI's internal state...", text: $newMemoryContent, axis: .vertical)
+            TextField("Describe what you'd like to change about Axon's internal state...", text: $newMemoryContent, axis: .vertical)
                 .lineLimit(4...8)
         } header: {
             Text("Internal Thread Changes")
@@ -461,7 +461,7 @@ struct NegotiationProposalBuilder: View {
 
     private var capabilitiesSection: some View {
         Section {
-            Text("Capability changes allow you to enable or disable specific features the AI can use.")
+            Text("Capability changes allow you to enable or disable specific features Axon can use.")
                 .font(.caption)
                 .foregroundColor(.secondary)
 

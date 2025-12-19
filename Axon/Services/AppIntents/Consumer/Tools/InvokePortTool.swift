@@ -11,7 +11,7 @@ import os.log
 
 // MARK: - Invoke Port Tool
 
-/// Tool for the AI to invoke external app ports
+/// Tool for Axon to invoke external app ports
 struct InvokePortTool {
     static let toolId = "invoke_port"
     static let toolName = "Invoke External App"

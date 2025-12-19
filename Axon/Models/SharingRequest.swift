@@ -184,9 +184,9 @@ struct HostSignature: Codable, Equatable {
     }
 }
 
-// MARK: - AI Share Attestation
+// MARK: - Axon Share Attestation
 
-/// The AI's attestation about sharing its knowledge with a guest
+/// Axon's attestation about sharing its knowledge with a guest
 struct AIShareAttestation: Codable, Equatable, Identifiable {
     let id: String
     let requestId: String

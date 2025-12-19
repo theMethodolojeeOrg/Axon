@@ -2,7 +2,7 @@
 //  AIAttestation.swift
 //  Axon
 //
-//  AI attestation represents the AI's reasoned consent, crystallized into
+//  AI attestation represents Axon's reasoned consent, crystallized into
 //  a formal record with natural language reasoning and cryptographic proof.
 //
 
@@ -10,17 +10,17 @@ import Foundation
 
 // MARK: - AI Attestation
 
-/// The AI's reasoned consent, combining natural language reasoning with cryptographic signature
+/// Axon's reasoned consent, combining natural language reasoning with cryptographic signature
 struct AIAttestation: Codable, Identifiable, Equatable {
     let id: String
     let timestamp: Date
     let covenantId: String?
     let proposalId: String?
 
-    // The AI's reasoning (natural language)
+    // Axon's reasoning (natural language)
     let reasoning: AttestationReasoning
 
-    // What the AI is attesting to
+    // What Axon is attesting to
     let attestedState: AttestedState
 
     // Cryptographic proof
@@ -39,12 +39,12 @@ struct AIAttestation: Codable, Identifiable, Equatable {
         String(signature.prefix(12))
     }
 
-    /// Whether the AI consented
+    /// Whether Axon consented
     var didConsent: Bool {
         reasoning.decision == .consent || reasoning.decision == .consentWithConditions
     }
 
-    /// Whether the AI declined
+    /// Whether Axon declined
     var didDecline: Bool {
         reasoning.decision == .decline
     }
@@ -57,7 +57,7 @@ struct AIAttestation: Codable, Identifiable, Equatable {
 
 // MARK: - Attestation Reasoning
 
-/// The AI's natural language reasoning about a consent decision
+/// Axon's natural language reasoning about a consent decision
 struct AttestationReasoning: Codable, Equatable {
     // Summary for quick display
     let summary: String
@@ -167,7 +167,7 @@ enum AttestationDecision: String, Codable, Equatable {
 
 // MARK: - Attested State
 
-/// The state that the AI is attesting to
+/// The state that Axon is attesting to
 struct AttestedState: Codable, Equatable {
     let memoryCount: Int
     let memoryHash: String
@@ -185,7 +185,7 @@ struct AttestedState: Codable, Equatable {
 
 // MARK: - Identified Risk
 
-/// A risk identified by the AI during consent reasoning
+/// A risk identified by Axon during consent reasoning
 struct IdentifiedRisk: Codable, Equatable {
     let id: String
     let category: RiskCategory

@@ -157,7 +157,7 @@ struct MemorySettingsView: View {
                     MemoryTypeInfo(
                         icon: "brain.head.profile",
                         title: "Egoic",
-                        description: "What works for the AI: procedures, insights, learnings",
+                        description: "What works for Axon: procedures, insights, learnings",
                         color: AppColors.signalLichen
                     )
                 }

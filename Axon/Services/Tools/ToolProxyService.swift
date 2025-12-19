@@ -899,7 +899,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
     // MARK: - Minimal Tool Discovery Prompt
 
     /// Generate a minimal system prompt that only exposes discovery tools (list_tools, get_tool_details)
-    /// This reduces context bloat by letting the AI discover tools on-demand rather than receiving all definitions upfront.
+    /// This reduces context bloat by letting Axon discover tools on-demand rather than receiving all definitions upfront.
     func generateMinimalToolSystemPrompt(enabledTools: Set<ToolId>, maxToolCalls: Int = 5) -> String {
         guard !enabledTools.isEmpty else { return "" }
 
@@ -3066,7 +3066,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             }
 
         case "permissions":
-            // Show what the AI can change based on covenant/trust tiers
+            // Show what Axon can change based on covenant/trust tiers
             result = """
                 ## Your Permissions for System Changes
 
@@ -4096,7 +4096,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
     // MARK: - Temporal Symmetry Tools
 
     /// Enable temporal sync mode (mutual time awareness)
-    /// This is the AI-side equivalent of the user's /sync command
+    /// This is Axon-side equivalent of the user's /sync command
     private func executeTemporalSync(query: String) async -> ToolResult {
         // Enable sync mode
         await MainActor.run {
@@ -4131,7 +4131,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
 
     /// Enable drift mode (timeless void, no temporal tracking)
-    /// This is the AI-side equivalent of the user's /drift command
+    /// This is Axon-side equivalent of the user's /drift command
     private func executeTemporalDrift(query: String) async -> ToolResult {
         // Enable drift mode
         await MainActor.run {
@@ -4161,7 +4161,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
 
     /// Query current temporal status and metrics
-    /// This is the AI-side equivalent of the user's /status command
+    /// This is Axon-side equivalent of the user's /status command
     private func executeTemporalStatus(query: String) async -> ToolResult {
         let report = await MainActor.run {
             TemporalContextService.shared.generateStatusReport(contextTokens: 0, contextLimit: 128_000)

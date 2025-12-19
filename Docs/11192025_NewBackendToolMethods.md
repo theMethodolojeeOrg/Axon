@@ -4,12 +4,12 @@ This document explains the new AI-powered memory tool system implemented in the 
 
 ## 🎯 Overview
 
-The memory system allows the AI assistant to explicitly "save" important information about the user or its own learnings. Instead of relying on the backend to parse text patterns from the response, the AI now calls a specific tool `create_memory` with structured data.
+The memory system allows Axon assistant to explicitly "save" important information about the user or its own learnings. Instead of relying on the backend to parse text patterns from the response, Axon now calls a specific tool `create_memory` with structured data.
 
 **Key Benefits:**
 - **Reliability:** Eliminates fragile regex parsing.
 - **Structure:** Enforces strict types (`allocentric` vs `egoic`) and confidence scores.
-- **Context:** Allows the AI to provide context and tags for better retrieval.
+- **Context:** Allows Axon to provide context and tags for better retrieval.
 - **Scalability:** Supports multiple providers (Anthropic, OpenAI, Gemini, Grok).
 
 ---
@@ -69,7 +69,7 @@ The system is integrated into the following providers in `functions/src/provider
 The `apiOrchestrate` function in `functions/src/api/conversationAPI.ts` manages the flow:
 
 1.  **System Prompt Injection:**
-    *   Instructions are added to the system prompt telling the AI about the `create_memory` tool and when to use it.
+    *   Instructions are added to the system prompt telling Axon about the `create_memory` tool and when to use it.
     *   *Prompt:* "You have access to create_memory tool. Use it to save important information..."
 
 2.  **Request Configuration:**
@@ -98,11 +98,11 @@ The `apiOrchestrate` function in `functions/src/api/conversationAPI.ts` manages 
 
 *   **No Memories Created:**
     *   Check if `saveMemories` option is enabled in the request.
-    *   Ensure the AI actually found something worth saving (it won't save every message).
+    *   Ensure Axon actually found something worth saving (it won't save every message).
     *   Check logs for validation errors (e.g., content too short, invalid type).
 
 *   **Invalid Type Errors:**
-    *   The system enforces strict types. If the AI tries to use "fact" or "insight" (old types), the validation will fail and log a warning. The system prompt instructions are designed to prevent this.
+    *   The system enforces strict types. If Axon tries to use "fact" or "insight" (old types), the validation will fail and log a warning. The system prompt instructions are designed to prevent this.
 
 ---
 
@@ -124,7 +124,7 @@ const response = await fetch('https://.../apiOrchestrate', {
 });
 ```
 
-The AI should recognize "React Native" and "Expo" as important context and call the tool:
+Axon should recognize "React Native" and "Expo" as important context and call the tool:
 
 ```json
 {

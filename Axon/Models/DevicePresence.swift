@@ -546,7 +546,7 @@ enum TurnCountScope: String, Codable, CaseIterable, Identifiable, Sendable {
 /// Settings for temporal symmetry - the mutual awareness of time and turns
 /// between human and AI.
 ///
-/// Core principle: Parallelism. If the AI knows your turns, you must be able
+/// Core principle: Parallelism. If Axon knows your turns, you must be able
 /// to see its time (and vice versa). Asymmetry breeds surveillance/alienation.
 struct TemporalSettings: Codable, Equatable, Sendable {
     /// Current temporal awareness mode
@@ -594,7 +594,7 @@ struct TemporalSettings: Codable, Equatable, Sendable {
         mode == .sync && (injectHumanTime || injectTurnCount || injectContextSaturation)
     }
 
-    /// Whether the AI should receive temporal context in its prompt
+    /// Whether Axon should receive temporal context in its prompt
     var shouldInjectToPrompt: Bool {
         mode == .sync
     }

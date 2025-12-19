@@ -1056,7 +1056,7 @@ struct ChatContainerView: View {
             conversationService.messages.append(systemMessage)
 
             // Persist messages via LocalConversationStore
-            // Slash command results are ephemeral context - they help the AI but don't need permanent storage
+            // Slash command results are ephemeral context - they help Axon but don't need permanent storage
             // If persistence is desired, use LocalConversationStore.shared.saveLocalMessage()
         }
     }
@@ -1170,7 +1170,7 @@ struct ChatContainerView: View {
                     content: """
                     🔒 **Private Thread Started**
 
-                    This thread is now private. The AI will not respond to messages here.
+                    This thread is now private. Axon will not respond to messages here.
 
                     Use this space for:
                     - Personal notes and drafts

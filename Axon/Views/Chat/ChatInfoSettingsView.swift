@@ -7,6 +7,10 @@
 
 import SwiftUI
 
+#if os(macOS)
+import AppKit
+#endif
+
 struct ChatInfoSettingsView: View {
     let conversation: Conversation
     @Environment(\.dismiss) private var dismiss
@@ -28,6 +32,13 @@ struct ChatInfoSettingsView: View {
 
     // Negotiation sheet
     @State private var showingNegotiationSheet = false
+
+    // Export/share
+    @State private var isExporting = false
+    @State private var exportErrorMessage: String? = nil
+    @State private var exportedFileURL: URL? = nil
+    @State private var exportedShareItems: [Any] = []
+    @State private var showingIOSShareSheet = false
 
     // Whether this conversation has custom overrides (vs using defaults)
     @State private var hasCustomOverrides: Bool = false
@@ -353,6 +364,51 @@ struct ChatInfoSettingsView: View {
             }
         }
 
+        // MARK: - Export
+        ChatInfoSection(title: "Export") {
+            VStack(spacing: 12) {
+                exportButtonRow(
+                    title: "Export JSON",
+                    subtitle: "Full thread + metadata",
+                    systemImage: "doc.text",
+                    format: .json
+                )
+
+                exportButtonRow(
+                    title: "Export Markdown",
+                    subtitle: "Readable transcript",
+                    systemImage: "doc.plaintext",
+                    format: .markdown
+                )
+
+                exportButtonRow(
+                    title: "Export ZIP",
+                    subtitle: "JSON + MD + attachment payloads (when available)",
+                    systemImage: "archivebox",
+                    format: .zip
+                )
+
+                if let exportErrorMessage {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppColors.accentError)
+
+                        Text(exportErrorMessage)
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.accentError)
+                            .lineLimit(3)
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(AppColors.accentError.opacity(0.1))
+                    .cornerRadius(8)
+                }
+            }
+        }
+
         // MARK: - Tools Section
         ChatInfoSection(title: "Tools") {
             VStack(spacing: 16) {
@@ -464,6 +520,20 @@ struct ChatInfoSettingsView: View {
                 .frame(minWidth: 550, idealWidth: 650, minHeight: 600, idealHeight: 800)
                 #endif
         }
+        #if canImport(UIKit)
+        .sheet(isPresented: $showingIOSShareSheet) {
+            if let exportedFileURL {
+                ActivityView(activityItems: [exportedFileURL])
+            } else {
+                EmptyView()
+            }
+        }
+        #endif
+        // macOS SharePicker anchor view (shows when `exportedShareItems` changes)
+        #if os(macOS)
+        MacSharePicker(items: exportedShareItems)
+            .frame(width: 0, height: 0)
+        #endif
     }
 
     // MARK: - iOS Remote Bridge Section
@@ -742,12 +812,107 @@ struct ChatInfoSettingsView: View {
         }
     }
 
+    private func exportButtonRow(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        format: ChatExportService.ExportFormat
+    ) -> some View {
+        Button {
+            Task { @MainActor in
+                await exportAndShare(format: format)
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 16))
+                    .foregroundColor(AppColors.signalMercury)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(AppTypography.bodySmall(.medium))
+                        .foregroundColor(AppColors.textPrimary)
+
+                    Text(subtitle)
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                if isExporting {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 14))
+                        .foregroundColor(AppColors.textSecondary)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
+        .disabled(isExporting)
+    }
+
+    @MainActor
+    private func exportAndShare(format: ChatExportService.ExportFormat) async {
+        exportErrorMessage = nil
+        isExporting = true
+        defer { isExporting = false }
+
+        do {
+            let exported = try await ChatExportService.shared.exportFile(for: conversation, format: format)
+            exportedFileURL = exported.url
+
+            #if os(macOS)
+            // macOS: offer both Save As… and Share.
+            // 1) Save panel
+            let panel = NSSavePanel()
+            panel.canCreateDirectories = true
+            panel.nameFieldStringValue = exported.suggestedFilename
+            panel.allowedFileTypes = [exported.url.pathExtension]
+
+            panel.begin { response in
+                guard response == .OK, let destination = panel.url else { return }
+                do {
+                    try FileManager.default.copyItem(at: exported.url, to: destination)
+                } catch {
+                    // If file exists, overwrite
+                    do {
+                        try? FileManager.default.removeItem(at: destination)
+                        try FileManager.default.copyItem(at: exported.url, to: destination)
+                    } catch {
+                        exportErrorMessage = error.localizedDescription
+                    }
+                }
+
+                // 2) Share picker (shares the saved file if we have it, else temp file)
+                exportedShareItems = [destination]
+            }
+            #else
+            // iOS: share sheet
+            showingIOSShareSheet = true
+            #endif
+        } catch {
+            exportErrorMessage = error.localizedDescription
+        }
+    }
+
     private func estimateTokenCount() async {
         // Rough estimation: 4 characters per token
-        // Get all messages for this conversation
-        let messages = conversationService.messages
-        let totalCharacters = messages.reduce(0) { $0 + $1.content.count }
-        estimatedTokens = max(1, totalCharacters / 4)
+        // Use getMessages to ensure we're counting the right conversation.
+        if let messages = try? await conversationService.getMessages(conversationId: conversation.id, limit: 10_000) {
+            let totalCharacters = messages.reduce(0) { $0 + $1.content.count }
+            estimatedTokens = max(1, totalCharacters / 4)
+        } else {
+            estimatedTokens = 0
+        }
     }
 
     private func loadEnabledTools() {
@@ -895,7 +1060,7 @@ struct ChatInfoSettingsView: View {
 
 // MARK: - Conversation Overrides Model
 
-struct ConversationOverrides: Codable {
+struct ConversationOverrides: Codable, Equatable {
     // Provider/Model Identifiers
     var builtInProvider: String?
     var customProviderId: UUID?

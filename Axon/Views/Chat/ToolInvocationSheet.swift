@@ -280,7 +280,7 @@ struct ToolInvocationSheet: View {
                 .font(AppTypography.bodyMedium(.semibold))
                 .foregroundColor(AppColors.textPrimary)
 
-            Text("Describe what change you'd like to propose to the AI's guidelines or behavior.")
+            Text("Describe what change you'd like to propose to Axon's guidelines or behavior.")
                 .font(AppTypography.bodySmall())
                 .foregroundColor(AppColors.textSecondary)
 
@@ -424,7 +424,7 @@ struct ToolInvocationSheet: View {
             HStack(spacing: 8) {
                 Image(systemName: "info.circle")
                     .font(.system(size: 12))
-                Text("The AI can see that a note exists, but must ask permission to read private notes.")
+                Text("Axon can see that a note exists, but must ask permission to read private notes.")
                     .font(AppTypography.labelSmall())
             }
             .foregroundColor(AppColors.textTertiary.opacity(0.8))
@@ -731,7 +731,7 @@ struct ToolInvocationSheet: View {
             do {
                 // Determine visibility based on user selection
                 let _ = noteVisibility // reserved for future: finer-grained visibility
-                // Note: We use .aiOnly for "Private" because .aiOnly means the AI CAN'T see contents
+                // Note: We use .aiOnly for "Private" because .aiOnly means Axon CAN'T see contents
                 // But we need to invert the logic - if user wants it private FROM AI, we need a new approach
                 // Actually looking at the model: .aiOnly means only AI can see, .userVisible means user can see
                 // For "Private" we want user to see but AI to need permission

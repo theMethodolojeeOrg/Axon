@@ -34,7 +34,7 @@ Every conversation with an LLM is with a "Memento"-level amnesiac AI.
 - Switching models = starting over contextually
 - Your interaction patterns—your *personalized training data*—evaporate with each conversation
 
-**The injustice:** You do the cognitive work of context-setting repeatedly. The AI learns nothing.
+**The injustice:** You do the cognitive work of context-setting repeatedly. Axon learns nothing.
 
 ---
 
@@ -330,7 +330,7 @@ open Axon.xcodeproj
 3. Enter your API key(s)
 4. Start chatting
 
-Memories are created automatically as you interact. You can also create them manually or let the AI create them via tool calls.
+Memories are created automatically as you interact. You can also create them manually or let Axon create them via tool calls.
 
 ---
 

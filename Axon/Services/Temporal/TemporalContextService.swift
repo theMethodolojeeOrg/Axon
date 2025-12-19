@@ -21,7 +21,7 @@ import os.log
 
 // MARK: - Temporal Context
 
-/// The temporal context to be injected into the AI's system prompt
+/// The temporal context to be injected into Axon's system prompt
 struct TemporalContext: Equatable {
     let humanTime: Date
     let humanTimeZone: TimeZone

@@ -304,7 +304,7 @@ class SlashCommandParser {
         List all available tools organized by category.
 
         ### /private
-        Start a private thread where the AI will not respond.
+        Start a private thread where Axon will not respond.
         Must be the first message in a new conversation.
         Useful for personal notes, drafts, or thinking out loud.
 
@@ -328,7 +328,7 @@ class SlashCommandParser {
 
         ---
 
-        *Tip: Use `/tool` to show definitions to the AI, use `/use` to run tools yourself.*
+        *Tip: Use `/tool` to show definitions to Axon, use `/use` to run tools yourself.*
         """
 
         return SlashCommandResult(
@@ -348,7 +348,7 @@ class SlashCommandParser {
             resultText: """
             🔒 **Private Thread Started**
 
-            This thread is now private. The AI will not respond to messages here.
+            This thread is now private. Axon will not respond to messages here.
 
             Use this space for:
             - Personal notes and drafts
@@ -465,7 +465,7 @@ class SlashCommandParser {
         details += """
 
         ### Usage
-        To use this tool, the AI should include:
+        To use this tool, the Axon should include:
         ```tool_request
         {"tool": "\(tool.rawValue)", "query": "your request here"}
         ```
@@ -722,7 +722,7 @@ class SlashCommandParser {
             id: "user_propose_covenant",
             toolId: "user_propose_covenant",
             displayName: "Propose Covenant Change",
-            description: "Suggest a change to the AI's covenant/guidelines",
+            description: "Suggest a change to Axon's covenant/guidelines",
             icon: "doc.text.magnifyingglass",
             category: "User Actions"
         ),
