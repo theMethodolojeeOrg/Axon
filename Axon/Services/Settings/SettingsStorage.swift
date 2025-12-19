@@ -18,6 +18,7 @@ class SettingsStorage {
     // Additional keys for conversation management
     private let displayNameOverridesKey = "conversation.displayNameOverrides"
     private let archivedConversationsKey = "conversation.archived"
+    private let pinnedConversationsKey = "conversation.pinned"
 
     // Migration keys
     private let iCloudSyncMigrationKey = "migration.iCloudSyncDefault.v1"
@@ -159,6 +160,52 @@ class SettingsStorage {
     private func saveArchivedEntries(_ entries: [ArchivedEntry]) {
         if let data = try? JSONEncoder().encode(entries) {
             defaults.set(data, forKey: archivedConversationsKey)
+        }
+    }
+
+    // MARK: - Conversation Pinning
+
+    func pinConversation(id: String) {
+        var pinned = loadPinnedConversations()
+        if !pinned.contains(id) {
+            pinned.insert(id, at: 0)  // Add to top of pinned list
+            savePinnedConversations(pinned)
+        }
+    }
+
+    func unpinConversation(id: String) {
+        var pinned = loadPinnedConversations()
+        pinned.removeAll { $0 == id }
+        savePinnedConversations(pinned)
+    }
+
+    func togglePinConversation(id: String) {
+        if isConversationPinned(id) {
+            unpinConversation(id: id)
+        } else {
+            pinConversation(id: id)
+        }
+    }
+
+    func isConversationPinned(_ id: String) -> Bool {
+        loadPinnedConversations().contains(id)
+    }
+
+    func pinnedConversationIds() -> [String] {
+        loadPinnedConversations()
+    }
+
+    private func loadPinnedConversations() -> [String] {
+        guard let data = defaults.data(forKey: pinnedConversationsKey),
+              let ids = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return ids
+    }
+
+    private func savePinnedConversations(_ ids: [String]) {
+        if let data = try? JSONEncoder().encode(ids) {
+            defaults.set(data, forKey: pinnedConversationsKey)
         }
     }
 

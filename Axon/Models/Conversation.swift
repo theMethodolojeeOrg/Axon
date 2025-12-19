@@ -23,6 +23,7 @@ struct Conversation: Codable, Identifiable, Equatable {
     let lastMessage: String?
     let tags: [String]?
     let isPinned: Bool?
+    let isPrivate: Bool?  // Private threads don't invoke AI
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -38,6 +39,7 @@ struct Conversation: Codable, Identifiable, Equatable {
         case tags
         case isPinned
         case archived
+        case isPrivate
     }
 
     init(
@@ -53,7 +55,8 @@ struct Conversation: Codable, Identifiable, Equatable {
         summary: String? = nil,
         lastMessage: String? = nil,
         tags: [String]? = nil,
-        isPinned: Bool? = false
+        isPinned: Bool? = false,
+        isPrivate: Bool? = false
     ) {
         self.id = id
         self.userId = userId
@@ -68,6 +71,7 @@ struct Conversation: Codable, Identifiable, Equatable {
         self.lastMessage = lastMessage
         self.tags = tags
         self.isPinned = isPinned
+        self.isPrivate = isPrivate
     }
 
     // Custom decoder to handle timestamp conversion
@@ -102,6 +106,7 @@ struct Conversation: Codable, Identifiable, Equatable {
         lastMessage = try container.decodeIfPresent(String.self, forKey: .lastMessage)
         tags = try container.decodeIfPresent([String].self, forKey: .tags)
         isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned)
+        isPrivate = try container.decodeIfPresent(Bool.self, forKey: .isPrivate)
     }
 
     // Custom encoder to convert dates back to timestamps
@@ -129,6 +134,7 @@ struct Conversation: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(lastMessage, forKey: .lastMessage)
         try container.encodeIfPresent(tags, forKey: .tags)
         try container.encodeIfPresent(isPinned, forKey: .isPinned)
+        try container.encodeIfPresent(isPrivate, forKey: .isPrivate)
     }
 }
 

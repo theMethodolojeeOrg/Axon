@@ -881,6 +881,17 @@ struct ChatContainerView: View {
                     draftService.transferNewChatDraft(to: conv.id)
                 }
 
+                // Check if this is a private thread - if so, just save message without AI
+                // Check both the model flag and UserDefaults (for persistence across app launches)
+                if conv.isPrivate == true || Self.isConversationPrivate(conv.id) {
+                    try await sendPrivateMessage(
+                        conversationId: conv.id,
+                        content: content,
+                        attachments: attachments
+                    )
+                    return
+                }
+
                 // Get enabled tools - check for per-conversation overrides first
                 let enabledTools: [String] = {
                     guard settings.toolSettings.toolsEnabled else { return [] }
@@ -951,6 +962,12 @@ struct ChatContainerView: View {
         #endif
         isInputFocused = false
 
+        // Handle /private command specially - it needs to create a private conversation
+        if case .privateThread = command {
+            handlePrivateThreadCommand()
+            return
+        }
+
         Task {
             // Execute the slash command
             let result = await SlashCommandParser.shared.execute(command)
@@ -991,6 +1008,183 @@ struct ChatContainerView: View {
             // Persist messages via LocalConversationStore
             // Slash command results are ephemeral context - they help the AI but don't need permanent storage
             // If persistence is desired, use LocalConversationStore.shared.saveLocalMessage()
+        }
+    }
+
+    /// Handle /private command - creates a private thread where AI won't respond
+    private func handlePrivateThreadCommand() {
+        // /private can only be used as the first message in a new conversation
+        // Allow if: no conversation exists, OR conversation exists but has no messages yet
+        if conversation != nil && !conversationService.messages.isEmpty {
+            // Already in a conversation with messages - show error
+            let errorMessage = Message(
+                conversationId: conversation?.id ?? "temp",
+                role: .assistant,
+                content: """
+                ⚠️ **Cannot make this thread private**
+
+                The `/private` command can only be used when starting a new conversation.
+
+                This thread already has messages, so it cannot be converted to private mode.
+
+                To create a private thread, start a new chat and type `/private` as your first message.
+                """,
+                modelName: "System",
+                providerName: "internal"
+            )
+            conversationService.messages.append(errorMessage)
+            return
+        }
+
+        // Create a new private conversation, or convert existing empty conversation to private
+        Task {
+            do {
+                showWelcome = false
+
+                let privateConv: Conversation
+                let privateConvWithFlag: Conversation
+
+                if let existingConv = conversation {
+                    // Convert existing empty conversation to private
+                    privateConv = existingConv
+
+                    // Mark as private in UserDefaults (persists the private flag)
+                    Self.setConversationPrivate(privateConv.id, isPrivate: true)
+
+                    // Update the title to indicate it's private
+                    try LocalConversationStore.shared.updateLocalConversation(
+                        id: privateConv.id,
+                        title: "🔒 Private Notes"
+                    )
+
+                    // Create a version with isPrivate set for in-memory use
+                    privateConvWithFlag = Conversation(
+                        id: privateConv.id,
+                        userId: privateConv.userId,
+                        title: "🔒 Private Notes",
+                        projectId: privateConv.projectId,
+                        createdAt: privateConv.createdAt,
+                        updatedAt: privateConv.updatedAt,
+                        messageCount: privateConv.messageCount,
+                        lastMessageAt: privateConv.lastMessageAt,
+                        archived: privateConv.archived,
+                        summary: privateConv.summary,
+                        lastMessage: privateConv.lastMessage,
+                        tags: privateConv.tags,
+                        isPinned: privateConv.isPinned,
+                        isPrivate: true
+                    )
+
+                    // Update UI with the private-flagged conversation
+                    onConversationCreated(privateConvWithFlag)
+
+                    print("[ChatContainer] Converted existing conversation to private: \(privateConv.id)")
+                } else {
+                    // Create new private conversation locally
+                    privateConv = try LocalConversationStore.shared.createLocalConversation(
+                        title: "🔒 Private Notes",
+                        projectId: "default"
+                    )
+
+                    // Mark as private in UserDefaults (persists the private flag)
+                    Self.setConversationPrivate(privateConv.id, isPrivate: true)
+
+                    // Create a version with isPrivate set for in-memory use
+                    privateConvWithFlag = Conversation(
+                        id: privateConv.id,
+                        userId: privateConv.userId,
+                        title: privateConv.title,
+                        projectId: privateConv.projectId,
+                        createdAt: privateConv.createdAt,
+                        updatedAt: privateConv.updatedAt,
+                        messageCount: privateConv.messageCount,
+                        lastMessageAt: privateConv.lastMessageAt,
+                        archived: privateConv.archived,
+                        summary: privateConv.summary,
+                        lastMessage: privateConv.lastMessage,
+                        tags: privateConv.tags,
+                        isPinned: privateConv.isPinned,
+                        isPrivate: true
+                    )
+
+                    // Update UI
+                    onConversationCreated(privateConvWithFlag)
+
+                    print("[ChatContainer] Created new private thread: \(privateConv.id)")
+                }
+
+                // Add welcome message
+                let welcomeMessage = Message(
+                    conversationId: privateConv.id,
+                    role: .assistant,
+                    content: """
+                    🔒 **Private Thread Started**
+
+                    This thread is now private. The AI will not respond to messages here.
+
+                    Use this space for:
+                    - Personal notes and drafts
+                    - Thinking out loud
+                    - Storing information for later
+
+                    *All messages in this thread are stored locally on your device.*
+                    """,
+                    modelName: "System",
+                    providerName: "internal"
+                )
+                conversationService.messages.append(welcomeMessage)
+
+                // Save the welcome message
+                try await ConversationSyncManager.shared.saveMessagesToCoreData([welcomeMessage], conversationId: privateConv.id)
+            } catch {
+                print("[ChatContainer] Failed to create private thread: \(error)")
+                let errorMessage = Message(
+                    conversationId: "temp",
+                    role: .assistant,
+                    content: "Failed to create private thread: \(error.localizedDescription)",
+                    modelName: "System",
+                    providerName: "internal"
+                )
+                conversationService.messages.append(errorMessage)
+            }
+        }
+    }
+
+    /// Check if a conversation is marked as private
+    static func isConversationPrivate(_ conversationId: String) -> Bool {
+        UserDefaults.standard.bool(forKey: "private_thread_\(conversationId)")
+    }
+
+    /// Mark a conversation as private
+    static func setConversationPrivate(_ conversationId: String, isPrivate: Bool) {
+        UserDefaults.standard.set(isPrivate, forKey: "private_thread_\(conversationId)")
+    }
+
+    /// Send a message in a private thread (no AI response)
+    private func sendPrivateMessage(
+        conversationId: String,
+        content: String,
+        attachments: [MessageAttachment]
+    ) async throws {
+        // Create user message
+        let userMessage = Message(
+            conversationId: conversationId,
+            role: .user,
+            content: content,
+            attachments: attachments.isEmpty ? nil : attachments
+        )
+
+        // Add to UI
+        conversationService.messages.append(userMessage)
+
+        // Save to Core Data
+        try await ConversationSyncManager.shared.saveMessagesToCoreData([userMessage], conversationId: conversationId)
+
+        print("[ChatContainer] Saved private message to thread: \(conversationId)")
+
+        // No AI response - just clean up
+        await MainActor.run {
+            isLoading = false
         }
     }
 

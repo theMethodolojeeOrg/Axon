@@ -12,9 +12,11 @@ import Foundation
 
 /// Slash command types supported by Axon
 enum SlashCommand {
-    case tool(toolId: String)
+    case tool(toolId: String)      // Show tool definition to AI
+    case use(toolId: String)       // User directly invokes a tool
     case listTools
     case help
+    case privateThread             // Mark thread as private (no AI)
     case unknown(command: String)
     case none
 }
@@ -99,11 +101,20 @@ class SlashCommandParser {
             }
             return .tool(toolId: toolId)
 
+        case "use":
+            guard let toolId = args, !toolId.isEmpty else {
+                return .unknown(command: "use (missing tool ID)")
+            }
+            return .use(toolId: toolId)
+
         case "tools", "listtools", "list_tools":
             return .listTools
 
         case "help":
             return .help
+
+        case "private":
+            return .privateThread
 
         default:
             return .unknown(command: commandStr)
@@ -113,16 +124,29 @@ class SlashCommandParser {
     // MARK: - Execution
 
     /// Execute a slash command and return the result
+    /// Note: /use command is handled separately via the tool invocation sheet
     func execute(_ command: SlashCommand) async -> SlashCommandResult {
         switch command {
         case .tool(let toolId):
             return await executeToolCommand(toolId: toolId)
+
+        case .use(let toolId):
+            // /use is handled via sheet in MessageInputBar, this is a fallback
+            return SlashCommandResult(
+                command: command,
+                displayText: "/use \(toolId)",
+                resultText: "Opening tool invocation form...",
+                success: true
+            )
 
         case .listTools:
             return await executeListToolsCommand()
 
         case .help:
             return executeHelpCommand()
+
+        case .privateThread:
+            return executePrivateCommand()
 
         case .unknown(let cmd):
             return SlashCommandResult(
@@ -132,8 +156,10 @@ class SlashCommandParser {
                 Unknown command: `/\(cmd)`
 
                 **Available commands:**
-                - `/tool <tool_id>` - Show full details for a specific tool
+                - `/tool <tool_id>` - Show tool definition to AI
+                - `/use <tool_id>` - Directly invoke a tool yourself
                 - `/tools` - List all available tools
+                - `/private` - Start a private thread (no AI)
                 - `/help` - Show this help message
 
                 Use `/tools` to see available tool IDs.
@@ -243,24 +269,55 @@ class SlashCommandParser {
         **Available commands:**
 
         ### /tool <tool_id>
-        Show full details, parameters, and examples for a specific tool.
+        Show full details and definition for a tool (visible to AI).
         Example: `/tool google_search`
+
+        ### /use <tool_id>
+        Directly invoke a tool yourself with a custom query.
+        Example: `/use google_search`
 
         ### /tools
         List all available tools organized by category.
+
+        ### /private
+        Start a private thread where the AI will not respond.
+        Must be the first message in a new conversation.
+        Useful for personal notes, drafts, or thinking out loud.
 
         ### /help
         Show this help message.
 
         ---
 
-        *Tip: Tool details shown via `/tool` are visible to both you and the AI, making it easy to collaborate on tool usage.*
+        *Tip: Use `/tool` to show definitions to the AI, use `/use` to run tools yourself.*
         """
 
         return SlashCommandResult(
             command: .help,
             displayText: "/help",
             resultText: resultText,
+            success: true
+        )
+    }
+
+    private func executePrivateCommand() -> SlashCommandResult {
+        // Note: The actual private thread creation is handled in AppContainerView
+        // This command must be the first message in a new conversation
+        return SlashCommandResult(
+            command: .privateThread,
+            displayText: "/private",
+            resultText: """
+            🔒 **Private Thread Started**
+
+            This thread is now private. The AI will not respond to messages here.
+
+            Use this space for:
+            - Personal notes and drafts
+            - Thinking out loud
+            - Storing information for later
+
+            *Messages in this thread are stored locally.*
+            """,
             success: true
         )
     }
@@ -366,11 +423,27 @@ class SlashCommandParser {
     /// All available slash commands
     static let availableCommands: [SlashCommandSuggestion] = [
         SlashCommandSuggestion(
+            id: "private",
+            command: "private",
+            displayName: "Private Thread",
+            description: "Start a thread without AI (first message only)",
+            icon: "lock.fill",
+            hasSubmenu: false
+        ),
+        SlashCommandSuggestion(
+            id: "use",
+            command: "use",
+            displayName: "Use Tool",
+            description: "Directly invoke a tool yourself",
+            icon: "play.circle.fill",
+            hasSubmenu: true
+        ),
+        SlashCommandSuggestion(
             id: "tool",
             command: "tool",
-            displayName: "Tool Details",
-            description: "Show details for a specific tool",
-            icon: "wrench.and.screwdriver",
+            displayName: "Tool Info",
+            description: "Show tool definition to AI",
+            icon: "info.circle",
             hasSubmenu: true
         ),
         SlashCommandSuggestion(
@@ -421,7 +494,7 @@ class SlashCommandParser {
         }
     }
 
-    /// Get tool suggestions for the /tool submenu
+    /// Get tool suggestions for the /tool submenu (shows ALL tools for AI reference)
     /// - Parameter filter: Optional filter text for the tool name
     /// - Returns: Filtered list of tool suggestions
     func getToolSuggestions(filter: String = "") -> [ToolSuggestion] {
@@ -432,7 +505,6 @@ class SlashCommandParser {
         var suggestions: [ToolSuggestion] = []
 
         for tool in ToolId.allCases {
-            let isEnabled = settings.toolSettings.isToolEnabled(tool)
             let toolId = tool.rawValue.lowercased()
             let displayName = tool.displayName.lowercased()
 
@@ -467,9 +539,148 @@ class SlashCommandParser {
         }
     }
 
+    /// Tools that are AI-only and shouldn't be directly invoked by users
+    private static let aiOnlyTools: Set<String> = [
+        // AI-specific meta tools
+        "propose_covenant_change",      // AI proposes changes, user shouldn't
+        "change_system_state",          // AI configures itself
+        "agent_state_append",           // AI's internal state
+        "agent_state_query",            // AI's internal state
+        "agent_state_clear",            // AI's internal state
+        "reflect_on_conversation",      // AI self-reflection
+        "list_tools",                   // AI tool discovery
+        "get_tool_details",             // AI tool discovery
+        "persistence_disable",          // AI privacy control
+
+        // Sub-agent orchestration (AI delegates to sub-agents)
+        "spawn_scout",
+        "spawn_mechanic",
+        "spawn_designer",
+        "query_job_status",
+        "accept_job_result",
+        "terminate_job",
+
+        // Heartbeat (AI configures its own proactive behavior)
+        "heartbeat_configure",
+        "heartbeat_run_once",
+        "heartbeat_set_delivery_profile",
+        "heartbeat_update_profile",
+
+        // Presence (AI manages its own focus)
+        "request_device_switch",
+        "set_presence_intent",
+        "save_state_checkpoint",
+
+        // Notification (redundant with chat - AI uses it, users just type)
+        "notify_user"
+    ]
+
+    /// User-centric special tools that provide inverse functionality
+    static let userSpecialTools: [ToolSuggestion] = [
+        ToolSuggestion(
+            id: "user_create_note",
+            toolId: "user_create_note",
+            displayName: "Create Note",
+            description: "Save a private note to the Internal Thread",
+            icon: "note.text.badge.plus",
+            category: "User Actions"
+        ),
+        ToolSuggestion(
+            id: "user_propose_covenant",
+            toolId: "user_propose_covenant",
+            displayName: "Propose Covenant Change",
+            description: "Suggest a change to the AI's covenant/guidelines",
+            icon: "doc.text.magnifyingglass",
+            category: "User Actions"
+        ),
+        ToolSuggestion(
+            id: "user_feedback",
+            toolId: "user_feedback",
+            displayName: "Give Feedback",
+            description: "Provide feedback on AI behavior or responses",
+            icon: "star.bubble",
+            category: "User Actions"
+        ),
+        ToolSuggestion(
+            id: "user_request_summary",
+            toolId: "user_request_summary",
+            displayName: "Request Conversation Summary",
+            description: "Ask AI to summarize what we've discussed",
+            icon: "doc.plaintext",
+            category: "User Actions"
+        )
+    ]
+
+    /// Get tool suggestions for the /use submenu (only user-invokable tools)
+    /// - Parameter filter: Optional filter text for the tool name
+    /// - Returns: Filtered list of user-invokable tool suggestions
+    func getUserInvokableTools(filter: String = "") -> [ToolSuggestion] {
+        let settings = SettingsStorage.shared.loadSettingsOrDefault()
+        let normalizedFilter = filter.lowercased().trimmingCharacters(in: .whitespaces)
+
+        var suggestions: [ToolSuggestion] = []
+
+        // Add user-special tools first
+        for tool in Self.userSpecialTools {
+            if !normalizedFilter.isEmpty {
+                guard tool.toolId.lowercased().contains(normalizedFilter) ||
+                      tool.displayName.lowercased().contains(normalizedFilter) else {
+                    continue
+                }
+            }
+            suggestions.append(tool)
+        }
+
+        // Add regular tools that are user-invokable
+        for tool in ToolId.allCases {
+            // Skip AI-only tools
+            guard !Self.aiOnlyTools.contains(tool.rawValue) else { continue }
+
+            let toolId = tool.rawValue.lowercased()
+            let displayName = tool.displayName.lowercased()
+
+            // Filter if there's a search term
+            if !normalizedFilter.isEmpty {
+                guard toolId.contains(normalizedFilter) ||
+                      displayName.contains(normalizedFilter) ||
+                      tool.category.displayName.lowercased().contains(normalizedFilter) else {
+                    continue
+                }
+            }
+
+            suggestions.append(ToolSuggestion(
+                id: tool.rawValue,
+                toolId: tool.rawValue,
+                displayName: tool.displayName,
+                description: tool.description,
+                icon: tool.icon,
+                category: tool.category.displayName
+            ))
+        }
+
+        // Sort: User Actions first, then enabled tools, then alphabetically
+        return suggestions.sorted { lhs, rhs in
+            // User Actions category always first
+            if lhs.category == "User Actions" && rhs.category != "User Actions" {
+                return true
+            }
+            if rhs.category == "User Actions" && lhs.category != "User Actions" {
+                return false
+            }
+
+            let lhsEnabled = settings.toolSettings.enabledToolIds.contains(lhs.toolId)
+            let rhsEnabled = settings.toolSettings.enabledToolIds.contains(rhs.toolId)
+
+            if lhsEnabled != rhsEnabled {
+                return lhsEnabled
+            }
+            return lhs.displayName < rhs.displayName
+        }
+    }
+
     /// Determine what state the autocomplete menu should be in
     /// - Parameter input: Current text input
-    /// - Returns: The menu state (hidden, showingCommands, showingTools)
+    /// - Returns: The menu state (hidden, showingCommands, showingTools, showingUseTools)
     func getMenuState(for input: String) -> SlashMenuState {
         let trimmed = input.trimmingCharacters(in: .whitespaces)
 
@@ -479,7 +690,13 @@ class SlashCommandParser {
 
         let afterSlash = String(trimmed.dropFirst())
 
-        // Check if we're in the tool submenu phase
+        // Check if we're in the /use submenu phase (invoke tool)
+        if afterSlash.lowercased().hasPrefix("use ") {
+            let toolFilter = String(afterSlash.dropFirst(4)) // Remove "use "
+            return .showingUseTools(filter: toolFilter)
+        }
+
+        // Check if we're in the /tool submenu phase (show definition)
         if afterSlash.lowercased().hasPrefix("tool ") {
             let toolFilter = String(afterSlash.dropFirst(5)) // Remove "tool "
             return .showingTools(filter: toolFilter)
@@ -494,5 +711,6 @@ class SlashCommandParser {
 enum SlashMenuState: Equatable {
     case hidden
     case showingCommands
-    case showingTools(filter: String)
+    case showingTools(filter: String)         // For /tool - show definition
+    case showingUseTools(filter: String)      // For /use - invoke tool
 }

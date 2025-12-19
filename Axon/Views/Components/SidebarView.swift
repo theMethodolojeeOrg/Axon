@@ -221,26 +221,61 @@ struct SidebarView: View {
 
     // MARK: - Conversations Section
 
+    /// Sorted conversations: pinned first (in pin order), then unpinned by recency
+    private var sortedConversations: [Conversation] {
+        let nonArchived = conversationService.conversations.filter { !SettingsStorage.shared.isConversationArchived($0.id) }
+        let pinnedIds = SettingsStorage.shared.pinnedConversationIds()
+
+        // Separate pinned and unpinned
+        let pinned = pinnedIds.compactMap { id in nonArchived.first { $0.id == id } }
+        let unpinned = nonArchived.filter { !pinnedIds.contains($0.id) }
+
+        // Sort unpinned by most recent interaction (lastMessageAt or updatedAt)
+        let sortedUnpinned = unpinned.sorted { lhs, rhs in
+            let lhsDate = lhs.lastMessageAt ?? lhs.updatedAt
+            let rhsDate = rhs.lastMessageAt ?? rhs.updatedAt
+            return lhsDate > rhsDate
+        }
+
+        return pinned + sortedUnpinned
+    }
+
     private var conversationsSection: some View {
         ScrollView {
             LazyVStack(spacing: 8) {
                 if conversationService.conversations.isEmpty {
                     emptyConversationsView
                 } else {
-                    ForEach(conversationService.conversations.filter { !SettingsStorage.shared.isConversationArchived($0.id) }) { conversation in
+                    ForEach(sortedConversations) { conversation in
+                        let isPinned = SettingsStorage.shared.isConversationPinned(conversation.id)
                         ConversationSidebarRow(
                             conversation: conversation,
                             isSelected: selectedConversation?.id == conversation.id && currentView == .chat,
-                            displayNameOverride: SettingsStorage.shared.displayName(for: conversation.id)
+                            displayNameOverride: SettingsStorage.shared.displayName(for: conversation.id),
+                            isPinned: isPinned
                         ) {
                             onSelectConversation(conversation)
                         }
                         .contextMenu {
-                            Button(role: .destructive) {
-                                deletingConversation = conversation
-                                showingDeleteAlert = true
+                            // Pin/Unpin toggle
+                            Button {
+                                SettingsStorage.shared.togglePinConversation(id: conversation.id)
                             } label: {
-                                Label("Delete", systemImage: "trash")
+                                if SettingsStorage.shared.isConversationPinned(conversation.id) {
+                                    Label("Unpin", systemImage: "pin.slash")
+                                } else {
+                                    Label("Pin to Top", systemImage: "pin")
+                                }
+                            }
+
+                            Divider()
+
+                            Button {
+                                renamingConversation = conversation
+                                tempRenameTitle = SettingsStorage.shared.displayName(for: conversation.id) ?? conversation.title
+                                showingRenameSheet = true
+                            } label: {
+                                Label("Rename", systemImage: "pencil")
                             }
 
                             Button {
@@ -258,12 +293,13 @@ struct SidebarView: View {
                                 Label("Archive", systemImage: "archivebox")
                             }
 
-                            Button {
-                                renamingConversation = conversation
-                                tempRenameTitle = SettingsStorage.shared.displayName(for: conversation.id) ?? conversation.title
-                                showingRenameSheet = true
+                            Divider()
+
+                            Button(role: .destructive) {
+                                deletingConversation = conversation
+                                showingDeleteAlert = true
                             } label: {
-                                Label("Rename", systemImage: "pencil")
+                                Label("Delete", systemImage: "trash")
                             }
                         }
                     }
@@ -419,19 +455,29 @@ struct ConversationSidebarRow: View {
     let conversation: Conversation
     let isSelected: Bool
     var displayNameOverride: String? = nil
+    var isPinned: Bool = false
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
-                Image(systemName: "bubble.left.fill")
-                    .font(.system(size: 16))
-                    .foregroundColor(isSelected ? AppColors.signalMercury : AppColors.textTertiary)
+                // Icon - pin for pinned, bubble for regular
+                Image(systemName: isPinned ? "pin.fill" : "bubble.left.fill")
+                    .font(.system(size: isPinned ? 14 : 16))
+                    .foregroundColor(isPinned ? .white : (isSelected ? AppColors.signalMercury : AppColors.textTertiary))
+                    .frame(width: 28, height: 28)
+                    .background(
+                        isPinned ?
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(AppColors.signalMercury) :
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.clear)
+                    )
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(displayNameOverride ?? conversation.title)
-                        .font(AppTypography.bodyMedium(.medium))
-                        .foregroundColor(AppColors.textPrimary)
+                        .font(isPinned ? AppTypography.bodyMedium(.semibold) : AppTypography.bodyMedium(.medium))
+                        .foregroundColor(isPinned ? AppColors.textPrimary : AppColors.textPrimary)
                         .lineLimit(1)
 
                     if let lastMessage = conversation.lastMessage {
@@ -444,16 +490,25 @@ struct ConversationSidebarRow: View {
 
                 Spacer()
 
-                if let lastMessageAt = conversation.lastMessageAt {
-                    Text(lastMessageAt, style: .relative)
-                        .font(AppTypography.labelSmall())
-                        .foregroundColor(AppColors.textTertiary)
+                VStack(alignment: .trailing, spacing: 4) {
+                    if let lastMessageAt = conversation.lastMessageAt {
+                        Text(lastMessageAt, style: .relative)
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(isPinned ? AppColors.signalMercury : AppColors.textTertiary)
+                    }
                 }
             }
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : Color.clear)
+                    .fill(isSelected ? AppColors.signalMercury.opacity(0.15) :
+                          (isPinned ? AppColors.signalMercury.opacity(0.08) : Color.clear))
+            )
+            .overlay(
+                isPinned ?
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(AppColors.signalMercury.opacity(0.2), lineWidth: 1) :
+                    nil
             )
         }
         .buttonStyle(PlainButtonStyle())

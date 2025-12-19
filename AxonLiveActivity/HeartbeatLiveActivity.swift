@@ -10,6 +10,133 @@ import WidgetKit
 import Combine
 import SwiftUI
 
+// MARK: - Flipping Icon View
+
+/// An animated icon that flips between the status/mood icon and Axon logo
+/// The flip is a 3D rotation around the Y-axis (spinning "backward" in 3D)
+struct FlippingIconView: View {
+    let iconName: String
+    let iconColor: Color
+    let fontSize: Font
+    let iconSize: CGFloat
+    let isRunning: Bool
+
+    // Animation timing: 10 seconds on icon, 0.8 second flip (0.4s each half), brief logo display, flip back
+    private let displayDuration: Double = 10.0
+    private let flipDuration: Double = 0.4  // Half of total flip time (0.8s total)
+
+    var body: some View {
+        // Use TimelineView to drive the animation cycle
+        TimelineView(.periodic(from: .now, by: 0.05)) { timeline in
+            let phase = calculatePhase(at: timeline.date)
+
+            ZStack {
+                // Status/Mood Icon
+                Image(systemName: iconName)
+                    .font(fontSize)
+                    .foregroundStyle(iconColor)
+                    .symbolEffect(.pulse, isActive: isRunning)
+                    .opacity(phase.showIcon ? 1 : 0)
+                    .rotation3DEffect(
+                        .degrees(phase.iconRotation),
+                        axis: (x: 0, y: 1, z: 0),
+                        perspective: 0.5
+                    )
+
+                // Axon Logo (template image, colored to match)
+                Image("AxonLogoTemplate")
+                    .resizable()
+                    .renderingMode(.template)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: iconSize, height: iconSize)
+                    .foregroundStyle(iconColor)
+                    .opacity(phase.showLogo ? 1 : 0)
+                    .rotation3DEffect(
+                        .degrees(phase.logoRotation),
+                        axis: (x: 0, y: 1, z: 0),
+                        perspective: 0.5
+                    )
+            }
+        }
+    }
+
+    private struct AnimationPhase {
+        var showIcon: Bool
+        var showLogo: Bool
+        var iconRotation: Double
+        var logoRotation: Double
+    }
+
+    private func calculatePhase(at date: Date) -> AnimationPhase {
+        // Total cycle: 10s icon + 0.4s flip out + 0.4s flip in + 1s logo + 0.4s flip out + 0.4s flip in = ~12.6s
+        let logoDuration: Double = 1.0
+        let cycleDuration = displayDuration + flipDuration * 4 + logoDuration
+        let elapsed = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: cycleDuration)
+
+        if elapsed < displayDuration {
+            // Phase 1: Showing icon (0 - 10s)
+            return AnimationPhase(showIcon: true, showLogo: false, iconRotation: 0, logoRotation: -90)
+        } else if elapsed < displayDuration + flipDuration {
+            // Phase 2: Flipping icon away (10s - 10.4s)
+            let flipProgress = (elapsed - displayDuration) / flipDuration
+            let rotation = flipProgress * 90  // 0 -> 90 degrees (spinning backward/away)
+            return AnimationPhase(showIcon: true, showLogo: false, iconRotation: rotation, logoRotation: -90)
+        } else if elapsed < displayDuration + flipDuration * 2 {
+            // Phase 3: Flipping logo in (10.4s - 10.8s)
+            let flipProgress = (elapsed - displayDuration - flipDuration) / flipDuration
+            let rotation = -90 + flipProgress * 90  // -90 -> 0 degrees
+            return AnimationPhase(showIcon: false, showLogo: true, iconRotation: 90, logoRotation: rotation)
+        } else if elapsed < displayDuration + flipDuration * 2 + logoDuration {
+            // Phase 4: Showing logo (10.8s - 11.8s)
+            return AnimationPhase(showIcon: false, showLogo: true, iconRotation: 90, logoRotation: 0)
+        } else if elapsed < displayDuration + flipDuration * 3 + logoDuration {
+            // Phase 5: Flipping logo away (11.8s - 12.2s)
+            let flipProgress = (elapsed - displayDuration - flipDuration * 2 - logoDuration) / flipDuration
+            let rotation = flipProgress * 90  // 0 -> 90 degrees
+            return AnimationPhase(showIcon: false, showLogo: true, iconRotation: -90, logoRotation: rotation)
+        } else {
+            // Phase 6: Flipping icon back in (12.2s - 12.6s)
+            let flipProgress = (elapsed - displayDuration - flipDuration * 3 - logoDuration) / flipDuration
+            let rotation = -90 + flipProgress * 90  // -90 -> 0 degrees
+            return AnimationPhase(showIcon: true, showLogo: false, iconRotation: rotation, logoRotation: 90)
+        }
+    }
+}
+
+/// Convenience initializer with size presets
+extension FlippingIconView {
+    enum IconSize {
+        case compact      // Dynamic Island compact (14pt)
+        case minimal      // Dynamic Island minimal (12pt)
+        case standard     // Lock screen header (title2 ~22pt)
+        case expanded     // Dynamic Island expanded (title2)
+
+        var font: Font {
+            switch self {
+            case .compact: return .system(size: 14)
+            case .minimal: return .system(size: 12)
+            case .standard, .expanded: return .title2
+            }
+        }
+
+        var imageSize: CGFloat {
+            switch self {
+            case .compact: return 14
+            case .minimal: return 12
+            case .standard, .expanded: return 22
+            }
+        }
+    }
+
+    init(iconName: String, iconColor: Color, size: IconSize, isRunning: Bool = false) {
+        self.iconName = iconName
+        self.iconColor = iconColor
+        self.fontSize = size.font
+        self.iconSize = size.imageSize
+        self.isRunning = isRunning
+    }
+}
+
 struct HeartbeatLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: HeartbeatActivityAttributes.self) { context in
@@ -51,20 +178,15 @@ struct LockScreenView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Header with mood icon
+            // Header with animated flipping icon
             HStack(spacing: 10) {
-                // Mood icon (AI-selected) or status icon
-                if let mood = context.state.moodIcon {
-                    Image(systemName: mood.sfSymbolName)
-                        .font(.title2)
-                        .foregroundStyle(moodColor(for: mood))
-                        .symbolEffect(.pulse, isActive: context.state.status == .running)
-                } else {
-                    Image(systemName: context.state.status.iconName)
-                        .font(.title2)
-                        .foregroundStyle(statusColor)
-                        .symbolEffect(.pulse, isActive: context.state.status == .running)
-                }
+                // Animated icon that flips between mood/status icon and Axon logo
+                FlippingIconView(
+                    iconName: context.state.moodIcon?.sfSymbolName ?? context.state.status.iconName,
+                    iconColor: context.state.moodIcon.map { moodColor(for: $0) } ?? statusColor,
+                    size: .standard,
+                    isRunning: context.state.status == .running
+                )
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Axon")
@@ -188,7 +310,7 @@ struct LockScreenView: View {
 
     private var statusColor: Color {
         switch context.state.status {
-        case .idle: return .cyan
+        case .idle: return AppColors.signalLichen
         case .running: return .green
         case .quietHours: return .purple
         case .disabled: return .gray
@@ -324,18 +446,13 @@ struct CompactLeadingView: View {
     let context: ActivityViewContext<HeartbeatActivityAttributes>
 
     var body: some View {
-        // Show mood icon if set, otherwise status icon
-        if let mood = context.state.moodIcon {
-            Image(systemName: mood.sfSymbolName)
-                .font(.system(size: 14))
-                .foregroundStyle(moodColor(for: mood))
-                .symbolEffect(.pulse, isActive: context.state.status == .running)
-        } else {
-            Image(systemName: context.state.status.iconName)
-                .font(.system(size: 14))
-                .foregroundStyle(statusColor)
-                .symbolEffect(.pulse, isActive: context.state.status == .running)
-        }
+        // Animated icon that flips between mood/status icon and Axon logo
+        FlippingIconView(
+            iconName: context.state.moodIcon?.sfSymbolName ?? context.state.status.iconName,
+            iconColor: context.state.moodIcon.map { moodColor(for: $0) } ?? statusColor,
+            size: .compact,
+            isRunning: context.state.status == .running
+        )
     }
 
     private var statusColor: Color {
@@ -389,14 +506,35 @@ struct MinimalView: View {
     let context: ActivityViewContext<HeartbeatActivityAttributes>
 
     var body: some View {
-        if let mood = context.state.moodIcon {
-            Image(systemName: mood.sfSymbolName)
-                .font(.system(size: 12))
-                .symbolEffect(.pulse, isActive: context.state.status == .running)
-        } else {
-            Image(systemName: context.state.status.iconName)
-                .font(.system(size: 12))
-                .symbolEffect(.pulse, isActive: context.state.status == .running)
+        // Animated icon that flips between mood/status icon and Axon logo
+        FlippingIconView(
+            iconName: context.state.moodIcon?.sfSymbolName ?? context.state.status.iconName,
+            iconColor: context.state.moodIcon.map { moodColor(for: $0) } ?? statusColor,
+            size: .minimal,
+            isRunning: context.state.status == .running
+        )
+    }
+
+    private var statusColor: Color {
+        switch context.state.status {
+        case .idle: return .cyan
+        case .running: return .green
+        case .quietHours: return .purple
+        case .disabled: return .gray
+        case .error: return .red
+        }
+    }
+
+    private func moodColor(for mood: HeartbeatMoodIcon) -> Color {
+        switch mood {
+        case .thinking, .lightbulb, .sparkles: return .yellow
+        case .happy, .peaceful: return .green
+        case .curious, .searching: return .cyan
+        case .focused, .reading, .writing: return .blue
+        case .energetic: return .orange
+        case .organizing, .connecting: return .indigo
+        case .waiting, .sunrise, .sunset, .night: return .purple
+        case .wave, .heart, .star, .compass: return .pink
         }
     }
 }
@@ -408,23 +546,19 @@ struct ExpandedLeadingView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if let mood = context.state.moodIcon {
-                Image(systemName: mood.sfSymbolName)
-                    .font(.title2)
-                    .foregroundStyle(moodColor(for: mood))
-                    .symbolEffect(.pulse, isActive: context.state.status == .running)
+            // Animated icon that flips between mood/status icon and Axon logo
+            FlippingIconView(
+                iconName: context.state.moodIcon?.sfSymbolName ?? context.state.status.iconName,
+                iconColor: context.state.moodIcon.map { moodColor(for: $0) } ?? statusColor,
+                size: .expanded,
+                isRunning: context.state.status == .running
+            )
 
-                if let reason = context.state.moodReason {
-                    Text(reason)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            } else {
-                Image(systemName: context.state.status.iconName)
-                    .font(.title2)
-                    .foregroundStyle(statusColor)
-                    .symbolEffect(.pulse, isActive: context.state.status == .running)
+            if let reason = context.state.moodReason {
+                Text(reason)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
     }

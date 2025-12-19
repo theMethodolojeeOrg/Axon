@@ -292,6 +292,13 @@ struct MessageInputBar: View {
     @State private var commandSuggestions: [SlashCommandSuggestion] = []
     @State private var toolSuggestions: [ToolSuggestion] = []
 
+    // Tool Invocation Sheet (for /use command)
+    @State private var showToolInvocationSheet = false
+    @State private var selectedToolForInvocation: ToolSuggestion?
+
+    // Flag to prevent onChange from overriding manual state updates
+    @State private var skipNextTextChange = false
+
     // VS Code Bridge
     @ObservedObject private var bridgeServer = BridgeServer.shared
 
@@ -446,25 +453,62 @@ struct MessageInputBar: View {
             case .showingTools(let filter):
                 commandSuggestions = []
                 toolSuggestions = SlashCommandParser.shared.getToolSuggestions(filter: filter)
+            case .showingUseTools(let filter):
+                commandSuggestions = []
+                // Use filtered list for /use (excludes AI-only tools, adds user actions)
+                toolSuggestions = SlashCommandParser.shared.getUserInvokableTools(filter: filter)
             }
         }
     }
 
     private func handleCommandSelection(_ suggestion: SlashCommandSuggestion) {
         if suggestion.hasSubmenu {
-            // For commands with submenus (like /tool), insert the command with a space
+            // For commands with submenus (like /tool, /use), insert the command with a space
+            // and immediately show the tool list
+            // Set flag to prevent onChange from overriding our state
+            skipNextTextChange = true
             text = "/\(suggestion.command) "
+            // Immediately update state to show tool suggestions
+            withAnimation(.easeOut(duration: 0.15)) {
+                if suggestion.command == "use" {
+                    slashMenuState = .showingUseTools(filter: "")
+                    commandSuggestions = []
+                    // Use filtered list for /use (excludes AI-only tools, adds user actions)
+                    toolSuggestions = SlashCommandParser.shared.getUserInvokableTools(filter: "")
+                } else {
+                    slashMenuState = .showingTools(filter: "")
+                    commandSuggestions = []
+                    toolSuggestions = SlashCommandParser.shared.getToolSuggestions(filter: "")
+                }
+            }
         } else {
             // For direct commands, insert and send immediately
+            skipNextTextChange = true
             text = "/\(suggestion.command)"
             dismissSlashMenu()
+            // Auto-send after a brief delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                self.handleSend()
+            }
         }
     }
 
     private func handleToolSelection(_ tool: ToolSuggestion) {
-        // Insert the full /tool command with the selected tool ID
+        // Insert the full /tool command with the selected tool ID and auto-send
         text = "/tool \(tool.toolId)"
         dismissSlashMenu()
+        // Auto-send the command after a brief delay to ensure UI updates
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            self.handleSend()
+        }
+    }
+
+    private func handleUseToolSelection(_ tool: ToolSuggestion) {
+        // Clear text and show the tool invocation sheet
+        text = ""
+        dismissSlashMenu()
+        selectedToolForInvocation = tool
+        showToolInvocationSheet = true
     }
 
     private func dismissSlashMenu() {
@@ -487,6 +531,7 @@ struct MessageInputBar: View {
                         toolSuggestions: toolSuggestions,
                         onSelectCommand: handleCommandSelection,
                         onSelectTool: handleToolSelection,
+                        onSelectUseTool: handleUseToolSelection,
                         onDismiss: dismissSlashMenu
                     )
                     .padding(.horizontal)
@@ -540,6 +585,11 @@ struct MessageInputBar: View {
             }
         }
         .onChange(of: text) { newText in
+            // Skip if we manually set the state (e.g., after tapping a command)
+            if skipNextTextChange {
+                skipNextTextChange = false
+                return
+            }
             updateSlashMenuState(for: newText)
         }
         .onChange(of: selectedItem) { newItem in
@@ -573,6 +623,24 @@ struct MessageInputBar: View {
             allowsMultipleSelection: false
         ) { result in
             handleAnyFileImport(result)
+        }
+        // Tool Invocation Sheet (for /use command)
+        .sheet(isPresented: $showToolInvocationSheet) {
+            if let tool = selectedToolForInvocation {
+                ToolInvocationSheet(
+                    tool: tool,
+                    onDismiss: {
+                        showToolInvocationSheet = false
+                        selectedToolForInvocation = nil
+                    },
+                    onResult: { result, success in
+                        // Insert the result into the text field for the user to send to AI
+                        if success {
+                            text = "Tool result from \(tool.displayName):\n\n\(result)"
+                        }
+                    }
+                )
+            }
         }
     }
     
