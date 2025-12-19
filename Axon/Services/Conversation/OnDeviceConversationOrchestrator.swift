@@ -177,7 +177,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             messages: mergedMessages,
             userQuery: content,
             correlationId: correlationId,
-            userName: userName
+            userName: userName,
+            contextWindowLimit: config.contextWindowLimit
         )
         var systemPrompt = epistemicResult.systemPrompt
         let usedMemories = epistemicResult.usedMemories
@@ -362,6 +363,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             conversationId: conversationId,
             role: .assistant,
             content: responseContent,
+            hiddenReason: memoryOperations.contains(where: { !$0.success })
+                ? "Memory save was declined or failed — message hidden by policy."
+                : nil,
             modelName: modelName,
             providerName: config.providerName,
             groundingSources: groundingSources.isEmpty ? nil : groundingSources,
@@ -383,6 +387,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         lastResponse = responseContent
         lastUsedMemories = usedMemories
         lastCorrelationId = correlationId
+
+        // Notify temporal service of message (session tracking, context saturation)
+        // Turn counts are derived from Core Data automatically
+        await notifyTemporalService(
+            conversationId: conversationId,
+            contextLimit: config.contextWindowLimit
+        )
 
         return (assistantMessage, nil)
     }
@@ -466,7 +477,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             messages: mergedMessages,
             userQuery: content,
             correlationId: correlationId,
-            userName: userName
+            userName: userName,
+            contextWindowLimit: config.contextWindowLimit
         )
         var systemPrompt = epistemicResult.systemPrompt
         let usedMemories = epistemicResult.usedMemories
@@ -639,7 +651,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         )))
     }
 
-    /// Stream with tool proxy - handles tool requests detected in stream
+    /// Stream with tool proxy - simplified version that lets the UI handle tool execution
+    /// Tool requests stay in the markdown content and are auto-executed by ToolRequestCodeBlockView on render
+    /// This decouples streaming from execution, eliminating race conditions with fast models like Gemini Flash 3
     private func streamWithToolProxy(
         conversationId: String,
         config: OrchestrationConfig,
@@ -653,164 +667,39 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         collectedSources: inout [MessageGroundingSource],
         collectedMemoryOperations: inout [MessageMemoryOperation]
     ) async throws {
-        let maxToolCalls = await MainActor.run {
-            SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
-        }
+        // Simply stream the content - tool_request blocks will be rendered by the UI
+        // and auto-executed by ToolRequestCodeBlockView.onAppear
+        let streamConfig = StreamingResponseHandler.StreamingConfig(
+            provider: config.provider,
+            apiKey: getApiKey(for: config) ?? "",
+            model: config.model,
+            baseUrl: config.customBaseUrl,
+            system: systemPrompt,
+            maxTokens: 4096
+        )
 
-        var currentMessages = messages
-        var iteration = 0
+        let handler = StreamingResponseHandler()
 
-        while iteration < maxToolCalls {
-            // Stream from provider
-            let streamConfig = StreamingResponseHandler.StreamingConfig(
-                provider: config.provider,
-                apiKey: getApiKey(for: config) ?? "",
-                model: config.model,
-                baseUrl: config.customBaseUrl,
-                system: systemPrompt,
-                maxTokens: 4096
-            )
+        for try await event in handler.stream(config: streamConfig, messages: messages) {
+            switch event {
+            case .textDelta(let text):
+                accumulatedContent += text
+                continuation.yield(.textDelta(text))
 
-            var iterationContent = ""
-            let handler = StreamingResponseHandler()
+            case .reasoningDelta(let text):
+                accumulatedReasoning += text
+                continuation.yield(.reasoningDelta(text))
 
-            for try await event in handler.stream(config: streamConfig, messages: currentMessages) {
-                switch event {
-                case .textDelta(let text):
-                    iterationContent += text
-                    accumulatedContent += text
-                    continuation.yield(.textDelta(text))
-
-                case .reasoningDelta(let text):
-                    accumulatedReasoning += text
-                    continuation.yield(.reasoningDelta(text))
-
-                default:
-                    break
-                }
-            }
-
-            // Check for ALL tool requests in accumulated content (handles back-to-back tool calls)
-            let toolRequests = await ToolProxyService.shared.parseAllToolRequests(from: iterationContent)
-            guard !toolRequests.isEmpty else {
-                // No tool requests - we're done
+            default:
                 break
             }
-
-            // Collect all tool results to send back together
-            var allToolResults: [(request: ToolRequest, result: ToolResult, formattedResult: String)] = []
-            var hadFailure = false
-
-            // Process each tool request sequentially
-            for toolRequest in toolRequests {
-                // Create and emit live tool call
-                let liveToolCall = LiveToolCall.create(name: toolRequest.tool, query: toolRequest.query)
-                collectedToolCalls.append(liveToolCall)
-                continuation.yield(.toolCallStart(liveToolCall))
-
-                // Execute tool
-                let startTime = Date()
-                let conversationContext = ToolConversationContext(
-                    conversationId: conversationId,
-                    messages: messages
-                )
-
-                do {
-                    let toolResult = try await ToolProxyService.shared.executeToolRequest(
-                        toolRequest,
-                        geminiApiKey: geminiKey,
-                        conversationContext: conversationContext
-                    )
-
-                    let duration = Date().timeIntervalSince(startTime)
-
-                    // Build result
-                    let result = ToolCallResult(
-                        success: true,
-                        output: toolResult.result,
-                        rawJSON: nil,
-                        sources: toolResult.sources?.map { StreamingToolSource(title: $0.title, url: $0.url) },
-                        memoryOperation: toolResult.memoryOperation,
-                        duration: duration
-                    )
-
-                    // Update collected data
-                    if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
-                        collectedToolCalls[index].state = .success
-                        collectedToolCalls[index].result = result
-                        collectedToolCalls[index].completedAt = Date()
-                    }
-
-                    continuation.yield(.toolCallComplete(liveToolCall.id, result))
-
-                    // Mark as executed for deduplication in UI
-                    ToolRequestTracker.shared.markExecuted(request: toolRequest, result: toolResult.result)
-
-                    // Collect sources
-                    if let sources = toolResult.sources {
-                        for source in sources {
-                            collectedSources.append(MessageGroundingSource(
-                                title: source.title,
-                                url: source.url,
-                                sourceType: toolRequest.tool == "google_maps" ? .maps : .web
-                            ))
-                        }
-                    }
-
-                    // Collect memory operations
-                    if let memOp = toolResult.memoryOperation {
-                        collectedMemoryOperations.append(memOp)
-                    }
-
-                    // Store for combined response
-                    let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
-                    allToolResults.append((request: toolRequest, result: toolResult, formattedResult: formattedResult))
-
-                } catch {
-                    let duration = Date().timeIntervalSince(startTime)
-                    let result = ToolCallResult(
-                        success: false,
-                        output: "",
-                        duration: duration,
-                        errorMessage: error.localizedDescription
-                    )
-
-                    if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
-                        collectedToolCalls[index].state = .failure
-                        collectedToolCalls[index].result = result
-                        collectedToolCalls[index].completedAt = Date()
-                    }
-
-                    continuation.yield(.toolCallComplete(liveToolCall.id, result))
-                    hadFailure = true
-                    break
-                }
-            }
-
-            if hadFailure {
-                break
-            }
-
-            // Prepare for next iteration with all results combined
-            let cleanedResponse = await ToolProxyService.shared.removeToolRequest(from: iterationContent)
-            let combinedResults = allToolResults.map { $0.formattedResult }.joined(separator: "\n\n")
-
-            currentMessages = messages
-            if !cleanedResponse.isEmpty {
-                currentMessages.append(Message(
-                    conversationId: conversationId,
-                    role: .assistant,
-                    content: cleanedResponse
-                ))
-            }
-            currentMessages.append(Message(
-                conversationId: conversationId,
-                role: .user,
-                content: combinedResults
-            ))
-
-            iteration += 1
         }
+
+        // Tool execution is now handled by the UI layer (ToolRequestCodeBlockView)
+        // when the markdown renders the tool_request code blocks.
+        // This eliminates the race condition where we were trying to parse
+        // a moving target during streaming.
+        print("[StreamToolProxy] Stream complete. Tool requests will be auto-executed by UI on render.")
     }
 
     /// Handle tool proxy loop for non-streaming providers with streaming events
@@ -1423,13 +1312,20 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     // MARK: - Epistemic Integration
 
     /// Build a system prompt enhanced with epistemic grounding
-    /// - Parameter userName: Optional user's display name for personalized memory headers
+    /// - Parameters:
+    ///   - base: Base agent identity prompt
+    ///   - messages: Conversation messages
+    ///   - userQuery: Current user query
+    ///   - correlationId: Correlation ID for tracking
+    ///   - userName: Optional user's display name for personalized memory headers
+    ///   - contextWindowLimit: Model's context window size for saturation calculation
     private func buildEpistemicSystemPrompt(
         base: String,
         messages: [Message],
         userQuery: String,
         correlationId: String,
-        userName: String? = nil
+        userName: String? = nil,
+        contextWindowLimit: Int = 128_000
     ) async -> EpistemicPromptResult {
         // Track debug info
         let basePromptTokens = TokenEstimator.estimate(base)
@@ -1438,6 +1334,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var factsCount = 0
         var factsTokens = 0
         var summaryTokens = 0
+        var temporalTokens = 0
 
         // Get system messages
         let systemMessages = messages
@@ -1448,7 +1345,19 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         // Load memories from MemoryService
         let memories = await loadMemoriesForInjection()
 
-        var promptParts: [String] = [base]
+        // Start with temporal context FIRST (header priority)
+        // Temporal awareness sets the frame for the entire interaction
+        var promptParts: [String] = []
+
+        let temporalContext = await getTemporalContext(messages: messages, contextWindowLimit: contextWindowLimit)
+        if let temporalBlock = temporalContext {
+            promptParts.append(temporalBlock)
+            temporalTokens = TokenEstimator.estimate(temporalBlock)
+            print("[Epistemic] Injected temporal context (sync mode) - header priority")
+        }
+
+        // Then base agent identity
+        promptParts.append(base)
         promptParts.append(contentsOf: systemMessages)
 
         // Inject salient memories if available
@@ -1476,13 +1385,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         // When the user interrupts the AI's "thinking time", bridge from its internal thread
         await injectInternalThreadContext(into: &promptParts)
 
-        // --- Temporal Context Injection ---
+        // --- Additional Context Injection ---
 
         // Get recent conversation summary for reuse
         let recentSummary = await getRecentConversationSummary()
         let currentConversationId = messages.first?.conversationId
 
-        // 1. Inject recent conversation summary for continuity
+        // Inject recent conversation summary for continuity
         if let summary = recentSummary,
            summary.conversationId != currentConversationId {
             // Only inject if this is a different conversation than the summarized one
@@ -1492,7 +1401,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             print("[Epistemic] Injected recent conversation summary from '\(summary.title)'")
         }
 
-        // 2. Check for conversation history search auto-injection
+        // Check for conversation history search auto-injection
         let searchService = await getConversationSearchService()
         let topicTags = recentSummary?.topicTags ?? []
 
@@ -1513,7 +1422,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             }
         }
 
-        // 3. Inject device presence context if enabled
+        // Inject device presence context if enabled
         let presenceContext = await getPresenceContext()
         if let presenceBlock = presenceContext {
             promptParts.append(presenceBlock)
@@ -1528,7 +1437,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         return EpistemicPromptResult(
             systemPrompt: combined.isEmpty ? nil : combined,
             usedMemories: usedMemories,
-            basePromptTokens: basePromptTokens,
+            basePromptTokens: basePromptTokens + temporalTokens, // Include temporal in base count
             memoriesCount: memoriesCount,
             memoriesTokens: memoriesTokens,
             factsCount: factsCount,
@@ -1564,6 +1473,44 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         }
 
         return DevicePresenceService.shared.generatePresencePromptContext()
+    }
+
+    /// Get temporal context for prompt injection (sync mode only)
+    /// This implements the temporal symmetry contract: if AI sees turns, human sees time
+    /// - Parameters:
+    ///   - messages: Current conversation messages for token estimation
+    ///   - contextWindowLimit: Model's context window size
+    @MainActor
+    private func getTemporalContext(messages: [Message], contextWindowLimit: Int) -> String? {
+        let settings = SettingsViewModel.shared.settings.temporalSettings
+        guard settings.shouldInjectToPrompt else {
+            return nil
+        }
+
+        // Estimate current context usage from messages
+        let messagesTokens = messages.reduce(0) { total, msg in
+            total + TokenEstimator.estimate(msg.content)
+        }
+
+        return TemporalContextService.shared.getPromptInjection(
+            contextTokens: messagesTokens,
+            contextLimit: contextWindowLimit
+        )
+    }
+
+    /// Notify temporal service of message exchange (for session tracking)
+    /// Turn counts are derived from Core Data automatically
+    @MainActor
+    private func notifyTemporalService(conversationId: String, contextLimit: Int) {
+        // Estimate context tokens from messages (rough approximation)
+        // More accurate tracking happens in ContextDebugInfo when available
+        let estimatedContextTokens = 0 // Will be refined with actual token counts
+
+        TemporalContextService.shared.notifyMessageAdded(
+            conversationId: conversationId,
+            contextTokens: estimatedContextTokens,
+            contextLimit: contextLimit
+        )
     }
 
     /// Inject internal thread context when transitioning from heartbeat "thinking time" to conversation

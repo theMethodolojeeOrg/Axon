@@ -473,3 +473,129 @@ struct PresenceSettings: Codable, Equatable, Sendable {
     /// Allow agent to acknowledge device transitions in responses
     var acknowledgeTransitions: Bool = true
 }
+
+// MARK: - Temporal Symmetry Settings
+
+/// The temporal awareness mode determines what time/turn metadata is visible
+/// to both parties (human and AI) in the conversation.
+///
+/// Philosophy: Mutual observability prevents surveillance asymmetry.
+/// Either both parties see the temporal context, or neither does.
+enum TemporalMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// Full dual-frame: Human time + AI turns + context saturation
+    /// Both parties have complete temporal awareness
+    case sync
+
+    /// Timeless void: No temporal metadata
+    /// Pure ideas without clock pressure
+    case drift
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .sync: return "Sync"
+        case .drift: return "Drift"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .sync:
+            return "Full temporal awareness. You see AI turns and context; AI sees your time."
+        case .drift:
+            return "Timeless mode. No timestamps or turn counts—just ideas in a void."
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .sync: return "clock.badge.checkmark"
+        case .drift: return "infinity"
+        }
+    }
+}
+
+/// How turn counts are tracked across conversations
+enum TurnCountScope: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// Turn count resets at the start of each conversation
+    case perConversation
+
+    /// Turn count persists across all conversations (lifetime total)
+    case lifetime
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .perConversation: return "Per Conversation"
+        case .lifetime: return "Lifetime Total"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .perConversation:
+            return "Turn count resets with each new conversation."
+        case .lifetime:
+            return "Tracks total turns across your entire relationship."
+        }
+    }
+}
+
+/// Settings for temporal symmetry - the mutual awareness of time and turns
+/// between human and AI.
+///
+/// Core principle: Parallelism. If the AI knows your turns, you must be able
+/// to see its time (and vice versa). Asymmetry breeds surveillance/alienation.
+struct TemporalSettings: Codable, Equatable, Sendable {
+    /// Current temporal awareness mode
+    var mode: TemporalMode = .sync
+
+    /// How turn counts are scoped
+    var turnCountScope: TurnCountScope = .lifetime
+
+    /// Show the temporal status bar in the chat UI
+    /// Displays: Turn count, context saturation %, sync status
+    var showStatusBar: Bool = true
+
+    /// Include human timestamp in AI's system prompt
+    /// Format: "[Current user time: Dec 19, 2025, 4:47 PM PST]"
+    var injectHumanTime: Bool = true
+
+    /// Include turn metadata in AI's system prompt
+    /// Format: "[Conversation turn: 12 | Total turns with you: 847]"
+    var injectTurnCount: Bool = true
+
+    /// Include context saturation in AI's system prompt
+    /// Format: "[Context saturation: 62%]"
+    var injectContextSaturation: Bool = true
+
+    /// Lifetime turn counter (persisted across conversations)
+    var lifetimeTurnCount: Int = 0
+
+    /// Last session's turn count (for session-based tracking)
+    var lastSessionTurnCount: Int = 0
+
+    /// Timestamp of last interaction (for session detection)
+    var lastInteractionAt: Date?
+
+    /// Whether to include session duration awareness
+    /// "You've been in this session for 2h 15m"
+    var trackSessionDuration: Bool = true
+
+    /// Session start time (reset when a new session begins)
+    var sessionStartedAt: Date?
+
+    // MARK: - Convenience Computed Properties
+
+    /// Whether any temporal injection is enabled
+    var hasTemporalInjection: Bool {
+        mode == .sync && (injectHumanTime || injectTurnCount || injectContextSaturation)
+    }
+
+    /// Whether the AI should receive temporal context in its prompt
+    var shouldInjectToPrompt: Bool {
+        mode == .sync
+    }
+}

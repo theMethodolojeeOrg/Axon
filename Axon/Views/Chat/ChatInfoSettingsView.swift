@@ -309,7 +309,7 @@ struct ChatInfoSettingsView: View {
                     }
                     .frame(height: 12)
 
-                    Text("\(Int(progressPercentage * 100))% of context window used")
+                    Text("\(formattedProgressPercentage) of context window used")
                         .font(AppTypography.labelSmall())
                         .foregroundColor(AppColors.textTertiary)
                 }
@@ -708,6 +708,17 @@ struct ChatInfoSettingsView: View {
         guard let model = selectedModel ?? settingsViewModel.currentUnifiedModel() else { return 0 }
         guard model.contextWindow > 0 else { return 0 }
         return min(Double(estimatedTokens) / Double(model.contextWindow), 1.0)
+    }
+
+    private var formattedProgressPercentage: String {
+        let percent = progressPercentage * 100
+        if percent == 0 {
+            return "0%"
+        } else if percent < 1 {
+            return "<1%"
+        } else {
+            return "\(Int(round(percent)))%"
+        }
     }
 
     private var progressColor: Color {

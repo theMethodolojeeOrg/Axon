@@ -139,6 +139,11 @@ enum ActionCategory: String, Codable, CaseIterable, Equatable {
     case systemPromptChange = "system_prompt_change"
     case personalityAdjust = "personality_adjust"
 
+    // Mutual Agreement (require both parties to align)
+    case temporalSync = "temporal_sync"         // Enable time + turn awareness
+    case temporalDrift = "temporal_drift"       // Disable temporal tracking
+    case temporalModeChange = "temporal_mode_change"  // Change temporal awareness mode
+
     /// Whether this action affects the world (requires user biometrics)
     var affectsWorld: Bool {
         switch self {
@@ -157,7 +162,18 @@ enum ActionCategory: String, Codable, CaseIterable, Equatable {
         case .memoryAdd, .memoryModify, .memoryDelete,
              .agentStateWrite, .agentStateDelete, .heartbeatControl,
              .capabilityEnable, .capabilityDisable,
-             .providerSwitch, .systemPromptChange, .personalityAdjust:
+             .providerSwitch, .systemPromptChange, .personalityAdjust,
+             .temporalModeChange:  // Temporal awareness changes affect AI's experience
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Whether this action requires mutual agreement (affects both parties equally)
+    var requiresMutualAgreement: Bool {
+        switch self {
+        case .temporalSync, .temporalDrift, .temporalModeChange:
             return true
         default:
             return false
@@ -187,6 +203,9 @@ enum ActionCategory: String, Codable, CaseIterable, Equatable {
         case .providerSwitch: return "Switch Provider"
         case .systemPromptChange: return "Change System Prompt"
         case .personalityAdjust: return "Adjust Personality"
+        case .temporalSync: return "Enable Temporal Sync"
+        case .temporalDrift: return "Enable Temporal Drift"
+        case .temporalModeChange: return "Change Temporal Mode"
         }
     }
 
@@ -213,6 +232,9 @@ enum ActionCategory: String, Codable, CaseIterable, Equatable {
         case .providerSwitch: return "arrow.triangle.2.circlepath"
         case .systemPromptChange: return "text.badge.star"
         case .personalityAdjust: return "person.crop.circle.badge.questionmark"
+        case .temporalSync: return "clock.badge.checkmark"
+        case .temporalDrift: return "infinity"
+        case .temporalModeChange: return "clock.arrow.2.circlepath"
         }
     }
 }

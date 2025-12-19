@@ -58,13 +58,13 @@ struct SlashCommandMenu: View {
                 }
             }
         }
-        .onChange(of: menuState) { _ in
+        .onChange(of: menuState) {
             selectedIndex = 0
         }
-        .onChange(of: commandSuggestions) { _ in
+        .onChange(of: commandSuggestions) {
             selectedIndex = min(selectedIndex, max(0, commandSuggestions.count - 1))
         }
-        .onChange(of: toolSuggestions) { _ in
+        .onChange(of: toolSuggestions) {
             selectedIndex = min(selectedIndex, max(0, toolSuggestions.count - 1))
         }
     }
@@ -333,7 +333,7 @@ private struct TouchFeedbackButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
-            .onChange(of: configuration.isPressed) { pressed in
+            .onChange(of: configuration.isPressed) { _, pressed in
                 isPressed = pressed
             }
     }

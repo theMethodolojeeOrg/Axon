@@ -112,7 +112,8 @@ class StreamingResponseHandler {
         var apiMessages: [[String: Any]] = []
         for msg in messages where msg.role != .system {
             let role = msg.role == .assistant ? "assistant" : "user"
-            apiMessages.append(["role": role, "content": msg.content])
+            let contentBlocks = anthropicContentBlocks(for: msg)
+            apiMessages.append(["role": role, "content": contentBlocks])
         }
 
         var body: [String: Any] = [
@@ -219,7 +220,14 @@ class StreamingResponseHandler {
             apiMessages.append(["role": "system", "content": system])
         }
         for msg in messages where msg.role != .system {
-            apiMessages.append(["role": msg.role.rawValue, "content": msg.content])
+            // Grok uses a stricter payload than general OpenAI-compatible providers
+            let content: Any
+            if config.provider.lowercased() == "grok" {
+                content = grokContent(for: msg)
+            } else {
+                content = openAIContent(for: msg)
+            }
+            apiMessages.append(["role": msg.role.rawValue, "content": content])
         }
 
         let body: [String: Any] = [
@@ -280,7 +288,8 @@ class StreamingResponseHandler {
     ) async throws {
         // Gemini uses streamGenerateContent endpoint
         let baseUrl = "https://generativelanguage.googleapis.com/v1beta"
-        let url = URL(string: "\(baseUrl)/models/\(config.model):streamGenerateContent?key=\(config.apiKey)")!
+        let modelId = config.model.starts(with: "models/") ? config.model : "models/\(config.model)"
+        let url = URL(string: "\(baseUrl)/\(modelId):streamGenerateContent?key=\(config.apiKey)")!
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -292,7 +301,7 @@ class StreamingResponseHandler {
             let role = msg.role == .assistant ? "model" : "user"
             contents.append([
                 "role": role,
-                "parts": [["text": msg.content]]
+                "parts": geminiParts(for: msg)
             ])
         }
 
@@ -455,6 +464,273 @@ class StreamingResponseHandler {
             continuation: continuation
         )
     }
+
+    // MARK: - Attachment Formatting
+
+    private func anthropicContentBlocks(for message: Message) -> [[String: Any]] {
+        var blocks: [[String: Any]] = []
+
+        let trimmedText = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedText.isEmpty {
+            blocks.append(["type": "text", "text": trimmedText])
+        }
+
+        for attachment in message.attachments ?? [] {
+            switch attachment.type {
+            case .image:
+                if let block = anthropicMediaBlock(type: "image", attachment: attachment) {
+                    blocks.append(block)
+                }
+            case .document:
+                if let block = anthropicMediaBlock(type: "document", attachment: attachment) {
+                    blocks.append(block)
+                }
+            case .audio, .video:
+                continue
+            }
+        }
+
+        if blocks.isEmpty {
+            blocks.append(["type": "text", "text": ""])
+        }
+
+        return blocks
+    }
+
+    private func anthropicMediaBlock(type: String, attachment: MessageAttachment) -> [String: Any]? {
+        let mimeType = resolvedMimeType(for: attachment)
+
+        if let base64 = attachment.base64 {
+            return [
+                "type": type,
+                "source": [
+                    "type": "base64",
+                    "media_type": mimeType,
+                    "data": base64
+                ]
+            ]
+        } else if let url = attachment.url {
+            return [
+                "type": type,
+                "source": [
+                    "type": "url",
+                    "url": url
+                ]
+            ]
+        }
+        return nil
+    }
+
+    private func openAIContent(for message: Message) -> Any {
+        let attachments = message.attachments ?? []
+        if attachments.isEmpty {
+            return message.content
+        }
+
+        var parts: [[String: Any]] = []
+
+        let trimmedText = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedText.isEmpty {
+            parts.append(["type": "text", "text": trimmedText])
+        }
+
+        for attachment in attachments {
+            let mimeType = resolvedMimeType(for: attachment)
+
+            switch attachment.type {
+            case .image:
+                if let base64 = attachment.base64 {
+                    parts.append([
+                        "type": "image_url",
+                        "image_url": [
+                            "url": "data:\(mimeType);base64,\(base64)",
+                            "detail": "high"
+                        ]
+                    ])
+                } else if let url = attachment.url {
+                    parts.append([
+                        "type": "image_url",
+                        "image_url": [
+                            "url": url,
+                            "detail": "high"
+                        ]
+                    ])
+                }
+
+            case .audio:
+                if let base64 = attachment.base64 {
+                    let format = mimeType.components(separatedBy: "/").last ?? "wav"
+                    parts.append([
+                        "type": "input_audio",
+                        "input_audio": [
+                            "data": base64,
+                            "format": format
+                        ]
+                    ])
+                }
+
+            case .document, .video:
+                continue
+            }
+        }
+
+        if parts.isEmpty {
+            return message.content
+        }
+
+        return parts
+    }
+
+    private func grokContent(for message: Message) -> Any {
+        let attachments = message.attachments ?? []
+        if attachments.isEmpty {
+            return message.content
+        }
+
+        var parts: [[String: Any]] = []
+
+        let trimmedText = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedText.isEmpty {
+            parts.append(["type": "text", "text": trimmedText])
+        }
+
+        for attachment in attachments where attachment.type == .image {
+            let mimeType = resolvedMimeType(for: attachment)
+
+            guard mimeType == "image/jpeg" || mimeType == "image/png" else { continue }
+
+            if let base64 = attachment.base64 {
+                parts.append([
+                    "type": "image_url",
+                    "image_url": [
+                        "url": "data:\(mimeType);base64,\(base64)",
+                        "detail": "high"
+                    ]
+                ])
+            } else if let url = attachment.url {
+                parts.append([
+                    "type": "image_url",
+                    "image_url": [
+                        "url": url,
+                        "detail": "high"
+                    ]
+                ])
+            }
+        }
+
+        if parts.isEmpty {
+            return message.content
+        }
+
+        return parts
+    }
+
+    private func geminiParts(for message: Message) -> [[String: Any]] {
+        var parts: [[String: Any]] = []
+        let trimmedText = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedText.isEmpty {
+            parts.append(["text": trimmedText])
+        }
+
+        for attachment in message.attachments ?? [] {
+            let mimeType = resolvedMimeType(for: attachment)
+
+            if let base64 = attachment.base64 {
+                parts.append([
+                    "inline_data": [
+                        "mime_type": mimeType,
+                        "data": base64
+                    ]
+                ])
+            } else if let url = attachment.url {
+                var fileData: [String: Any] = ["file_uri": url]
+                fileData["mime_type"] = mimeType
+                parts.append(["file_data": fileData])
+            }
+        }
+
+        if parts.isEmpty {
+            parts.append(["text": ""])
+        }
+
+        return parts
+    }
+
+    private func resolvedMimeType(for attachment: MessageAttachment) -> String {
+        if let mime = attachment.mimeType, mime.contains("/") {
+            return mime
+        }
+
+        if let mime = attachment.mimeType?.lowercased(), let resolved = Self.mimeTypeMap[mime] {
+            return resolved
+        }
+
+        if let name = attachment.name?.lowercased() {
+            let ext = (name as NSString).pathExtension
+            if let resolved = Self.mimeTypeMap[ext] {
+                return resolved
+            }
+        }
+
+        switch attachment.type {
+        case .image: return "image/jpeg"
+        case .document: return "application/pdf"
+        case .audio: return "audio/mp3"
+        case .video: return "video/mp4"
+        }
+    }
+
+    private static let mimeTypeMap: [String: String] = [
+        // Images
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+        "gif": "image/gif",
+        "webp": "image/webp",
+        "heic": "image/heic",
+        "heif": "image/heif",
+
+        // Video
+        "mp4": "video/mp4",
+        "m4v": "video/mp4",
+        "mpeg": "video/mpeg",
+        "mpg": "video/mpg",
+        "mov": "video/mov",
+        "avi": "video/avi",
+        "flv": "video/x-flv",
+        "webm": "video/webm",
+        "wmv": "video/wmv",
+        "3gp": "video/3gpp",
+        "3gpp": "video/3gpp",
+        "quicktime": "video/quicktime",
+
+        // Audio
+        "wav": "audio/wav",
+        "mp3": "audio/mp3",
+        "aiff": "audio/aiff",
+        "aif": "audio/aiff",
+        "aac": "audio/aac",
+        "ogg": "audio/ogg",
+        "flac": "audio/flac",
+        "m4a": "audio/aac",
+        "mpga": "audio/mpeg",
+        "opus": "audio/opus",
+
+        // Documents
+        "pdf": "application/pdf",
+        "txt": "text/plain",
+        "text": "text/plain",
+        "html": "text/html",
+        "css": "text/css",
+        "js": "application/javascript",
+        "py": "text/x-python",
+        "swift": "text/x-swift",
+        "json": "application/json",
+        "xml": "application/xml",
+        "csv": "text/csv",
+        "md": "text/markdown",
+        "markdown": "text/markdown",
+    ]
 }
 
 // MARK: - Non-Streaming Fallback

@@ -112,6 +112,9 @@ struct AppSettings: Codable, Equatable, Sendable {
     // Multi-Device Presence
     var presenceSettings: PresenceSettings = PresenceSettings()
 
+    // Temporal Symmetry (mutual time/turn awareness)
+    var temporalSettings: TemporalSettings = TemporalSettings()
+
     // Backend Configuration (optional - for cloud features)
     var backendAPIURL: String? = nil  // e.g., "https://us-central1-your-project.cloudfunctions.net"
     var backendAuthToken: String? = nil  // Optional auth token for backend (stored in Keychain separately)
@@ -1927,6 +1930,8 @@ enum ToolCategory: String, CaseIterable, Identifiable, Sendable {
     case systemControl = "system_control"
     case toolDiscovery = "tool_discovery"
     case debugging = "debugging"
+    case temporalSymmetry = "temporal_symmetry"
+    case externalApps = "external_apps"
 
     var id: String { rawValue }
 
@@ -1944,6 +1949,8 @@ enum ToolCategory: String, CaseIterable, Identifiable, Sendable {
         case .systemControl: return "System Control"
         case .toolDiscovery: return "Tool Discovery"
         case .debugging: return "Debugging"
+        case .temporalSymmetry: return "Temporal Symmetry"
+        case .externalApps: return "External Apps"
         }
     }
 
@@ -1961,6 +1968,8 @@ enum ToolCategory: String, CaseIterable, Identifiable, Sendable {
         case .systemControl: return "Notifications and persistence control"
         case .toolDiscovery: return "Discover and query available tools"
         case .debugging: return "Debug VS Code bridge and connections"
+        case .temporalSymmetry: return "Mutual time awareness between human and AI"
+        case .externalApps: return "Invoke external iOS apps via URL schemes and Shortcuts"
         }
     }
 
@@ -1978,6 +1987,8 @@ enum ToolCategory: String, CaseIterable, Identifiable, Sendable {
         case .systemControl: return "slider.horizontal.3"
         case .toolDiscovery: return "list.bullet"
         case .debugging: return "ladybug"
+        case .temporalSymmetry: return "clock.badge.checkmark"
+        case .externalApps: return "app.connected.to.app.below.fill"
         }
     }
 }
@@ -2040,6 +2051,15 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
     case acceptJobResult = "accept_job_result"         // Accept and integrate sub-agent job result
     case terminateJob = "terminate_job"                // Terminate a running sub-agent job
 
+    // Temporal Symmetry Tools (AI-side of /sync, /drift, /status)
+    case temporalSync = "temporal_sync"                // Enable temporal sync mode (mutual awareness)
+    case temporalDrift = "temporal_drift"              // Enable drift mode (timeless void)
+    case temporalStatus = "temporal_status"            // Query temporal status report
+
+    // External App Integration Tools (Port Registry)
+    case discoverPorts = "discover_ports"              // List/search available external app integrations
+    case invokePort = "invoke_port"                    // Invoke an external app via URL scheme
+
     var id: String { rawValue }
 
     var displayName: String {
@@ -2081,6 +2101,11 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .queryJobStatus: return "Query Job Status"
         case .acceptJobResult: return "Accept Job Result"
         case .terminateJob: return "Terminate Job"
+        case .temporalSync: return "Temporal Sync"
+        case .temporalDrift: return "Temporal Drift"
+        case .temporalStatus: return "Temporal Status"
+        case .discoverPorts: return "Discover External Apps"
+        case .invokePort: return "Invoke External App"
         }
     }
 
@@ -2123,6 +2148,11 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .queryJobStatus: return "Query status of active and completed sub-agent jobs"
         case .acceptJobResult: return "Accept and integrate a sub-agent's job result"
         case .terminateJob: return "Terminate a running sub-agent job"
+        case .temporalSync: return "Enable temporal sync mode (mutual time awareness)"
+        case .temporalDrift: return "Enable drift mode (timeless void, no tracking)"
+        case .temporalStatus: return "Query current temporal status and metrics"
+        case .discoverPorts: return "List and search available external app integrations"
+        case .invokePort: return "Open an external app with specified action and parameters"
         }
     }
 
@@ -2165,6 +2195,11 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .queryJobStatus: return "list.bullet.clipboard"
         case .acceptJobResult: return "checkmark.seal"
         case .terminateJob: return "stop.circle"
+        case .temporalSync: return "clock.badge.checkmark"
+        case .temporalDrift: return "infinity"
+        case .temporalStatus: return "chart.bar.fill"
+        case .discoverPorts: return "app.connected.to.app.below.fill"
+        case .invokePort: return "arrow.up.forward.app"
         }
     }
 
@@ -2183,7 +2218,9 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
              .querySystemState, .changeSystemState,
              .debugBridge,
              .queryDevicePresence, .requestDeviceSwitch, .setPresenceIntent, .saveStateCheckpoint,
-             .spawnScout, .spawnMechanic, .spawnDesigner, .queryJobStatus, .acceptJobResult, .terminateJob:
+             .spawnScout, .spawnMechanic, .spawnDesigner, .queryJobStatus, .acceptJobResult, .terminateJob,
+             .temporalSync, .temporalDrift, .temporalStatus,
+             .discoverPorts, .invokePort:
             return .internal
         }
     }
@@ -2203,7 +2240,9 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
              .querySystemState, .changeSystemState,
              .debugBridge,
              .queryDevicePresence, .requestDeviceSwitch, .setPresenceIntent, .saveStateCheckpoint,
-             .spawnScout, .spawnMechanic, .spawnDesigner, .queryJobStatus, .acceptJobResult, .terminateJob:
+             .spawnScout, .spawnMechanic, .spawnDesigner, .queryJobStatus, .acceptJobResult, .terminateJob,
+             .temporalSync, .temporalDrift, .temporalStatus,
+             .discoverPorts, .invokePort:
             return false
         }
     }
@@ -2223,7 +2262,9 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
              .querySystemState, .changeSystemState,
              .debugBridge,
              .queryDevicePresence, .requestDeviceSwitch, .setPresenceIntent, .saveStateCheckpoint,
-             .spawnScout, .spawnMechanic, .spawnDesigner, .queryJobStatus, .acceptJobResult, .terminateJob:
+             .spawnScout, .spawnMechanic, .spawnDesigner, .queryJobStatus, .acceptJobResult, .terminateJob,
+             .temporalSync, .temporalDrift, .temporalStatus,
+             .discoverPorts, .invokePort:
             return false
         }
     }
@@ -2245,6 +2286,8 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
             return true  // Sub-agent spawning requires user consent (job attestation gate)
         case .terminateJob:
             return true  // Terminating a running job should require user awareness
+        case .invokePort:
+            return true  // Opening external apps requires user awareness
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch,
              .openaiWebSearch, .openaiImageGeneration,
              .createMemory, .conversationSearch, .queryCovenant, .querySystemState,
@@ -2254,7 +2297,9 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
              .persistenceDisable, .notifyUser,
              .debugBridge,
              .queryDevicePresence, .setPresenceIntent, .saveStateCheckpoint,
-             .queryJobStatus, .acceptJobResult:
+             .queryJobStatus, .acceptJobResult,
+             .temporalSync, .temporalDrift, .temporalStatus,  // Temporal tools visible via status bar
+             .discoverPorts:  // Read-only list of available apps
             return false
         }
     }
@@ -2352,6 +2397,12 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
                 "Job will be marked as terminated",
                 "Partial results may be available in silo"
             ]
+        case .invokePort:
+            return [
+                "Open an external app via URL scheme",
+                "Pass parameters to the external app action",
+                "External app may perform actions on your behalf"
+            ]
         default:
             return []
         }
@@ -2389,6 +2440,10 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
             return .toolDiscovery
         case .debugBridge:
             return .debugging
+        case .temporalSync, .temporalDrift, .temporalStatus:
+            return .temporalSymmetry
+        case .discoverPorts, .invokePort:
+            return .externalApps
         }
     }
 

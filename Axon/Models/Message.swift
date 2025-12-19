@@ -12,6 +12,9 @@ struct Message: Codable, Identifiable, Equatable {
     let conversationId: String
     let role: MessageRole
     let content: String
+    /// If set, the UI should hide the assistant message body behind a banner.
+    /// The full text should still be available via the Select Text sheet.
+    let hiddenReason: String?
     let timestamp: Date
     let tokens: TokenUsage?
     let artifacts: [String]?
@@ -38,6 +41,7 @@ struct Message: Codable, Identifiable, Equatable {
         case conversationId
         case role
         case content
+        case hiddenReason
         case timestamp = "createdAt"
         case tokens
         case artifacts
@@ -60,6 +64,7 @@ struct Message: Codable, Identifiable, Equatable {
         conversationId: String,
         role: MessageRole,
         content: String,
+        hiddenReason: String? = nil,
         timestamp: Date = Date(),
         tokens: TokenUsage? = nil,
         artifacts: [String]? = nil,
@@ -80,6 +85,7 @@ struct Message: Codable, Identifiable, Equatable {
         self.conversationId = conversationId
         self.role = role
         self.content = content
+        self.hiddenReason = hiddenReason
         self.timestamp = timestamp
         self.tokens = tokens
         self.artifacts = artifacts
@@ -105,7 +111,8 @@ struct Message: Codable, Identifiable, Equatable {
         // conversationId is optional when messages are nested in listAll responses
         conversationId = try container.decodeIfPresent(String.self, forKey: .conversationId) ?? ""
         role = try container.decode(MessageRole.self, forKey: .role)
-        
+        hiddenReason = try container.decodeIfPresent(String.self, forKey: .hiddenReason)
+
         // Handle content which can be String or [ContentPart]
         if let contentString = try? container.decode(String.self, forKey: .content) {
             content = contentString
@@ -171,6 +178,7 @@ struct Message: Codable, Identifiable, Equatable {
         try container.encode(conversationId, forKey: .conversationId)
         try container.encode(role, forKey: .role)
         try container.encode(content, forKey: .content)
+        try container.encodeIfPresent(hiddenReason, forKey: .hiddenReason)
 
         // Convert timestamp to milliseconds
         try container.encode(timestamp.timeIntervalSince1970 * 1000, forKey: .timestamp)

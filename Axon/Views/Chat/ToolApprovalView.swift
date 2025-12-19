@@ -26,7 +26,11 @@ struct ToolApprovalRequestView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
-            Button(action: { withAnimation(.spring(response: 0.3)) { isExpanded.toggle() } }) {
+            Button {
+                withAnimation(.spring(response: 0.3)) {
+                    isExpanded.toggle()
+                }
+            } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "lock.shield.fill")
                         .font(.system(size: 14))
@@ -285,7 +289,11 @@ struct ToolApprovalBadge: View {
     @State private var showDetails = false
 
     var body: some View {
-        Button(action: { withAnimation(.spring(response: 0.3)) { showDetails.toggle() } }) {
+        Button {
+            withAnimation(.spring(response: 0.3)) {
+                showDetails.toggle()
+            }
+        } label: {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.shield.fill")
                     .font(.system(size: 12))

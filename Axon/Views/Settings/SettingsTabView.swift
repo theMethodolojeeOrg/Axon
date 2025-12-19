@@ -23,6 +23,7 @@ struct SettingsTabView: View {
         case custom = "Custom"
         case tools = "Tools"
         case dynamicTools = "Pipelines"
+        case intents = "Intents"
         case memory = "Memory"
         case sovereignty = "Consent"
         case security = "Security"
@@ -42,6 +43,7 @@ struct SettingsTabView: View {
             case .custom: return "slider.horizontal.3"
             case .tools: return "wrench.and.screwdriver.fill"
             case .dynamicTools: return "arrow.triangle.branch"
+            case .intents: return "app.connected.to.app.below.fill"
             case .memory: return "AxonLogoTemplate"
             case .sovereignty: return "shield.checkered"
             case .security: return "lock.shield.fill"
@@ -95,6 +97,8 @@ struct SettingsTabView: View {
                             ToolSettingsView(viewModel: viewModel)
                         case .dynamicTools:
                             DynamicToolsSettingsView(viewModel: viewModel)
+                        case .intents:
+                            IntentsSettingsView()
                         case .memory:
                             MemorySettingsView(viewModel: viewModel)
                         case .sovereignty:

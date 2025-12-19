@@ -709,7 +709,11 @@ struct ToolCategoryAccordion: View {
     var body: some View {
         VStack(spacing: 0) {
             // Accordion Header
-            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() } }) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
                 HStack(spacing: 12) {
                     // Category toggle (3-state)
                     CategoryToggleButton(

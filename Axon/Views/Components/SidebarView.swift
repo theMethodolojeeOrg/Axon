@@ -189,7 +189,11 @@ struct SidebarView: View {
 
                 Spacer()
 
-                Button(action: { withAnimation { isPresented = false } }) {
+                Button {
+                    withAnimation {
+                        isPresented = false
+                    }
+                } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 16))
                         .foregroundColor(AppColors.textSecondary)

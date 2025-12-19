@@ -96,7 +96,9 @@ struct ToolInvocationSheet: View {
             }
             .background(AppColors.substratePrimary)
             .navigationTitle(isUserSpecialTool ? "User Action" : "Run Tool")
+            #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -211,7 +213,9 @@ struct ToolInvocationSheet: View {
                 TextField("https://example.com/article", text: $urlField)
                     .font(.system(size: 15))
                     .textContentType(.URL)
+                    #if !os(macOS)
                     .autocapitalization(.none)
+                    #endif
                     .disableAutocorrection(true)
                     .padding(12)
                     .background(AppColors.substrateTertiary)
@@ -726,7 +730,7 @@ struct ToolInvocationSheet: View {
         Task {
             do {
                 // Determine visibility based on user selection
-                let visibility: InternalThreadVisibility = noteVisibility == .userOnly ? .aiOnly : .userVisible
+                let _ = noteVisibility // reserved for future: finer-grained visibility
                 // Note: We use .aiOnly for "Private" because .aiOnly means the AI CAN'T see contents
                 // But we need to invert the logic - if user wants it private FROM AI, we need a new approach
                 // Actually looking at the model: .aiOnly means only AI can see, .userVisible means user can see

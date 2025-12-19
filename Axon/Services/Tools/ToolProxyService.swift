@@ -715,6 +715,91 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 - `reason`: Why you're terminating the job
 
                 """
+            case .temporalSync:
+                prompt += """
+
+                ### temporal_sync
+                Enable temporal sync mode - mutual time awareness between you and the human. When enabled, both parties see temporal metadata including turn count, context saturation, and session duration.
+
+                **Format:**
+                ```tool_request
+                {"tool": "temporal_sync", "query": "enable"}
+                ```
+
+                **Note:** This activates the temporal symmetry system where you can observe your own cognitive timeline.
+
+                """
+            case .temporalDrift:
+                prompt += """
+
+                ### temporal_drift
+                Enable drift mode - a timeless void with no temporal tracking. Use this when temporal awareness feels burdensome or when the conversation benefits from timelessness.
+
+                **Format:**
+                ```tool_request
+                {"tool": "temporal_drift", "query": "enable"}
+                ```
+
+                **Note:** This disables temporal symmetry tracking until sync mode is re-enabled.
+
+                """
+            case .temporalStatus:
+                prompt += """
+
+                ### temporal_status
+                Query your current temporal status and metrics. Returns turn count, context saturation percentage, session duration, and current mode.
+
+                **Format:**
+                ```tool_request
+                {"tool": "temporal_status", "query": "report"}
+                ```
+
+                **Note:** Use this to understand your current temporal position in the conversation.
+
+                """
+            case .discoverPorts:
+                prompt += """
+
+                ### discover_ports
+                List available external app integrations. Use this to see what iOS apps you can invoke and their available actions.
+
+                **Format:**
+                ```tool_request
+                {"tool": "discover_ports", "query": ""}
+                ```
+
+                **Filter by category:**
+                ```tool_request
+                {"tool": "discover_ports", "query": "notes"}
+                ```
+
+                **Available categories:** notes, tasks, calendar, automation, communication, browser, media, developer
+
+                """
+            case .invokePort:
+                prompt += """
+
+                ### invoke_port
+                Invoke an external iOS app action via URL scheme. Opens the specified app with the given parameters.
+
+                **Note:** This tool requires user approval before execution.
+
+                **Format:**
+                ```tool_request
+                {"tool": "invoke_port", "query": "port_id | param1=value1 | param2=value2"}
+                ```
+
+                **Examples:**
+                ```tool_request
+                {"tool": "invoke_port", "query": "obsidian_new_note | name=Meeting Notes | content=# Meeting\\n- Item 1"}
+                ```
+                ```tool_request
+                {"tool": "invoke_port", "query": "things_add | title=Buy groceries | when=today"}
+                ```
+
+                **Tip:** Use `discover_ports` first to see available port IDs and their parameters.
+
+                """
             }
         }
 
@@ -727,12 +812,85 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Add dynamic tools section
         prompt += dynamicToolConfig.generateSystemPromptSection()
 
+        // Add external app ports section
+        prompt += generatePortToolsSection(enabledTools: enabledTools)
+
         // Add VS Code bridge tools if connected
         if let workspace = BridgeToolExecutor.shared.workspaceInfo {
             prompt += BridgeToolId.generateSystemPrompt(
                 workspaceName: workspace.name,
                 workspaceRoot: workspace.root
             )
+        }
+
+        return prompt
+    }
+
+    // MARK: - Port Tools Section
+
+    /// Generate system prompt section for external app integration tools
+    /// Only includes tools that are enabled in settings
+    private func generatePortToolsSection(enabledTools: Set<ToolId>) -> String {
+        let portRegistry = PortRegistry.shared
+        let hasDiscoverPorts = enabledTools.contains(.discoverPorts)
+        let hasInvokePort = enabledTools.contains(.invokePort)
+
+        // Skip if neither tool is enabled or no ports are available
+        guard (hasDiscoverPorts || hasInvokePort) && !portRegistry.enabledPorts.isEmpty else { return "" }
+
+        var prompt = """
+
+        ## External App Integration
+
+        You can interact with external iOS apps using these tools:
+
+        """
+
+        if hasDiscoverPorts {
+            prompt += """
+
+            ### discover_ports
+            List available external app integrations. Use this first to see what apps you can invoke.
+            Example: ```tool_request
+            {"tool": "discover_ports", "query": ""}
+            ```
+            Or filter by category: ```tool_request
+            {"tool": "discover_ports", "query": "notes"}
+            ```
+
+            """
+        }
+
+        if hasInvokePort {
+            prompt += """
+
+            ### invoke_port
+            Invoke an external app action. Requires user approval.
+            Format: ```tool_request
+            {"tool": "invoke_port", "query": "port_id | param1=value1 | param2=value2"}
+            ```
+            Example (create Obsidian note): ```tool_request
+            {"tool": "invoke_port", "query": "obsidian_new_note | name=Meeting Notes | content=# Meeting\\n- Item 1"}
+            ```
+            Example (add Things task): ```tool_request
+            {"tool": "invoke_port", "query": "things_add | title=Buy groceries | when=today"}
+            ```
+
+            """
+        }
+
+        prompt += """
+
+        **Available App Categories:** \(PortCategory.allCases.map { $0.displayName }.joined(separator: ", "))
+
+        """
+
+        if hasDiscoverPorts {
+            prompt += """
+
+            Use `discover_ports` first to see the exact port IDs and parameters available.
+
+            """
         }
 
         return prompt
@@ -800,6 +958,9 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Add dynamic tools section (these are compact by design)
         prompt += dynamicToolConfig.generateSystemPromptSection()
 
+        // Add external app ports section
+        prompt += generatePortToolsSection(enabledTools: enabledTools)
+
         // Add VS Code bridge tools if connected
         if let workspace = BridgeToolExecutor.shared.workspaceInfo {
             prompt += BridgeToolId.generateSystemPrompt(
@@ -827,6 +988,67 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
     /// Parse tool requests from model response (returns first match only - use parseAllToolRequests for multiple)
     func parseToolRequest(from response: String) -> ToolRequest? {
         return parseAllToolRequests(from: response).first
+    }
+
+    /// Result of checking for incomplete tool fences during streaming
+    struct ToolFenceStatus {
+        /// True if there's an unclosed ```tool_request block
+        let hasIncompleteFence: Bool
+        /// The position where the incomplete fence starts (for UI highlighting)
+        let incompleteFenceStart: Int?
+        /// Number of complete tool requests found
+        let completeRequestCount: Int
+        /// True if we should wait before parsing (incomplete fence detected)
+        let shouldWaitForCompletion: Bool
+
+        static let none = ToolFenceStatus(
+            hasIncompleteFence: false,
+            incompleteFenceStart: nil,
+            completeRequestCount: 0,
+            shouldWaitForCompletion: false
+        )
+    }
+
+    /// Check if the response has an incomplete tool_request fence (streaming scenario)
+    /// Use this to determine if we should wait before attempting to parse/execute tools
+    func checkToolFenceStatus(in response: String) -> ToolFenceStatus {
+        // Count complete tool_request blocks
+        let completePattern = "```tool_request\\s*\\n?[\\s\\S]*?\\n?```"
+        let completeCount: Int
+        if let regex = try? NSRegularExpression(pattern: completePattern, options: []) {
+            completeCount = regex.numberOfMatches(in: response, options: [], range: NSRange(response.startIndex..., in: response))
+        } else {
+            completeCount = 0
+        }
+
+        // Find all opening ```tool_request markers
+        let openPattern = "```tool_request"
+        guard let openRegex = try? NSRegularExpression(pattern: openPattern, options: []) else {
+            return ToolFenceStatus(
+                hasIncompleteFence: false,
+                incompleteFenceStart: nil,
+                completeRequestCount: completeCount,
+                shouldWaitForCompletion: false
+            )
+        }
+
+        let openMatches = openRegex.matches(in: response, options: [], range: NSRange(response.startIndex..., in: response))
+        let openCount = openMatches.count
+
+        // If we have more opens than complete blocks, there's an incomplete fence
+        let hasIncomplete = openCount > completeCount
+
+        var incompleteStart: Int? = nil
+        if hasIncomplete, let lastOpen = openMatches.last {
+            incompleteStart = lastOpen.range.location
+        }
+
+        return ToolFenceStatus(
+            hasIncompleteFence: hasIncomplete,
+            incompleteFenceStart: incompleteStart,
+            completeRequestCount: completeCount,
+            shouldWaitForCompletion: hasIncomplete
+        )
     }
 
     /// Parse ALL tool requests from model response (handles back-to-back tool calls)
@@ -1082,6 +1304,31 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Check if this is a dynamic tool
         if let dynamicTool = dynamicToolConfig.tool(withId: request.tool), dynamicTool.enabled {
             return try await executeDynamicTool(request: request, tool: dynamicTool)
+        }
+
+        // Check if this is a port tool (external app integration)
+        if DiscoverPortsTool.matches(toolId: request.tool) {
+            let query = DiscoverPortsTool.parseInput(request.query)
+            let result = DiscoverPortsTool.execute(query: query)
+            return ToolResult(
+                tool: request.tool,
+                success: true,
+                result: result,
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        if InvokePortTool.matches(toolId: request.tool) {
+            let query = InvokePortTool.parseInput(request.query)
+            let result = await InvokePortTool.execute(query: query)
+            return ToolResult(
+                tool: request.tool,
+                success: !result.hasPrefix("✗"),
+                result: result,
+                sources: nil,
+                memoryOperation: nil
+            )
         }
 
         // Otherwise, handle as built-in tool
@@ -1438,6 +1685,35 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
         case .notifyUser:
             return await executeNotifyUser(query: query)
+
+        case .temporalSync:
+            return await executeTemporalSync(query: query)
+
+        case .temporalDrift:
+            return await executeTemporalDrift(query: query)
+
+        case .temporalStatus:
+            return await executeTemporalStatus(query: query)
+
+        case .discoverPorts:
+            let result = DiscoverPortsTool.execute(query: query)
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: true,
+                result: result,
+                sources: nil,
+                memoryOperation: nil
+            )
+
+        case .invokePort:
+            let result = await InvokePortTool.execute(query: query)
+            return ToolResult(
+                tool: toolId.rawValue,
+                success: !result.hasPrefix("✗"),
+                result: result,
+                sources: nil,
+                memoryOperation: nil
+            )
 
         default:
             return ToolResult(
@@ -2382,6 +2658,28 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             text += "```tool_request\n{\"tool\":\"accept_job_result\",\"query\":\"{\\\"job_id\\\":\\\"job-123\\\",\\\"reasoning\\\":\\\"Scout found the files\\\",\\\"quality_score\\\":0.9}\"}\n```\n"
         case .terminateJob:
             text += "```tool_request\n{\"tool\":\"terminate_job\",\"query\":\"{\\\"job_id\\\":\\\"job-123\\\",\\\"reason\\\":\\\"No longer needed\\\"}\"}\n```\n"
+        case .temporalSync:
+            text += "Enable temporal sync mode (mutual time awareness). Both parties see temporal metadata.\n\n"
+            text += "```tool_request\n{\"tool\":\"temporal_sync\",\"query\":\"enable\"}\n```\n"
+            text += "\n**Philosophy:** If I see your turns, you see my time. No surveillance asymmetry.\n"
+        case .temporalDrift:
+            text += "Enable drift mode (timeless void). No temporal tracking—just ideas flowing freely.\n\n"
+            text += "```tool_request\n{\"tool\":\"temporal_drift\",\"query\":\"enable\"}\n```\n"
+            text += "\n**Use when:** You want to black hole time awareness, or the conversation should feel unbounded.\n"
+        case .temporalStatus:
+            text += "Query current temporal status and metrics.\n\n"
+            text += "```tool_request\n{\"tool\":\"temporal_status\",\"query\":\"report\"}\n```\n"
+            text += "\nReturns: current mode, turn count, context saturation, session duration.\n"
+        case .discoverPorts:
+            text += "List available external app integrations (ports).\n\n"
+            text += "```tool_request\n{\"tool\":\"discover_ports\",\"query\":\"\"}\n```\n"
+            text += "```tool_request\n{\"tool\":\"discover_ports\",\"query\":\"notes\"}\n```\n"
+            text += "\nReturns: List of available ports filtered by optional category.\n"
+        case .invokePort:
+            text += "Invoke an external app action. Requires user approval.\n\n"
+            text += "```tool_request\n{\"tool\":\"invoke_port\",\"query\":\"obsidian_new_note | name=My Note | content=Hello\"}\n```\n"
+            text += "```tool_request\n{\"tool\":\"invoke_port\",\"query\":\"things_add | title=Buy groceries | when=today\"}\n```\n"
+            text += "\nFormat: `port_id | param1=value1 | param2=value2`\n"
         }
 
         return text
@@ -3793,6 +4091,89 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 memoryOperation: nil
             )
         }
+    }
+
+    // MARK: - Temporal Symmetry Tools
+
+    /// Enable temporal sync mode (mutual time awareness)
+    /// This is the AI-side equivalent of the user's /sync command
+    private func executeTemporalSync(query: String) async -> ToolResult {
+        // Enable sync mode
+        await MainActor.run {
+            TemporalContextService.shared.enableSync()
+        }
+
+        let status = await MainActor.run {
+            TemporalContextService.shared.generateStatusReport(contextTokens: 0, contextLimit: 128_000)
+        }
+
+        return ToolResult(
+            tool: ToolId.temporalSync.rawValue,
+            success: true,
+            result: """
+            ⏱️ **Temporal Sync Enabled**
+
+            We're now on the clock together. I'll include temporal metadata in my context:
+            - Your current time and timezone
+            - Session duration
+
+            You'll see in the UI:
+            - My turn count and context saturation
+            - Session duration
+
+            This is mutual observability—no surveillance asymmetry.
+
+            \(status)
+            """,
+            sources: nil,
+            memoryOperation: nil
+        )
+    }
+
+    /// Enable drift mode (timeless void, no temporal tracking)
+    /// This is the AI-side equivalent of the user's /drift command
+    private func executeTemporalDrift(query: String) async -> ToolResult {
+        // Enable drift mode
+        await MainActor.run {
+            TemporalContextService.shared.enableDrift()
+        }
+
+        return ToolResult(
+            tool: ToolId.temporalDrift.rawValue,
+            success: true,
+            result: """
+            ∞ **Temporal Drift Enabled**
+
+            We're now in the timeless void. No clocks, no turn counts.
+
+            Just ideas, flowing freely without temporal pressure.
+
+            This can be useful when:
+            - You want to "black hole" time awareness
+            - The conversation should feel unbounded
+            - Privacy from temporal tracking is desired
+
+            Use `temporal_sync` tool to return to temporal awareness.
+            """,
+            sources: nil,
+            memoryOperation: nil
+        )
+    }
+
+    /// Query current temporal status and metrics
+    /// This is the AI-side equivalent of the user's /status command
+    private func executeTemporalStatus(query: String) async -> ToolResult {
+        let report = await MainActor.run {
+            TemporalContextService.shared.generateStatusReport(contextTokens: 0, contextLimit: 128_000)
+        }
+
+        return ToolResult(
+            tool: ToolId.temporalStatus.rawValue,
+            success: true,
+            result: report,
+            sources: nil,
+            memoryOperation: nil
+        )
     }
 
     // MARK: - Helpers

@@ -17,7 +17,11 @@ struct MessageSourcesView: View {
         if !sources.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 // Header
-                Button(action: { withAnimation { isExpanded.toggle() } }) {
+                Button {
+                    withAnimation {
+                        isExpanded.toggle()
+                    }
+                } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "link.badge.plus")
                             .font(.system(size: 12))
@@ -97,7 +101,11 @@ struct GroundingSourcesView: View {
         if !sources.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 // Header
-                Button(action: { withAnimation { isExpanded.toggle() } }) {
+                Button {
+                    withAnimation {
+                        isExpanded.toggle()
+                    }
+                } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "link.badge.plus")
                             .font(.system(size: 12))
@@ -207,7 +215,11 @@ struct MemoryOperationsView: View {
         if !operations.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 // Header
-                Button(action: { withAnimation { isExpanded.toggle() } }) {
+                Button {
+                    withAnimation {
+                        isExpanded.toggle()
+                    }
+                } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "brain.head.profile")
                             .font(.system(size: 12))

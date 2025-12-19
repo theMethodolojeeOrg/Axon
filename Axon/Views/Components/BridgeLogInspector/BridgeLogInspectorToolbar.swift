@@ -43,7 +43,7 @@ struct BridgeLogInspectorToolbar: View {
         }
         .padding(12)
         .background(AppColors.substrateSecondary)
-        .onChange(of: searchText) { newValue in
+        .onChange(of: searchText) { _, newValue in
             logService.filterText = newValue
         }
     }

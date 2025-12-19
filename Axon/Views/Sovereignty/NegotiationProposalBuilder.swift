@@ -193,7 +193,11 @@ struct NegotiationProposalBuilder: View {
         Form {
             // Back button
             Section {
-                Button(action: { withAnimation { selectedCategory = nil } }) {
+                Button {
+                    withAnimation {
+                        selectedCategory = nil
+                    }
+                } label: {
                     HStack {
                         Image(systemName: "chevron.left")
                         Text("Choose Different Category")

@@ -439,6 +439,7 @@ class ConversationSyncManager: ObservableObject {
                 entity.conversationId = conversationId
                 entity.role = message.role.rawValue
                 entity.content = message.content
+                entity.hiddenReason = message.hiddenReason
                 entity.timestamp = message.timestamp
                 entity.modelName = message.modelName
                 entity.providerName = message.providerName
@@ -567,6 +568,7 @@ class ConversationSyncManager: ObservableObject {
                     conversationId: conversationId,
                     role: role,
                     content: content,
+                    hiddenReason: entity.hiddenReason,
                     timestamp: timestamp,
                     tokens: nil,
                     artifacts: nil,
@@ -618,4 +620,3 @@ extension ConversationEntity {
         )
     }
 }
-

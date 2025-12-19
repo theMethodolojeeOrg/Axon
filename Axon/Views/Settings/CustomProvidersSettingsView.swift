@@ -175,7 +175,11 @@ struct CustomProviderCard: View {
 
             // Expand/Collapse models
             if !provider.models.isEmpty {
-                Button(action: { withAnimation { isExpanded.toggle() } }) {
+                Button {
+                    withAnimation {
+                        isExpanded.toggle()
+                    }
+                } label: {
                     HStack {
                         Text(isExpanded ? "Hide Models" : "Show Models")
                             .font(AppTypography.bodySmall())

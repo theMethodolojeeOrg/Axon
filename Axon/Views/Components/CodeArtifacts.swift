@@ -724,9 +724,16 @@ private struct InspectorTabButton: View {
 
 // MARK: - Tool Request Code Block View
 
-/// Specialized code block for tool_request that allows manual execution
+/// Specialized code block for tool_request that auto-executes on appear
+/// The tool request stays in the markdown content but is rendered as a minimal/hidden UI
+/// This decouples display from execution - we can parse and execute at leisure after streaming completes
 struct ToolRequestCodeBlockView: View {
     let code: String
+
+    /// Controls whether tool requests auto-execute when they appear
+    /// When true, tools execute automatically as soon as the view renders
+    /// When false, user must click "Apply" to execute
+    static var autoExecuteEnabled: Bool = true
 
     @State private var executionState: ToolExecutionState = .notExecuted
     @State private var executionResult: String?
@@ -915,10 +922,15 @@ struct ToolRequestCodeBlockView: View {
     }
 
     /// Check if this exact tool request was already executed in this session
+    /// If auto-execute is enabled and not yet executed, triggers execution automatically
     private func checkIfAlreadyExecuted() {
         if ToolRequestTracker.shared.wasExecuted(hash: contentHash) {
             executionState = .success
             executionResult = ToolRequestTracker.shared.getResult(hash: contentHash)
+        } else if Self.autoExecuteEnabled && executionState == .notExecuted {
+            // Auto-execute on appear - this is the key to decoupling display from execution
+            // The tool request is in the markdown, the UI renders it, and we execute when ready
+            executeToolRequest()
         }
     }
 

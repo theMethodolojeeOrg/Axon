@@ -16,7 +16,11 @@ struct ContextDebugView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Header - Always visible
-            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() } }) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "ant.fill")
                         .font(.system(size: 12))

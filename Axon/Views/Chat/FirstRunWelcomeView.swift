@@ -21,7 +21,11 @@ struct FirstRunWelcomeCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header
-            Button(action: { withAnimation { isExpanded.toggle() } }) {
+            Button {
+                withAnimation {
+                    isExpanded.toggle()
+                }
+            } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 14))
@@ -201,7 +205,11 @@ struct APIKeySourcesView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Button(action: { withAnimation { isExpanded.toggle() } }) {
+            Button {
+                withAnimation {
+                    isExpanded.toggle()
+                }
+            } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "link.badge.plus")
                         .font(.system(size: 12))

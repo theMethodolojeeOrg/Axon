@@ -129,50 +129,8 @@ class ConversationService: ObservableObject {
     /// - modelId: The API model identifier to send to the provider (e.g., "claude-haiku-4-5-20251001")
     /// - modelDisplayName: The human-readable name for UI display (e.g., "Claude Haiku 4.5")
     private func getProviderAndModel(for conversationId: String, settings: AppSettings) -> (provider: String, modelId: String, modelDisplayName: String, providerName: String) {
-        // Check for conversation overrides
-        let overridesKey = "conversation_overrides_\(conversationId)"
-        if let data = UserDefaults.standard.data(forKey: overridesKey),
-           let overrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data) {
-
-            // Custom provider override
-            if let customProviderId = overrides.customProviderId,
-               let customProvider = settings.customProviders.first(where: { $0.id == customProviderId }),
-               let customModelId = overrides.customModelId,
-               let customModel = customProvider.models.first(where: { $0.id == customModelId }) {
-                // For custom providers, modelCode is the API identifier
-                let modelId = customModel.modelCode
-                let modelDisplayName = overrides.modelDisplayName ?? customModel.friendlyName ?? customProvider.providerName
-                let providerDisplay = overrides.providerDisplayName ?? customProvider.providerName
-                return ("openai-compatible", modelId, modelDisplayName, providerDisplay)
-            }
-
-            // Built-in provider override
-            if let builtInProvider = overrides.builtInProvider,
-               let provider = AIProvider(rawValue: builtInProvider),
-               let builtInModel = overrides.builtInModel,
-               let model = provider.availableModels.first(where: { $0.id == builtInModel }) {
-                let modelDisplayName = overrides.modelDisplayName ?? model.name
-                let providerDisplay = overrides.providerDisplayName ?? provider.displayName
-                // model.id is the API identifier (e.g., "claude-haiku-4-5-20251001")
-                return (provider.rawValue, model.id, modelDisplayName, providerDisplay)
-            }
-        }
-
-        // Fallback to global settings (custom)
-        if let customProviderId = settings.selectedCustomProviderId,
-           let customProvider = settings.customProviders.first(where: { $0.id == customProviderId }),
-           let customModelId = settings.selectedCustomModelId,
-           let customModel = customProvider.models.first(where: { $0.id == customModelId }) {
-            let modelId = customModel.modelCode
-            let modelDisplayName = customModel.friendlyName ?? customProvider.providerName
-            return ("openai-compatible", modelId, modelDisplayName, customProvider.providerName)
-        }
-
-        // Default: built-in provider
-        let provider = settings.defaultProvider
-        let model = provider.availableModels.first(where: { $0.id == settings.defaultModel }) ?? provider.availableModels.first
-        // model.id is the API identifier, model.name is the display name
-        return (provider.rawValue, model?.id ?? "unknown", model?.name ?? "Unknown", provider.displayName)
+        let resolved = ConversationModelResolver.resolve(conversationId: conversationId, settings: settings)
+        return (resolved.normalizedProvider, resolved.modelId, resolved.modelDisplayName, resolved.providerName)
     }
 
     // MARK: - Conversations
@@ -810,11 +768,13 @@ class ConversationService: ObservableObject {
     ) async {
         // Do not override a manual rename.
         if SettingsStorage.shared.displayName(for: conversationId) != nil {
+            print("[ConversationService] ℹ️ Auto-title skipped: manual rename exists")
             return
         }
 
         // Only attempt when we have a conversation loaded.
         guard let conv = conversations.first(where: { $0.id == conversationId }) else {
+            print("[ConversationService] ⚠️ Auto-title skipped: conversation not in memory")
             return
         }
 
@@ -823,30 +783,33 @@ class ConversationService: ObservableObject {
         let placeholderTitle = String(userMessage.content.prefix(50)).trimmingCharacters(in: .whitespacesAndNewlines)
         let isPlaceholder = conv.title == "New Chat" || conv.title == placeholderTitle
         guard isPlaceholder else {
-            return
-        }
-
-        // Availability gate.
-        // NOTE: FoundationModels in the current SDK is gated at iOS 26 / macOS 26.
-        // If/when the SDK exposes it at iOS 18.4/macOS 15.4, we can lower this.
-        guard #available(iOS 26.0, macOS 26.0, *) else {
+            print("[ConversationService] ℹ️ Auto-title skipped: title already non-placeholder ('\(conv.title)')")
             return
         }
 
         do {
-            let generated = try await AppleIntelligenceChatTitleService.shared.generateTitle(
+            let generated = try await ConversationTitleOrchestrator.shared.generateTitle(
                 userMessage: userMessage,
                 assistantMessage: assistantMessage
             )
 
             let trimmed = generated.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return }
+            guard !trimmed.isEmpty else {
+                print("[ConversationService] ⚠️ Auto-title generation produced empty title; skipping")
+                return
+            }
 
             // 1) Update UI immediately via local display name override.
-            SettingsStorage.shared.setDisplayName(trimmed, for: conversationId)
+            ConversationTitleOrchestrator.shared.applyTitle(trimmed, to: conversationId)
 
-            // 2) Persist/sync as the official conversation title.
-            _ = try await updateConversation(id: conversationId, title: trimmed)
+            // 2) Persist/sync as the official conversation title (if possible).
+            do {
+                _ = try await updateConversation(id: conversationId, title: trimmed)
+            } catch {
+                // In local-only / offline mode this can still succeed (local store), but if it
+                // fails we keep the displayNameOverride so the UI still shows the new title.
+                print("[ConversationService] ⚠️ Auto-title could not persist server-side: \(error.localizedDescription)")
+            }
 
             print("[ConversationService] ✅ Auto-renamed conversation \(conversationId) -> '\(trimmed)'")
         } catch {

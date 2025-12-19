@@ -184,7 +184,11 @@ struct AppContainerView: View {
             .toolbar {
                 // Leading sidebar toggle
                 ToolbarItem {
-                    Button(action: { withAnimation { showSidebar.toggle() } }) {
+                    Button {
+                        withAnimation {
+                            showSidebar.toggle()
+                        }
+                    } label: {
                         Image(systemName: "sidebar.left")
                             .foregroundColor(AppColors.textPrimary)
                     }
@@ -284,17 +288,21 @@ struct AppContainerView: View {
             }
         }
 
-        // For macOS split view, the UX is much better if “New Chat” actually creates
+        // For macOS split view, the UX is much better if "New Chat" actually creates
         // and selects a conversation immediately (so the detail pane switches to chat UI).
         // In local-first / device-direct CloudLLM mode this should be a local conversation.
         do {
             let conv = try conversationService.createConversationOffline(title: "New Chat")
             selectedConversation = conv
             conversationService.currentConversation = conv
+
+            // Update temporal context with the new conversation
+            TemporalContextService.shared.setCurrentConversation(conv.id)
         } catch {
             // If local creation fails (should be rare), fall back to clearing selection.
             selectedConversation = nil
             conversationService.clearCurrentConversation()
+            TemporalContextService.shared.setCurrentConversation(nil)
         }
 
         currentView = .chat
@@ -319,6 +327,9 @@ struct AppContainerView: View {
         conversationService.currentConversation = conversation
         currentView = .chat
         showSidebar = false
+
+        // Update temporal context with the new conversation
+        TemporalContextService.shared.setCurrentConversation(conversation.id)
     }
 
     private func navigateToView(_ view: MainView) {
@@ -732,6 +743,16 @@ struct ChatContainerView: View {
                                         .padding(.top, 16)
                                         .transition(.opacity.combined(with: .move(edge: .top)))
                                     }
+
+                                    // Show temporal status bar after the last assistant message
+                                    if message.role == .assistant && index == conversationService.messages.count - 1 {
+                                        TemporalStatusBar(
+                                            contextSaturation: getContextSaturation(for: message.id),
+                                            contextLimit: getContextLimit(for: message.id)
+                                        )
+                                        .padding(.horizontal)
+                                        .padding(.top, 12)
+                                    }
                                 }
 
                                 // Add separator after assistant messages (before next user message)
@@ -863,6 +884,14 @@ struct ChatContainerView: View {
 
         // Store the task so we can cancel it if needed
         currentSendTask = Task {
+            // Ensure UI state is always finalized on the MainActor
+            defer {
+                Task { @MainActor in
+                    isLoading = false
+                    currentSendTask = nil
+                }
+            }
+
             do {
                 // Create conversation if needed
                 let conv: Conversation
@@ -935,13 +964,34 @@ struct ChatContainerView: View {
             } catch is CancellationError {
                 // Task was cancelled - this is expected when user stops generation
                 print("[ChatContainer] Message generation was stopped by user")
-                await MainActor.run { cleanupStreamingState() }
+                await MainActor.run {
+                    cleanupStreamingState()
+                    // Ensure UI state ends cleanly even on cancellation
+                    isLoading = false
+                }
             } catch {
-                print("Error sending message: \(error.localizedDescription)")
-                await MainActor.run { cleanupStreamingState() }
+                print("[ChatContainer] Error sending message: \(error.localizedDescription)")
+                await MainActor.run {
+                    cleanupStreamingState()
+                    // Ensure UI state ends cleanly even on error
+                    isLoading = false
+                }
+
+                // If we errored after creating a conversation, surface an error bubble so the user
+                // doesn’t experience a silent “no response”.
+                // Prefer the resolved conversation ID if available.
+                let convId = conversationService.currentConversation?.id ?? conversation?.id
+                if let convId {
+                    let errorBubble = Message(
+                        conversationId: convId,
+                        role: .assistant,
+                        content: "⚠️ Request failed: \(error.localizedDescription)\n\nTry again, or check provider/API key/network.",
+                        modelName: "System",
+                        providerName: "internal"
+                    )
+                    conversationService.messages.append(errorBubble)
+                }
             }
-            isLoading = false
-            currentSendTask = nil
         }
     }
 
@@ -1284,6 +1334,7 @@ struct ChatContainerView: View {
         let contextMessages = conversationService.messages.filter { $0.id != assistantId }
 
         // Stream the response
+        print("[ChatContainer] Starting streaming: provider=\(config.provider) model=\(config.model) conv=\(conversationId)")
         let orchestrator = OnDeviceConversationOrchestrator()
         let stream = orchestrator.sendMessageStreaming(
             conversationId: conversationId,
@@ -1300,12 +1351,18 @@ struct ChatContainerView: View {
         var finalSources: [MessageGroundingSource] = []
         var finalMemoryOps: [MessageMemoryOperation] = []
 
+        var didReceiveAnyDelta = false
+
         for try await event in stream {
             try Task.checkCancellation()
 
             await MainActor.run {
                 switch event {
                 case .textDelta(let text):
+                    if !didReceiveAnyDelta {
+                        didReceiveAnyDelta = true
+                        print("[ChatContainer] First text delta received for \(assistantId)")
+                    }
                     finalContent += text
                     streamedContent[assistantId] = finalContent
 
@@ -1333,7 +1390,14 @@ struct ChatContainerView: View {
                     }
 
                 case .completion(let completion):
-                    finalContent = completion.fullContent
+                    // SAFETY: never overwrite our locally accumulated deltas with a shorter completion payload.
+                    // Some providers / fast models can emit a completion event whose fullContent is stale.
+                    if completion.fullContent.count > finalContent.count {
+                        finalContent = completion.fullContent
+                    } else if completion.fullContent.count < finalContent.count {
+                        print("[Streaming] Completion fullContent shorter than accumulated deltas (completion=\(completion.fullContent.count), accumulated=\(finalContent.count)). Keeping accumulated.")
+                    }
+
                     finalReasoning = completion.reasoning ?? ""
                     finalSources = completion.groundingSources
                     finalMemoryOps = completion.memoryOperations
@@ -1346,6 +1410,24 @@ struct ChatContainerView: View {
                     print("[ChatContainer] Streaming error: \(error.localizedDescription)")
                 }
             }
+        }
+
+        // If streaming ended but we never received any deltas, surface a visible error.
+        if !didReceiveAnyDelta && finalContent.isEmpty {
+            await MainActor.run {
+                finalizeStreamingMessage(
+                    assistantId: assistantId,
+                    conversationId: conversationId,
+                    content: "⚠️ No response received (stream ended without deltas).\n\nThis is usually a networking/provider issue or a stream parsing mismatch.",
+                    reasoning: nil,
+                    toolCalls: [],
+                    sources: [],
+                    memoryOps: [],
+                    modelName: config.model,
+                    providerName: config.providerName
+                )
+            }
+            return
         }
 
         // Finalize the message
@@ -1411,6 +1493,16 @@ struct ChatContainerView: View {
 
             // Record usage
             recordUsage(for: finalMessage, inputContent: "")
+
+            // Notify temporal service of message (session tracking, context saturation)
+            // Turn counts are derived from Core Data automatically
+            let contextTokens = contextDebugInfo?.totalTokens ?? 0
+            let contextLimit = contextDebugInfo?.contextWindowLimit ?? 128_000
+            TemporalContextService.shared.notifyMessageAdded(
+                conversationId: conversationId,
+                contextTokens: contextTokens,
+                contextLimit: contextLimit
+            )
         }
 
         // Clean up streaming state
@@ -1503,12 +1595,12 @@ struct ChatContainerView: View {
     private func saveDraftDebounced() {
         // Cancel previous save task
         draftSaveTask?.cancel()
-        
+
         // Schedule new save with debounce
         draftSaveTask = Task {
             do {
                 try await Task.sleep(nanoseconds: 500_000_000) // 0.5 second debounce
-                
+
                 // Save draft
                 let draftKey = conversation?.id ?? DraftMessageService.newChatDraftKey
                 draftService.saveDraft(
@@ -1520,6 +1612,37 @@ struct ChatContainerView: View {
                 // Task was cancelled, ignore
             }
         }
+    }
+
+    // MARK: - Temporal Context Helpers
+
+    /// Get current context saturation for the temporal status bar
+    private func getContextSaturation(for messageId: String? = nil) -> Double {
+        // Try to get from the specified message's debug info, or latest
+        let targetId = messageId ?? conversationService.messages.last?.id
+        if let id = targetId, let debugInfo = contextDebugInfos[id] {
+            return debugInfo.usagePercentage
+        }
+
+        // Fallback: estimate based on message count
+        let messageCount = conversationService.messages.count
+        let estimatedTokensPerMessage = 200
+        let contextLimit = getContextLimit()
+        let estimated = Double(messageCount * estimatedTokensPerMessage) / Double(contextLimit)
+        return min(estimated, 1.0)
+    }
+
+    /// Get context window limit for current model
+    private func getContextLimit(for messageId: String? = nil) -> Int {
+        // Try to get from the specified message's debug info
+        let targetId = messageId ?? conversationService.messages.last?.id
+        if let id = targetId, let debugInfo = contextDebugInfos[id] {
+            return debugInfo.contextWindowLimit
+        }
+
+        // Fallback: get from settings
+        let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
+        return AIProvider.contextWindowForModel(settings.defaultModel, settings: settings)
     }
 }
 

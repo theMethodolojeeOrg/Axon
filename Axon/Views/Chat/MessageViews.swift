@@ -349,8 +349,38 @@ struct AssistantMessageView: View {
                 .padding(.bottom, 12)
             }
 
-            // Main content with inline tool calls during streaming
-            if let toolCalls = liveToolCalls, !toolCalls.isEmpty {
+            // Main content (or hidden banner)
+            if let hiddenReason = message.hiddenReason, !hiddenReason.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "eye.slash")
+                            .foregroundColor(AppColors.textTertiary)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Message hidden")
+                                .font(AppTypography.titleSmall())
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Text(hiddenReason)
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textSecondary)
+
+                            Text("Use Select Text to view/copy the full message.")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textTertiary)
+                        }
+                    }
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(AppColors.substrateSecondary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(AppColors.glassBorder, lineWidth: 1)
+                            )
+                    )
+                }
+            } else if let toolCalls = liveToolCalls, !toolCalls.isEmpty {
                 // Streaming mode with tool calls - interleave content and tools
                 StreamingContentWithToolsView(
                     content: textToRender,

@@ -18,7 +18,11 @@ struct InlineToolCallView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Header - always visible
-            Button(action: { withAnimation(.spring(response: 0.3)) { isExpanded.toggle() } }) {
+            Button {
+                withAnimation(.spring(response: 0.3)) {
+                    isExpanded.toggle()
+                }
+            } label: {
                 HStack(spacing: 10) {
                     // State indicator
                     stateIndicator

@@ -9,12 +9,15 @@ import SwiftUI
 import PhotosUI
 import Combine
 import UniformTypeIdentifiers
+import os.log
 
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
 import AppKit
 #endif
+
+private let attachmentLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Axon", category: "Attachments")
 
 // MARK: - Custom Text Editor with Enter/Shift+Enter handling
 
@@ -286,6 +289,7 @@ struct MessageInputBar: View {
     @State private var showVideoImporter = false
     @State private var showAudioImporter = false
     @State private var showAnyFileImporter = false
+    @State private var showAttachmentOptions = false  // iOS action sheet
 
     // Slash Command Menu
     @State private var slashMenuState: SlashMenuState = .hidden
@@ -332,51 +336,44 @@ struct MessageInputBar: View {
 
     private var attachmentCapability: AttachmentCapability {
         let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
-        var providerString = settings.defaultProvider.rawValue
-        var modelString = settings.defaultModel
 
-        if let conversationId = conversationId {
-            let overridesKey = "conversation_overrides_\(conversationId)"
-            if let data = UserDefaults.standard.data(forKey: overridesKey),
-               let overrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data) {
-
-                if overrides.customProviderId != nil {
-                    providerString = "openai-compatible"
-                } else if let builtInProvider = overrides.builtInProvider {
-                    providerString = builtInProvider
-                }
-                
-                if let overrideModel = overrides.model {
-                    modelString = overrideModel
-                }
-            } else if settings.selectedCustomProviderId != nil {
-                providerString = "openai-compatible"
-            }
-        } else if settings.selectedCustomProviderId != nil {
-            providerString = "openai-compatible"
+        // Resolve the effective provider+model used for this conversation.
+        // This keeps the attachment UI aligned with the actual send path.
+        let resolved: ConversationModelResolver.ResolvedProviderModel
+        if let conversationId {
+            resolved = ConversationModelResolver.resolve(conversationId: conversationId, settings: settings)
+            attachmentLog.debug("Resolved provider for conversation \(conversationId): \(resolved.normalizedProvider) / \(resolved.modelId)")
+        } else {
+            resolved = ConversationModelResolver.resolveGlobal(settings: settings)
+            attachmentLog.debug("Resolved global provider: \(resolved.normalizedProvider) / \(resolved.modelId)")
         }
 
         // Check if Gemini tools are enabled - if so, we can proxy media through Gemini
-        let geminiToolsEnabled = settings.toolSettings.enabledTools.contains { 
+        let geminiToolsEnabled = settings.toolSettings.enabledTools.contains {
             [.googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch].contains($0)
         }
         let mediaProxyEnabled = settings.toolSettings.experimentalFeaturesEnabled && settings.toolSettings.mediaProxyEnabled
         let geminiKey = try? APIKeysStorage.shared.getAPIKey(for: .gemini)
         let canProxyMedia = geminiToolsEnabled && mediaProxyEnabled && geminiKey != nil && !geminiKey!.isEmpty
 
-        switch providerString {
+        switch resolved.normalizedProvider {
         case "anthropic":
-            // Claude 3.5/3.7 supports PDFs natively
+            // Claude supports images + PDFs natively.
+            // Audio/video require the Gemini proxy.
             let supportsVideoAudio = canProxyMedia
             return AttachmentCapability(
                 images: true,
                 documents: true,
                 video: supportsVideoAudio,
                 audio: supportsVideoAudio,
-                description: supportsVideoAudio ? "Claude supports images and PDFs natively, and video/audio via Gemini proxy." : "Claude supports images and PDFs."
+                description: supportsVideoAudio
+                    ? "Claude supports images and PDFs natively, and video/audio via Gemini proxy."
+                    : "Claude supports images and PDFs."
             )
+
         case "gemini":
-            // Gemini 1.5+ supports everything
+            // Gemini supports images, documents, video, and audio.
+            attachmentLog.info("Gemini provider detected - all attachment types enabled (images, documents, video, audio)")
             return AttachmentCapability(
                 images: true,
                 documents: true,
@@ -384,35 +381,67 @@ struct MessageInputBar: View {
                 audio: true,
                 description: "Gemini supports images, documents, video, and audio."
             )
+
         case "openai":
-            // GPT-4o supports images and audio natively
+            // OpenAI: treat audio as supported for GPT-4o-family models.
+            // Video/PDF are still proxied.
+            let model = resolved.modelId.lowercased()
+            let supportsAudioNatively = model.contains("4o") || model.contains("audio") || model.contains("realtime")
             let supportsVideo = canProxyMedia
+
             return AttachmentCapability(
                 images: true,
                 documents: canProxyMedia,
                 video: supportsVideo,
-                audio: true,
-                description: supportsVideo ? "GPT supports images and audio natively, and video/docs via Gemini proxy." : "GPT supports images and audio."
+                audio: supportsAudioNatively,
+                description: supportsVideo
+                    ? "GPT supports images natively; audio depends on model; video/docs via Gemini proxy."
+                    : "GPT supports images natively; audio depends on model."
             )
+
         case "grok":
+            // Grok is images-only unless proxied.
             let supportsAll = canProxyMedia
             return AttachmentCapability(
                 images: true,
                 documents: supportsAll,
                 video: supportsAll,
                 audio: supportsAll,
-                description: supportsAll ? "Grok supports images natively, and other media via Gemini proxy." : "Grok supports images only."
+                description: supportsAll
+                    ? "Grok supports images natively, and other media via Gemini proxy."
+                    : "Grok supports images only."
             )
+
         case "openai-compatible":
-            let supportsAll = canProxyMedia
+            // Provider-declared: use the selected custom provider/model from settings/overrides.
+            // If your provider doesn't declare capabilities yet, we fall back to conservative defaults.
+            if let (caps, description) = declaredCustomProviderCapability(settings: settings, conversationId: conversationId) {
+                let withProxySuffix = canProxyMedia
+                    ? description + " (Plus video/audio/docs via Gemini proxy when enabled.)"
+                    : description
+
+                return AttachmentCapability(
+                    images: caps.images,
+                    documents: caps.documents || canProxyMedia,
+                    video: caps.video || canProxyMedia,
+                    audio: caps.audio || canProxyMedia,
+                    description: withProxySuffix
+                )
+            }
+
+            // Fallback if not declared: images only (or proxy for the rest)
             return AttachmentCapability(
                 images: true,
-                documents: supportsAll,
-                video: supportsAll,
-                audio: supportsAll,
-                description: supportsAll ? "Images supported; other formats via Gemini proxy." : "Images supported; other formats depend on the provider."
+                documents: canProxyMedia,
+                video: canProxyMedia,
+                audio: canProxyMedia,
+                description: canProxyMedia
+                    ? "Images supported; other formats via Gemini proxy."
+                    : "Images supported; other formats depend on the provider."
             )
+
         default:
+            // Conservative default.
             return AttachmentCapability(
                 images: true,
                 documents: canProxyMedia,
@@ -421,6 +450,77 @@ struct MessageInputBar: View {
                 description: "Images supported."
             )
         }
+    }
+
+    /// Provider-declared capability lookup for custom providers.
+    ///
+    /// NOTE: If your `CustomProviderModel`/`CustomProvider` types later grow explicit capability fields,
+    /// this should be updated to read those instead of using the heuristics below.
+    private func declaredCustomProviderCapability(
+        settings: AppSettings,
+        conversationId: String?
+    ) -> (caps: AttachmentCapability, description: String)? {
+        // Identify custom provider + model using the same override precedence used by ConversationService.
+        var providerId: UUID? = nil
+        var modelId: UUID? = nil
+
+        if let conversationId {
+            let overridesKey = "conversation_overrides_\(conversationId)"
+            if let data = UserDefaults.standard.data(forKey: overridesKey),
+               let overrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data) {
+                providerId = overrides.customProviderId
+                modelId = overrides.customModelId
+            }
+        }
+
+        if providerId == nil { providerId = settings.selectedCustomProviderId }
+        if modelId == nil { modelId = settings.selectedCustomModelId }
+
+        guard let providerId,
+              let provider = settings.customProviders.first(where: { $0.id == providerId }) else {
+            return nil
+        }
+
+        // Heuristic: without explicit capability metadata, infer from model code/name.
+        // This is a best-effort until the provider schema declares capabilities.
+        var modelCode: String? = nil
+        if let modelId,
+           let model = provider.models.first(where: { $0.id == modelId }) {
+            modelCode = model.modelCode
+        }
+
+        let signature = (modelCode ?? "").lowercased()
+
+        // Vision/Multimodal hints
+        let supportsVision = signature.contains("vision") || signature.contains("image") || signature.contains("vl") || signature.contains("v-") || signature.hasSuffix("-v")
+
+        // Audio hints
+        let supportsAudio = signature.contains("audio") || signature.contains("speech") || signature.contains("tts") || signature.contains("realtime")
+
+        // Video hints (rare in openai-compatible providers)
+        let supportsVideo = signature.contains("video")
+
+        // Documents (PDF) hints
+        let supportsDocs = signature.contains("pdf") || signature.contains("doc")
+
+        // Default to images (most compatible OpenAI-like providers support vision if they are multimodal).
+        let images = supportsVision || true
+
+        let descParts: [String] = [
+            "Custom provider: \(provider.providerName)",
+            modelCode != nil ? "model: \(modelCode!)" : nil
+        ].compactMap { $0 }
+
+        return (
+            AttachmentCapability(
+                images: images,
+                documents: supportsDocs,
+                video: supportsVideo,
+                audio: supportsAudio,
+                description: ""
+            ),
+            descParts.joined(separator: ", ")
+        )
     }
     
     private var canSend: Bool {
@@ -584,7 +684,7 @@ struct MessageInputBar: View {
                 .padding(.bottom, 8)
             }
         }
-        .onChange(of: text) { newText in
+        .onChange(of: text) { _, newText in
             // Skip if we manually set the state (e.g., after tapping a command)
             if skipNextTextChange {
                 skipNextTextChange = false
@@ -592,14 +692,31 @@ struct MessageInputBar: View {
             }
             updateSlashMenuState(for: newText)
         }
-        .onChange(of: selectedItem) { newItem in
+        .onChange(of: selectedItem) { _, newItem in
             handlePhotoSelection(newItem)
+        }
+        // State change observers for debugging
+        .onChange(of: showFileImporter) { _, newValue in
+            attachmentLog.info("showFileImporter changed to \(newValue)")
+        }
+        .onChange(of: showVideoImporter) { _, newValue in
+            attachmentLog.info("showVideoImporter changed to \(newValue)")
+        }
+        .onChange(of: showAudioImporter) { _, newValue in
+            attachmentLog.info("showAudioImporter changed to \(newValue)")
+        }
+        .onChange(of: showPhotoPicker) { _, newValue in
+            attachmentLog.info("showPhotoPicker changed to \(newValue)")
+        }
+        .onChange(of: showAttachmentOptions) { _, newValue in
+            attachmentLog.info("showAttachmentOptions (action sheet) changed to \(newValue)")
         }
         .fileImporter(
             isPresented: $showFileImporter,
             allowedContentTypes: attachmentCapability.documents ? [.pdf, .text, .plainText, .rtf, .image, .item] : [.item],
             allowsMultipleSelection: false
         ) { result in
+            attachmentLog.info("fileImporter (document) callback triggered")
             handleFileImport(result, type: .document)
         }
         .fileImporter(
@@ -607,6 +724,7 @@ struct MessageInputBar: View {
             allowedContentTypes: [.movie, .video, .mpeg4Movie, .quickTimeMovie, .avi, .mpeg, .mpeg2Video],
             allowsMultipleSelection: false
         ) { result in
+            attachmentLog.info("fileImporter (video) callback triggered")
             handleFileImport(result, type: .video)
         }
         .fileImporter(
@@ -614,6 +732,7 @@ struct MessageInputBar: View {
             allowedContentTypes: [.audio, .mp3, .wav, .aiff, .mpeg4Audio],
             allowsMultipleSelection: false
         ) { result in
+            attachmentLog.info("fileImporter (audio) callback triggered")
             handleFileImport(result, type: .audio)
         }
         // Mac: Any file picker
@@ -622,6 +741,7 @@ struct MessageInputBar: View {
             allowedContentTypes: [.item],
             allowsMultipleSelection: false
         ) { result in
+            attachmentLog.info("fileImporter (any file) callback triggered")
             handleAnyFileImport(result)
         }
         // Tool Invocation Sheet (for /use command)
@@ -642,6 +762,50 @@ struct MessageInputBar: View {
                 )
             }
         }
+        // Photos picker attached at top level to avoid UIContextMenuInteraction warning
+        // when dismissing Menu while presenting picker
+        .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
+        // iOS: Use confirmationDialog (action sheet) instead of Menu to avoid UIContextMenu timing issues
+        #if os(iOS)
+        .confirmationDialog(
+            "Add Attachment",
+            isPresented: $showAttachmentOptions,
+            titleVisibility: .visible
+        ) {
+            let capability = attachmentCapability
+            let _ = attachmentLog.info("confirmationDialog opened - capabilities: images=\(capability.images), docs=\(capability.documents), video=\(capability.video), audio=\(capability.audio)")
+
+            if capability.images {
+                Button("Photo Library") {
+                    attachmentLog.info("User tapped Photo Library")
+                    showPhotoPicker = true
+                }
+            }
+            if capability.video {
+                Button("Video") {
+                    attachmentLog.info("User tapped Video - setting showVideoImporter=true")
+                    showVideoImporter = true
+                }
+            }
+            if capability.audio {
+                Button("Audio") {
+                    attachmentLog.info("User tapped Audio - setting showAudioImporter=true")
+                    showAudioImporter = true
+                }
+            }
+            if capability.documents {
+                Button("Document") {
+                    attachmentLog.info("User tapped Document - setting showFileImporter=true")
+                    showFileImporter = true
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                attachmentLog.debug("User cancelled attachment selection")
+            }
+        } message: {
+            Text(attachmentCapability.description)
+        }
+        #endif
     }
     
     // MARK: - Subviews
@@ -717,42 +881,51 @@ struct MessageInputBar: View {
     
     @ViewBuilder
     private func attachmentMenu(capability: AttachmentCapability) -> some View {
+        #if os(iOS)
+        // iOS: Use button that triggers confirmationDialog (avoids UIContextMenu timing issues)
+        Button {
+            attachmentLog.info("Attachment button tapped - opening action sheet")
+            showAttachmentOptions = true
+        } label: {
+            HStack(spacing: 2) {
+                Image(systemName: "paperclip")
+                    .font(.system(size: 18, weight: .medium))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundColor(AppColors.textSecondary)
+            .frame(width: 36, height: 32)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        #else
+        // macOS: Keep Menu (works fine, no UIContextMenu timing issues)
         Menu {
-            #if os(macOS)
-            // Mac: Show "Choose File..." option first for any file
             Button(action: { showAnyFileImporter = true }) {
                 Label("Choose File...", systemImage: "folder")
             }
-            
             Divider()
-            #endif
-            
             if capability.images {
                 Button(action: { showPhotoPicker = true }) {
                     Label("Photo Library", systemImage: "photo.on.rectangle")
                 }
             }
-
             if capability.video {
                 Button(action: { showVideoImporter = true }) {
                     Label("Video", systemImage: "video")
                 }
             }
-
             if capability.audio {
                 Button(action: { showAudioImporter = true }) {
                     Label("Audio", systemImage: "waveform")
                 }
             }
-
             if capability.documents {
                 Button(action: { showFileImporter = true }) {
                     Label("Document", systemImage: "doc")
                 }
             }
-
             Divider()
-
             Text(capability.description)
                 .font(.caption)
                 .foregroundColor(AppColors.textSecondary)
@@ -768,9 +941,9 @@ struct MessageInputBar: View {
             .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
-        .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
+        #endif
     }
-    
+
     /// Whether the current input is a slash command
     private var isSlashCommand: Bool {
         text.trimmingCharacters(in: .whitespaces).hasPrefix("/")
@@ -934,17 +1107,21 @@ struct MessageInputBar: View {
     }
     
     private func handleFileImport(_ result: Result<[URL], Error>, type: MessageAttachment.AttachmentType) {
+        attachmentLog.info("handleFileImport called for type: \(String(describing: type))")
         switch result {
         case .success(let urls):
+            attachmentLog.info("File import success - got \(urls.count) URL(s)")
             guard let url = urls.first else {
-                print("[MessageInputBar] File import: No URL returned")
+                attachmentLog.error("File import: No URL returned")
                 return
             }
+            attachmentLog.info("Attempting to access security-scoped resource: \(url.lastPathComponent)")
             guard url.startAccessingSecurityScopedResource() else {
-                print("[MessageInputBar] Failed to access security-scoped resource: \(url.lastPathComponent)")
+                attachmentLog.error("Failed to access security-scoped resource: \(url.lastPathComponent)")
                 return
             }
             defer { url.stopAccessingSecurityScopedResource() }
+            attachmentLog.info("Security-scoped resource access granted for: \(url.lastPathComponent)")
 
             do {
                 let data = try Data(contentsOf: url)
@@ -968,27 +1145,30 @@ struct MessageInputBar: View {
                 withAnimation(.easeOut(duration: 0.2)) {
                     attachments.append(attachment)
                 }
-                print("[MessageInputBar] Successfully added \(type): \(url.lastPathComponent) (\(data.count) bytes)")
+                attachmentLog.info("Successfully added \(String(describing: type)): \(url.lastPathComponent) (\(data.count) bytes)")
             } catch {
-                print("[MessageInputBar] Failed to read file data: \(error.localizedDescription)")
+                attachmentLog.error("Failed to read file data: \(error.localizedDescription)")
             }
         case .failure(let error):
-            print("[MessageInputBar] File import failed: \(error.localizedDescription)")
+            attachmentLog.error("File import FAILED: \(error.localizedDescription)")
         }
     }
-    
+
     private func handleAnyFileImport(_ result: Result<[URL], Error>) {
+        attachmentLog.info("handleAnyFileImport called")
         switch result {
         case .success(let urls):
+            attachmentLog.info("Any file import success - got \(urls.count) URL(s)")
             guard let url = urls.first else {
-                print("[MessageInputBar] File import: No URL returned")
+                attachmentLog.error("Any file import: No URL returned")
                 return
             }
             guard url.startAccessingSecurityScopedResource() else {
-                print("[MessageInputBar] Failed to access security-scoped resource: \(url.lastPathComponent)")
+                attachmentLog.error("Failed to access security-scoped resource: \(url.lastPathComponent)")
                 return
             }
             defer { url.stopAccessingSecurityScopedResource() }
+            attachmentLog.info("Security-scoped access granted for: \(url.lastPathComponent)")
 
             do {
                 let data = try Data(contentsOf: url)
@@ -1005,12 +1185,12 @@ struct MessageInputBar: View {
                 withAnimation(.easeOut(duration: 0.2)) {
                     attachments.append(attachment)
                 }
-                print("[MessageInputBar] Successfully added file: \(url.lastPathComponent) (\(data.count) bytes, type: \(type))")
+                attachmentLog.info("Successfully added file: \(url.lastPathComponent) (\(data.count) bytes, type: \(String(describing: type)))")
             } catch {
-                print("[MessageInputBar] Failed to read file data: \(error.localizedDescription)")
+                attachmentLog.error("Failed to read file data: \(error.localizedDescription)")
             }
         case .failure(let error):
-            print("[MessageInputBar] File import failed: \(error.localizedDescription)")
+            attachmentLog.error("Any file import FAILED: \(error.localizedDescription)")
         }
     }
 

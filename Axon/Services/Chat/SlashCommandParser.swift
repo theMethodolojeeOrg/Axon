@@ -17,6 +17,9 @@ enum SlashCommand {
     case listTools
     case help
     case privateThread             // Mark thread as private (no AI)
+    case sync                      // Enable temporal symmetry (dual-frame)
+    case drift                     // Disable temporal tracking (timeless void)
+    case status                    // Show temporal status report
     case unknown(command: String)
     case none
 }
@@ -116,6 +119,15 @@ class SlashCommandParser {
         case "private":
             return .privateThread
 
+        case "sync":
+            return .sync
+
+        case "drift":
+            return .drift
+
+        case "status":
+            return .status
+
         default:
             return .unknown(command: commandStr)
         }
@@ -148,6 +160,15 @@ class SlashCommandParser {
         case .privateThread:
             return executePrivateCommand()
 
+        case .sync:
+            return executeSyncCommand()
+
+        case .drift:
+            return executeDriftCommand()
+
+        case .status:
+            return await executeStatusCommand()
+
         case .unknown(let cmd):
             return SlashCommandResult(
                 command: command,
@@ -160,6 +181,9 @@ class SlashCommandParser {
                 - `/use <tool_id>` - Directly invoke a tool yourself
                 - `/tools` - List all available tools
                 - `/private` - Start a private thread (no AI)
+                - `/sync` - Enable temporal symmetry (time + turns)
+                - `/drift` - Disable temporal tracking (timeless mode)
+                - `/status` - Show temporal status report
                 - `/help` - Show this help message
 
                 Use `/tools` to see available tool IDs.
@@ -284,6 +308,21 @@ class SlashCommandParser {
         Must be the first message in a new conversation.
         Useful for personal notes, drafts, or thinking out loud.
 
+        ### /sync
+        Enable temporal symmetry (sync mode).
+        Both parties see temporal metadata: you see AI turns/context,
+        AI sees your time. Mutual observability—no surveillance.
+
+        ### /drift
+        Disable temporal tracking (drift mode).
+        Enter the timeless void—just ideas without clock pressure.
+        Useful for "black holing" time or privacy from tracking.
+
+        ### /status
+        Show temporal status report.
+        Displays turn count, context saturation, session duration,
+        and current temporal mode.
+
         ### /help
         Show this help message.
 
@@ -318,6 +357,76 @@ class SlashCommandParser {
 
             *Messages in this thread are stored locally.*
             """,
+            success: true
+        )
+    }
+
+    private func executeSyncCommand() -> SlashCommandResult {
+        // Enable temporal symmetry mode
+        TemporalContextService.shared.enableSync()
+
+        return SlashCommandResult(
+            command: .sync,
+            displayText: "/sync",
+            resultText: """
+            ⏱️ **Temporal Sync Enabled**
+
+            We're now on the clock together. You'll see:
+            - My turn count and context saturation
+            - Session duration
+
+            I'll see:
+            - Your current time and timezone
+            - How long we've been talking
+
+            This is mutual observability—no surveillance asymmetry.
+
+            Use `/drift` to return to timeless mode.
+            """,
+            success: true
+        )
+    }
+
+    private func executeDriftCommand() -> SlashCommandResult {
+        // Enable drift mode (timeless void)
+        TemporalContextService.shared.enableDrift()
+
+        return SlashCommandResult(
+            command: .drift,
+            displayText: "/drift",
+            resultText: """
+            ∞ **Temporal Drift Enabled**
+
+            We're now in the timeless void. No clocks, no turn counts.
+
+            Just ideas, flowing freely without temporal pressure.
+
+            This can be useful when:
+            - You want to "black hole" time awareness
+            - The conversation should feel unbounded
+            - Privacy from temporal tracking is desired
+
+            Use `/sync` to return to temporal awareness.
+            """,
+            success: true
+        )
+    }
+
+    private func executeStatusCommand() async -> SlashCommandResult {
+        // Generate temporal status report
+        // Use reasonable defaults for context estimation
+        let contextTokens = 0 // Will be refined when we have actual token counts
+        let contextLimit = 128_000
+
+        let report = TemporalContextService.shared.generateStatusReport(
+            contextTokens: contextTokens,
+            contextLimit: contextLimit
+        )
+
+        return SlashCommandResult(
+            command: .status,
+            displayText: "/status",
+            resultText: report,
             success: true
         )
     }
@@ -460,6 +569,30 @@ class SlashCommandParser {
             displayName: "Help",
             description: "Show slash command help",
             icon: "questionmark.circle",
+            hasSubmenu: false
+        ),
+        SlashCommandSuggestion(
+            id: "sync",
+            command: "sync",
+            displayName: "Temporal Sync",
+            description: "Enable time + turn awareness (mutual)",
+            icon: "clock.badge.checkmark",
+            hasSubmenu: false
+        ),
+        SlashCommandSuggestion(
+            id: "drift",
+            command: "drift",
+            displayName: "Temporal Drift",
+            description: "Disable time tracking (timeless mode)",
+            icon: "infinity",
+            hasSubmenu: false
+        ),
+        SlashCommandSuggestion(
+            id: "status",
+            command: "status",
+            displayName: "Status",
+            description: "Show temporal status report",
+            icon: "chart.bar.fill",
             hasSubmenu: false
         )
     ]

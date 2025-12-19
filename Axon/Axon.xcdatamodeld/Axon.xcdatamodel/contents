@@ -68,6 +68,7 @@
         <attribute name="reasoningText" optional="YES" attributeType="String"/>
         <attribute name="contextDebugJSON" optional="YES" attributeType="String"/>
         <attribute name="liveToolCallsJSON" optional="YES" attributeType="String"/>
+        <attribute name="hiddenReason" optional="YES" attributeType="String"/>
     </entity>
 
     <!-- ElevenLabs voice catalog cache (CloudKit syncable) -->

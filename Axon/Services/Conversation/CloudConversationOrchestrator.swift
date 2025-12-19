@@ -240,7 +240,23 @@ class CloudConversationOrchestrator: ConversationOrchestrator {
             )
         }
 
+        // Notify temporal service of message (session tracking, context saturation)
+        // Turn counts are derived from Core Data automatically
+        await notifyTemporalService(conversationId: conversationId, contextLimit: config.contextWindowLimit)
+
         return (assistantMessage, response.memories)
+    }
+
+    /// Notify temporal service of message exchange (for session tracking)
+    @MainActor
+    private func notifyTemporalService(conversationId: String, contextLimit: Int) {
+        // Cloud backend doesn't provide precise token counts, use estimate
+        let estimatedContextTokens = 0
+        TemporalContextService.shared.notifyMessageAdded(
+            conversationId: conversationId,
+            contextTokens: estimatedContextTokens,
+            contextLimit: contextLimit
+        )
     }
 
     func regenerateAssistantMessage(

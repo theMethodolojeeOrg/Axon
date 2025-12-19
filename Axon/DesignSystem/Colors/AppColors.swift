@@ -35,6 +35,10 @@ struct AppColors {
         let signalHematiteLight: Color
         let signalHematiteDark: Color
 
+        let signalSaturn: Color
+        let signalSaturnLight: Color
+        let signalSaturnDark: Color
+
         // Text
         let textPrimary: Color
         let textSecondary: Color
@@ -73,7 +77,12 @@ struct AppColors {
         copperDark: Color(hex: "8a5c2e"),
         hematite: Color(hex: "6b5a5a"),
         hematiteLight: Color(hex: "867575"),
-        hematiteDark: Color(hex: "503f3f")
+        hematiteDark: Color(hex: "503f3f"),
+        // Saturn: A dusty gold/ochre evoking the planet's bands and alchemical lead.
+        // Represents temporal cycles, the passage of turns, and ringed majesty.
+        saturn: Color(hex: "9a8a5a"),
+        saturnLight: Color(hex: "b5a575"),
+        saturnDark: Color(hex: "7a6a45")
     )
 
     private static let dark = Palette(
@@ -99,6 +108,10 @@ struct AppColors {
         signalHematite: sharedSignals.hematite,
         signalHematiteLight: sharedSignals.hematiteLight,
         signalHematiteDark: sharedSignals.hematiteDark,
+
+        signalSaturn: sharedSignals.saturn,
+        signalSaturnLight: sharedSignals.saturnLight,
+        signalSaturnDark: sharedSignals.saturnDark,
 
         // Text (existing)
         textPrimary: Color.white.opacity(0.95),
@@ -149,6 +162,10 @@ struct AppColors {
         signalHematite: sharedSignals.hematite,
         signalHematiteLight: sharedSignals.hematiteLight,
         signalHematiteDark: sharedSignals.hematiteDark,
+
+        signalSaturn: sharedSignals.saturn,
+        signalSaturnLight: sharedSignals.saturnLight,
+        signalSaturnDark: sharedSignals.saturnDark,
 
         // Text
         textPrimary: Color(hex: "111315").opacity(0.95),
@@ -232,6 +249,10 @@ struct AppColors {
     static let signalHematite = sharedSignals.hematite
     static let signalHematiteLight = sharedSignals.hematiteLight
     static let signalHematiteDark = sharedSignals.hematiteDark
+
+    static let signalSaturn = sharedSignals.saturn
+    static let signalSaturnLight = sharedSignals.saturnLight
+    static let signalSaturnDark = sharedSignals.saturnDark
 
     // MARK: - Text Colors
 

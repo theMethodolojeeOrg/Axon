@@ -147,6 +147,7 @@ class LocalConversationStore: ObservableObject {
         entity.conversationId = conversationId
         entity.role = message.role.rawValue
         entity.content = message.content
+        entity.hiddenReason = message.hiddenReason
         entity.timestamp = message.timestamp
         entity.modelName = message.modelName
         entity.providerName = message.providerName
@@ -407,6 +408,7 @@ class LocalConversationStore: ObservableObject {
                     conversationId: conversationId,
                     role: role,
                     content: content,
+                    hiddenReason: entity.hiddenReason,
                     timestamp: timestamp,
                     tokens: nil,
                     artifacts: nil,
