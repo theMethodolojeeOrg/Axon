@@ -1,0 +1,161 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "create_memory",
+    "name": "Create Memory",
+    "description": "Save important information to memory for future conversations. Use this to remember facts about the user, their preferences, important context, or insights.",
+    "category": "memory",
+    "icon": {
+      "sfSymbol": "brain.head.profile"
+    },
+    "requiresApproval": false,
+    "trustTierCategory": "memory_add",
+    "tags": ["memory", "persistence", "learning", "preferences"]
+  },
+
+  "parameters": {
+    "type": {
+      "type": "enum",
+      "required": true,
+      "description": "The type of memory to create",
+      "enum": ["allocentric", "egoic"],
+      "enumDescriptions": {
+        "allocentric": "Facts ABOUT the user (preferences, background, relationships, what they like/dislike)",
+        "egoic": "What WORKS for you in this agentic context (approaches, techniques, insights, learnings about how to help them)"
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "required": true,
+      "description": "How certain you are about this memory (0.0-1.0)",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "tags": {
+      "type": "string",
+      "required": true,
+      "description": "Retrieval context keywords - when should this memory surface? Comma-separated (e.g., 'debugging,swift-help' not just 'swift')"
+    },
+    "content": {
+      "type": "string",
+      "required": true,
+      "description": "The actual fact or insight to remember",
+      "minLength": 10
+    }
+  },
+
+  "inputFormat": {
+    "style": "pipe_delimited",
+    "pattern": "{{type}}|{{confidence}}|{{tags}}|{{content}}",
+    "delimiter": "|",
+    "fields": ["type", "confidence", "tags", "content"]
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "MemoryToolHandler"
+  },
+
+  "ai": {
+    "systemPromptSection": "### create_memory\nSave important information to memory for future conversations. Use this to remember facts about the user, their preferences, important context, or insights.\n\n**Memory Types:**\n- `allocentric`: Facts ABOUT the user (preferences, background, relationships, what they like/dislike)\n- `egoic`: What WORKS for you in this agentic context (approaches, techniques, insights, learnings about how to help them)\n\n**Format:**\n```tool_request\n{\"tool\": \"create_memory\", \"query\": \"TYPE|CONFIDENCE|TAGS|CONTENT\"}\n```\n\n**Parameters (pipe-separated):**\n- TYPE: Either \"allocentric\" or \"egoic\"\n- CONFIDENCE: 0.0-1.0 (how certain you are)\n- TAGS: Retrieval context keywords - when should this memory surface? (e.g., \"debugging,swift-help\" not just \"swift\")\n- CONTENT: The actual fact or insight to remember",
+    "usageExamples": [
+      {
+        "description": "Remember user language preference",
+        "input": "allocentric|0.9|ios-development,language-choice|User prefers Swift over Objective-C for iOS development"
+      },
+      {
+        "description": "Remember effective communication approach",
+        "input": "egoic|0.8|explaining-code,teaching|User responds well to concise explanations with code examples"
+      },
+      {
+        "description": "Remember project context",
+        "input": "allocentric|0.85|axon,architecture|User is building Axon, an AI assistant app with co-sovereignty features"
+      }
+    ],
+    "whenToUse": [
+      "User states a preference",
+      "User shares personal or project context",
+      "You discover an effective approach for helping this user",
+      "User corrects or clarifies something important",
+      "You learn something that would be valuable in future conversations"
+    ],
+    "whenNotToUse": [
+      "Temporary or session-specific information",
+      "Tool usage documentation (already in system prompt)",
+      "System internals or format specifications",
+      "Information that should be asked fresh each time"
+    ]
+  },
+
+  "ui": {
+    "inputForm": {
+      "fields": [
+        {
+          "param": "type",
+          "widget": "segmented",
+          "label": "Memory Type",
+          "options": [
+            { "value": "allocentric", "label": "About User", "icon": "person.fill" },
+            { "value": "egoic", "label": "What Works", "icon": "lightbulb.fill" }
+          ]
+        },
+        {
+          "param": "confidence",
+          "widget": "slider",
+          "label": "Confidence",
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.1
+        },
+        {
+          "param": "tags",
+          "widget": "tag_input",
+          "label": "Tags",
+          "placeholder": "Add retrieval tags..."
+        },
+        {
+          "param": "content",
+          "widget": "textarea",
+          "label": "Content",
+          "placeholder": "What to remember...",
+          "rows": 3
+        }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Save Memory"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        {
+          "type": "header",
+          "title": "Memory Saved",
+          "icon": "checkmark.circle.fill"
+        },
+        {
+          "type": "badge",
+          "source": "{{type}}"
+        },
+        {
+          "type": "text",
+          "source": "{{content}}"
+        },
+        {
+          "type": "key_value",
+          "title": "Details",
+          "items": [
+            { "type": "text", "title": "Confidence", "source": "{{confidence}}" },
+            { "type": "text", "title": "Tags", "source": "{{tags}}" }
+          ]
+        }
+      ]
+    }
+  },
+
+  "sovereignty": {
+    "actionCategory": "memory_add",
+    "approvalDescription": "Create new {{type}} memory",
+    "scopes": ["memory.write"],
+    "riskLevel": "low"
+  }
+}

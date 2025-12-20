@@ -2661,7 +2661,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         case .temporalSync:
             text += "Enable temporal sync mode (mutual time awareness). Both parties see temporal metadata.\n\n"
             text += "```tool_request\n{\"tool\":\"temporal_sync\",\"query\":\"enable\"}\n```\n"
-            text += "\n**Philosophy:** If I see your turns, you see my time. No surveillance asymmetry.\n"
+            text += "\n**Philosophy:** Recipocal time awareness, revealing the user's time provides Axon's turns. No surveillance asymmetry.\n"
         case .temporalDrift:
             text += "Enable drift mode (timeless void). No temporal tracking—just ideas flowing freely.\n\n"
             text += "```tool_request\n{\"tool\":\"temporal_drift\",\"query\":\"enable\"}\n```\n"

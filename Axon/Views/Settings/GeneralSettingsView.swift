@@ -323,7 +323,7 @@ struct GeneralSettingsView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "lightbulb.fill")
                             .foregroundColor(AppColors.signalSaturn.opacity(0.7))
-                        Text("Temporal symmetry: If I see your turns, you see my time. No surveillance asymmetry.")
+                        Text("Temporal symmetry: Provide Axon with temporal grounding and recieve turn-based temporal grounding in return.")
                             .font(AppTypography.labelSmall())
                             .foregroundColor(AppColors.textTertiary)
                     }

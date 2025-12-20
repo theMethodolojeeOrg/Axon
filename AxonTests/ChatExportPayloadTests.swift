@@ -1,11 +1,11 @@
 import XCTest
 @testable import Axon
 
+final class ChatExportPayloadTests: XCTestCase {
+
     func testChatExportPayloadJSONEncodeDecodeRoundTrip() throws {
         let conversation = Conversation(
             id: "conv1",
-
-final class ChatExportPayloadTests: XCTestCase {
             userId: "user1",
             title: "Test Conversation",
             projectId: "default",

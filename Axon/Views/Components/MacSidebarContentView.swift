@@ -29,6 +29,7 @@ struct MacSidebarContentView: View {
     @State private var deleteError: String? = nil
     @State private var syncErrorMessage: String? = nil
     @State private var showingSyncError: Bool = false
+    @State private var showingWorkspaces: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -113,6 +114,9 @@ struct MacSidebarContentView: View {
                 Text("Failed to sync conversations: \(error)")
             }
         }
+        .sheet(isPresented: $showingWorkspaces) {
+            WorkspacesView()
+        }
         .task {
             let retention = SettingsStorage.shared.loadSettings()?.archiveRetentionDays ?? 30
             SettingsStorage.shared.purgeExpiredArchived(retentionDays: retention)
@@ -169,6 +173,21 @@ struct MacSidebarContentView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(AppColors.signalMercury)
+
+            // Workspaces button
+            Button(action: {
+                showingWorkspaces = true
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "folder.fill")
+                    Text("Workspaces")
+                        .font(AppTypography.bodyMedium(.medium))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+            }
+            .buttonStyle(.bordered)
+            .tint(AppColors.textSecondary)
         }
         .padding(12)
         .background(AppColors.substratePrimary)
@@ -257,27 +276,15 @@ struct MacSidebarContentView: View {
             .cornerRadius(8)
 
             Button {
-                onNavigate(.internalThread)
+                onNavigate(.cognition)
             } label: {
-                Label("Internal Thread", systemImage: currentView == .internalThread ? "note.text" : "note.text")
+                Label("Cognition", systemImage: currentView == .cognition ? "brain.head.profile.fill" : "brain.head.profile")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(currentView == .internalThread ? AppColors.signalMercury.opacity(0.12) : Color.clear)
-            .cornerRadius(8)
-
-            Button {
-                onNavigate(.memory)
-            } label: {
-                Label("Memory", systemImage: currentView == .memory ? "brain.fill" : "brain")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(currentView == .memory ? AppColors.signalMercury.opacity(0.12) : Color.clear)
+            .background(currentView == .cognition ? AppColors.signalMercury.opacity(0.12) : Color.clear)
             .cornerRadius(8)
 
             Button {

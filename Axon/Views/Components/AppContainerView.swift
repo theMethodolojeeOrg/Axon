@@ -10,8 +10,7 @@ import MarkdownUI
 
 enum MainView {
     case chat
-    case internalThread
-    case memory
+    case cognition  // Combines Memory + Internal Thread
     case settings
 }
 
@@ -170,10 +169,8 @@ struct AppContainerView: View {
                             selectedConversation = conv
                         }
                     )
-                case .internalThread:
-                    InternalThreadView()
-                case .memory:
-                    MemoryView()
+                case .cognition:
+                    CognitionView()
                 case .settings:
                     SettingsView()
                 }
@@ -265,10 +262,8 @@ struct AppContainerView: View {
                 return SettingsStorage.shared.displayName(for: conv.id) ?? conv.title
             }
             return "New Chat"
-        case .memory:
-            return "Memory"
-        case .internalThread:
-            return "Internal Thread"
+        case .cognition:
+            return "Cognition"
         case .settings:
             return "Settings"
         }

@@ -17,12 +17,16 @@ final class ChatExportService {
         case json
         case markdown
         case zip
+        case sessionAudioCached
+        case sessionAudioAll
 
         var fileExtension: String {
             switch self {
             case .json: return "json"
             case .markdown: return "md"
             case .zip: return "zip"
+            case .sessionAudioCached: return "zip"
+            case .sessionAudioAll: return "zip"
             }
         }
 
@@ -31,6 +35,8 @@ final class ChatExportService {
             case .json: return "thread"
             case .markdown: return "thread"
             case .zip: return "chat-export"
+            case .sessionAudioCached: return "session-audio-cached"
+            case .sessionAudioAll: return "session-audio-all"
             }
         }
     }
@@ -59,6 +65,16 @@ final class ChatExportService {
         case .zip:
             let url = try ChatZipExporter().buildZip(payload)
             return ExportedFile(url: url, suggestedFilename: url.lastPathComponent)
+
+        case .sessionAudioCached:
+            let messages = payload.messages
+            let url = try await SessionAudioZipExporter().buildZip(conversationId: conversation.id, messages: messages, mode: .cachedOnly)
+            return ExportedFile(url: url, suggestedFilename: url.lastPathComponent)
+
+        case .sessionAudioAll:
+            let messages = payload.messages
+            let url = try await SessionAudioZipExporter().buildZip(conversationId: conversation.id, messages: messages, mode: .includeRemoteIfAvailable)
+            return ExportedFile(url: url, suggestedFilename: url.lastPathComponent)
         }
     }
 
@@ -70,6 +86,10 @@ final class ChatExportService {
         switch format {
         case .zip:
             stem = "chat-export_\(safeTitle)_\(dateStamp)"
+        case .sessionAudioCached:
+            stem = "session-audio-cached_\(safeTitle)_\(dateStamp)"
+        case .sessionAudioAll:
+            stem = "session-audio-all_\(safeTitle)_\(dateStamp)"
         default:
             stem = "\(format.defaultFilenameStem)_\(safeTitle)_\(dateStamp)"
         }

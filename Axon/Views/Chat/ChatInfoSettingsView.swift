@@ -388,6 +388,20 @@ struct ChatInfoSettingsView: View {
                     format: .zip
                 )
 
+                exportButtonRow(
+                    title: "Session Audio (Cached)",
+                    subtitle: "TTS audio stored on this device",
+                    systemImage: "waveform",
+                    format: .sessionAudioCached
+                )
+
+                exportButtonRow(
+                    title: "Session Audio (All)",
+                    subtitle: "Includes CloudKit audio when available",
+                    systemImage: "waveform.and.arrow.down",
+                    format: .sessionAudioAll
+                )
+
                 if let exportErrorMessage {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")

@@ -44,11 +44,8 @@ struct MacDetailWithInspector: View {
                         }
                     }
 
-                case .internalThread:
-                    InternalThreadView()
-
-                case .memory:
-                    MemoryView()
+                case .cognition:
+                    CognitionView()
 
                 case .settings:
                     SettingsView()

@@ -27,6 +27,7 @@ struct SidebarView: View {
     @State private var deleteError: String? = nil
     @State private var syncErrorMessage: String? = nil
     @State private var showingSyncError: Bool = false
+    @State private var showingWorkspaces: Bool = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -150,6 +151,9 @@ struct SidebarView: View {
                 Text("Failed to sync conversations: \(error)")
             }
         }
+        .sheet(isPresented: $showingWorkspaces) {
+            WorkspacesView()
+        }
     }
 
     // MARK: - Header
@@ -217,6 +221,26 @@ struct SidebarView: View {
                 .background(AppColors.signalMercury)
                 .foregroundColor(.white)
                 .cornerRadius(12)
+            }
+
+            // Workspaces button
+            Button(action: {
+                showingWorkspaces = true
+            }) {
+                HStack {
+                    Image(systemName: "folder.fill")
+                    Text("Workspaces")
+                        .font(AppTypography.bodyMedium(.medium))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(AppColors.substrateSecondary)
+                .foregroundColor(AppColors.textPrimary)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                )
             }
         }
         .padding()
@@ -358,19 +382,11 @@ struct SidebarView: View {
                 }
 
                 NavigationButton(
-                    icon: "note.text",
-                    title: "Thread",
-                    isSelected: currentView == .internalThread
+                    icon: "brain.head.profile",
+                    title: "Cognition",
+                    isSelected: currentView == .cognition
                 ) {
-                    onNavigate(.internalThread)
-                }
-
-                NavigationButton(
-                    icon: "brain.fill",
-                    title: "Memory",
-                    isSelected: currentView == .memory
-                ) {
-                    onNavigate(.memory)
+                    onNavigate(.cognition)
                 }
 
                 NavigationButton(

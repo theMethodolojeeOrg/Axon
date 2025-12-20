@@ -156,7 +156,7 @@ class HeuristicsViewModel: ObservableObject {
         if !searchText.isEmpty {
             return "No heuristics match your search query."
         }
-        return "Heuristics are synthesized from your memories to capture recurring themes, recent focus, and areas of interest. Tap the synthesize button to generate your first insights."
+        return "Heuristics are synthesized from Axon's memories to capture recurring themes, recent focus, and areas of interest. Tap the synthesize button to generate cognitive shortcuts."
     }
 
     // MARK: - Selection Actions
