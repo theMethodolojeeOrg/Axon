@@ -66,3 +66,56 @@ struct SettingsCard<Content: View>: View {
         )
     }
 }
+
+/// A container for settings subviews pushed via NavigationLink.
+/// Wraps content in a ScrollView with the correct background color.
+struct SettingsSubviewContainer<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        ScrollView {
+            content
+                .padding()
+        }
+        .background(AppColors.substratePrimary)
+    }
+}
+
+/// A navigation row for settings category screens.
+/// Used in category wrapper views (Providers, Automation, Privacy, Connectivity) to link to subviews.
+struct SettingsCategoryRow: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(iconColor.opacity(0.2))
+                    .frame(width: 40, height: 40)
+                Image(systemName: icon)
+                    .font(.system(size: 18))
+                    .foregroundColor(iconColor)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(AppTypography.bodyMedium())
+                    .foregroundColor(AppColors.textPrimary)
+                Text(subtitle)
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(AppColors.textSecondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14))
+                .foregroundColor(AppColors.textTertiary)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(AppColors.substrateSecondary)
+        )
+    }
+}

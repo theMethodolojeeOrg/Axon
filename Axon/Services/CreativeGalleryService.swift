@@ -113,11 +113,20 @@ final class CreativeGalleryService: ObservableObject {
         items.removeAll { $0.id == item.id }
     }
     
+    /// Add a directly created item to the gallery
+    func addItem(_ item: CreativeItem) {
+        // Save to cache
+        saveItemToCache(item)
+        
+        // Add to in-memory list and maintain sort order
+        items.insert(item, at: 0) // Newest first
+    }
+    
     /// Permanently delete items marked as deleted
     func purgeDeletedItems() {
         let context = persistence.container.viewContext
         let fetchRequest: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "CreativeItemEntity")
-        fetchRequest.predicate = NSPredicate(format: "isDeleted == YES")
+        fetchRequest.predicate = NSPredicate(format: "markedDeleted == YES")
         
         let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
         
@@ -144,7 +153,7 @@ final class CreativeGalleryService: ObservableObject {
         let fetchRequest = NSFetchRequest<NSManagedObject>(entityName: "CreativeItemEntity")
         fetchRequest.entity = entityDescription
         fetchRequest.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
-        fetchRequest.predicate = NSPredicate(format: "isDeleted == NO OR isDeleted == nil")
+        fetchRequest.predicate = NSPredicate(format: "markedDeleted == NO OR markedDeleted == nil")
         
         do {
             let entities = try context.fetch(fetchRequest)
@@ -221,7 +230,7 @@ final class CreativeGalleryService: ObservableObject {
             language: entity.value(forKey: "language") as? String,
             fileSize: entity.value(forKey: "fileSize") as? Int64,
             thumbnailBase64: entity.value(forKey: "thumbnailBase64") as? String,
-            isDeleted: entity.value(forKey: "isDeleted") as? Bool ?? false,
+            isDeleted: entity.value(forKey: "markedDeleted") as? Bool ?? false,
             deletedAt: entity.value(forKey: "deletedAt") as? Date
         )
     }
@@ -240,7 +249,7 @@ final class CreativeGalleryService: ObservableObject {
         entity.setValue(item.language, forKey: "language")
         entity.setValue(item.fileSize, forKey: "fileSize")
         entity.setValue(item.thumbnailBase64, forKey: "thumbnailBase64")
-        entity.setValue(item.isDeleted, forKey: "isDeleted")
+        entity.setValue(item.isDeleted, forKey: "markedDeleted")
         entity.setValue(item.deletedAt, forKey: "deletedAt")
     }
     

@@ -48,7 +48,9 @@ struct ProvidersSettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             // API Keys
             NavigationLink {
-                APIKeysSettingsView(viewModel: viewModel)
+                SettingsSubviewContainer {
+                    APIKeysSettingsView(viewModel: viewModel)
+                }
             } label: {
                 SettingsCategoryRow(
                     icon: "key.fill",
@@ -61,7 +63,9 @@ struct ProvidersSettingsView: View {
 
             // Models
             NavigationLink {
-                ModelSyncSettingsView(viewModel: viewModel)
+                SettingsSubviewContainer {
+                    ModelSyncSettingsView(viewModel: viewModel)
+                }
             } label: {
                 SettingsCategoryRow(
                     icon: "cpu",
@@ -74,7 +78,9 @@ struct ProvidersSettingsView: View {
 
             // Custom Providers
             NavigationLink {
-                CustomProvidersSettingsView(viewModel: viewModel)
+                SettingsSubviewContainer {
+                    CustomProvidersSettingsView(viewModel: viewModel)
+                }
             } label: {
                 SettingsCategoryRow(
                     icon: "slider.horizontal.3",

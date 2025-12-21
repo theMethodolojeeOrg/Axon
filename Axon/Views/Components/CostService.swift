@@ -6,9 +6,23 @@ final class CostService: ObservableObject {
 
     @Published private(set) var monthlyTotalsUSD: [AIProvider: Double] = [:]
     @Published private(set) var todaysTotalsUSD: [AIProvider: Double] = [:]
+    
+    // MARK: - Media Generation Costs
+    
+    @Published private(set) var monthlyImageCostUSD: Double = 0
+    @Published private(set) var monthlyTTSCostUSD: Double = 0
+    @Published private(set) var monthlyImageCount: Int = 0
+    @Published private(set) var monthlyTTSCount: Int = 0
+    
+    @Published private(set) var todayImageCostUSD: Double = 0
+    @Published private(set) var todayTTSCostUSD: Double = 0
 
     // Aggregate total for this month across all providers
     var totalThisMonthUSD: Double {
+        monthlyTotalsUSD.values.reduce(0, +) + monthlyImageCostUSD + monthlyTTSCostUSD
+    }
+    
+    var chatCostThisMonthUSD: Double {
         monthlyTotalsUSD.values.reduce(0, +)
     }
 
@@ -54,11 +68,72 @@ final class CostService: ObservableObject {
         }
         objectWillChange.send()
     }
+    
+    // MARK: - Media Generation Recording
+    
+    /// Record an image generation cost
+    func recordImageGeneration(quality: ImageQuality, size: ImageSize) {
+        let cost = MediaCostEstimator.estimateImageCost(quality: quality, size: size)
+        monthlyImageCostUSD += cost
+        monthlyImageCount += 1
+        if isToday(Date()) {
+            todayImageCostUSD += cost
+        }
+        objectWillChange.send()
+    }
+    
+    /// Record a TTS generation cost
+    func recordTTSGeneration(provider: TTSProvider, characterCount: Int) {
+        let cost = MediaCostEstimator.estimateTTSCost(provider: provider, characterCount: characterCount)
+        monthlyTTSCostUSD += cost
+        monthlyTTSCount += 1
+        if isToday(Date()) {
+            todayTTSCostUSD += cost
+        }
+        objectWillChange.send()
+    }
 
     // MARK: - Helpers
 
     private func isToday(_ date: Date) -> Bool {
         calendar.isDateInToday(date)
+    }
+}
+
+// MARK: - Media Cost Estimator
+
+struct MediaCostEstimator {
+    // OpenAI Image pricing (per image)
+    static let openAIImagePricing: [ImageQuality: [ImageSize: Double]] = [
+        .low: [.square1024: 0.01, .landscape1536: 0.013, .portrait1536: 0.013, .auto: 0.01],
+        .medium: [.square1024: 0.04, .landscape1536: 0.05, .portrait1536: 0.05, .auto: 0.04],
+        .high: [.square1024: 0.17, .landscape1536: 0.20, .portrait1536: 0.20, .auto: 0.17],
+        .auto: [.square1024: 0.04, .landscape1536: 0.05, .portrait1536: 0.05, .auto: 0.04]
+    ]
+    
+    // TTS pricing (per 1,000 characters)
+    static let ttsPricingPerKChars: [TTSProvider: Double] = [
+        .openai: 0.015,      // tts-1 standard
+        .elevenlabs: 0.20,   // API standard rate
+        .gemini: 0.0         // Currently free tier
+    ]
+    
+    /// Estimate cost for image generation
+    static func estimateImageCost(quality: ImageQuality, size: ImageSize) -> Double {
+        openAIImagePricing[quality]?[size] ?? openAIImagePricing[.auto]?[.square1024] ?? 0.04
+    }
+    
+    /// Estimate cost for TTS generation
+    static func estimateTTSCost(provider: TTSProvider, characterCount: Int) -> Double {
+        let perKChars = ttsPricingPerKChars[provider] ?? 0.015
+        return (Double(characterCount) / 1000.0) * perKChars
+    }
+    
+    /// Format cost as friendly string
+    static func formattedCost(_ cost: Double) -> String {
+        if cost < 0.001 { return "<$0.01" }
+        if cost < 0.01 { return String(format: "~$%.3f", cost) }
+        return String(format: "~$%.2f", cost)
     }
 }
 

@@ -242,6 +242,26 @@ struct SidebarView: View {
                         .stroke(AppColors.glassBorder, lineWidth: 1)
                 )
             }
+            
+            // Create Gallery button
+            Button(action: {
+                onNavigate(.create)
+            }) {
+                HStack {
+                    Image(systemName: "paintpalette.fill")
+                    Text("Create")
+                        .font(AppTypography.bodyMedium(.medium))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(currentView == .create ? AppColors.signalMercury.opacity(0.15) : AppColors.substrateSecondary)
+                .foregroundColor(currentView == .create ? AppColors.signalMercury : AppColors.textPrimary)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(currentView == .create ? AppColors.signalMercury.opacity(0.3) : AppColors.glassBorder, lineWidth: 1)
+                )
+            }
         }
         .padding()
         .background(AppColors.substratePrimary)

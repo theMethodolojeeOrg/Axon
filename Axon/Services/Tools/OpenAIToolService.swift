@@ -405,8 +405,8 @@ struct UserLocationContext {
 
 enum ImageSize: String {
     case square1024 = "1024x1024"
-    case landscape1792 = "1792x1024"
-    case portrait1024 = "1024x1792"
+    case landscape1536 = "1536x1024"
+    case portrait1536 = "1024x1536"
     case auto = "auto"
 }
 

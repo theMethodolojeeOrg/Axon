@@ -35,6 +35,10 @@ class ConversationService: ObservableObject {
     private var deletedIdsTimestamps: [String: Date] = [:]
     private let deletionRetentionPeriod: TimeInterval = 300 // 5 minutes to prevent resurrection
 
+    // Track ephemeral conversations (created but not yet persisted)
+    // These are conversations shown in UI but not saved to Core Data until first message is sent
+    private var ephemeralConversationIds: Set<String> = []
+
     private init() {
         // Load conversations from local Core Data immediately (instant UI)
         loadLocalConversations()
@@ -211,6 +215,112 @@ class ConversationService: ObservableObject {
 
         print("[ConversationService] Created offline conversation: \(conversation.id)")
         return conversation
+    }
+
+    // MARK: - Ephemeral Conversations
+
+    /// Create an ephemeral conversation (in-memory only, not persisted until first message)
+    /// This prevents empty "New Chat" conversations from cluttering the sidebar
+    func createEphemeralConversation(title: String) -> Conversation {
+        let localId = "ephemeral_\(UUID().uuidString)"
+        let now = Date()
+
+        let conversation = Conversation(
+            id: localId,
+            userId: nil,
+            title: title,
+            projectId: defaultProjectId,
+            createdAt: now,
+            updatedAt: now,
+            messageCount: 0,
+            lastMessageAt: nil,
+            archived: false
+        )
+
+        // Track as ephemeral (not persisted)
+        ephemeralConversationIds.insert(localId)
+
+        // Add to in-memory array and set as current
+        self.conversations.insert(conversation, at: 0)
+        self.currentConversation = conversation
+
+        print("[ConversationService] Created ephemeral conversation: \(localId)")
+        return conversation
+    }
+
+    /// Check if a conversation is ephemeral (not yet persisted)
+    func isEphemeral(_ conversationId: String) -> Bool {
+        return ephemeralConversationIds.contains(conversationId)
+    }
+
+    /// Persist an ephemeral conversation to Core Data
+    /// Called when the first message is sent to the conversation
+    func persistEphemeralConversation(_ conversationId: String, title: String? = nil) throws -> Conversation {
+        guard ephemeralConversationIds.contains(conversationId) else {
+            // Not ephemeral, return existing conversation
+            if let existing = conversations.first(where: { $0.id == conversationId }) {
+                return existing
+            }
+            throw ConversationError.notFound
+        }
+
+        // Remove from ephemeral tracking
+        ephemeralConversationIds.remove(conversationId)
+
+        // Find the ephemeral conversation in memory
+        guard let ephemeralIndex = conversations.firstIndex(where: { $0.id == conversationId }) else {
+            throw ConversationError.notFound
+        }
+        let ephemeral = conversations[ephemeralIndex]
+
+        // Create a real persisted conversation
+        let persistedConversation = try localStore.createLocalConversation(
+            title: title ?? ephemeral.title,
+            projectId: defaultProjectId
+        )
+
+        // Replace ephemeral with persisted in the array
+        conversations[ephemeralIndex] = persistedConversation
+
+        // Update current conversation reference if needed
+        if currentConversation?.id == conversationId {
+            currentConversation = persistedConversation
+        }
+
+        self.pendingOperationsCount = localStore.pendingOperationCount
+
+        print("[ConversationService] Persisted ephemeral conversation: \(conversationId) -> \(persistedConversation.id)")
+        return persistedConversation
+    }
+
+    /// Discard an ephemeral conversation without persisting
+    /// Called when user navigates away from a new chat without sending a message
+    func discardEphemeralConversation(_ conversationId: String) {
+        guard ephemeralConversationIds.contains(conversationId) else {
+            return // Not ephemeral, nothing to discard
+        }
+
+        // Remove from ephemeral tracking
+        ephemeralConversationIds.remove(conversationId)
+
+        // Remove from in-memory array
+        conversations.removeAll { $0.id == conversationId }
+
+        // Clear current if it was this conversation
+        if currentConversation?.id == conversationId {
+            currentConversation = nil
+        }
+
+        print("[ConversationService] Discarded ephemeral conversation: \(conversationId)")
+    }
+
+    /// Discard all ephemeral conversations
+    /// Called on app cleanup or when explicitly clearing empty chats
+    func discardAllEphemeralConversations() {
+        let ephemeralIds = ephemeralConversationIds
+        for id in ephemeralIds {
+            discardEphemeralConversation(id)
+        }
     }
 
     func getConversation(id: String) async throws -> Conversation {

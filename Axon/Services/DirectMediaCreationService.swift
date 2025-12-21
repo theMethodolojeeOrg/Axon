@@ -244,8 +244,6 @@ class DirectMediaCreationService: ObservableObject {
                 useSpeakerBoost: true
             )
             
-            ElevenLabsService.shared.configure(apiKey: apiKey)
-            
             let audioData = try await ElevenLabsService.shared.generateTTSBase64(
                 text: text,
                 voiceId: voiceId,

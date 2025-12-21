@@ -346,6 +346,122 @@ final class LiveActivityService: ObservableObject {
         #endif
     }
 
+    // MARK: - Video Generation Live Activities
+
+    #if os(iOS)
+    @Published private(set) var videoGenerationActivities: [String: Activity<VideoGenerationActivityAttributes>] = [:]
+    #endif
+
+    /// Start a Live Activity for a video generation job
+    func startVideoGenerationActivity(for job: VideoGenerationJob) async throws {
+        #if os(iOS)
+        guard isSupported else {
+            throw LiveActivityError.notSupported
+        }
+
+        // Check if activity already exists
+        if videoGenerationActivities[job.id] != nil {
+            return
+        }
+
+        let attributes = VideoGenerationActivityAttributes(
+            jobId: job.id,
+            provider: VideoGenerationActivityProvider(from: job.provider),
+            promptPreview: job.promptPreview,
+            estimatedCostUSD: job.estimatedCostUSD,
+            durationSeconds: job.duration.rawValue,
+            resolution: job.size.resolution
+        )
+
+        let initialState = VideoGenerationActivityAttributes.ContentState(
+            state: VideoGenerationActivityState(from: job.state),
+            startedAt: job.startedAt,
+            elapsedSeconds: 0,
+            progress: job.progress,
+            statusMessage: nil
+        )
+
+        do {
+            let activity = try Activity.request(
+                attributes: attributes,
+                content: .init(state: initialState, staleDate: nil),
+                pushType: nil
+            )
+            videoGenerationActivities[job.id] = activity
+        } catch {
+            throw LiveActivityError.failedToStart(error.localizedDescription)
+        }
+        #endif
+    }
+
+    /// Update a video generation Live Activity
+    func updateVideoGenerationActivity(
+        jobId: String,
+        state: VideoGenerationState,
+        progress: Int?,
+        statusMessage: String?
+    ) async {
+        #if os(iOS)
+        guard let activity = videoGenerationActivities[jobId] else { return }
+
+        let elapsedSeconds = activity.attributes.durationSeconds
+
+        let contentState = VideoGenerationActivityAttributes.ContentState(
+            state: VideoGenerationActivityState(from: state),
+            startedAt: activity.content.state.startedAt ?? Date(),
+            elapsedSeconds: Int(Date().timeIntervalSince(activity.content.state.startedAt ?? Date())),
+            progress: progress,
+            statusMessage: statusMessage?.truncated(to: 60)
+        )
+
+        // Set stale date for terminal states
+        let staleDate: Date? = state.isTerminal ? Date().addingTimeInterval(30) : nil
+
+        await activity.update(
+            ActivityContent(state: contentState, staleDate: staleDate)
+        )
+
+        // Auto-end after completion with delay
+        if state.isTerminal {
+            Task {
+                try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+                await endVideoGenerationActivity(jobId: jobId)
+            }
+        }
+        #endif
+    }
+
+    /// End a video generation Live Activity
+    func endVideoGenerationActivity(jobId: String, immediately: Bool = false) async {
+        #if os(iOS)
+        guard let activity = videoGenerationActivities[jobId] else { return }
+
+        let dismissalPolicy: ActivityUIDismissalPolicy = immediately ? .immediate : .after(Date().addingTimeInterval(5))
+
+        await activity.end(dismissalPolicy: dismissalPolicy)
+        videoGenerationActivities.removeValue(forKey: jobId)
+        #endif
+    }
+
+    /// End all video generation Live Activities
+    func endAllVideoGenerationActivities() async {
+        #if os(iOS)
+        for activity in Activity<VideoGenerationActivityAttributes>.activities {
+            await activity.end(dismissalPolicy: .immediate)
+        }
+        videoGenerationActivities.removeAll()
+        #endif
+    }
+
+    /// Get the number of active video generation activities
+    var activeVideoGenerationCount: Int {
+        #if os(iOS)
+        return videoGenerationActivities.count
+        #else
+        return 0
+        #endif
+    }
+
     // MARK: - Private
 
     private func checkSupport() {

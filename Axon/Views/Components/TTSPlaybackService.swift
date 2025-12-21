@@ -598,6 +598,31 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         try await playAudio(cached.data, messageId: messageId, format: cached.format)
     }
 
+    /// Play audio from raw data (for CreativeItem playback)
+    /// - Parameters:
+    ///   - data: The audio data to play
+    ///   - itemId: Identifier for tracking playback state
+    ///   - mimeType: MIME type to determine audio format
+    func playAudioData(_ data: Data, itemId: String, mimeType: String?) async throws {
+        // Determine format from mimeType
+        let format: TTSAudioFormat
+        switch mimeType {
+        case "audio/wav":
+            format = .wav
+        case "audio/pcm":
+            // Raw PCM needs WAV header
+            let wavData = wrapPCMInWAVHeader(data)
+            try await playAudio(wavData, messageId: itemId, format: .wav)
+            return
+        case "audio/mp4", "audio/m4a":
+            format = .m4a
+        default:
+            format = .mp3
+        }
+
+        try await playAudio(data, messageId: itemId, format: format)
+    }
+
     // MARK: - Voice Preview
 
     /// Generate preview text for a voice based on provider

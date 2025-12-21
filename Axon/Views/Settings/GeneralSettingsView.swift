@@ -335,6 +335,49 @@ struct GeneralSettingsView: View {
                 }
             }
 
+            // MARK: - Text-to-Speech
+
+            GeneralSettingsSection(title: "Text-to-Speech") {
+                NavigationLink {
+                    SettingsSubviewContainer {
+                        TTSSettingsView(viewModel: viewModel)
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "waveform.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(AppColors.signalMercury)
+                            .frame(width: 32)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Voice Settings")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Text(ttsSummary)
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14))
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(AppColors.substrateSecondary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(AppColors.glassBorder, lineWidth: 1)
+                            )
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+
             // MARK: - Data Management
 
             GeneralSettingsSection(title: "Data Management") {
@@ -382,6 +425,11 @@ struct GeneralSettingsView: View {
                 .frame(minWidth: 550, idealWidth: 650, minHeight: 600, idealHeight: 800)
                 #endif
         }
+    }
+
+    private var ttsSummary: String {
+        let tts = viewModel.settings.ttsSettings
+        return "\(tts.provider.displayName) · \(tts.qualityTier.displayName)"
     }
 
     private var dataManagementSummary: String {

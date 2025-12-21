@@ -18,20 +18,11 @@ struct SettingsTabView: View {
 
     enum SettingsTab: String, CaseIterable, Identifiable {
         case general = "General"
-        case apiKeys = "API Keys"
-        case models = "Models"
-        case custom = "Custom"
-        case tools = "Tools"
-        case dynamicTools = "Pipelines"
-        case intents = "Intents"
+        case providers = "Providers"
+        case automation = "Automation"
         case memory = "Memory"
-        case sovereignty = "Consent"
-        case security = "Security"
-        case devices = "Devices"
-        case server = "API Server"
-        case backend = "Backend"
-        case tts = "TTS"
-        case archived = "Archived"
+        case privacy = "Privacy"
+        case connectivity = "Connectivity"
         case developer = "Developer"
 
         var id: String { rawValue }
@@ -39,20 +30,11 @@ struct SettingsTabView: View {
         var icon: String {
             switch self {
             case .general: return "gearshape.fill"
-            case .apiKeys: return "key.fill"
-            case .models: return "cpu"
-            case .custom: return "slider.horizontal.3"
-            case .tools: return "wrench.and.screwdriver.fill"
-            case .dynamicTools: return "arrow.triangle.branch"
-            case .intents: return "app.connected.to.app.below.fill"
+            case .providers: return "key.fill"
+            case .automation: return "wrench.and.screwdriver.fill"
             case .memory: return "AxonLogoTemplate"
-            case .sovereignty: return "shield.checkered"
-            case .security: return "lock.shield.fill"
-            case .devices: return "laptopcomputer.and.iphone"
-            case .server: return "network"
-            case .backend: return "server.rack"
-            case .tts: return "waveform.circle.fill"
-            case .archived: return "archivebox.fill"
+            case .privacy: return "shield.checkered"
+            case .connectivity: return "network"
             case .developer: return "hammer.fill"
             }
         }
@@ -89,34 +71,16 @@ struct SettingsTabView: View {
                         switch selectedTab {
                         case .general:
                             GeneralSettingsView(viewModel: viewModel)
-                        case .apiKeys:
-                            APIKeysSettingsView(viewModel: viewModel)
-                        case .models:
-                            ModelSyncSettingsView(viewModel: viewModel)
-                        case .custom:
-                            CustomProvidersSettingsView(viewModel: viewModel)
-                        case .tools:
-                            ToolSettingsView(viewModel: viewModel)
-                        case .dynamicTools:
-                            DynamicToolsSettingsView(viewModel: viewModel)
-                        case .intents:
-                            IntentsSettingsView()
+                        case .providers:
+                            ProvidersSettingsView(viewModel: viewModel)
+                        case .automation:
+                            AutomationSettingsView(viewModel: viewModel)
                         case .memory:
                             MemorySettingsView(viewModel: viewModel)
-                        case .sovereignty:
-                            SovereigntySettingsView(viewModel: viewModel)
-                        case .security:
-                            SecuritySettingsView(viewModel: viewModel)
-                        case .devices:
-                            DevicesSettingsView(viewModel: viewModel)
-                        case .server:
-                            ServerSettingsView(viewModel: viewModel)
-                        case .backend:
-                            BackendSettingsView(viewModel: viewModel)
-                        case .tts:
-                            TTSSettingsView(viewModel: viewModel)
-                        case .archived:
-                            ArchivedConversationsSettingsView(viewModel: viewModel)
+                        case .privacy:
+                            PrivacySettingsView(viewModel: viewModel)
+                        case .connectivity:
+                            ConnectivitySettingsView(viewModel: viewModel)
                         case .developer:
                             DeveloperSettingsView(viewModel: viewModel)
                         }

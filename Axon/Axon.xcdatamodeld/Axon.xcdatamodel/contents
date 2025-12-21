@@ -146,4 +146,23 @@
         <attribute name="respondedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="taskId" optional="YES" attributeType="String"/>
     </entity>
+
+    <!-- Creative gallery items (photos, audio, video, artifacts) -->
+    <entity name="CreativeItemEntity" representedClassName="CreativeItemEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="String" defaultValueString=""/>
+        <attribute name="type" attributeType="String" defaultValueString="photo"/>
+        <attribute name="conversationId" attributeType="String" defaultValueString=""/>
+        <attribute name="messageId" attributeType="String" defaultValueString=""/>
+        <attribute name="createdAt" attributeType="Date" defaultDateTimeInterval="783558060" usesScalarValueType="NO"/>
+        <attribute name="contentURL" optional="YES" attributeType="String"/>
+        <attribute name="contentBase64" optional="YES" attributeType="String"/>
+        <attribute name="mimeType" optional="YES" attributeType="String"/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+        <attribute name="prompt" optional="YES" attributeType="String"/>
+        <attribute name="language" optional="YES" attributeType="String"/>
+        <attribute name="fileSize" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="thumbnailBase64" optional="YES" attributeType="String"/>
+        <attribute name="markedDeleted" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+    </entity>
 </model>

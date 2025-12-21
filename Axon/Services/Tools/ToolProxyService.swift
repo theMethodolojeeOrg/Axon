@@ -800,6 +800,41 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 **Tip:** Use `discover_ports` first to see available port IDs and their parameters.
 
                 """
+            case .geminiVideoGeneration:
+                prompt += """
+
+                ### gemini_video_gen
+                Generate videos using Gemini Veo 3.1. Creates videos from text prompts.
+
+                **Note:** Video generation is handled through the Create gallery. This tool provides status and cost information.
+
+                **Options:**
+                - `size`: "720p" (default) or "1080p"
+                - `duration`: 4, 6, or 8 seconds
+                - `aspect_ratio`: "16:9" (landscape) or "9:16" (portrait)
+
+                Example: ```tool_request
+                {"tool": "gemini_video_gen", "query": "A serene mountain landscape at sunrise with mist rolling through the valleys"}
+                ```
+
+                """
+            case .openaiVideoGeneration:
+                prompt += """
+
+                ### openai_video_gen
+                Generate videos using OpenAI Sora. Creates videos from text prompts.
+
+                **Note:** Video generation is handled through the Create gallery. This tool provides status and cost information.
+
+                **Options:**
+                - `size`: "1280x720" (default), "720x1280", "1920x1080", "1080x1920"
+                - `duration`: 5, 10, 15, or 20 seconds
+
+                Example: ```tool_request
+                {"tool": "openai_video_gen", "query": "A futuristic city with flying cars and neon lights at night"}
+                ```
+
+                """
             }
         }
 
@@ -2680,6 +2715,14 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             text += "```tool_request\n{\"tool\":\"invoke_port\",\"query\":\"obsidian_new_note | name=My Note | content=Hello\"}\n```\n"
             text += "```tool_request\n{\"tool\":\"invoke_port\",\"query\":\"things_add | title=Buy groceries | when=today\"}\n```\n"
             text += "\nFormat: `port_id | param1=value1 | param2=value2`\n"
+        case .geminiVideoGeneration:
+            text += "Generate video using Gemini Veo 3.1.\n\n"
+            text += "```tool_request\n{\"tool\":\"gemini_video_gen\",\"query\":\"A serene mountain landscape at sunrise\"}\n```\n"
+            text += "\n**Note:** Video generation is long-running (1-6 minutes) and handled via the Create gallery with Live Activity support.\n"
+        case .openaiVideoGeneration:
+            text += "Generate video using OpenAI Sora.\n\n"
+            text += "```tool_request\n{\"tool\":\"openai_video_gen\",\"query\":\"A futuristic city with flying cars\"}\n```\n"
+            text += "\n**Note:** Video generation is long-running and handled via the Create gallery with Live Activity support.\n"
         }
 
         return text

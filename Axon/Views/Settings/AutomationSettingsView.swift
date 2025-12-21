@@ -43,7 +43,9 @@ struct AutomationSettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             // Tools
             NavigationLink {
-                ToolSettingsView(viewModel: viewModel)
+                SettingsSubviewContainer {
+                    ToolSettingsView(viewModel: viewModel)
+                }
             } label: {
                 SettingsCategoryRow(
                     icon: "wrench.and.screwdriver.fill",
@@ -56,7 +58,9 @@ struct AutomationSettingsView: View {
 
             // Pipelines (Dynamic Tools)
             NavigationLink {
-                DynamicToolsSettingsView(viewModel: viewModel)
+                SettingsSubviewContainer {
+                    DynamicToolsSettingsView(viewModel: viewModel)
+                }
             } label: {
                 SettingsCategoryRow(
                     icon: "arrow.triangle.branch",
@@ -69,7 +73,9 @@ struct AutomationSettingsView: View {
 
             // Intents
             NavigationLink {
-                IntentsSettingsView()
+                SettingsSubviewContainer {
+                    IntentsSettingsView()
+                }
             } label: {
                 SettingsCategoryRow(
                     icon: "app.connected.to.app.below.fill",

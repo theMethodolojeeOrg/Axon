@@ -7,26 +7,99 @@ struct CostsBreakdownView: View {
     var body: some View {
         NavigationView {
             List {
-                Section(header: Text("This Month")) {
-                    ForEach(Array(costService.monthlyTotalsUSD.keys), id: \.self) { provider in
+                // Total Summary
+                Section {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Total This Month")
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textSecondary)
+                            Text(costService.totalThisMonthUSDFriendly)
+                                .font(AppTypography.titleLarge())
+                                .foregroundColor(AppColors.textPrimary)
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 8)
+                }
+                
+                // Chat/API Costs
+                Section(header: Text("Chat & API")) {
+                    ForEach(Array(costService.monthlyTotalsUSD.keys).filter { 
+                        (costService.monthlyTotalsUSD[$0] ?? 0) > 0 
+                    }, id: \.self) { provider in
                         let monthTotal = costService.monthlyTotalsUSD[provider] ?? 0
                         let todayTotal = costService.todaysTotalsUSD[provider] ?? 0
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(provider.displayName)
-                                    .font(AppTypography.titleSmall())
+                                    .font(AppTypography.bodyMedium())
                                     .foregroundColor(AppColors.textPrimary)
                                 if todayTotal > 0 {
                                     Text("Today: $" + String(format: "%.2f", todayTotal))
-                                        .font(AppTypography.bodySmall())
-                                        .foregroundColor(AppColors.textSecondary)
+                                        .font(AppTypography.labelSmall())
+                                        .foregroundColor(AppColors.textTertiary)
                                 }
                             }
                             Spacer()
                             Text("$" + String(format: "%.2f", monthTotal))
-                                .font(AppTypography.titleSmall())
+                                .font(AppTypography.bodyMedium(.medium))
                                 .foregroundColor(AppColors.textPrimary)
                         }
+                    }
+                    
+                    if costService.chatCostThisMonthUSD == 0 {
+                        Text("No chat costs yet")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+                }
+                
+                // Image Generation
+                Section(header: Text("Image Generation")) {
+                    if costService.monthlyImageCount > 0 {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("OpenAI Images")
+                                    .font(AppTypography.bodyMedium())
+                                    .foregroundColor(AppColors.textPrimary)
+                                Text("\(costService.monthlyImageCount) image\(costService.monthlyImageCount == 1 ? "" : "s") generated")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                            }
+                            Spacer()
+                            Text("$" + String(format: "%.2f", costService.monthlyImageCostUSD))
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+                        }
+                    } else {
+                        Text("No images generated yet")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+                }
+                
+                // Audio Generation
+                Section(header: Text("Audio Generation")) {
+                    if costService.monthlyTTSCount > 0 {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Text-to-Speech")
+                                    .font(AppTypography.bodyMedium())
+                                    .foregroundColor(AppColors.textPrimary)
+                                Text("\(costService.monthlyTTSCount) audio\(costService.monthlyTTSCount == 1 ? "" : "s") generated")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                            }
+                            Spacer()
+                            Text("$" + String(format: "%.2f", costService.monthlyTTSCostUSD))
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+                        }
+                    } else {
+                        Text("No audio generated yet")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textTertiary)
                     }
                 }
             }
@@ -35,7 +108,7 @@ struct CostsBreakdownView: View {
             #else
             .listStyle(.insetGrouped)
             #endif
-            .navigationTitle("Costs")
+            .navigationTitle("Cost Breakdown")
             #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -62,3 +135,4 @@ struct CostsBreakdownView: View {
 #Preview {
     CostsBreakdownView()
 }
+

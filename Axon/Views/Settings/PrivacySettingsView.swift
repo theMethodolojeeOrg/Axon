@@ -35,7 +35,9 @@ struct PrivacySettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             // Consent (Sovereignty)
             NavigationLink {
-                SovereigntySettingsView(viewModel: viewModel)
+                SettingsSubviewContainer {
+                    SovereigntySettingsView(viewModel: viewModel)
+                }
             } label: {
                 SettingsCategoryRow(
                     icon: "shield.checkered",
@@ -48,7 +50,9 @@ struct PrivacySettingsView: View {
 
             // Security
             NavigationLink {
-                SecuritySettingsView(viewModel: viewModel)
+                SettingsSubviewContainer {
+                    SecuritySettingsView(viewModel: viewModel)
+                }
             } label: {
                 SettingsCategoryRow(
                     icon: "lock.shield.fill",

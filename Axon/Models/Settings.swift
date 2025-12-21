@@ -2053,11 +2053,13 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
     case urlContext = "url_context"
     case googleMaps = "google_maps"
     case fileSearch = "file_search"  // RAG-based document search (Gemini 2.5+, 3.0+)
+    case geminiVideoGeneration = "gemini_video_gen"  // Veo 3.1 video generation
 
     // OpenAI Native Tools (called directly via OpenAI API)
     case openaiWebSearch = "openai_web_search"      // Web search via gpt-4o-search-preview
     case openaiImageGeneration = "openai_image_gen" // Image generation via gpt-image-1
     case openaiDeepResearch = "openai_deep_research" // Deep research via o3-deep-research
+    case openaiVideoGeneration = "openai_video_gen"   // Sora video generation
 
     // Built-in Tools
     case createMemory = "create_memory"
@@ -2121,9 +2123,11 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .urlContext: return "URL Context"
         case .googleMaps: return "Google Maps"
         case .fileSearch: return "File Search"
+        case .geminiVideoGeneration: return "Video Generation"
         case .openaiWebSearch: return "Web Search"
         case .openaiImageGeneration: return "Image Generation"
         case .openaiDeepResearch: return "Deep Research"
+        case .openaiVideoGeneration: return "Video Generation"
         case .createMemory: return "Memory Creation"
         case .conversationSearch: return "Conversation History"
         case .reflectOnConversation: return "Conversation Reflection"
@@ -2168,9 +2172,11 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .urlContext: return "Fetch and analyze content from URLs"
         case .googleMaps: return "Location queries and place information"
         case .fileSearch: return "Search uploaded documents using semantic RAG"
+        case .geminiVideoGeneration: return "Generate videos with Veo 3.1 (text/image to video)"
         case .openaiWebSearch: return "Real-time web search powered by OpenAI"
         case .openaiImageGeneration: return "Generate and edit images with GPT Image"
         case .openaiDeepResearch: return "Multi-step research with web search and analysis"
+        case .openaiVideoGeneration: return "Generate videos with Sora (text/image to video)"
         case .createMemory: return "AI creates memories about you during chat"
         case .conversationSearch: return "Search recent conversations for context"
         case .reflectOnConversation: return "Analyze model usage, memories, and topic shifts"
@@ -2215,9 +2221,11 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
         case .urlContext: return "link"
         case .googleMaps: return "map"
         case .fileSearch: return "doc.text.magnifyingglass"
+        case .geminiVideoGeneration: return "video.badge.plus"
         case .openaiWebSearch: return "globe.americas"
         case .openaiImageGeneration: return "photo.badge.plus"
         case .openaiDeepResearch: return "text.book.closed"
+        case .openaiVideoGeneration: return "video.badge.plus"
         case .createMemory: return "brain.head.profile"
         case .conversationSearch: return "clock.arrow.circlepath"
         case .reflectOnConversation: return "waveform.path.ecg"
@@ -2257,9 +2265,9 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var provider: ToolProvider {
         switch self {
-        case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
+        case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch, .geminiVideoGeneration:
             return .gemini
-        case .openaiWebSearch, .openaiImageGeneration, .openaiDeepResearch:
+        case .openaiWebSearch, .openaiImageGeneration, .openaiDeepResearch, .openaiVideoGeneration:
             return .openai
         case .createMemory, .conversationSearch, .reflectOnConversation,
              .agentStateAppend, .agentStateQuery, .agentStateClear,
@@ -2280,9 +2288,9 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
     /// Whether this tool requires a Gemini API key
     var requiresGeminiKey: Bool {
         switch self {
-        case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
+        case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch, .geminiVideoGeneration:
             return true
-        case .openaiWebSearch, .openaiImageGeneration, .openaiDeepResearch,
+        case .openaiWebSearch, .openaiImageGeneration, .openaiDeepResearch, .openaiVideoGeneration,
              .createMemory, .conversationSearch, .reflectOnConversation,
              .agentStateAppend, .agentStateQuery, .agentStateClear,
              .heartbeatConfigure, .heartbeatRunOnce, .heartbeatSetDeliveryProfile, .heartbeatUpdateProfile,
@@ -2302,9 +2310,9 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
     /// Whether this tool requires an OpenAI API key
     var requiresOpenAIKey: Bool {
         switch self {
-        case .openaiWebSearch, .openaiImageGeneration, .openaiDeepResearch:
+        case .openaiWebSearch, .openaiImageGeneration, .openaiDeepResearch, .openaiVideoGeneration:
             return true
-        case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch,
+        case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch, .geminiVideoGeneration,
              .createMemory, .conversationSearch, .reflectOnConversation,
              .agentStateAppend, .agentStateQuery, .agentStateClear,
              .heartbeatConfigure, .heartbeatRunOnce, .heartbeatSetDeliveryProfile, .heartbeatUpdateProfile,
@@ -2340,6 +2348,8 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
             return true  // Terminating a running job should require user awareness
         case .invokePort:
             return true  // Opening external apps requires user awareness
+        case .geminiVideoGeneration, .openaiVideoGeneration:
+            return true  // Video generation is long-running and expensive
         case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch,
              .openaiWebSearch, .openaiImageGeneration,
              .createMemory, .conversationSearch, .queryCovenant, .querySystemState,
@@ -2455,6 +2465,18 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
                 "Pass parameters to the external app action",
                 "External app may perform actions on your behalf"
             ]
+        case .geminiVideoGeneration:
+            return [
+                "Generate video using Gemini Veo 3.1 (long-running, 30s-6min)",
+                "Video generation costs approximately $0.35/second",
+                "Video will appear in Create gallery when complete"
+            ]
+        case .openaiVideoGeneration:
+            return [
+                "Generate video using OpenAI Sora (long-running, may take several minutes)",
+                "Video generation costs approximately $0.20/second",
+                "Video will appear in Create gallery when complete"
+            ]
         default:
             return []
         }
@@ -2468,9 +2490,9 @@ enum ToolId: String, Codable, CaseIterable, Identifiable, Sendable {
     /// Tool category for organizational purposes
     var category: ToolCategory {
         switch self {
-        case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch:
+        case .googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch, .geminiVideoGeneration:
             return .geminiTools
-        case .openaiWebSearch, .openaiImageGeneration, .openaiDeepResearch:
+        case .openaiWebSearch, .openaiImageGeneration, .openaiDeepResearch, .openaiVideoGeneration:
             return .openaiTools
         case .createMemory, .conversationSearch, .reflectOnConversation:
             return .memoryReflection

@@ -12,6 +12,7 @@ enum MainView {
     case chat
     case cognition  // Combines Memory + Internal Thread
     case settings
+    case create     // Creative gallery for generated media and artifacts
 }
 
 struct AppContainerView: View {
@@ -173,6 +174,8 @@ struct AppContainerView: View {
                     CognitionView()
                 case .settings:
                     SettingsView()
+                case .create:
+                    CreateGalleryView()
                 }
             }
             #if !os(macOS)
@@ -266,6 +269,8 @@ struct AppContainerView: View {
             return "Cognition"
         case .settings:
             return "Settings"
+        case .create:
+            return "Create"
         }
     }
 
@@ -283,22 +288,21 @@ struct AppContainerView: View {
             }
         }
 
-        // For macOS split view, the UX is much better if "New Chat" actually creates
-        // and selects a conversation immediately (so the detail pane switches to chat UI).
-        // In local-first / device-direct CloudLLM mode this should be a local conversation.
-        do {
-            let conv = try conversationService.createConversationOffline(title: "New Chat")
-            selectedConversation = conv
-            conversationService.currentConversation = conv
-
-            // Update temporal context with the new conversation
-            TemporalContextService.shared.setCurrentConversation(conv.id)
-        } catch {
-            // If local creation fails (should be rare), fall back to clearing selection.
-            selectedConversation = nil
-            conversationService.clearCurrentConversation()
-            TemporalContextService.shared.setCurrentConversation(nil)
+        // Discard any existing ephemeral conversation from the previous selection
+        // This prevents empty "New Chat" threads from accumulating
+        if let previousId = selectedConversation?.id {
+            conversationService.discardEphemeralConversation(previousId)
         }
+
+        // Create an ephemeral conversation (in-memory only, not persisted to Core Data)
+        // The conversation will only be persisted when the user sends their first message
+        // This prevents empty "New Chat" threads from cluttering the sidebar
+        let conv = conversationService.createEphemeralConversation(title: "New Chat")
+        selectedConversation = conv
+        conversationService.currentConversation = conv
+
+        // Update temporal context with the new conversation
+        TemporalContextService.shared.setCurrentConversation(conv.id)
 
         currentView = .chat
         showSidebar = false
@@ -318,6 +322,13 @@ struct AppContainerView: View {
             }
         }
 
+        // Discard any ephemeral conversation from the previous selection
+        // This prevents empty "New Chat" threads from accumulating when user
+        // creates a new chat but then selects an existing conversation instead
+        if let previousId = selectedConversation?.id {
+            conversationService.discardEphemeralConversation(previousId)
+        }
+
         selectedConversation = conversation
         conversationService.currentConversation = conversation
         currentView = .chat
@@ -328,6 +339,12 @@ struct AppContainerView: View {
     }
 
     private func navigateToView(_ view: MainView) {
+        // Discard any ephemeral conversation when navigating away from chat
+        // This prevents empty "New Chat" threads from accumulating
+        if view != .chat, let currentId = selectedConversation?.id {
+            conversationService.discardEphemeralConversation(currentId)
+        }
+
         currentView = view
         showSidebar = false
     }
@@ -888,12 +905,23 @@ struct ChatContainerView: View {
             }
 
             do {
-                // Create conversation if needed
+                // Create or persist conversation if needed
                 let conv: Conversation
                 if let existing = conversation {
-                    conv = existing
+                    // Check if this is an ephemeral conversation that needs to be persisted
+                    if conversationService.isEphemeral(existing.id) {
+                        // Persist the ephemeral conversation now that user is sending first message
+                        let title = content.isEmpty ? "New Chat" : String(content.prefix(50))
+                        conv = try conversationService.persistEphemeralConversation(existing.id, title: title)
+                        onConversationCreated(conv)
+
+                        // Transfer "New Chat" draft to actual conversation
+                        draftService.transferNewChatDraft(to: conv.id)
+                    } else {
+                        conv = existing
+                    }
                 } else {
-                    // Create new conversation with first message as title
+                    // No conversation exists - create new one with first message as title
                     let title = content.isEmpty ? "New Chat" : String(content.prefix(50))
                     conv = try await conversationService.createConversation(
                         title: title,

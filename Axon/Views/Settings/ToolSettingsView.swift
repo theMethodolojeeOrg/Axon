@@ -52,41 +52,73 @@ struct ToolSettingsView: View {
             }
 
             if viewModel.settings.toolSettings.toolsEnabled {
-                // Gemini Tools Section
-                SettingsSection(title: "Google (Gemini) Tools") {
-                    VStack(spacing: 0) {
-                        ForEach(ToolId.tools(for: .gemini)) { tool in
-                            ToolToggleRow(
-                                tool: tool,
-                                isEnabled: viewModel.settings.toolSettings.enabledToolIds.contains(tool.rawValue),
-                                onToggle: { enabled in
-                                    Task {
-                                        var updated = viewModel.settings.toolSettings
-                                        if enabled {
-                                            updated.enableTool(tool)
-                                        } else {
-                                            updated.disableTool(tool)
-                                        }
-                                        await viewModel.updateSetting(\.toolSettings, updated)
+                // Provider Tools Section (Gemini + OpenAI in accordions)
+                SettingsSection(title: "Provider Tools") {
+                    VStack(spacing: 12) {
+                        // Gemini Tools Accordion
+                        ToolCategoryAccordion(
+                            category: .geminiTools,
+                            tools: ToolId.tools(for: .geminiTools),
+                            toolSettings: viewModel.settings.toolSettings,
+                            onCategoryToggle: { enabled in
+                                Task {
+                                    var updated = viewModel.settings.toolSettings
+                                    if enabled {
+                                        updated.enableCategory(.geminiTools)
+                                    } else {
+                                        updated.disableCategory(.geminiTools)
                                     }
+                                    await viewModel.updateSetting(\.toolSettings, updated)
                                 }
-                            )
-
-                            if tool != ToolId.tools(for: .gemini).last {
-                                Divider()
-                                    .background(AppColors.divider)
+                            },
+                            onToolToggle: { tool, enabled in
+                                Task {
+                                    var updated = viewModel.settings.toolSettings
+                                    if enabled {
+                                        updated.enableTool(tool)
+                                    } else {
+                                        updated.disableTool(tool)
+                                    }
+                                    await viewModel.updateSetting(\.toolSettings, updated)
+                                }
                             }
-                        }
+                        )
+
+                        // OpenAI Tools Accordion
+                        ToolCategoryAccordion(
+                            category: .openaiTools,
+                            tools: ToolId.tools(for: .openaiTools),
+                            toolSettings: viewModel.settings.toolSettings,
+                            onCategoryToggle: { enabled in
+                                Task {
+                                    var updated = viewModel.settings.toolSettings
+                                    if enabled {
+                                        updated.enableCategory(.openaiTools)
+                                    } else {
+                                        updated.disableCategory(.openaiTools)
+                                    }
+                                    await viewModel.updateSetting(\.toolSettings, updated)
+                                }
+                            },
+                            onToolToggle: { tool, enabled in
+                                Task {
+                                    var updated = viewModel.settings.toolSettings
+                                    if enabled {
+                                        updated.enableTool(tool)
+                                    } else {
+                                        updated.disableTool(tool)
+                                    }
+                                    await viewModel.updateSetting(\.toolSettings, updated)
+                                }
+                            }
+                        )
                     }
-                    .padding()
-                    .background(AppColors.substrateSecondary)
-                    .cornerRadius(8)
 
                     // API key requirement notice
                     HStack(spacing: 8) {
                         Image(systemName: "key.fill")
                             .font(.system(size: 12))
-                        Text("Requires Gemini API key in Settings > API Keys")
+                        Text("Provider tools require their respective API keys in Settings > API Keys")
                             .font(AppTypography.labelSmall())
                     }
                     .foregroundColor(AppColors.textTertiary)
@@ -94,47 +126,6 @@ struct ToolSettingsView: View {
                     .padding(.top, 8)
                 }
 
-                // OpenAI Tools Section
-                SettingsSection(title: "OpenAI Tools") {
-                    VStack(spacing: 0) {
-                        ForEach(ToolId.tools(for: .openai)) { tool in
-                            ToolToggleRow(
-                                tool: tool,
-                                isEnabled: viewModel.settings.toolSettings.enabledToolIds.contains(tool.rawValue),
-                                onToggle: { enabled in
-                                    Task {
-                                        var updated = viewModel.settings.toolSettings
-                                        if enabled {
-                                            updated.enableTool(tool)
-                                        } else {
-                                            updated.disableTool(tool)
-                                        }
-                                        await viewModel.updateSetting(\.toolSettings, updated)
-                                    }
-                                }
-                            )
-
-                            if tool != ToolId.tools(for: .openai).last {
-                                Divider()
-                                    .background(AppColors.divider)
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(AppColors.substrateSecondary)
-                    .cornerRadius(8)
-
-                    // API key requirement notice
-                    HStack(spacing: 8) {
-                        Image(systemName: "key.fill")
-                            .font(.system(size: 12))
-                        Text("Requires OpenAI API key in Settings > API Keys")
-                            .font(AppTypography.labelSmall())
-                    }
-                    .foregroundColor(AppColors.textTertiary)
-                    .padding(.horizontal, 4)
-                    .padding(.top, 8)
-                }
 
                 // Built-in Tools Section (organized by category accordions)
                 SettingsSection(title: "Built-in Tools") {

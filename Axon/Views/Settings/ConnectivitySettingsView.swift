@@ -42,7 +42,9 @@ struct ConnectivitySettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             // Devices
             NavigationLink {
-                DevicesSettingsView(viewModel: viewModel)
+                SettingsSubviewContainer {
+                    DevicesSettingsView(viewModel: viewModel)
+                }
             } label: {
                 SettingsCategoryRow(
                     icon: "laptopcomputer.and.iphone",
@@ -55,7 +57,9 @@ struct ConnectivitySettingsView: View {
 
             // API Server
             NavigationLink {
-                ServerSettingsView(viewModel: viewModel)
+                SettingsSubviewContainer {
+                    ServerSettingsView(viewModel: viewModel)
+                }
             } label: {
                 SettingsCategoryRow(
                     icon: "network",
@@ -68,7 +72,9 @@ struct ConnectivitySettingsView: View {
 
             // Backend
             NavigationLink {
-                BackendSettingsView(viewModel: viewModel)
+                SettingsSubviewContainer {
+                    BackendSettingsView(viewModel: viewModel)
+                }
             } label: {
                 SettingsCategoryRow(
                     icon: "server.rack",

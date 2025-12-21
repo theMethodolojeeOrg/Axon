@@ -12,5 +12,7 @@ import SwiftUI
 struct AxonLiveActivityBundle: WidgetBundle {
     var body: some Widget {
         HeartbeatLiveActivity()
+        SubAgentLiveActivity()
+        VideoGenerationLiveActivity()
     }
 }

@@ -39,7 +39,7 @@ enum CreativeItemType: String, Codable, CaseIterable, Identifiable {
     var emptyStateMessage: String {
         switch self {
         case .photo: return "No images generated yet"
-        case .video: return "Video generation coming soon"
+        case .video: return "No videos generated yet"
         case .audio: return "No audio generated yet"
         case .artifact: return "No artifacts created yet"
         }
@@ -48,8 +48,7 @@ enum CreativeItemType: String, Codable, CaseIterable, Identifiable {
     /// Whether this type is currently available (not coming soon)
     var isAvailable: Bool {
         switch self {
-        case .photo, .audio, .artifact: return true
-        case .video: return false  // Coming soon: Veo3, Sora2
+        case .photo, .audio, .artifact, .video: return true
         }
     }
 }

@@ -219,6 +219,51 @@ struct DataManagementView: View {
                 // MARK: - Sync Status
                 DataManagementSyncStatus(viewModel: viewModel)
 
+                // MARK: - Archived Conversations
+                DataManagementSection(title: "Archived", icon: "archivebox.fill") {
+                    NavigationLink {
+                        ArchivedConversationsSettingsView(viewModel: viewModel)
+                    } label: {
+                        HStack(spacing: 16) {
+                            ZStack {
+                                Circle()
+                                    .fill(AppColors.substrateSecondary)
+                                    .frame(width: 44, height: 44)
+
+                                Image(systemName: "archivebox.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(AppColors.signalMercury)
+                            }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Archived Conversations")
+                                    .font(AppTypography.bodyMedium(.medium))
+                                    .foregroundColor(AppColors.textPrimary)
+
+                                Text(archivedSubtitle)
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14))
+                                .foregroundColor(AppColors.textTertiary)
+                        }
+                        .padding(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(AppColors.substrateSecondary)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                                )
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+
                 Spacer(minLength: 40)
             }
             .padding()
@@ -326,6 +371,10 @@ struct DataManagementView: View {
         let minutes = s / 60
         let remainder = s % 60
         return "Every \(minutes)m \(remainder)s"
+    }
+
+    private var archivedSubtitle: String {
+        return "View and restore archived chats"
     }
 }
 

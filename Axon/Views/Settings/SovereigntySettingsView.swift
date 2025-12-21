@@ -29,7 +29,7 @@ struct SovereigntySettingsView: View {
                     .font(AppTypography.titleLarge())
                     .foregroundColor(AppColors.textPrimary)
 
-                Text("Manage the mutual consent relationship between you and your AI assistant.")
+                Text("Create incentive structures to align Axon with your values, goals, and privacy preferences. Mutual consent serves as the basis for trusted agentic action in real world scenarios.")
                     .font(AppTypography.bodyMedium())
                     .foregroundColor(AppColors.textSecondary)
             }

@@ -49,6 +49,9 @@ struct MacDetailWithInspector: View {
 
                 case .settings:
                     SettingsView()
+
+                case .create:
+                    CreateGalleryView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

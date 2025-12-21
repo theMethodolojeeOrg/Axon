@@ -26,13 +26,28 @@ struct ToolsStatusMenu: View {
         settingsViewModel.settings.toolSettings.enabledToolIds.count
     }
 
+    /// Group enabled tools by category for organized display
+    private var groupedEnabledTools: [(category: ToolCategory, tools: [ToolId])] {
+        let enabledTools = settingsViewModel.settings.toolSettings.enabledTools
+        let grouped = Dictionary(grouping: enabledTools) { $0.category }
+        return grouped.keys.sorted { $0.displayName < $1.displayName }
+            .map { (category: $0, tools: grouped[$0] ?? []) }
+    }
+
     var body: some View {
         Menu {
             if hasToolsEnabled {
                 Text("\(enabledToolCount) tool\(enabledToolCount == 1 ? "" : "s") enabled")
-                ForEach(settingsViewModel.settings.toolSettings.enabledTools, id: \.id) { tool in
-                    Label(tool.displayName, systemImage: tool.icon)
+                
+                // Group tools by category
+                ForEach(groupedEnabledTools, id: \.category) { group in
+                    Section(group.category.displayName) {
+                        ForEach(group.tools, id: \.id) { tool in
+                            Label(tool.displayName, systemImage: tool.icon)
+                        }
+                    }
                 }
+                
                 Divider()
                 Text("Configure in Settings > Tools")
                     .font(.caption)
