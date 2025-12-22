@@ -1325,6 +1325,7 @@ enum APIProvider: String, CaseIterable, Identifiable {
 
 /// TTS provider selection - mutually exclusive
 enum TTSProvider: String, Codable, CaseIterable, Identifiable {
+    case apple = "apple"          // Native Apple TTS (free, no API key required)
     case elevenlabs = "elevenlabs"
     case gemini = "gemini"
     case openai = "openai"
@@ -1333,6 +1334,7 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
+        case .apple: return "Apple (Siri)"
         case .elevenlabs: return "ElevenLabs"
         case .gemini: return "Gemini"
         case .openai: return "OpenAI"
@@ -1341,6 +1343,7 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
 
     var description: String {
         switch self {
+        case .apple: return "On-device Siri voices • Free • No API key"
         case .elevenlabs: return "High-quality voices with fine-tuned controls"
         case .gemini: return "Google's TTS with expressive voices"
         case .openai: return "Promptable TTS with natural voices"
@@ -1349,9 +1352,18 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .apple: return "apple.logo"
         case .elevenlabs: return "waveform"
         case .gemini: return "sparkles"
         case .openai: return "brain.head.profile"
+        }
+    }
+
+    /// Whether this provider requires an API key
+    var requiresAPIKey: Bool {
+        switch self {
+        case .apple: return false
+        case .elevenlabs, .gemini, .openai: return true
         }
     }
 }
@@ -1633,8 +1645,8 @@ enum TTSQualityTier: String, Codable, CaseIterable, Identifiable {
 }
 
 struct TTSSettings: Codable, Equatable {
-    /// Active TTS provider
-    var provider: TTSProvider = .elevenlabs
+    /// Active TTS provider (defaults to Apple TTS for zero-config experience)
+    var provider: TTSProvider = .apple
 
     /// Quality tier - affects model selection per provider
     var qualityTier: TTSQualityTier = .high
@@ -1652,6 +1664,11 @@ struct TTSSettings: Codable, Equatable {
     // MARK: - Voice Gender Filter
     /// Filter voices by gender (nil = show all)
     var voiceGenderFilter: VoiceGender? = nil
+
+    // MARK: - Apple TTS Settings
+    var appleVoice: AppleTTSVoice = .samantha
+    /// Speech rate (0.0 to 1.0, where 0.5 is default/normal)
+    var appleRate: Float = 0.5
 
     // MARK: - ElevenLabs Settings
     var model: TTSModel = .turboV25

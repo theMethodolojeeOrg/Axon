@@ -12,12 +12,14 @@ enum TTSAudioFormat: String {
     case mp3 = "mp3"
     case wav = "wav"
     case m4a = "m4a"
+    case caf = "caf"  // Core Audio Format - used by Apple TTS
 
     var fileTypeHint: String {
         switch self {
         case .mp3: return AVFileType.mp3.rawValue
         case .wav: return AVFileType.wav.rawValue
         case .m4a: return AVFileType.m4a.rawValue
+        case .caf: return AVFileType.caf.rawValue
         }
     }
 }
@@ -412,6 +414,10 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
             // Generate new audio
             else {
                 switch settings.ttsSettings.provider {
+                case .apple:
+                    audioData = try await generateAppleTTSAudio(text: processedText, settings: settings)
+                    audioFormat = .caf
+
                 case .elevenlabs:
                     audioData = try await generateElevenLabsAudio(text: processedText, settings: settings)
                     audioFormat = .mp3
@@ -442,6 +448,9 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
                         let voiceName: String?
 
                         switch settings.ttsSettings.provider {
+                        case .apple:
+                            voiceId = settings.ttsSettings.appleVoice.rawValue
+                            voiceName = settings.ttsSettings.appleVoice.displayName
                         case .elevenlabs:
                             voiceId = settings.ttsSettings.selectedVoiceId
                             voiceName = settings.ttsSettings.selectedVoiceName
@@ -588,6 +597,22 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         )
     }
 
+    // MARK: - Apple TTS
+
+    private func generateAppleTTSAudio(text: String, settings: AppSettings) async throws -> Data {
+        let voice = settings.ttsSettings.appleVoice
+        let rate = settings.ttsSettings.appleRate
+
+        print("[TTSPlaybackService] Using Apple TTS voice: \(voice.displayName)")
+        print("[TTSPlaybackService] Requesting audio generation from Apple TTS...")
+
+        return try await AppleTTSService.shared.generateSpeech(
+            text: text,
+            voice: voice,
+            rate: rate
+        )
+    }
+
     func playGenerated(messageId: String, settings: AppSettings? = nil) async throws {
         guard let cached = getCachedAudio(for: messageId, settings: settings) else {
             print("[TTSPlaybackService] No cached audio for message: \(messageId)")
@@ -630,6 +655,8 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         let firstName = voiceName.components(separatedBy: " ").first ?? voiceName
         let companyName: String
         switch provider {
+        case .apple:
+            companyName = "Apple"
         case .elevenlabs:
             companyName = "ElevenLabs"
         case .gemini:
@@ -710,6 +737,30 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         }
     }
 
+    /// Preview an Apple (Siri) voice
+    func previewAppleVoice(_ voice: AppleTTSVoice, settings: AppSettings) async throws {
+        print("[TTSPlaybackService] Previewing Apple voice: \(voice.displayName)")
+
+        stop()
+        isGenerating = true
+        currentMessageId = "preview_apple_\(voice.rawValue)"
+
+        let previewText = Self.previewText(for: .apple, voiceName: voice.displayName)
+
+        do {
+            let audioData = try await generateAppleTTSAudioForPreview(
+                text: previewText,
+                voice: voice,
+                settings: settings
+            )
+            isGenerating = false
+            try await playAudio(audioData, messageId: currentMessageId, format: .caf)
+        } catch {
+            isGenerating = false
+            throw error
+        }
+    }
+
     // MARK: - Preview Audio Generation (no caching)
 
     private func generateElevenLabsAudioForPreview(text: String, voiceId: String, settings: AppSettings) async throws -> Data {
@@ -761,6 +812,15 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
             speed: speed,
             instructions: model.supportsInstructions && !instructions.isEmpty ? instructions : nil,
             apiKey: openaiKey
+        )
+    }
+
+    private func generateAppleTTSAudioForPreview(text: String, voice: AppleTTSVoice, settings: AppSettings) async throws -> Data {
+        let rate = settings.ttsSettings.appleRate
+        return try await AppleTTSService.shared.generateSpeech(
+            text: text,
+            voice: voice,
+            rate: rate
         )
     }
 

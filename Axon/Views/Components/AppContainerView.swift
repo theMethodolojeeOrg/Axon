@@ -1293,6 +1293,51 @@ struct ChatContainerView: View {
         let modelId = settings.defaultModel
         let providerDisplayName = settings.defaultProvider.displayName
 
+        // Pre-flight check: Verify built-in providers (Apple Intelligence, MLX) are available
+        // This prevents the "generating forever" issue when the provider can't actually respond
+        if !settings.defaultProvider.isAvailable {
+            let reason = settings.defaultProvider.unavailableReason ?? "Provider is not available on this device"
+            let guidance: String
+            switch settings.defaultProvider {
+            case .appleFoundation:
+                guidance = """
+                **Apple Intelligence is not available.**
+
+                \(reason)
+
+                **To fix this:**
+                1. Go to **Settings > Apple Intelligence & Siri**
+                2. Enable Apple Intelligence and complete setup
+                3. Wait for the on-device model to download
+
+                Alternatively, configure an API key in Axon Settings to use a cloud provider.
+                """
+            case .localMLX:
+                guidance = """
+                **On-device MLX models are not available.**
+
+                \(reason)
+
+                MLX requires a physical iPhone or iPad with Apple Silicon. The iOS Simulator cannot run Metal-based models.
+
+                Please run on a physical device, or switch to a cloud provider in Settings.
+                """
+            default:
+                guidance = "⚠️ \(reason)"
+            }
+
+            // Show error message immediately instead of starting a failing stream
+            let errorMessage = Message(
+                conversationId: conversationId,
+                role: .assistant,
+                content: guidance,
+                modelName: "System",
+                providerName: "internal"
+            )
+            conversationService.messages.append(errorMessage)
+            return
+        }
+
         let placeholderMessage = Message(
             id: assistantId,
             conversationId: conversationId,
@@ -1431,17 +1476,46 @@ struct ChatContainerView: View {
 
                 case .error(let error):
                     print("[ChatContainer] Streaming error: \(error.localizedDescription)")
+                    // Surface streaming errors to the user instead of silent failure
+                    let errorText = error.localizedDescription
+                    if finalContent.isEmpty {
+                        // If we haven't received any content yet, this is likely a provider issue
+                        finalContent = "⚠️ **Request failed**: \(errorText)\n\nCheck your provider settings or try a different model."
+                    }
                 }
             }
         }
 
         // If streaming ended but we never received any deltas, surface a visible error.
         if !didReceiveAnyDelta && finalContent.isEmpty {
+            // Provide more actionable guidance based on the provider
+            let providerGuidance: String
+            if config.provider == "appleFoundation" {
+                providerGuidance = """
+                ⚠️ **Apple Intelligence did not respond.**
+
+                This can happen if:
+                • Apple Intelligence is not enabled on this device
+                • The on-device model is still downloading
+                • This device doesn't support Apple Intelligence
+
+                **To fix:** Go to Settings > Apple Intelligence & Siri and ensure it's fully set up.
+                """
+            } else if config.provider == "localMLX" {
+                providerGuidance = """
+                ⚠️ **MLX model did not respond.**
+
+                On-device models require a physical device with Apple Silicon. The Simulator cannot run Metal-based inference.
+                """
+            } else {
+                providerGuidance = "⚠️ No response received from \(config.providerName).\n\nThis may be a network issue or provider outage. Try again or check your API key."
+            }
+
             await MainActor.run {
                 finalizeStreamingMessage(
                     assistantId: assistantId,
                     conversationId: conversationId,
-                    content: "⚠️ No response received (stream ended without deltas).\n\nThis is usually a networking/provider issue or a stream parsing mismatch.",
+                    content: providerGuidance,
                     reasoning: nil,
                     toolCalls: [],
                     sources: [],

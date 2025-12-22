@@ -192,6 +192,8 @@ struct CreateAudioSheet: View {
                 .foregroundColor(AppColors.textSecondary)
             
             switch selectedProvider {
+            case .apple:
+                appleInfoView
             case .openai:
                 openAIVoicePicker
             case .gemini:
@@ -216,6 +218,23 @@ struct CreateAudioSheet: View {
                         selectedOpenAIVoice = voice
                     }
                 }
+            }
+        }
+    }
+
+    private var appleInfoView: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "info.circle.fill")
+                .foregroundColor(AppColors.signalMercury)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Apple TTS is for reading messages")
+                    .font(AppTypography.bodySmall(.medium))
+                    .foregroundColor(AppColors.textPrimary)
+                
+                Text("For audio file creation, switch to ElevenLabs, OpenAI, or Gemini.")
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(AppColors.textSecondary)
             }
         }
     }
@@ -318,6 +337,9 @@ struct CreateAudioSheet: View {
                 let item: CreativeItem
                 
                 switch selectedProvider {
+                case .apple:
+                    // Apple TTS is for in-chat TTS only, not for gallery audio creation
+                    throw DirectMediaError.generationFailed("Apple TTS is available for reading messages aloud. For audio file creation, please use ElevenLabs, OpenAI, or Gemini.")
                 case .openai:
                     item = try await creationService.generateAudioOpenAI(
                         text: text,

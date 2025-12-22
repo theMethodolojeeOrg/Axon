@@ -23,6 +23,8 @@ struct TTSSettingsView: View {
             ttsTextSection
 
             switch viewModel.settings.ttsSettings.provider {
+            case .apple:
+                appleSection
             case .elevenlabs:
                 elevenLabsSection
             case .gemini:
@@ -101,6 +103,21 @@ struct TTSSettingsView: View {
         UnifiedSettingsSection(title: "TTS Provider") {
             SettingsCard(padding: 0) {
                 VStack(spacing: 0) {
+                    // Apple TTS (free, always available)
+                    ProviderRow(
+                        title: TTSProvider.apple.displayName,
+                        subtitle: TTSProvider.apple.description,
+                        icon: TTSProvider.apple.icon,
+                        isSelected: viewModel.settings.ttsSettings.provider == .apple,
+                        status: .configured,  // Always configured - no API key needed
+                        showFreeBadge: true,
+                        onSelect: {
+                            Task { await viewModel.updateTTSSetting(\.provider, .apple) }
+                        }
+                    )
+
+                    Divider().background(AppColors.divider)
+
                     ProviderRow(
                         title: TTSProvider.elevenlabs.displayName,
                         subtitle: TTSProvider.elevenlabs.description,
@@ -308,6 +325,13 @@ struct TTSSettingsView: View {
 
     // MARK: - Voice Filtering
 
+    private var filteredAppleVoices: [AppleTTSVoice] {
+        if let filter = viewModel.settings.ttsSettings.voiceGenderFilter {
+            return AppleTTSVoice.voices(for: filter)
+        }
+        return AppleTTSVoice.allCases
+    }
+
     private var filteredGeminiVoices: [GeminiTTSVoice] {
         if let filter = viewModel.settings.ttsSettings.voiceGenderFilter {
             return GeminiTTSVoice.voices(for: filter)
@@ -320,6 +344,133 @@ struct TTSSettingsView: View {
             return OpenAITTSVoice.voices(for: filter)
         }
         return OpenAITTSVoice.allCases
+    }
+
+    // MARK: - Apple TTS
+
+    private var appleSection: some View {
+        UnifiedSettingsSection(title: "Apple (Siri)") {
+            VStack(alignment: .leading, spacing: 12) {
+                // Info card
+                SettingsCard(padding: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(AppColors.accentSuccess)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("On-Device • No API Key Required")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Text("Uses native Siri voices. Works offline, completely private.")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+
+                        Spacer()
+                    }
+                }
+
+                // Voice picker
+                SettingsCard(padding: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Voice")
+                                .font(AppTypography.labelMedium())
+                                .foregroundColor(AppColors.textSecondary)
+
+                            Spacer()
+
+                            // Gender filter
+                            HStack(spacing: 4) {
+                                GenderFilterButton(
+                                    label: "All",
+                                    isSelected: viewModel.settings.ttsSettings.voiceGenderFilter == nil,
+                                    action: { Task { await viewModel.updateTTSSetting(\.voiceGenderFilter, nil) } }
+                                )
+                                GenderFilterButton(
+                                    label: "♀",
+                                    isSelected: viewModel.settings.ttsSettings.voiceGenderFilter == .female,
+                                    action: { Task { await viewModel.updateTTSSetting(\.voiceGenderFilter, .female) } }
+                                )
+                                GenderFilterButton(
+                                    label: "♂",
+                                    isSelected: viewModel.settings.ttsSettings.voiceGenderFilter == .male,
+                                    action: { Task { await viewModel.updateTTSSetting(\.voiceGenderFilter, .male) } }
+                                )
+                            }
+                        }
+
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                            ForEach(filteredAppleVoices) { voice in
+                                AppleVoiceCard(
+                                    voice: voice,
+                                    isSelected: viewModel.settings.ttsSettings.appleVoice == voice,
+                                    settings: viewModel.settings,
+                                    onSelect: {
+                                        Task { await viewModel.updateTTSSetting(\.appleVoice, voice) }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Speech rate slider
+                SettingsCard(padding: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Speech Rate")
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Speed")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textPrimary)
+                                Spacer()
+                                Text(String(format: "%.1fx", Double(viewModel.settings.ttsSettings.appleRate) * 2))
+                                    .font(AppTypography.bodySmall(.medium))
+                                    .foregroundColor(AppColors.signalMercury)
+                            }
+                            Slider(
+                                value: Binding(
+                                    get: { Double(viewModel.settings.ttsSettings.appleRate) },
+                                    set: { newValue in
+                                        Task { await viewModel.updateTTSSetting(\.appleRate, Float(newValue)) }
+                                    }
+                                ),
+                                in: 0.25...1.0,
+                                step: 0.05
+                            )
+                            .tint(AppColors.signalMercury)
+
+                            HStack {
+                                Text("Slow")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                                Spacer()
+                                Text("Normal")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                                Spacer()
+                                Text("Fast")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                            }
+                        }
+                    }
+                }
+
+                // Tip about premium voices
+                HStack(spacing: 6) {
+                    Image(systemName: "lightbulb")
+                    Text("For higher-quality voices, add API keys for ElevenLabs, Gemini, or OpenAI in Settings → API Keys.")
+                        .font(AppTypography.labelSmall())
+                }
+                .foregroundColor(AppColors.textTertiary)
+            }
+        }
     }
 
     // MARK: - Gemini
@@ -729,6 +880,7 @@ private struct ProviderRow: View {
     let icon: String
     let isSelected: Bool
     let status: ProviderStatus
+    var showFreeBadge: Bool = false
     let onSelect: () -> Void
 
     var body: some View {
@@ -740,9 +892,21 @@ private struct ProviderRow: View {
                     .frame(width: 32)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(AppTypography.bodyMedium(.medium))
-                        .foregroundColor(AppColors.textPrimary)
+                    HStack(spacing: 6) {
+                        Text(title)
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        if showFreeBadge {
+                            Text("FREE")
+                                .font(.system(size: 9, weight: .bold))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(AppColors.accentSuccess.opacity(0.2))
+                                .foregroundColor(AppColors.accentSuccess)
+                                .cornerRadius(4)
+                        }
+                    }
 
                     Text(subtitle)
                         .font(AppTypography.labelSmall())
@@ -880,6 +1044,96 @@ private struct ElevenLabsVoicePickerCard: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Apple Voice Card
+
+struct AppleVoiceCard: View {
+    let voice: AppleTTSVoice
+    let isSelected: Bool
+    let settings: AppSettings
+    let onSelect: () -> Void
+
+    @StateObject private var ttsService = TTSPlaybackService.shared
+    @State private var previewError: String?
+
+    private var isPreviewingThisVoice: Bool {
+        ttsService.currentMessageId == "preview_apple_\(voice.rawValue)"
+    }
+
+    var body: some View {
+        Button(action: onSelect) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(voice.displayName)
+                        .font(AppTypography.bodyMedium(.medium))
+                        .foregroundColor(AppColors.textPrimary)
+                    Spacer()
+
+                    // Preview button
+                    Button {
+                        if isPreviewingThisVoice && (ttsService.isPlaying || ttsService.isGenerating) {
+                            ttsService.stop()
+                        } else {
+                            Task {
+                                do {
+                                    previewError = nil
+                                    try await ttsService.previewAppleVoice(voice, settings: settings)
+                                } catch {
+                                    previewError = error.localizedDescription
+                                }
+                            }
+                        }
+                    } label: {
+                        Group {
+                            if isPreviewingThisVoice && ttsService.isGenerating {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                    .frame(width: 20, height: 20)
+                            } else if isPreviewingThisVoice && ttsService.isPlaying {
+                                Image(systemName: "stop.fill")
+                                    .font(.system(size: 12))
+                            } else {
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 12))
+                            }
+                        }
+                        .foregroundColor(AppColors.signalMercury)
+                        .frame(width: 28, height: 28)
+                        .background(AppColors.signalMercury.opacity(0.15))
+                        .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(AppColors.signalMercury)
+                    }
+                }
+
+                Text(voice.gender == .female ? "Female" : "Male")
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(AppColors.textSecondary)
+
+                if let error = previewError {
+                    Text(error)
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.accentWarning)
+                        .lineLimit(2)
+                }
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(isSelected ? AppColors.signalMercury : AppColors.glassBorder, lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

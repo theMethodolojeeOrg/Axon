@@ -102,7 +102,8 @@ final class MLXModelService: ObservableObject {
         // Scan for already downloaded models
         updateDownloadedModels()
         // Set up memory management for iOS
-        #if canImport(MLX)
+        // Note: MLX requires physical device - simulator has no Metal GPU support
+        #if canImport(MLX) && !targetEnvironment(simulator)
         // Limit Metal buffer cache to 20MB to help with memory pressure
         MLX.GPU.set(cacheLimit: 20 * 1024 * 1024)
         #endif
