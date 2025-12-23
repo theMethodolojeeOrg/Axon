@@ -1,0 +1,55 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "grok_image_generation",
+        "name": "Image Generation",
+        "description": "Generates images based on text descriptions using the Grok-2 Image model.",
+        "category": "creative",
+        "icon": {
+            "sfSymbol": "paintbrush.fill"
+        },
+        "requiresApproval": true,
+        "tags": [
+            "grok",
+            "image",
+            "generation",
+            "creative"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "grok"
+    },
+    "parameters": {
+        "prompt": {
+            "type": "string",
+            "description": "Description of the image to generate",
+            "required": true
+        },
+        "n": {
+            "type": "integer",
+            "description": "Number of images to generate (1-10)",
+            "default": 1,
+            "required": false
+        },
+        "response_format": {
+            "type": "string",
+            "description": "Format of the response ('url' or 'b64_json')",
+            "enum": [
+                "url",
+                "b64_json"
+            ],
+            "default": "url",
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Image Generation\nGenerate images from text descriptions.\n\n**Usage:**\nCall this tool with a detailed prompt to create an image.",
+        "imageGeneration": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "medium"
+    }
+}

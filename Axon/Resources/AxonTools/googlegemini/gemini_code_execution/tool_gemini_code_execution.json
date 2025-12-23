@@ -1,0 +1,32 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "gemini_code_execution",
+        "name": "Code Execution",
+        "description": "Enables the model to generate and execute Python code to solve complex problems, perform calculations, and analyze data.",
+        "category": "provider",
+        "icon": {
+            "sfSymbol": "terminal.fill"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "gemini",
+            "python",
+            "code",
+            "calculation",
+            "analysis"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "gemini"
+    },
+    "ai": {
+        "systemPromptSection": "### Code Execution\nThis tool enables you to write and execute Python code. Use it for math, data analysis, string processing, and tasks requiring iterative problem solving.\n\n**Capabilities:**\n- Iterative execution: Write code, run it, analyze output, and refine.\n- Libraries: standard library plus numpy, pandas, matplotlib, scipy, sklearn, and more.\n- I/O: Can process uploaded files (CSV, text) and generate Matplotlib plots.\n\n**Usage:**\nImplicitly enabled. Generate Python code blocks to use."
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "medium"
+    }
+}

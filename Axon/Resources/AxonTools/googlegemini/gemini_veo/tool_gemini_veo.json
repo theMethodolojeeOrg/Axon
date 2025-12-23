@@ -1,0 +1,64 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "gemini_veo",
+        "name": "Veo Video Generation",
+        "description": "Generate high-fidelity videos from text prompts using the Veo model.",
+        "category": "custom",
+        "icon": {
+            "sfSymbol": "film.fill"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "gemini",
+            "video",
+            "creative",
+            "movie",
+            "veo"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "gemini"
+    },
+    "parameters": {
+        "prompt": {
+            "type": "string",
+            "description": "Descriptive prompt for the video to generate",
+            "required": true
+        },
+        "negative_prompt": {
+            "type": "string",
+            "description": "What to exclude from the video",
+            "required": false
+        },
+        "duration_seconds": {
+            "type": "integer",
+            "description": "Duration of the video in seconds",
+            "enum": [
+                4,
+                6,
+                8
+            ],
+            "default": 4
+        },
+        "aspect_ratio": {
+            "type": "string",
+            "description": "Aspect ratio of the generated video",
+            "enum": [
+                "16:9",
+                "9:16"
+            ],
+            "default": "16:9"
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Veo Video Generation\nGenerate videos based on text prompts.\n\n**Capabilities:**\n- Text-to-Video generation\n- Cinematic quality\n\n**Usage:**\nCall this tool with a detailed prompt describing the desired scene, action, and style.",
+        "videoGeneration": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

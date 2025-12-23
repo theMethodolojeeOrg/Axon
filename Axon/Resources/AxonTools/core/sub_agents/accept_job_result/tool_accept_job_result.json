@@ -1,0 +1,82 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "accept_job_result",
+    "name": "Accept Job Result",
+    "description": "Accept and integrate a sub-agent job result.",
+    "category": "sub_agents",
+    "icon": { "sfSymbol": "checkmark.circle" },
+    "requiresApproval": false,
+    "tags": ["sub-agent", "job", "accept", "result"]
+  },
+  "parameters": {
+    "job_id": {
+      "type": "string",
+      "required": true,
+      "description": "Job ID to accept"
+    },
+    "reasoning": {
+      "type": "string",
+      "required": false,
+      "description": "Reason for acceptance"
+    },
+    "quality_score": {
+      "type": "number",
+      "required": false,
+      "description": "Quality rating 0-1",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "promote_to_memory": {
+      "type": "boolean",
+      "required": false,
+      "description": "Promote result to long-term memory",
+      "default": false
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "sub_agent"
+  },
+  "ai": {
+    "systemPromptSection": "### accept_job_result\nAccept sub-agent result.\n\n**Format:**\n```tool_request\n{\"tool\": \"accept_job_result\", \"query\": \"{\\\"job_id\\\": \\\"job-abc\\\", \\\"quality_score\\\": 0.9}\"}\n```\n\n**Parameters:**\n- job_id: Required\n- reasoning: Why accepting\n- quality_score: 0-1 rating\n- promote_to_memory: Save to long-term memory",
+    "usageExamples": [
+      { "description": "Accept with score", "input": "{\"job_id\": \"job-abc123\", \"quality_score\": 0.9}" },
+      { "description": "Accept and promote", "input": "{\"job_id\": \"job-abc123\", \"promote_to_memory\": true}" }
+    ],
+    "whenToUse": [
+      "Job completed successfully",
+      "Integrate results into main context"
+    ],
+    "whenNotToUse": [
+      "Results not reviewed",
+      "Quality issues"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "job_id", "widget": "text_field", "label": "Job ID", "placeholder": "job-..." },
+        { "param": "quality_score", "widget": "slider", "label": "Quality Score", "min": 0, "max": 1, "step": 0.1 },
+        { "param": "promote_to_memory", "widget": "toggle", "label": "Promote to Memory" },
+        { "param": "reasoning", "widget": "textarea", "label": "Reasoning", "rows": 2 }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Accept Result"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Result Accepted", "icon": "checkmark.circle" },
+        { "type": "text", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "agent_manage",
+    "approvalDescription": "Accept job result",
+    "scopes": ["agent.manage"],
+    "riskLevel": "low"
+  }
+}

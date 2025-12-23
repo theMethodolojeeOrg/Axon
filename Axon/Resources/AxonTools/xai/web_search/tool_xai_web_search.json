@@ -1,0 +1,68 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "xai_web_search",
+    "name": "xAI Web Search",
+    "description": "Search the web using xAI's Grok models with live search capabilities.",
+    "category": "search",
+    "icon": { "sfSymbol": "magnifyingglass.circle" },
+    "requiresApproval": false,
+    "tags": ["search", "web", "xai", "grok", "live"]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": true,
+      "description": "Search query for current information"
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "provider_native",
+    "handler": "xai",
+    "provider": "xai",
+    "nativeToolName": "xai_web_search"
+  },
+  "ai": {
+    "systemPromptSection": "### xai_web_search\nSearch the web using xAI's Grok with live search.\n\n**Format:**\n```tool_request\n{\"tool\": \"xai_web_search\", \"query\": \"latest tech news\"}\n```\n\n**Features:**\n- Real-time web search\n- X/Twitter integration\n- Current events access",
+    "usageExamples": [
+      { "description": "News search", "input": "{\"query\": \"latest tech news\"}" },
+      { "description": "Current events", "input": "{\"query\": \"trending topics today\"}" }
+    ],
+    "whenToUse": [
+      "Need real-time information",
+      "Social media trends",
+      "Current events"
+    ],
+    "whenNotToUse": [
+      "Historical data",
+      "Local file searches"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "query", "widget": "text_field", "label": "Search Query", "placeholder": "What do you want to search?" }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Search"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Search Results", "icon": "magnifyingglass.circle" },
+        { "type": "markdown", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "web_search",
+    "approvalDescription": "Search web: {{query}}",
+    "scopes": ["web.search"],
+    "riskLevel": "low"
+  },
+  "requirements": {
+    "apiKey": "xaiApiKey",
+    "provider": "xai"
+  }
+}

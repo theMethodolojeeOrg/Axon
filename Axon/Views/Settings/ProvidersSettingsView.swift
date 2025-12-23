@@ -90,6 +90,21 @@ struct ProvidersSettingsView: View {
                 )
             }
             .buttonStyle(.plain)
+
+            // Realtime Voice
+            NavigationLink {
+                SettingsSubviewContainer {
+                    LiveVoiceSettingsView(viewModel: viewModel)
+                }
+            } label: {
+                SettingsCategoryRow(
+                    icon: "waveform.circle.fill",
+                    iconColor: AppColors.signalIndigo,
+                    title: "Realtime Voice",
+                    subtitle: "Configure live session providers and voices"
+                )
+            }
+            .buttonStyle(.plain)
         }
         .navigationTitle("Providers")
     }

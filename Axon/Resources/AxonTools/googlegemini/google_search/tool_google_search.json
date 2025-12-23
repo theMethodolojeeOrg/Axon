@@ -1,0 +1,71 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "google_search",
+    "name": "Google Search",
+    "description": "Search the web for current information using Google's search capabilities.",
+    "category": "search",
+    "icon": { "sfSymbol": "magnifyingglass" },
+    "requiresApproval": false,
+    "tags": ["search", "web", "google", "current-info", "news"]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": true,
+      "description": "Search query for current information"
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "provider_native",
+    "handler": "gemini",
+    "provider": "gemini",
+    "nativeToolName": "google_search"
+  },
+  "ai": {
+    "systemPromptSection": "### google_search\nSearch the web for current information. Use for recent news, current prices, weather, stocks, or anything requiring up-to-date information.\n\n**Format:**\n```tool_request\n{\"tool\": \"google_search\", \"query\": \"current weather in Tokyo\"}\n```\n\n**Use for:** Recent news, live data, current events, fact-checking, prices, weather.",
+    "usageExamples": [
+      { "description": "Weather lookup", "input": "{\"query\": \"current weather in Tokyo\"}" },
+      { "description": "Stock price", "input": "{\"query\": \"AAPL stock price today\"}" },
+      { "description": "Recent news", "input": "{\"query\": \"latest AI news this week\"}" }
+    ],
+    "whenToUse": [
+      "Need current/real-time information",
+      "Fact-checking recent events",
+      "Weather, stocks, prices",
+      "Recent news or announcements"
+    ],
+    "whenNotToUse": [
+      "Historical facts that don't change",
+      "Information from user's local files",
+      "Creative or hypothetical scenarios"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "query", "widget": "text_field", "label": "Search Query", "placeholder": "What do you want to search for?" }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Search"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Search Results", "icon": "magnifyingglass" },
+        { "type": "markdown", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "web_search",
+    "approvalDescription": "Search Google for: {{query}}",
+    "scopes": ["web.search"],
+    "riskLevel": "low"
+  },
+  "requirements": {
+    "apiKey": "geminiApiKey",
+    "provider": "gemini"
+  }
+}

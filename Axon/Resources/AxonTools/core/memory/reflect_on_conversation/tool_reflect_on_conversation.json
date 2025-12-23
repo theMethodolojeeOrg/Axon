@@ -1,0 +1,45 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "reflect_on_conversation",
+    "name": "Reflect on Conversation",
+    "description": "Meta-analysis of the current conversation to identify patterns, key themes, and potential memories to create.",
+    "category": "memory",
+    "icon": { "sfSymbol": "sparkles" },
+    "requiresApproval": true,
+    "tags": ["memory", "reflection", "meta-analysis", "patterns"]
+  },
+  "parameters": {},
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "memory"
+  },
+  "ai": {
+    "systemPromptSection": "### reflect_on_conversation\nPerform meta-analysis on the current conversation.\n\n**Format:**\n```tool_request\n{\"tool\": \"reflect_on_conversation\", \"query\": \"\"}\n```\n\n**Returns:** Analysis of themes, patterns, and suggested memories.",
+    "whenToUse": [
+      "End of a substantial conversation",
+      "User asks what you learned",
+      "Before creating multiple memories"
+    ],
+    "whenNotToUse": [
+      "Very short conversations",
+      "Simple Q&A interactions"
+    ]
+  },
+  "ui": {
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Conversation Reflection", "icon": "sparkles" },
+        { "type": "text", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "memory_reflect",
+    "approvalDescription": "Reflect on current conversation",
+    "scopes": ["memory.read", "conversation.analyze"],
+    "riskLevel": "medium"
+  }
+}

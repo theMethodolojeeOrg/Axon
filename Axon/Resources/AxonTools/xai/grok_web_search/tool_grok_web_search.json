@@ -1,0 +1,61 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "grok_web_search",
+        "name": "Web Search",
+        "description": "Allows the agent to search the web and browse pages to find information.",
+        "category": "discovery",
+        "icon": {
+            "sfSymbol": "globe"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "grok",
+            "search",
+            "web",
+            "internet"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "grok"
+    },
+    "parameters": {
+        "query": {
+            "type": "string",
+            "description": "The search query",
+            "required": true
+        },
+        "allowed_domains": {
+            "type": "array",
+            "description": "List of domains to restrict search to (max 5)",
+            "items": {
+                "type": "string"
+            },
+            "required": false
+        },
+        "excluded_domains": {
+            "type": "array",
+            "description": "List of domains to exclude from search (max 5)",
+            "items": {
+                "type": "string"
+            },
+            "required": false
+        },
+        "enable_image_understanding": {
+            "type": "boolean",
+            "description": "Enable visual analysis of images found during search",
+            "default": false,
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Web Search\nSearch the public web for information.\n\n**Capabilities:**\n- Search engines\n- Web browsing\n\n**Usage:**\nEnabled via tool configuration.",
+        "webSearch": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

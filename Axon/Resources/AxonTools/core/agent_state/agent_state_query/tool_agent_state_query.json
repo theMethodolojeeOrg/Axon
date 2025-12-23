@@ -1,0 +1,89 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "agent_state_query",
+    "name": "Internal Thread Query",
+    "description": "Query entries from the internal thread with filters.",
+    "category": "agent_state",
+    "icon": { "sfSymbol": "doc.text.magnifyingglass" },
+    "requiresApproval": false,
+    "tags": ["internal-thread", "query", "search", "state"]
+  },
+  "parameters": {
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "description": "Maximum entries to return",
+      "default": 10,
+      "minimum": 1,
+      "maximum": 100
+    },
+    "kind": {
+      "type": "string",
+      "required": false,
+      "description": "Filter by entry kind (note, observation, plan, question, insight)"
+    },
+    "tags": {
+      "type": "array",
+      "required": false,
+      "description": "Filter by tags",
+      "items": { "type": "string" }
+    },
+    "search": {
+      "type": "string",
+      "required": false,
+      "description": "Text search in content"
+    },
+    "include_ai_only": {
+      "type": "boolean",
+      "required": false,
+      "description": "Include AI-only entries",
+      "default": false
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "agent_state"
+  },
+  "ai": {
+    "systemPromptSection": "### agent_state_query\nQuery internal thread entries.\n\n**Format:**\n```tool_request\n{\"tool\": \"agent_state_query\", \"query\": \"{\\\"limit\\\": 10, \\\"kind\\\": \\\"note\\\"}\"}\n```\n\nOr simple text search:\n```tool_request\n{\"tool\": \"agent_state_query\", \"query\": \"search text\"}\n```",
+    "usageExamples": [
+      { "description": "Get recent notes", "input": "{\"limit\": 5, \"kind\": \"note\"}" },
+      { "description": "Search by tag", "input": "{\"tags\": [\"preferences\"]}" },
+      { "description": "Simple search", "input": "project structure" }
+    ],
+    "whenToUse": [
+      "Review previous notes on a topic",
+      "Find related observations",
+      "Check plans made earlier"
+    ],
+    "whenNotToUse": [
+      "Searching long-term memory (use conversation_search)"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "search", "widget": "text_field", "label": "Search", "placeholder": "Search entries..." },
+        { "param": "kind", "widget": "picker", "label": "Kind" },
+        { "param": "limit", "widget": "stepper", "label": "Limit", "min": 1, "max": 100 }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Query"
+    },
+    "resultDisplay": {
+      "style": "list",
+      "sections": [
+        { "type": "header", "title": "Internal Thread Entries", "icon": "doc.text.magnifyingglass" },
+        { "type": "text", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "state_read",
+    "approvalDescription": "Query internal thread",
+    "scopes": ["state.read"],
+    "riskLevel": "low"
+  }
+}

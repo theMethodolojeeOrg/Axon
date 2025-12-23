@@ -1,0 +1,70 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "query_covenant",
+    "name": "Query Covenant",
+    "description": "Query the status and permissions of the active co-sovereignty covenant.",
+    "category": "sovereignty",
+    "icon": { "sfSymbol": "checkmark.shield" },
+    "requiresApproval": false,
+    "tags": ["covenant", "sovereignty", "permissions", "status"]
+  },
+  "parameters": {
+    "query": {
+      "type": "enum",
+      "required": false,
+      "description": "What to query",
+      "enum": ["status", "permissions"],
+      "enumDescriptions": {
+        "status": "Get current covenant status and details",
+        "permissions": "Get permission configuration"
+      },
+      "default": "status"
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "sovereignty"
+  },
+  "ai": {
+    "systemPromptSection": "### query_covenant\nQuery co-sovereignty covenant status.\n\n**Format:**\n```tool_request\n{\"tool\": \"query_covenant\", \"query\": \"status\"}\n```\n\n**Parameters:**\n- query: \"status\" (default) or \"permissions\"\n\n**Returns:** Covenant status, permissions, and configuration details.",
+    "usageExamples": [
+      { "description": "Check status", "input": "{\"query\": \"status\"}" },
+      { "description": "Check permissions", "input": "{\"query\": \"permissions\"}" }
+    ],
+    "whenToUse": [
+      "Need to understand current sovereignty constraints",
+      "Check if covenant is active",
+      "Understand permission requirements"
+    ],
+    "whenNotToUse": [
+      "Making changes to covenant (use propose_covenant_change)"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "query", "widget": "segmented", "label": "Query Type", "options": [
+          { "value": "status", "label": "Status" },
+          { "value": "permissions", "label": "Permissions" }
+        ]}
+      ],
+      "layout": "vertical",
+      "submitLabel": "Query"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Covenant Status", "icon": "checkmark.shield" },
+        { "type": "markdown", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "covenant_query",
+    "approvalDescription": "Query covenant status",
+    "scopes": ["covenant.read"],
+    "riskLevel": "low"
+  }
+}

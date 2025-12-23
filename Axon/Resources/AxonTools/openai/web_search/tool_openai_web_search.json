@@ -1,0 +1,83 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "openai_web_search",
+    "name": "OpenAI Web Search",
+    "description": "Search the web using OpenAI's search-preview models with location awareness.",
+    "category": "search",
+    "icon": { "sfSymbol": "globe.magnifyingglass" },
+    "requiresApproval": false,
+    "tags": ["search", "web", "openai", "current-info", "citations"]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": true,
+      "description": "Search query for current information"
+    },
+    "filters": {
+      "type": "object",
+      "required": false,
+      "description": "Search filters (optional)"
+    },
+    "enable_image_understanding": {
+      "type": "boolean",
+      "required": false,
+      "description": "Enable image understanding in results",
+      "default": false
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "provider_native",
+    "handler": "openai",
+    "provider": "openai",
+    "nativeToolName": "openai_web_search",
+    "model": "gpt-4o-search-preview"
+  },
+  "ai": {
+    "systemPromptSection": "### openai_web_search\nSearch the web using GPT-4o search-preview models.\n\n**Format:**\n```tool_request\n{\"tool\": \"openai_web_search\", \"query\": \"latest news about SpaceX\"}\n```\n\n**Features:**\n- Location-aware search results\n- Citation extraction with URLs\n- Real-time information\n\n**Use for:** Current events, news, fact-checking, real-time data.",
+    "usageExamples": [
+      { "description": "News search", "input": "{\"query\": \"latest SpaceX launch news\"}" },
+      { "description": "Current events", "input": "{\"query\": \"current Bitcoin price\"}" }
+    ],
+    "whenToUse": [
+      "Need current/real-time information",
+      "Want citations with sources",
+      "Location-relevant searches"
+    ],
+    "whenNotToUse": [
+      "Historical facts",
+      "Local file searches",
+      "Creative scenarios"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "query", "widget": "text_field", "label": "Search Query", "placeholder": "What do you want to search for?" },
+        { "param": "enable_image_understanding", "widget": "toggle", "label": "Enable Image Understanding" }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Search"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Search Results", "icon": "globe.magnifyingglass" },
+        { "type": "markdown", "source": "{{output}}" },
+        { "type": "list", "title": "Citations", "source": "{{citations}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "web_search",
+    "approvalDescription": "Search web: {{query}}",
+    "scopes": ["web.search"],
+    "riskLevel": "low"
+  },
+  "requirements": {
+    "apiKey": "openaiApiKey",
+    "provider": "openai"
+  }
+}

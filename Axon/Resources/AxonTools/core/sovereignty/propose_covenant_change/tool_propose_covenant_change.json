@@ -1,0 +1,69 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "propose_covenant_change",
+    "name": "Propose Covenant Change",
+    "description": "Submit a proposal to modify the co-sovereignty covenant.",
+    "category": "sovereignty",
+    "icon": { "sfSymbol": "doc.badge.plus" },
+    "requiresApproval": true,
+    "tags": ["covenant", "sovereignty", "proposal", "change"]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": true,
+      "description": "Proposal in format: PROPOSAL_TYPE|REASONING|DETAILS"
+    }
+  },
+  "inputFormat": { "style": "pipe_delimited" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "sovereignty"
+  },
+  "ai": {
+    "systemPromptSection": "### propose_covenant_change\nSubmit covenant modification proposal.\n\n**Format:**\n```tool_request\n{\"tool\": \"propose_covenant_change\", \"query\": \"PROPOSAL_TYPE|REASONING|DETAILS\"}\n```\n\n**Proposal Types:**\n- permission_request: Request new permission scope\n- permission_release: Release a permission\n- scope_expansion: Expand tool access\n- scope_reduction: Reduce tool access\n\n**Example:**\n```tool_request\n{\"tool\": \"propose_covenant_change\", \"query\": \"permission_request|Need file access for task completion|file.write scope for Documents folder\"}\n```\n\n**Note:** Proposals require human review and approval.",
+    "usageExamples": [
+      { "description": "Request permission", "input": "permission_request|Need to save files|file.write scope for Documents" },
+      { "description": "Release permission", "input": "permission_release|Task completed|file.write no longer needed" }
+    ],
+    "whenToUse": [
+      "Need additional permissions for a task",
+      "Want to release unused permissions",
+      "Propose scope changes"
+    ],
+    "whenNotToUse": [
+      "Just checking current status (use query_covenant)",
+      "Routine operations within existing permissions"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "proposal_type", "widget": "dropdown", "label": "Proposal Type", "options": [
+          { "value": "permission_request", "label": "Request Permission" },
+          { "value": "permission_release", "label": "Release Permission" },
+          { "value": "scope_expansion", "label": "Expand Scope" },
+          { "value": "scope_reduction", "label": "Reduce Scope" }
+        ]},
+        { "param": "reasoning", "widget": "textarea", "label": "Reasoning", "placeholder": "Why is this change needed?", "rows": 2 },
+        { "param": "details", "widget": "textarea", "label": "Details", "placeholder": "Specific permissions or scopes", "rows": 3 }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Submit Proposal"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Proposal Submitted", "icon": "doc.badge.plus" },
+        { "type": "markdown", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "covenant_modify",
+    "approvalDescription": "Propose covenant change: {{query}}",
+    "scopes": ["covenant.propose"],
+    "riskLevel": "high"
+  }
+}

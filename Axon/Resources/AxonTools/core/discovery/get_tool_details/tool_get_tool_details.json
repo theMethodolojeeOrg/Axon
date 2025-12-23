@@ -1,0 +1,60 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "get_tool_details",
+    "name": "Get Tool Details",
+    "description": "Get detailed information about a specific tool.",
+    "category": "discovery",
+    "icon": { "sfSymbol": "info.circle" },
+    "requiresApproval": false,
+    "tags": ["discovery", "tool", "details", "schema"]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": true,
+      "description": "Tool ID to get details for"
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "discovery"
+  },
+  "ai": {
+    "systemPromptSection": "### get_tool_details\nGet tool details.\n\n**Format:**\n```tool_request\n{\"tool\": \"get_tool_details\", \"query\": \"tool_id\"}\n```\n\n**Returns:** name, description, category, parameters, requirements.",
+    "usageExamples": [
+      { "description": "Get memory tool details", "input": "create_memory" },
+      { "description": "Get heartbeat details", "input": "heartbeat_configure" }
+    ],
+    "whenToUse": [
+      "Need to understand a tool's parameters",
+      "Before using an unfamiliar tool"
+    ],
+    "whenNotToUse": [
+      "Already know the tool"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "query", "widget": "text_field", "label": "Tool ID", "placeholder": "Enter tool ID..." }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Get Details"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Tool Details", "icon": "info.circle" },
+        { "type": "text", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "discovery_query",
+    "approvalDescription": "Get details for: {{query}}",
+    "scopes": ["discovery.read"],
+    "riskLevel": "low"
+  }
+}

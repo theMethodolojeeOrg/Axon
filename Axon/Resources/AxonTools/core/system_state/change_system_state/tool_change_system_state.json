@@ -1,0 +1,68 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "change_system_state",
+    "name": "Change System State",
+    "description": "Request changes to system configuration (requires user approval).",
+    "category": "system_state",
+    "icon": { "sfSymbol": "gearshape.arrow.triangle.2.circlepath" },
+    "requiresApproval": true,
+    "tags": ["system", "configuration", "change", "model"]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": true,
+      "description": "Format: CATEGORY|TARGET|VALUE|REASONING"
+    }
+  },
+  "inputFormat": {
+    "style": "pipe_delimited",
+    "pattern": "{{category}}|{{target}}|{{value}}|{{reasoning}}",
+    "delimiter": "|",
+    "fields": ["category", "target", "value", "reasoning"]
+  },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "system_state"
+  },
+  "ai": {
+    "systemPromptSection": "### change_system_state\nRequest system configuration change.\n\n**Format:**\n```tool_request\n{\"tool\": \"change_system_state\", \"query\": \"CATEGORY|TARGET|VALUE|REASONING\"}\n```\n\n**Categories:**\n- model: Change AI model (target=provider, value=model_id)\n- tool: Enable/disable tool (target=tool_id, value=enable|disable)\n- provider: Switch provider (target=provider_name, value=unused)\n\n**Examples:**\n- `model|gemini|gemini-2.0-flash|Need faster responses`\n- `tool|code_execution|enable|Need to run Python code`\n- `provider|openai|_|User requested OpenAI`",
+    "usageExamples": [
+      { "description": "Change model", "input": "model|gemini|gemini-2.0-flash|Better for this task" },
+      { "description": "Enable tool", "input": "tool|code_execution|enable|Need to run code" },
+      { "description": "Switch provider", "input": "provider|openai|_|User requested" }
+    ],
+    "whenToUse": [
+      "Current model not suited for task",
+      "Need specific tool capabilities",
+      "User asked to switch provider"
+    ],
+    "whenNotToUse": [
+      "Current config works fine",
+      "Without clear reasoning"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "query", "widget": "textarea", "label": "Change Request", "placeholder": "CATEGORY|TARGET|VALUE|REASONING", "rows": 2 }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Request Change"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Change Requested", "icon": "gearshape.arrow.triangle.2.circlepath" },
+        { "type": "text", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "system_modify",
+    "approvalDescription": "Change system configuration",
+    "scopes": ["system.modify"],
+    "riskLevel": "high"
+  }
+}

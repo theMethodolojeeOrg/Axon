@@ -93,6 +93,9 @@ struct AppSettings: Codable, Equatable, Sendable {
     // VS Code Bridge
     var bridgeSettings: BridgeSettings = BridgeSettings()
 
+    // Realtime Voice
+    var liveSettings: LiveSettings = LiveSettings()
+
     // Custom Providers
     var customProviders: [CustomProviderConfig] = []
 
@@ -2718,4 +2721,20 @@ enum AudioSyncQuality: String, Codable, CaseIterable, Identifiable, Sendable {
         case .compressed: return "arrow.down.right.and.arrow.up.left"
         }
     }
+}
+
+// MARK: - Live Settings for Realtime Voice
+
+struct LiveSettings: Codable, Equatable, Sendable {
+    /// Active Live provider (defaults to Gemini)
+    var defaultProvider: AIProvider = .gemini
+
+    /// Default model ID for Live sessions
+    var defaultModelId: String = "gemini-2.5-flash-native-audio-preview-09-2025"
+
+    /// OpenAI-specific voice (default: marin)
+    var openAIVoice: String = "marin"
+
+    /// Gemini-specific voice (default: Leda)
+    var geminiVoice: String = "Leda"
 }

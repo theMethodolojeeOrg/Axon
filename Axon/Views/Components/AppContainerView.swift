@@ -20,6 +20,7 @@ struct AppContainerView: View {
     @StateObject private var authService = AuthenticationService.shared
     @StateObject private var costService = CostService.shared
     @StateObject private var taglineManager = TaglineManager.shared
+    @StateObject private var liveService = LiveSessionService.shared
 
     @State private var showSidebar = false
     @State private var selectedConversation: Conversation?
@@ -38,6 +39,12 @@ struct AppContainerView: View {
             #else
             iosBody
             #endif
+
+            // Live Session Overlay
+            if liveService.status != .idle && liveService.status != .disconnected {
+                LiveSessionOverlay()
+                    .zIndex(200) // Ensure visibility
+            }
 
             // Launch Screen Overlay
             if showLaunchScreen {
@@ -226,6 +233,14 @@ struct AppContainerView: View {
                                 Image(systemName: "square.and.pencil")
                                     .foregroundColor(AppColors.signalMercury)
                             }
+                            
+                            if selectedConversation != nil {
+                                Button(action: startLiveSession) {
+                                    Image(systemName: "waveform.circle")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(AppColors.signalIndigo)
+                                }
+                            }
                         }
                     }
                 }
@@ -347,6 +362,44 @@ struct AppContainerView: View {
 
         currentView = view
         showSidebar = false
+    }
+
+
+    private func startLiveSession() {
+        guard let conversation = selectedConversation else { return }
+        
+        let settings = settingsViewModel.settings.liveSettings
+        var provider: AIProvider = settings.defaultProvider
+        var modelId = settings.defaultModelId
+        var voice = (provider == .openai) ? settings.openAIVoice : settings.geminiVoice
+        
+        // Check for overrides
+        let key = "conversation_overrides_\(conversation.id)"
+        if let data = UserDefaults.standard.data(forKey: key),
+           let overrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data) {
+            
+            if let pRaw = overrides.liveProvider {
+                 if pRaw == "openai" { provider = .openai }
+                 else if pRaw == "gemini" { provider = .gemini }
+            }
+            if let m = overrides.liveModel { modelId = m }
+            if let v = overrides.liveVoice { voice = v }
+        }
+        
+        // Update voice based on provider if not overridden specifically (simplified logic)
+        // Ideally we should check if voice matches provider context, but we trust the user/logic here.
+        
+        let config = LiveSessionConfig(
+             apiKey: "", // Resolved by Service
+             modelId: modelId,
+             voice: voice,
+             systemInstruction: "You are a helpful assistant.",
+             tools: nil
+        )
+        
+        Task {
+            await liveService.startSession(config: config, providerType: provider)
+        }
     }
 }
 

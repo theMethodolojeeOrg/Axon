@@ -199,12 +199,15 @@ enum CanonicalModelKey: String, CaseIterable, Hashable, Codable {
     case deepseekChat = "deepseek-chat"
 
     // Z.ai (Zhipu AI)
+    case glm47 = "glm-4.7"
     case glm46 = "glm-4.6"
     case glm46v = "glm-4.6v"
+    case glm46vFlashX = "glm-4.6v-flashx"
     case glm46vFlash = "glm-4.6v-flash"
     case glm45 = "glm-4.5"
-    case glm45Air = "glm-4.5-air"
     case glm45v = "glm-4.5v"
+    case glm45Air = "glm-4.5-air"
+    case glm45Flash = "glm-4.5-flash"
 
     // MiniMax
     case minimaxM2 = "minimax-m2"
@@ -271,12 +274,15 @@ struct PricingRegistry {
         .deepseekChat: .init(inputPerMTokUSD: 0.27, outputPerMTokUSD: 1.10, cachedInputPerMTokUSD: 0.07, notes: "V3 chat model"),
 
         // Z.ai (Zhipu AI)
-        .glm46: .init(inputPerMTokUSD: 0.60, outputPerMTokUSD: 2.20, cachedInputPerMTokUSD: nil, notes: "Flagship text"),
-        .glm46v: .init(inputPerMTokUSD: 0.30, outputPerMTokUSD: 0.90, cachedInputPerMTokUSD: nil, notes: "Flagship vision + thinking"),
-        .glm46vFlash: .init(inputPerMTokUSD: 0.15, outputPerMTokUSD: 0.45, cachedInputPerMTokUSD: nil, notes: "Fast vision"),
-        .glm45: .init(inputPerMTokUSD: 0.60, outputPerMTokUSD: 2.20, cachedInputPerMTokUSD: nil, notes: nil),
-        .glm45Air: .init(inputPerMTokUSD: 0.30, outputPerMTokUSD: 0.90, cachedInputPerMTokUSD: nil, notes: "Balanced tier"),
-        .glm45v: .init(inputPerMTokUSD: 0.60, outputPerMTokUSD: 1.80, cachedInputPerMTokUSD: nil, notes: "Multimodal"),
+        .glm47: .init(inputPerMTokUSD: 0.60, outputPerMTokUSD: 2.20, cachedInputPerMTokUSD: 0.11, notes: "Latest flagship, best coding"),
+        .glm46: .init(inputPerMTokUSD: 0.60, outputPerMTokUSD: 2.20, cachedInputPerMTokUSD: 0.11, notes: "Previous flagship"),
+        .glm46v: .init(inputPerMTokUSD: 0.30, outputPerMTokUSD: 0.90, cachedInputPerMTokUSD: 0.05, notes: "Flagship vision + thinking"),
+        .glm46vFlashX: .init(inputPerMTokUSD: 0.04, outputPerMTokUSD: 0.40, cachedInputPerMTokUSD: 0.004, notes: "Ultra-fast vision"),
+        .glm46vFlash: .init(inputPerMTokUSD: 0.00, outputPerMTokUSD: 0.00, cachedInputPerMTokUSD: nil, notes: "Free vision"),
+        .glm45: .init(inputPerMTokUSD: 0.60, outputPerMTokUSD: 2.20, cachedInputPerMTokUSD: 0.11, notes: nil),
+        .glm45v: .init(inputPerMTokUSD: 0.60, outputPerMTokUSD: 1.80, cachedInputPerMTokUSD: 0.11, notes: "Multimodal"),
+        .glm45Air: .init(inputPerMTokUSD: 0.20, outputPerMTokUSD: 1.10, cachedInputPerMTokUSD: 0.03, notes: "Balanced tier"),
+        .glm45Flash: .init(inputPerMTokUSD: 0.00, outputPerMTokUSD: 0.00, cachedInputPerMTokUSD: nil, notes: "Free"),
 
         // MiniMax (extremely low pricing)
         .minimaxM2: .init(inputPerMTokUSD: 0.15, outputPerMTokUSD: 0.60, cachedInputPerMTokUSD: nil, notes: "1M context, agentic"),
@@ -376,9 +382,12 @@ struct PricingKeyResolver {
         if lower.contains("deepseek-reasoner") || lower.contains("deepseek-r1") { return .deepseekReasoner }
         if lower.contains("deepseek-chat") || lower.contains("deepseek-v3") { return .deepseekChat }
         // Z.ai (Zhipu AI)
+        if lower.contains("glm-4.7") { return .glm47 }
+        if lower.contains("glm-4.6v-flashx") { return .glm46vFlashX }
         if lower.contains("glm-4.6v-flash") { return .glm46vFlash }
         if lower.contains("glm-4.6v") { return .glm46v }
         if lower.contains("glm-4.6") { return .glm46 }
+        if lower.contains("glm-4.5-flash") { return .glm45Flash }
         if lower.contains("glm-4.5-air") { return .glm45Air }
         if lower.contains("glm-4.5v") { return .glm45v }
         if lower.contains("glm-4.5") { return .glm45 }
@@ -401,7 +410,7 @@ struct PricingKeyResolver {
         case .xai: return .grok3Mini
         case .perplexity: return .sonar
         case .deepseek: return .deepseekChat
-        case .zai: return .glm45Air
+        case .zai: return .glm47
         case .minimax: return .minimaxM2
         case .mistral: return .codestral
         case .appleFoundation: return .claudeHaiku45  // Apple Intelligence is free, no pricing key needed - fallback for display

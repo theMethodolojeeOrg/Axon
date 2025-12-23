@@ -1,0 +1,66 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "invoke_port",
+    "name": "Invoke Port",
+    "description": "Invoke an external app integration with parameters.",
+    "category": "discovery",
+    "icon": { "sfSymbol": "arrow.up.forward.app" },
+    "requiresApproval": true,
+    "tags": ["ports", "external", "invoke", "integration"]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": true,
+      "description": "Format: port_id | param1=value1 | param2=value2"
+    }
+  },
+  "inputFormat": {
+    "style": "pipe_delimited",
+    "pattern": "{{port_id}}|{{params}}",
+    "delimiter": "|"
+  },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "discovery"
+  },
+  "ai": {
+    "systemPromptSection": "### invoke_port\nInvoke external app.\n\n**Format:**\n```tool_request\n{\"tool\": \"invoke_port\", \"query\": \"port_id | param1=value1 | param2=value2\"}\n```\n\n**Examples:**\n- `obsidian_new_note | title=Meeting Notes | content=...`\n- `things_add | title=Review code | notes=PR #123`\n- `bear_create | title=Ideas | text=My ideas`",
+    "usageExamples": [
+      { "description": "Create Obsidian note", "input": "obsidian_new_note | title=Notes | content=My content" },
+      { "description": "Add task to Things", "input": "things_add | title=Review code | notes=PR #123" },
+      { "description": "Create Bear note", "input": "bear_create | title=Ideas | text=Some ideas" }
+    ],
+    "whenToUse": [
+      "User wants to create content in external app",
+      "Integration with notes, tasks, etc."
+    ],
+    "whenNotToUse": [
+      "Port doesn't exist",
+      "Without user request"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "query", "widget": "textarea", "label": "Port Invocation", "placeholder": "port_id | param1=value1 | ...", "rows": 2 }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Invoke"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Port Invoked", "icon": "arrow.up.forward.app" },
+        { "type": "text", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "port_invoke",
+    "approvalDescription": "Invoke external app port",
+    "scopes": ["port.invoke"],
+    "riskLevel": "medium"
+  }
+}

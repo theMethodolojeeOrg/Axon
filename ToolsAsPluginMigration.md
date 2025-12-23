@@ -431,13 +431,26 @@ All handlers:
 - `AppSettings.selectedModelId` → `defaultModel`
 - `PortRegistryEntry.buildURL` → `generateUrl`
 
-### 🔲 Phase 4: Create tool.json Files — PENDING
-- Need to create actual tool.json manifests in `/Axon/Resources/AxonTools/`
+### ✅ Phase 4: Create tool.json Files — COMPLETE
+*Completed December 23, 2024*
 
-### 🔲 Phase 5: Integration — PENDING
-- `ToolIndexServiceV2.swift`
-- `ToolApprovalBridgeV2.swift`
-- `ToolSovereigntyBridgeV2.swift`
+Created **80 tool.json manifests** in `/Axon/Resources/AxonTools/`:
+
+| Category | Tools |
+|----------|-------|
+| **Core Tools (33)** | memory (3), agent_state (4), heartbeat (4), discovery (4), notification (1), system_state (2), temporal (3), device_presence (4), sub_agents (6), sovereignty (2), debug (1) |
+| **System Tools (16)** | mac_system_info, mac_processes, mac_disk_usage, mac_clipboard_*, mac_notification, mac_spotlight_search, mac_file_*, mac_app_*, mac_screenshot, mac_network_info, mac_ping, mac_shell |
+| **Provider Tools (31)** | Gemini (18), OpenAI (11), xAI (5), zAI (5) - see Provider Handlers section for details |
+
+Master index created: `_index.json`
+
+### ✅ Phase 5: Integration — COMPLETE
+*Completed December 23, 2024*
+
+- `ToolIndexServiceV2.swift` — Search index and system prompt generation
+- `ToolApprovalBridgeV2.swift` — Bridge V2 tools to existing ToolApprovalService
+- `ToolSovereigntyBridgeV2.swift` — Bridge V2 tools to existing SovereigntyService
+- `ToolExecutionRouterV2.swift` — Updated to use new bridges for approval/sovereignty checks
 
 ### 🔲 Phase 6: UI Layer — PENDING
 - `ToolUIRenderer.swift`
@@ -450,12 +463,64 @@ All handlers:
 
 ---
 
-## Remaining Provider Handlers
+## ✅ Provider Handlers — COMPLETE
+*Completed December 23, 2024*
 
-The following provider-specific handlers are pending:
+Created **4 provider handlers** in `/Axon/Services/ToolsV2/Handlers/`:
 
-| Handler | Tools |
-|---------|-------|
-| `OpenAIHandler.swift` | web_search, image_gen, deep_research, video_gen |
-| `GeminiHandler.swift` | google_search, code_execution, url_context, video_gen |
+| Handler | Handler ID | Tools |
+|---------|-----------|-------|
+| `GeminiHandler.swift` | `gemini` | 18 tools (see below) |
+| `OpenAIHandler.swift` | `openai` | 10 tools (see below) |
+| `XAIHandler.swift` | `xai` | 5 tools (see below) |
+| `ZAIHandler.swift` | `zai` | 5 tools (see below) |
+
+All handlers registered in `InternalHandlerRegistryV2.registerBuiltInHandlers()`
+
+### Provider Tool Details
+
+**GeminiHandler (18 tools):**
+- Search: `google_search`, `gemini_google_search`
+- Code: `code_execution`, `gemini_code_execution`
+- Web: `url_context`, `gemini_url_context`
+- Maps: `google_maps`, `gemini_google_maps`
+- Files: `file_search`, `gemini_file_search`
+- Video Gen: `gemini_veo`, `gemini_video_gen`
+- Image Gen: `gemini_image_generation`
+- Research: `gemini_deep_research`
+- Computer: `gemini_computer_use`
+- Embeddings: `gemini_embeddings`
+- Audio: `gemini_speech_to_text`, `gemini_text_to_speech`
+- Video Analysis: `gemini_video_understanding`
+
+**OpenAIHandler (10 tools):**
+- Search: `openai_web_search`, `web_search`
+- Image Gen: `openai_image_gen`, `openai_image_generation`, `image_generation`
+- Research: `openai_deep_research`, `deep_research`
+- Video Gen: `openai_video_gen`, `openai_video_generation`, `video_generation`
+- Computer: `openai_computer_use`
+- Embeddings: `openai_embeddings`
+- Audio: `openai_speech_to_text`, `openai_text_to_speech`
+
+**XAIHandler (5 tools):**
+- Search: `xai_web_search`, `grok_web_search`, `web_search`
+- X/Twitter: `grok_x_search`
+- Image Gen: `grok_image_generation`
+- Code: `grok_code_execution`
+
+**ZAIHandler (5 tools):**
+- Search: `zai_web_search`, `glm_web_search`, `web_search`
+- Image Gen: `glm_cogview_4`
+- Video Gen: `glm_cogvideo_3`
+- Audio: `glm_speech_to_text`
+
+### Provider Tool Manifests
+
+Updated `_index.json` with **31 provider tools** (up from 12):
+- Gemini: 18 tool manifests in `/googlegemini/`
+- OpenAI: 11 tool manifests in `/openai/`
+- xAI: 5 tool manifests in `/xai/`
+- zAI: 5 tool manifests in `/zai/`
+
+**Total tools: 80** (33 core + 16 system + 31 provider)
 

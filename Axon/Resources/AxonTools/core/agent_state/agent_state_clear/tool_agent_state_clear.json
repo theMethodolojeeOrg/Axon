@@ -1,0 +1,68 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "agent_state_clear",
+    "name": "Internal Thread Clear",
+    "description": "Clear entries from the internal thread (all or specific IDs).",
+    "category": "agent_state",
+    "icon": { "sfSymbol": "trash" },
+    "requiresApproval": false,
+    "tags": ["internal-thread", "clear", "delete", "state"]
+  },
+  "parameters": {
+    "all": {
+      "type": "boolean",
+      "required": false,
+      "description": "Clear all entries"
+    },
+    "ids": {
+      "type": "array",
+      "required": false,
+      "description": "Specific entry IDs to delete",
+      "items": { "type": "string" }
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "agent_state"
+  },
+  "ai": {
+    "systemPromptSection": "### agent_state_clear\nClear internal thread entries.\n\n**Clear all:**\n```tool_request\n{\"tool\": \"agent_state_clear\", \"query\": \"{\\\"all\\\": true}\"}\n```\n\n**Clear specific IDs:**\n```tool_request\n{\"tool\": \"agent_state_clear\", \"query\": \"{\\\"ids\\\": [\\\"id1\\\", \\\"id2\\\"]}\"}\n```",
+    "usageExamples": [
+      { "description": "Clear all", "input": "{\"all\": true}" },
+      { "description": "Clear specific entries", "input": "{\"ids\": [\"entry-123\", \"entry-456\"]}" }
+    ],
+    "whenToUse": [
+      "Clean up completed task notes",
+      "Remove outdated observations",
+      "Start fresh for a new context"
+    ],
+    "whenNotToUse": [
+      "Important ongoing work notes",
+      "Without user consent for all-clear"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "all", "widget": "toggle", "label": "Clear All" }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Clear"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Entries Cleared", "icon": "trash" },
+        { "type": "text", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "state_delete",
+    "approvalDescription": "Clear internal thread entries",
+    "scopes": ["state.delete"],
+    "riskLevel": "medium"
+  }
+}

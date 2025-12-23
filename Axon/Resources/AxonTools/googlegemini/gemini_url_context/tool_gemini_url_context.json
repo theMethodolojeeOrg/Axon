@@ -1,0 +1,43 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "gemini_url_context",
+        "name": "URL Context",
+        "description": "Enables the model to fetch, read, and analyze content from URLs mentioned in the conversation.",
+        "category": "discovery",
+        "icon": {
+            "sfSymbol": "link"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "gemini",
+            "url",
+            "web",
+            "read",
+            "context"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "gemini"
+    },
+    "parameters": {
+        "urls": {
+            "type": "array",
+            "description": "List of URLs to explicitly fetch context from (optional, model usually detects automatically)",
+            "items": {
+                "type": "string"
+            },
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### URL Context\nAutomatically fetch and read content from URLs.\n\n**Capabilities:**\n- Read web pages, PDFs, and articles\n- Summarize and analyze external content\n\n**Usage:**\nEnabled via tool configuration. The model will automatically access URLs provided in the user prompt.",
+        "urlContext": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

@@ -1,0 +1,50 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "gemini_video_understanding",
+        "name": "Video Understanding",
+        "description": "Analyzes video content to provide summaries, answer questions, or extract insights.",
+        "category": "system",
+        "icon": {
+            "sfSymbol": "video.bubble.left"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "gemini",
+            "video",
+            "understanding",
+            "ocr"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "google"
+    },
+    "parameters": {
+        "file": {
+            "type": "string",
+            "description": "Path to the video file to analyze",
+            "required": true
+        },
+        "prompt": {
+            "type": "string",
+            "description": "Instructions for analysis (e.g., 'Summarize this video')",
+            "required": true
+        },
+        "model": {
+            "type": "string",
+            "description": "The model to use",
+            "default": "gemini-2.5-flash",
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Video Understanding\nAnalyze video content using Gemini.",
+        "videoUnderstanding": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

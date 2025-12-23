@@ -1,0 +1,51 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "gemini_computer_use",
+        "name": "Computer Use",
+        "description": "Allows the model to interact with a computer via screenshots and UI actions (click, type, scroll).",
+        "category": "system",
+        "icon": {
+            "sfSymbol": "desktopcomputer"
+        },
+        "requiresApproval": true,
+        "tags": [
+            "gemini",
+            "computer",
+            "automation",
+            "browser",
+            "control"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "gemini"
+    },
+    "parameters": {
+        "environment": {
+            "type": "string",
+            "description": "The environment to control",
+            "enum": [
+                "browser"
+            ],
+            "default": "browser"
+        },
+        "excluded_actions": {
+            "type": "array",
+            "description": "List of UI actions to disable",
+            "items": {
+                "type": "string"
+            },
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Computer Use\nInteract with the computer interface to perform tasks.\n\n**Capabilities:**\n- View screen (screenshots)\n- Click, Type, Scroll\n- Navigate Websites\n\n**Usage:**\nEnabled via tool configuration. The model will request screen state and actions.",
+        "computerUse": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "high"
+    }
+}

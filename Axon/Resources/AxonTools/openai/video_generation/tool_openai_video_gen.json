@@ -1,0 +1,111 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "openai_video_gen",
+    "name": "OpenAI Video Generation",
+    "description": "Generate videos from text prompts using OpenAI's Sora models.",
+    "category": "generation",
+    "icon": { "sfSymbol": "film" },
+    "requiresApproval": true,
+    "tags": ["video", "generation", "sora", "ai", "creative"]
+  },
+  "parameters": {
+    "prompt": {
+      "type": "string",
+      "required": true,
+      "description": "Description of the video to generate"
+    },
+    "model": {
+      "type": "enum",
+      "required": false,
+      "description": "Sora model to use",
+      "enum": ["sora-2", "sora-2-pro"],
+      "enumDescriptions": {
+        "sora-2": "Standard Sora model (faster)",
+        "sora-2-pro": "Pro model (higher quality)"
+      },
+      "default": "sora-2"
+    },
+    "size": {
+      "type": "enum",
+      "required": false,
+      "description": "Video resolution",
+      "enum": ["1280x720", "1920x1080"],
+      "enumDescriptions": {
+        "1280x720": "720p HD",
+        "1920x1080": "1080p Full HD"
+      },
+      "default": "1280x720"
+    },
+    "seconds": {
+      "type": "integer",
+      "required": false,
+      "description": "Video duration in seconds",
+      "default": 8,
+      "minimum": 5,
+      "maximum": 20
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "provider_native",
+    "handler": "openai",
+    "provider": "openai",
+    "nativeToolName": "openai_video_gen",
+    "model": "sora-2",
+    "longRunning": true,
+    "pollingInterval": 5000
+  },
+  "ai": {
+    "systemPromptSection": "### openai_video_gen\nGenerate videos using Sora models.\n\n**Format:**\n```tool_request\n{\"tool\": \"openai_video_gen\", \"query\": \"{\\\"prompt\\\": \\\"A drone shot over a forest\\\", \\\"seconds\\\": 10}\"}\n```\n\n**Parameters:**\n- prompt: Video description (required)\n- model: sora-2 (default) or sora-2-pro\n- size: 1280x720 (default) or 1920x1080\n- seconds: 5-20 (default: 8)\n\n**Note:** Requires approval. Generation takes 1-5 minutes.",
+    "usageExamples": [
+      { "description": "Simple video", "input": "{\"prompt\": \"Ocean waves crashing on rocks\"}" },
+      { "description": "Pro quality", "input": "{\"prompt\": \"Cinematic cityscape timelapse\", \"model\": \"sora-2-pro\", \"seconds\": 15}" }
+    ],
+    "whenToUse": [
+      "Creating video content",
+      "Visual storytelling",
+      "Creative video generation"
+    ],
+    "whenNotToUse": [
+      "Real-time video needs",
+      "Very long videos",
+      "Video editing"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "prompt", "widget": "textarea", "label": "Video Description", "placeholder": "Describe the video you want to create...", "rows": 3 },
+        { "param": "model", "widget": "segmented", "label": "Model", "options": [
+          { "value": "sora-2", "label": "Sora 2" },
+          { "value": "sora-2-pro", "label": "Sora 2 Pro" }
+        ]},
+        { "param": "size", "widget": "segmented", "label": "Resolution", "options": [
+          { "value": "1280x720", "label": "720p" },
+          { "value": "1920x1080", "label": "1080p" }
+        ]},
+        { "param": "seconds", "widget": "slider", "label": "Duration (seconds)", "min": 5, "max": 20, "step": 1 }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Generate Video"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Video Generated", "icon": "film" },
+        { "type": "video", "source": "{{videoUrl}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "content_generate",
+    "approvalDescription": "Generate video: {{prompt}}",
+    "scopes": ["content.generate"],
+    "riskLevel": "medium"
+  },
+  "requirements": {
+    "apiKey": "openaiApiKey",
+    "provider": "openai"
+  }
+}

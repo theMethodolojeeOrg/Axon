@@ -1,0 +1,63 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "code_execution",
+    "name": "Code Execution",
+    "description": "Execute Python code in a secure sandbox environment with data science libraries.",
+    "category": "code",
+    "icon": { "sfSymbol": "terminal" },
+    "requiresApproval": false,
+    "tags": ["code", "python", "execution", "sandbox", "data-science"]
+  },
+  "parameters": {},
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "provider_native",
+    "handler": "gemini",
+    "provider": "gemini",
+    "nativeToolName": "code_execution"
+  },
+  "ai": {
+    "systemPromptSection": "### code_execution\nExecute Python code in a secure sandbox. Available libraries: numpy, pandas, matplotlib, scipy, sklearn.\n\n**Capabilities:**\n- Mathematical calculations\n- Data analysis and visualization\n- File I/O for CSV, text, plots\n- Statistical operations\n\n**Note:** Code is executed server-side by Gemini. The AI will generate and run the code automatically when needed.",
+    "usageExamples": [
+      { "description": "Calculate statistics", "input": "Calculate the mean and standard deviation of [1, 2, 3, 4, 5]" },
+      { "description": "Generate chart", "input": "Create a bar chart of quarterly sales: Q1=100, Q2=150, Q3=120, Q4=200" }
+    ],
+    "whenToUse": [
+      "Complex calculations",
+      "Data analysis tasks",
+      "Chart/graph generation",
+      "Statistical operations"
+    ],
+    "whenNotToUse": [
+      "Simple arithmetic the AI can do",
+      "Tasks requiring local file access",
+      "Long-running computations"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [],
+      "layout": "vertical",
+      "submitLabel": "Execute"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Code Execution", "icon": "terminal" },
+        { "type": "code", "source": "{{code}}", "language": "python" },
+        { "type": "text", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "code_execute",
+    "approvalDescription": "Execute Python code",
+    "scopes": ["code.execute"],
+    "riskLevel": "medium"
+  },
+  "requirements": {
+    "apiKey": "geminiApiKey",
+    "provider": "gemini"
+  }
+}

@@ -1,0 +1,110 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "openai_image_gen",
+    "name": "OpenAI Image Generation",
+    "description": "Generate images from text prompts using GPT Image models.",
+    "category": "generation",
+    "icon": { "sfSymbol": "photo.artframe" },
+    "requiresApproval": true,
+    "tags": ["image", "generation", "dalle", "ai", "creative"]
+  },
+  "parameters": {
+    "prompt": {
+      "type": "string",
+      "required": true,
+      "description": "Description of the image to generate"
+    },
+    "n": {
+      "type": "integer",
+      "required": false,
+      "description": "Number of images to generate",
+      "default": 1,
+      "minimum": 1,
+      "maximum": 4
+    },
+    "size": {
+      "type": "enum",
+      "required": false,
+      "description": "Image dimensions",
+      "enum": ["1024x1024", "1792x1024", "1024x1792"],
+      "enumDescriptions": {
+        "1024x1024": "Square (1024x1024)",
+        "1792x1024": "Landscape (1792x1024)",
+        "1024x1792": "Portrait (1024x1792)"
+      },
+      "default": "1024x1024"
+    },
+    "quality": {
+      "type": "enum",
+      "required": false,
+      "description": "Image quality",
+      "enum": ["standard", "hd"],
+      "enumDescriptions": {
+        "standard": "Standard quality (faster)",
+        "hd": "HD quality (more detailed)"
+      },
+      "default": "standard"
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "provider_native",
+    "handler": "openai",
+    "provider": "openai",
+    "nativeToolName": "openai_image_gen",
+    "model": "gpt-image-1"
+  },
+  "ai": {
+    "systemPromptSection": "### openai_image_gen\nGenerate images using GPT Image models.\n\n**Format:**\n```tool_request\n{\"tool\": \"openai_image_gen\", \"query\": \"{\\\"prompt\\\": \\\"A futuristic city at sunset\\\", \\\"size\\\": \\\"1792x1024\\\"}\"}\n```\n\n**Parameters:**\n- prompt: Image description (required)\n- n: Number of images (1-4, default: 1)\n- size: 1024x1024, 1792x1024, or 1024x1792\n- quality: standard or hd\n\n**Note:** Requires user approval.",
+    "usageExamples": [
+      { "description": "Simple image", "input": "{\"prompt\": \"A golden retriever in a meadow\"}" },
+      { "description": "HD landscape", "input": "{\"prompt\": \"Cyberpunk cityscape\", \"size\": \"1792x1024\", \"quality\": \"hd\"}" }
+    ],
+    "whenToUse": [
+      "Creating visual content",
+      "Illustrations for concepts",
+      "Creative image generation"
+    ],
+    "whenNotToUse": [
+      "Photo editing (use different tool)",
+      "Real-time image needs"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "prompt", "widget": "textarea", "label": "Image Description", "placeholder": "Describe the image you want...", "rows": 3 },
+        { "param": "size", "widget": "segmented", "label": "Size", "options": [
+          { "value": "1024x1024", "label": "Square" },
+          { "value": "1792x1024", "label": "Landscape" },
+          { "value": "1024x1792", "label": "Portrait" }
+        ]},
+        { "param": "quality", "widget": "segmented", "label": "Quality", "options": [
+          { "value": "standard", "label": "Standard" },
+          { "value": "hd", "label": "HD" }
+        ]},
+        { "param": "n", "widget": "slider", "label": "Count", "min": 1, "max": 4, "step": 1 }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Generate Image"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Generated Image", "icon": "photo.artframe" },
+        { "type": "image", "source": "{{imageUrl}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "content_generate",
+    "approvalDescription": "Generate image: {{prompt}}",
+    "scopes": ["content.generate"],
+    "riskLevel": "medium"
+  },
+  "requirements": {
+    "apiKey": "openaiApiKey",
+    "provider": "openai"
+  }
+}

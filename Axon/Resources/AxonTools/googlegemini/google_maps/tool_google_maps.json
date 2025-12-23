@@ -1,0 +1,68 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "google_maps",
+    "name": "Google Maps",
+    "description": "Query location information, find nearby places, and get business details.",
+    "category": "location",
+    "icon": { "sfSymbol": "map" },
+    "requiresApproval": false,
+    "tags": ["maps", "location", "places", "business", "nearby"]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": true,
+      "description": "Location or place query"
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "provider_native",
+    "handler": "gemini",
+    "provider": "gemini",
+    "nativeToolName": "google_maps"
+  },
+  "ai": {
+    "systemPromptSection": "### google_maps\nQuery location information and find nearby places.\n\n**Format:**\n```tool_request\n{\"tool\": \"google_maps\", \"query\": \"coffee shops near Times Square\"}\n```\n\n**Capabilities:**\n- Find nearby places\n- Get business information\n- Location queries\n\n**Note:** May not be supported in all Gemini model versions.",
+    "usageExamples": [
+      { "description": "Find nearby", "input": "{\"query\": \"coffee shops near Times Square\"}" },
+      { "description": "Business info", "input": "{\"query\": \"Apple Store San Francisco\"}" }
+    ],
+    "whenToUse": [
+      "Finding nearby places",
+      "Business information lookup",
+      "Location-based queries"
+    ],
+    "whenNotToUse": [
+      "General web search",
+      "Non-location queries"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "query", "widget": "text_field", "label": "Location Query", "placeholder": "What place are you looking for?" }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Search"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Maps Results", "icon": "map" },
+        { "type": "markdown", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "location_query",
+    "approvalDescription": "Search Google Maps",
+    "scopes": ["location.search"],
+    "riskLevel": "low"
+  },
+  "requirements": {
+    "apiKey": "geminiApiKey",
+    "provider": "gemini"
+  }
+}

@@ -49,6 +49,11 @@ struct ChatInfoSettingsView: View {
     // Whether tool settings have been customized for this conversation
     @State private var hasCustomToolOverrides: Bool = false
 
+    // Realtime Voice Overrides
+    @State private var selectedLiveProvider: String?
+    @State private var selectedLiveModel: String?
+    @State private var selectedLiveVoice: String?
+
     // iOS Remote Mode connection state
     #if !os(macOS)
     @State private var remoteHost: String = ""
@@ -327,6 +332,103 @@ struct ChatInfoSettingsView: View {
                 .padding()
                 .background(AppColors.substrateSecondary)
                 .cornerRadius(8)
+            }
+        }
+
+        // MARK: - Realtime Voice
+        ChatInfoSection(title: "Realtime Voice") {
+            VStack(spacing: 16) {
+                // Live Provider
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Provider")
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textSecondary)
+
+                    Menu {
+                        Button("Default (\(settingsViewModel.settings.liveSettings.defaultProvider == .openai ? "OpenAI" : "Gemini"))") {
+                            selectedLiveProvider = nil
+                            selectedLiveModel = nil
+                            selectedLiveVoice = nil
+                            saveConversationOverrides()
+                        }
+                        Divider()
+                        Button("Gemini Live") {
+                            selectedLiveProvider = "gemini"
+                            saveConversationOverrides()
+                        }
+                        Button("OpenAI Realtime") {
+                            selectedLiveProvider = "openai"
+                            saveConversationOverrides()
+                        }
+                    } label: {
+                        HStack {
+                            Text(selectedLiveProvider == "openai" ? "OpenAI Realtime" :
+                                 selectedLiveProvider == "gemini" ? "Gemini Live" :
+                                 "Default (\(settingsViewModel.settings.liveSettings.defaultProvider == .openai ? "OpenAI" : "Gemini"))")
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textPrimary)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppColors.textTertiary)
+                        }
+                        .padding(12)
+                        .background(AppColors.substrateSecondary)
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                // Voice Selection
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Voice")
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textSecondary)
+
+                    Menu {
+                        Button("Default") {
+                            selectedLiveVoice = nil
+                            saveConversationOverrides()
+                        }
+                        Divider()
+                        if (selectedLiveProvider == "openai") || (selectedLiveProvider == nil && settingsViewModel.settings.liveSettings.defaultProvider == .openai) {
+                            Button("Alloy") { selectedLiveVoice = "alloy"; saveConversationOverrides() }
+                            Button("Ash") { selectedLiveVoice = "ash"; saveConversationOverrides() }
+                            Button("Ballad") { selectedLiveVoice = "ballad"; saveConversationOverrides() }
+                            Button("Coral") { selectedLiveVoice = "coral"; saveConversationOverrides() }
+                            Button("Echo") { selectedLiveVoice = "echo"; saveConversationOverrides() }
+                            Button("Sage") { selectedLiveVoice = "sage"; saveConversationOverrides() }
+                            Button("Shimmer") { selectedLiveVoice = "shimmer"; saveConversationOverrides() }
+                            Button("Verse") { selectedLiveVoice = "verse"; saveConversationOverrides() }
+                            Button("Marin") { selectedLiveVoice = "marin"; saveConversationOverrides() }
+                        } else {
+                            // Gemini voices
+                            Button("Kore") { selectedLiveVoice = "Kore"; saveConversationOverrides() }
+                            Button("Leda") { selectedLiveVoice = "Leda"; saveConversationOverrides() }
+                            Button("Puck") { selectedLiveVoice = "Puck"; saveConversationOverrides() }
+                            Button("Charon") { selectedLiveVoice = "Charon"; saveConversationOverrides() }
+                            Button("Fenrir") { selectedLiveVoice = "Fenrir"; saveConversationOverrides() }
+                            Button("Orus") { selectedLiveVoice = "Orus"; saveConversationOverrides() }
+                            Button("Aoede") { selectedLiveVoice = "Aoede"; saveConversationOverrides() }
+                            Button("Callirrhoe") { selectedLiveVoice = "Callirrhoe"; saveConversationOverrides() }
+                            Button("Zenir") { selectedLiveVoice = "Zenir"; saveConversationOverrides() }
+                        }
+                    } label: {
+                        HStack {
+                            Text(selectedLiveVoice ?? "Default")
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textPrimary)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppColors.textTertiary)
+                        }
+                        .padding(12)
+                        .background(AppColors.substrateSecondary)
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
 
@@ -1023,11 +1125,19 @@ struct ChatInfoSettingsView: View {
                     })
                 }
             }
+
+            // Restore Live settings
+            selectedLiveProvider = overrides.liveProvider
+            selectedLiveModel = overrides.liveModel
+            selectedLiveVoice = overrides.liveVoice
         } else {
             // No overrides exist - initialize from global defaults
             hasCustomOverrides = false
             selectedProvider = settingsViewModel.currentUnifiedProvider()
             selectedModel = settingsViewModel.currentUnifiedModel()
+            selectedLiveProvider = nil
+            selectedLiveModel = nil
+            selectedLiveVoice = nil
         }
     }
 
@@ -1064,6 +1174,11 @@ struct ChatInfoSettingsView: View {
             overrides.modelDisplayName = model.name
         }
 
+        // Save Live settings
+        overrides.liveProvider = selectedLiveProvider
+        overrides.liveModel = selectedLiveModel
+        overrides.liveVoice = selectedLiveVoice
+
         // Persist to UserDefaults
         let key = "conversation_overrides_\(conversation.id)"
         if let data = try? JSONEncoder().encode(overrides) {
@@ -1081,6 +1196,11 @@ struct ConversationOverrides: Codable, Equatable {
     var builtInModel: String?
     var customModelId: UUID?
     var model: String?
+
+    // Realtime Live Session Overrides
+    var liveProvider: String?
+    var liveModel: String?
+    var liveVoice: String?
 
     // Human-friendly metadata (optional)
     var providerDisplayName: String?

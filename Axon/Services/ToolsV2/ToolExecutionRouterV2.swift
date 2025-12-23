@@ -30,8 +30,8 @@ final class ToolExecutionRouterV2: ObservableObject {
     
     private let pluginLoader = ToolPluginLoader.shared
     private let handlerRegistry = InternalHandlerRegistryV2.shared
-    private let approvalService = ToolApprovalService.shared
-    private let sovereigntyService = SovereigntyService.shared
+    private let approvalBridge = ToolApprovalBridgeV2.shared
+    private let sovereigntyBridge = ToolSovereigntyBridgeV2.shared
     private let dynamicEngine = DynamicToolExecutionEngine.shared
     
     // MARK: - Properties
@@ -109,13 +109,21 @@ final class ToolExecutionRouterV2: ObservableObject {
             throw error
         }
         
-        // 5. Check approval requirements
-        if loadedTool.manifest.tool.effectiveRequiresApproval {
-            let approved = try await checkApprovalV2(
+        // 5. Check sovereignty and approval requirements
+        let sovereigntyCheck = sovereigntyBridge.isExecutionBlocked(manifest: loadedTool.manifest)
+        if sovereigntyCheck.blocked {
+            return ToolResultV2.failure(
+                toolId: toolId,
+                error: sovereigntyCheck.reason ?? "Execution blocked by sovereignty"
+            )
+        }
+        
+        if approvalBridge.requiresApproval(manifest: loadedTool.manifest) {
+            let approvalResult = await approvalBridge.requestApproval(
                 manifest: loadedTool.manifest,
                 inputs: inputs
             )
-            if !approved {
+            if !approvalResult.isApprovedV2 {
                 let error = ToolExecutionErrorV2.approvalDenied(toolId)
                 lastError = error
                 throw error
@@ -328,40 +336,13 @@ final class ToolExecutionRouterV2: ObservableObject {
         return errors
     }
     
-    // MARK: - Approval
-    
-    /// Check if approval is needed and obtain it
-    private func checkApprovalV2(
-        manifest: ToolManifest,
-        inputs: [String: Any]
-    ) async throws -> Bool {
-        // Create a DynamicToolConfig wrapper for approval service compatibility
-        let toolConfig = DynamicToolConfig(
-            id: manifest.tool.id,
-            name: manifest.tool.name,
-            description: manifest.tool.description,
-            category: .utility, // V2 tools use a different category system
-            enabled: true,
-            icon: manifest.tool.icon?.resolvedIcon ?? "questionmark",
-            requiredSecrets: [],
-            pipeline: [],
-            parameters: [:],
-            requiresApproval: manifest.tool.effectiveRequiresApproval,
-            approvalScopes: manifest.sovereignty?.scopes
-        )
-        
-        let result = await approvalService.requestApprovalWithSovereignty(
-            tool: toolConfig,
-            inputs: inputs
-        )
-        
-        switch result {
-        case .approved, .approvedForSession, .approvedViaTrustTier:
-            return true
-        case .denied, .blocked, .timeout, .cancelled, .stop, .error:
-            return false
-        }
-    }
+    // MARK: - Approval (delegated to bridges)
+    //
+    // Approval and sovereignty checks are now handled by:
+    // - ToolApprovalBridgeV2: Biometric authentication and session tracking
+    // - ToolSovereigntyBridgeV2: Trust tier permissions and covenant checks
+    //
+    // See checkApprovalV2 logic in executeToolV2() above.
     
     // MARK: - Execution Routing
     

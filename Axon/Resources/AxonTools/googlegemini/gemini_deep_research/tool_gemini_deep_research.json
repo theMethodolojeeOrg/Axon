@@ -1,0 +1,45 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "gemini_deep_research",
+        "name": "Deep Research",
+        "description": "An autonomous agent that performs deep, multi-step research on complex topics to produce detailed reports.",
+        "category": "discovery",
+        "icon": {
+            "sfSymbol": "doc.text.magnifyingglass"
+        },
+        "requiresApproval": true,
+        "tags": [
+            "gemini",
+            "research",
+            "agent",
+            "report",
+            "deep"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "gemini"
+    },
+    "parameters": {
+        "topic": {
+            "type": "string",
+            "description": "The research topic or question to investigate.",
+            "required": true
+        },
+        "format": {
+            "type": "string",
+            "description": "Desired format of the output (e.g., 'technical report', 'executive summary').",
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Deep Research\nDelegate complex research tasks to a specialized agent.\n\n**Capabilities:**\n- Multi-step web search and synthesis\n- In-depth report generation\n\n**Usage:**\nCall this tool to initiate a deep research session. Expect a delay for the final results.",
+        "deepResearch": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "medium"
+    }
+}

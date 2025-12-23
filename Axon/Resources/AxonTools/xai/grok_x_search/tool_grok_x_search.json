@@ -1,0 +1,78 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "grok_x_search",
+        "name": "X Search",
+        "description": "Allows the agent to search X (formerly Twitter) for posts, users, and threads.",
+        "category": "discovery",
+        "icon": {
+            "sfSymbol": "bird"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "grok",
+            "x",
+            "twitter",
+            "social",
+            "search"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "grok"
+    },
+    "parameters": {
+        "query": {
+            "type": "string",
+            "description": "The search query",
+            "required": true
+        },
+        "allowed_x_handles": {
+            "type": "array",
+            "description": "Only search posts from these handles (max 10)",
+            "items": {
+                "type": "string"
+            },
+            "required": false
+        },
+        "excluded_x_handles": {
+            "type": "array",
+            "description": "Exclude posts from these handles (max 10)",
+            "items": {
+                "type": "string"
+            },
+            "required": false
+        },
+        "from_date": {
+            "type": "string",
+            "description": "Start date for search (YYYY-MM-DD)",
+            "required": false
+        },
+        "to_date": {
+            "type": "string",
+            "description": "End date for search (YYYY-MM-DD)",
+            "required": false
+        },
+        "enable_image_understanding": {
+            "type": "boolean",
+            "description": "Enable visual analysis of images found in posts",
+            "default": false,
+            "required": false
+        },
+        "enable_video_understanding": {
+            "type": "boolean",
+            "description": "Enable analysis of videos found in posts",
+            "default": false,
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### X Search\nSearch X (Twitter) for real-time information and social posts.\n\n**Usage:**\nUse this tool to find recent discussions, news, or user posts on X.",
+        "xSearch": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

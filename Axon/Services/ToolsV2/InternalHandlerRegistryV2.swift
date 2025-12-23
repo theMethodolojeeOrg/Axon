@@ -113,10 +113,12 @@ final class InternalHandlerRegistryV2: ObservableObject {
         registerHandler(DiscoveryHandler())
         registerHandler(DevicePresenceHandler())
         registerHandler(BridgeHandler())
-        
-        // Provider-specific handlers (to be added):
-        // registerHandler(OpenAIHandler())
-        // registerHandler(GeminiHandler())
+
+        // Provider-specific handlers
+        registerHandler(GeminiHandler())
+        registerHandler(OpenAIHandler())
+        registerHandler(XAIHandler())
+        registerHandler(ZAIHandler())
         
         logger.info("Built-in handlers registered: \(self.handlers.count)")
     }

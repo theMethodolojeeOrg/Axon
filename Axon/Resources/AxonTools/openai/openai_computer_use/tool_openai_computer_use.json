@@ -1,0 +1,58 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "openai_computer_use",
+        "name": "Computer Use",
+        "description": "Enables the model to interact with a computer interface (screen, keyboard, mouse) to perform tasks.",
+        "category": "system",
+        "icon": {
+            "sfSymbol": "desktopcomputer"
+        },
+        "requiresApproval": true,
+        "tags": [
+            "openai",
+            "computer",
+            "browser",
+            "automation"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "openai"
+    },
+    "parameters": {
+        "display_width": {
+            "type": "integer",
+            "description": "Width of the display in pixels",
+            "default": 1024,
+            "required": false
+        },
+        "display_height": {
+            "type": "integer",
+            "description": "Height of the display in pixels",
+            "default": 768,
+            "required": false
+        },
+        "environment": {
+            "type": "string",
+            "description": "The environment type (e.g., 'browser', 'mac', 'ubuntu', 'windows')",
+            "enum": [
+                "browser",
+                "mac",
+                "ubuntu",
+                "windows"
+            ],
+            "default": "browser",
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Computer Use\nInteract with the computer to find information or perform actions.\n\n**Capabilities:**\n- View screen\n- Move mouse and click\n- Type text\n\n**Usage:**\nOutput computer actions to control the interface.",
+        "computerUse": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "high"
+    }
+}

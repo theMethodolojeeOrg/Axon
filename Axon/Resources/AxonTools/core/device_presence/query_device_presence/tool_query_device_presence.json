@@ -1,0 +1,46 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "query_device_presence",
+    "name": "Query Device Presence",
+    "description": "Query current device and multi-device presence status.",
+    "category": "device_presence",
+    "icon": { "sfSymbol": "iphone.and.arrow.forward" },
+    "requiresApproval": false,
+    "tags": ["device", "presence", "multi-device", "handoff"]
+  },
+  "parameters": {},
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "device_presence"
+  },
+  "ai": {
+    "systemPromptSection": "### query_device_presence\nQuery device presence.\n\n**Format:**\n```tool_request\n{\"tool\": \"query_device_presence\", \"query\": \"\"}\n```\n\n**Returns:**\n- Current device ID and name\n- Device status (active/idle)\n- Other known devices (if multi-device enabled)",
+    "usageExamples": [
+      { "description": "Check presence", "input": "" }
+    ],
+    "whenToUse": [
+      "Check which devices are available",
+      "Understand current device context"
+    ],
+    "whenNotToUse": [
+      "Single device usage"
+    ]
+  },
+  "ui": {
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Device Presence", "icon": "iphone.and.arrow.forward" },
+        { "type": "text", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "device_query",
+    "approvalDescription": "Query device presence",
+    "scopes": ["device.read"],
+    "riskLevel": "low"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "list_tools",
+    "name": "List Tools",
+    "description": "List all available tools, optionally filtered by category.",
+    "category": "discovery",
+    "icon": { "sfSymbol": "list.bullet" },
+    "requiresApproval": false,
+    "tags": ["discovery", "tools", "list", "catalog"]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": false,
+      "description": "Filter: 'all' or category name",
+      "default": "all"
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "discovery"
+  },
+  "ai": {
+    "systemPromptSection": "### list_tools\nList available tools.\n\n**Format:**\n```tool_request\n{\"tool\": \"list_tools\", \"query\": \"all\"}\n```\n\n**Filters:** all, memory, heartbeat, discovery, system, etc.\n\n**Returns:** Tools grouped by category with descriptions.",
+    "usageExamples": [
+      { "description": "List all tools", "input": "all" },
+      { "description": "List memory tools", "input": "memory" },
+      { "description": "List system tools", "input": "system" }
+    ],
+    "whenToUse": [
+      "Need to know available capabilities",
+      "User asks what you can do"
+    ],
+    "whenNotToUse": [
+      "Already know the tool list"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "query", "widget": "text_field", "label": "Filter", "placeholder": "all or category name" }
+      ],
+      "layout": "vertical",
+      "submitLabel": "List"
+    },
+    "resultDisplay": {
+      "style": "list",
+      "sections": [
+        { "type": "header", "title": "Available Tools", "icon": "list.bullet" },
+        { "type": "text", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "discovery_query",
+    "approvalDescription": "List available tools",
+    "scopes": ["discovery.read"],
+    "riskLevel": "low"
+  }
+}
