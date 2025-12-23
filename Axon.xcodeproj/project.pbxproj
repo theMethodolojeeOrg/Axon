@@ -11,6 +11,7 @@
 		E217D4332EEA4BF700D3DAB2 /* CryptoKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4322EEA4BF700D3DAB2 /* CryptoKit.framework */; };
 		E217D4352EEA4BFF00D3DAB2 /* CryptoTokenKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4342EEA4BFF00D3DAB2 /* CryptoTokenKit.framework */; };
 		E217D7B62EEDDD5C00D3DAB2 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D7B52EEDDD5C00D3DAB2 /* CoreLocation.framework */; };
+		E21FBEA82EFA1AC2009EF882 /* F5TTS in Frameworks */ = {isa = PBXBuildFile; productRef = E21FBEA72EFA1AC2009EF882 /* F5TTS */; };
 		E22498CA2ED5D1880053D459 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = E22498C92ED5D1880053D459 /* MarkdownUI */; };
 		E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9A2EB23493009B116D /* FirebaseAuth */; };
 		E23FFF9D2EB23493009B116D /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9C2EB23493009B116D /* FirebaseCore */; };
@@ -176,6 +177,7 @@
 				E26F3F892EF0D6B7000E55BD /* MLXLLM in Frameworks */,
 				E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */,
 				E23FFFA32EB23493009B116D /* FirebaseMessaging in Frameworks */,
+				E21FBEA82EFA1AC2009EF882 /* F5TTS in Frameworks */,
 				E217D4352EEA4BFF00D3DAB2 /* CryptoTokenKit.framework in Frameworks */,
 				E26F3F872EF0D6B7000E55BD /* MLXEmbedders in Frameworks */,
 				E254EDE02EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport in Frameworks */,
@@ -307,6 +309,7 @@
 				E26F3F882EF0D6B7000E55BD /* MLXLLM */,
 				E26F3F8A2EF0D6B7000E55BD /* MLXLMCommon */,
 				E26F3F8C2EF0D6B7000E55BD /* MLXVLM */,
+				E21FBEA72EFA1AC2009EF882 /* F5TTS */,
 			);
 			productName = Axon;
 			productReference = E254ED962EB21B76000CDD9D /* Axon.app */;
@@ -417,6 +420,8 @@
 				E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */,
 				E22498C82ED5D1880053D459 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 				E26F3F852EF0D6B7000E55BD /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+				E21FBEA62EFA1AC2009EF882 /* XCRemoteSwiftPackageReference "f5-tts-swift" */,
+				E21FCC002EFA24B1009EF882 /* XCRemoteSwiftPackageReference "kokoro-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E254ED972EB21B76000CDD9D /* Products */;
@@ -963,6 +968,22 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		E21FBEA62EFA1AC2009EF882 /* XCRemoteSwiftPackageReference "f5-tts-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/lucasnewman/f5-tts-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.0.6;
+			};
+		};
+		E21FCC002EFA24B1009EF882 /* XCRemoteSwiftPackageReference "kokoro-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mlalma/kokoro-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.10;
+			};
+		};
 		E22498C82ED5D1880053D459 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui.git";
@@ -1006,6 +1027,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		E21FBEA72EFA1AC2009EF882 /* F5TTS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E21FBEA62EFA1AC2009EF882 /* XCRemoteSwiftPackageReference "f5-tts-swift" */;
+			productName = F5TTS;
+		};
 		E22498C92ED5D1880053D459 /* MarkdownUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E22498C82ED5D1880053D459 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;

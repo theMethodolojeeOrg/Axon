@@ -418,6 +418,18 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
                     audioData = try await generateAppleTTSAudio(text: processedText, settings: settings)
                     audioFormat = .caf
 
+                case .mlxAudio:
+                    // F5-TTS currently unavailable due to library compatibility issue
+                    // Fall back to Apple TTS
+                    if MLXTTSService.isAvailable {
+                        audioData = try await generateMLXAudio(text: processedText, settings: settings)
+                        audioFormat = .wav
+                    } else {
+                        print("[TTSPlaybackService] F5-TTS unavailable, falling back to Apple TTS")
+                        audioData = try await generateAppleTTSAudio(text: processedText, settings: settings)
+                        audioFormat = .caf
+                    }
+
                 case .elevenlabs:
                     audioData = try await generateElevenLabsAudio(text: processedText, settings: settings)
                     audioFormat = .mp3
@@ -451,6 +463,9 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
                         case .apple:
                             voiceId = settings.ttsSettings.appleVoice.rawValue
                             voiceName = settings.ttsSettings.appleVoice.displayName
+                        case .mlxAudio:
+                            voiceId = settings.ttsSettings.mlxVoice.rawValue
+                            voiceName = settings.ttsSettings.mlxVoice.displayName
                         case .elevenlabs:
                             voiceId = settings.ttsSettings.selectedVoiceId
                             voiceName = settings.ttsSettings.selectedVoiceName
@@ -613,6 +628,22 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         )
     }
 
+    // MARK: - MLX-Audio TTS
+
+    private func generateMLXAudio(text: String, settings: AppSettings) async throws -> Data {
+        let voice = settings.ttsSettings.mlxVoice
+        let speed = settings.ttsSettings.mlxSpeed
+
+        print("[TTSPlaybackService] Using MLX-Audio voice: \(voice.displayName)")
+        print("[TTSPlaybackService] Requesting audio generation from MLX-Audio...")
+
+        return try await MLXTTSService.shared.generateSpeech(
+            text: text,
+            voice: voice,
+            speed: speed
+        )
+    }
+
     func playGenerated(messageId: String, settings: AppSettings? = nil) async throws {
         guard let cached = getCachedAudio(for: messageId, settings: settings) else {
             print("[TTSPlaybackService] No cached audio for message: \(messageId)")
@@ -657,6 +688,8 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         switch provider {
         case .apple:
             companyName = "Apple"
+        case .mlxAudio:
+            companyName = "MLX"
         case .elevenlabs:
             companyName = "ElevenLabs"
         case .gemini:

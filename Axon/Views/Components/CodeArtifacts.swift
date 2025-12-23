@@ -722,6 +722,121 @@ private struct InspectorTabButton: View {
 }
 #endif
 
+// MARK: - Completed Tool Call View
+
+/// Displays an already-executed tool call from persisted message data.
+/// This prevents re-execution of tools when messages are reloaded from storage.
+struct CompletedToolCallView: View {
+    let toolCall: LiveToolCall
+
+    @State private var isExpanded: Bool = false
+
+    private var stateColor: Color {
+        switch toolCall.state {
+        case .success: return AppColors.signalLichen
+        case .failure: return AppColors.signalHematite
+        case .running: return AppColors.signalMercury
+        case .pending: return AppColors.textTertiary
+        }
+    }
+
+    private var borderColor: Color {
+        switch toolCall.state {
+        case .success: return AppColors.signalLichen
+        case .failure: return AppColors.signalHematite
+        default: return AppColors.glassBorder
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+
+            if isExpanded {
+                expandedContent
+            }
+        }
+        .background(AppColors.substrateTertiary)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(borderColor, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            // Tool icon and name
+            Image(systemName: toolCall.icon)
+                .font(.system(size: 14))
+                .foregroundColor(stateColor)
+
+            Text(toolCall.displayName)
+                .font(AppTypography.bodySmall(.medium))
+                .foregroundColor(AppColors.textPrimary)
+
+            Spacer()
+
+            // State indicator
+            HStack(spacing: 6) {
+                Image(systemName: toolCall.state == .success ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(stateColor)
+
+                if let duration = toolCall.duration {
+                    Text(String(format: "%.1fs", duration))
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                }
+
+                // Expand/collapse chevron
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(AppColors.textTertiary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(stateColor.opacity(0.1))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.spring(response: 0.3)) {
+                isExpanded.toggle()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var expandedContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Query
+            if let query = toolCall.request?.query {
+                Text(query)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(AppColors.textSecondary)
+                    .lineLimit(3)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+            }
+
+            // Result if available
+            if let result = toolCall.result {
+                Divider()
+                    .overlay(AppColors.glassBorder.opacity(0.5))
+
+                Text(result.output)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(result.success ? AppColors.textSecondary : AppColors.signalHematite)
+                    .lineLimit(5)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
+            }
+        }
+        .padding(.bottom, toolCall.result == nil ? 8 : 0)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+}
+
 // MARK: - Tool Request Code Block View
 
 /// Specialized code block for tool_request that auto-executes on appear

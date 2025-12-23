@@ -388,8 +388,12 @@ struct AssistantMessageView: View {
                 )
             } else {
                 // Standard markdown rendering
-                AssistantMarkdownView(content: textToRender)
-                    .codeArtifactHost()
+                // Pass persisted liveToolCalls to prevent re-execution of already-completed tools
+                AssistantMarkdownView(
+                    content: textToRender,
+                    executedToolCalls: message.liveToolCalls
+                )
+                .codeArtifactHost()
             }
 
             // Grounding sources (from tool calls like web search, maps)

@@ -25,6 +25,8 @@ struct TTSSettingsView: View {
             switch viewModel.settings.ttsSettings.provider {
             case .apple:
                 appleSection
+            case .mlxAudio:
+                mlxAudioSection
             case .elevenlabs:
                 elevenLabsSection
             case .gemini:
@@ -115,6 +117,22 @@ struct TTSSettingsView: View {
                             Task { await viewModel.updateTTSSetting(\.provider, .apple) }
                         }
                     )
+
+                    Divider().background(AppColors.divider)
+
+                    // F5-TTS (free, on-device neural TTS) - Currently disabled
+                    ProviderRow(
+                        title: TTSProvider.mlxAudio.displayName + " (Coming Soon)",
+                        subtitle: "Temporarily unavailable",
+                        icon: TTSProvider.mlxAudio.icon,
+                        isSelected: viewModel.settings.ttsSettings.provider == .mlxAudio,
+                        status: .notConfigured,
+                        showFreeBadge: true,
+                        onSelect: {
+                            // Disabled - don't allow selection
+                        }
+                    )
+                    .opacity(0.5)
 
                     Divider().background(AppColors.divider)
 
@@ -351,6 +369,9 @@ struct TTSSettingsView: View {
     private var appleSection: some View {
         UnifiedSettingsSection(title: "Apple (Siri)") {
             VStack(alignment: .leading, spacing: 12) {
+                // Voice Quality Detection Banner
+                AppleVoiceQualityBanner()
+                
                 // Info card
                 SettingsCard(padding: 12) {
                     HStack(spacing: 12) {
@@ -461,11 +482,121 @@ struct TTSSettingsView: View {
                         }
                     }
                 }
+            }
+        }
+    }
 
-                // Tip about premium voices
+
+    // MARK: - F5-TTS (MLX Neural)
+
+    private var mlxAudioSection: some View {
+        UnifiedSettingsSection(title: "F5 Neural TTS") {
+            VStack(alignment: .leading, spacing: 12) {
+                // Availability/Status card
+                SettingsCard(padding: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "clock.badge.exclamationmark")
+                            .foregroundColor(AppColors.accentWarning)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Coming Soon")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Text("F5-TTS is temporarily unavailable due to a library compatibility issue. Use Apple TTS or cloud providers for now.")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+
+                        Spacer()
+                    }
+                }
+
+                // Model status
+                MLXModelStatusBanner()
+
+                // Voice info (F5-TTS uses a single reference voice)
+                SettingsCard(padding: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Voice")
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        HStack(spacing: 12) {
+                            Image(systemName: "waveform.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(AppColors.signalMercury)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Mother Nature")
+                                    .font(AppTypography.bodyMedium(.medium))
+                                    .foregroundColor(AppColors.textPrimary)
+
+                                Text("Natural female voice with expressive tone")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(AppColors.accentSuccess)
+                        }
+                    }
+                }
+                .disabled(!MLXTTSService.isAvailable)
+
+                // Speech speed slider
+                SettingsCard(padding: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Speech Speed")
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Speed")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textPrimary)
+                                Spacer()
+                                Text(String(format: "%.1fx", viewModel.settings.ttsSettings.mlxSpeed))
+                                    .font(AppTypography.bodySmall(.medium))
+                                    .foregroundColor(AppColors.signalMercury)
+                            }
+                            Slider(
+                                value: Binding(
+                                    get: { Double(viewModel.settings.ttsSettings.mlxSpeed) },
+                                    set: { newValue in
+                                        Task { await viewModel.updateTTSSetting(\.mlxSpeed, Float(newValue)) }
+                                    }
+                                ),
+                                in: 0.5...2.0,
+                                step: 0.1
+                            )
+                            .tint(AppColors.signalMercury)
+
+                            HStack {
+                                Text("0.5x")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                                Spacer()
+                                Text("1.0x")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                                Spacer()
+                                Text("2.0x")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                            }
+                        }
+                    }
+                }
+                .disabled(!MLXTTSService.isAvailable)
+
+                // Info tip
                 HStack(spacing: 6) {
-                    Image(systemName: "lightbulb")
-                    Text("For higher-quality voices, add API keys for ElevenLabs, Gemini, or OpenAI in Settings → API Keys.")
+                    Image(systemName: "info.circle")
+                    Text("Model downloads automatically on first use (~300MB). Works completely offline after download.")
                         .font(AppTypography.labelSmall())
                 }
                 .foregroundColor(AppColors.textTertiary)
@@ -1343,6 +1474,185 @@ struct OpenAIVoiceCard: View {
             )
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Apple Voice Quality Banner
+
+/// Banner that detects and displays the current Apple TTS voice quality tier
+/// Shows guidance for downloading Premium voices when only Compact voices are available
+private struct AppleVoiceQualityBanner: View {
+    @State private var qualityTier: AppleVoiceQualityTier = .compact
+    @State private var hasChecked = false
+    
+    var body: some View {
+        SettingsCard(padding: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: qualityTier.icon)
+                    .font(.system(size: 20))
+                    .foregroundColor(iconColor)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text("Voice Quality: \(qualityTier.displayName)")
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+                        
+                        if qualityTier == .premium {
+                            Text("Best")
+                                .font(AppTypography.labelSmall())
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(AppColors.accentSuccess.opacity(0.2))
+                                .foregroundColor(AppColors.accentSuccess)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    
+                    Text(qualityTier.description)
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textSecondary)
+                    
+                    if qualityTier == .compact {
+                        Text("Download Premium voices for natural speech:")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textSecondary)
+                            .padding(.top, 4)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            instructionRow("1", "Open Settings app")
+                            instructionRow("2", "Accessibility → Spoken Content")
+                            instructionRow("3", "Voices → English → Download Premium")
+                        }
+                        .padding(.top, 2)
+                        
+                        Button {
+                            openAccessibilitySettings()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "gear")
+                                Text("Open Settings")
+                            }
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.signalMercury)
+                        }
+                        .padding(.top, 6)
+                    }
+                }
+                
+                Spacer()
+                
+                Button {
+                    checkQualityTier()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundColor(AppColors.signalMercury)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .onAppear {
+            if !hasChecked {
+                checkQualityTier()
+            }
+        }
+    }
+    
+    private var iconColor: Color {
+        switch qualityTier {
+        case .premium:
+            return AppColors.accentSuccess
+        case .enhanced:
+            return AppColors.signalMercury
+        case .compact:
+            return AppColors.accentWarning
+        }
+    }
+    
+    private func instructionRow(_ number: String, _ text: String) -> some View {
+        HStack(spacing: 6) {
+            Text(number)
+                .font(AppTypography.labelSmall())
+                .foregroundColor(AppColors.signalMercury)
+                .frame(width: 16)
+            Text(text)
+                .font(AppTypography.labelSmall())
+                .foregroundColor(AppColors.textTertiary)
+        }
+    }
+    
+    private func checkQualityTier() {
+        qualityTier = AppleTTSService.detectVoiceQualityTier()
+        hasChecked = true
+    }
+    
+    private func openAccessibilitySettings() {
+        #if os(iOS)
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
+        }
+        #elseif os(macOS)
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.universalaccess?Accessibility_SpeakableItems") {
+            NSWorkspace.shared.open(url)
+        }
+        #endif
+    }
+}
+
+// MARK: - F5-TTS Model Status Banner
+
+/// Shows the current F5-TTS model download/load status
+private struct MLXModelStatusBanner: View {
+    @StateObject private var ttsService = MLXTTSService.shared
+
+    var body: some View {
+        if MLXTTSService.isAvailable {
+            SettingsCard(padding: 12) {
+                HStack(spacing: 12) {
+                    if ttsService.isDownloading {
+                        VStack(spacing: 4) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: AppColors.signalMercury))
+                            if ttsService.downloadProgress > 0 {
+                                Text("\(Int(ttsService.downloadProgress * 100))%")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
+                        }
+                    } else {
+                        Image(systemName: ttsService.isModelLoaded ? "checkmark.circle.fill" : "arrow.down.circle")
+                            .foregroundColor(ttsService.isModelLoaded ? AppColors.accentSuccess : AppColors.signalMercury)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        if ttsService.isDownloading {
+                            Text("Downloading Model...")
+                                .font(AppTypography.bodySmall(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+                            Text(ttsService.loadingStatus)
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        } else if ttsService.isModelLoaded {
+                            Text("Model Ready")
+                                .font(AppTypography.bodySmall(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+                            Text("F5-TTS model loaded and ready to use.")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        } else {
+                            Text("Model Not Downloaded")
+                                .font(AppTypography.bodySmall(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+                            Text("Will download on first use (~300MB).")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                    }
+
+                    Spacer()
+                }
+            }
+        }
     }
 }
 

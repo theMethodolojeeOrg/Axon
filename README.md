@@ -56,65 +56,49 @@ After enough interaction, the composition becomes something new: **your model**.
 
 ## Features
 
-### 🜔 Dual Memory System
+### 🜔 Dual Memory & Heuristics
 
-**Allocentric Memories** (About You)
-```
-"User prefers async/await over promises in TypeScript"
-Confidence: 85% | Conditions: backend code | Source: 15+ interactions
-```
+**Allocentric Memories** (Facts) + **Egoic Memories** (Patterns) + **Heuristics** (Cognitive Shortcuts).
 
-**Egoic Memories** (About What Works)
+Axon doesn't just remember *what* you said; it learns *how* to solve your problems.
 ```
-"When stuck on dependency resolution, check package-lock.json BEFORE npm install"
-Confidence: 92% | Success: 23/25 attempts | Discovered by: Claude Opus
+"User prefers async/await" (Memory)
+          +
+"When debugging Swift concurrency, check for main actor isolation first" (Heuristic)
 ```
 
-Together: An AI that knows you AND knows what works.
+### 🎨 Creative Engine
 
-### 🝆 Provider-Agnostic Intelligence
+Axon is not just a chatbot; it's a **creative studio**.
 
-Switch models mid-conversation without losing context.
+- **Video Generation**: Create videos from text prompts using available models.
+- **Audio & TTS**: 
+  - **Apple TTS**: Zero-config, native, offline speech.
+  - **Gemini TTS**: High-fidelity cloud speech.
+  - **Voice Browser**: Explore and select specialized voices.
+- **Unified Gallery**: Manage all your generated artifacts (Code, Images, Videos, Audio) in one sovereign space.
 
-```
-GPT-4 → Claude → Gemini → Local Model
-         ↓
-All see the same memories
-All contribute to shared learning
-No re-explaining basics
-```
+### 🔌 The Bridge (Local Proxy)
 
-### 🜹 Confidence-Based Learning
-
-Memories don't replace each other—they **scope** themselves.
+Turn your device into the intelligence hub for your entire workflow.
 
 ```
-Memory v1: "This works, 80% confidence"
-         ↓ Evidence supports in context Y
-Memory v2: "This works under condition Y, 90% confidence"
-         ↓ Evidence contradicts in context Z
-Memory v3: "This works under Y, NOT under Z"
-         ↓
-Failure becomes data, not wasted time
+VS Code / Cursor / Terminal
+          ↓
+    Axon Bridge (Localhost)
+          ↓
+  Memories + Heuristics + All Models
 ```
 
-### 🝥 Device-First Privacy
+- **VS Code Extension**: Direct integration with your editor.
+- **Live Activities**: "Heartbeat" tracking on Dynamic Island keeps you connected to background agents.
+- **File Sharing**: Seamlessly pipe files and context into the nervous system.
 
-- All data stored locally on YOUR device
-- API keys in secure Keychain (we never see them)
-- Optional iCloud sync (your account, your data)
-- No telemetry, no analytics, no cloud dependency
-- Works fully offline (except AI calls themselves)
+### 🛡️ Sovereign Architecture
 
-### 🝪 Local Proxy Server
-
-Turn your device into a context hub for your entire AI toolkit.
-
-```
-Cline, Kilocode, Continue → Your Local Server → Your Memories
-                                   ↓
-        All external tools inherit your learned patterns
-```
+- **Job Attestation**: Cryptographic proof of work for agentic tasks.
+- **Trust Tiers**: Granular control over what external tools can access.
+- **Device-First**: Keys, memories, and data live on your device. Sync is optional and encrypted.
 
 ---
 
@@ -343,18 +327,27 @@ Memories are created automatically as you interact. You can also create them man
 
 ---
 
+## Development History
+
+Axon has evolved rapidly from a basic iOS app to a sovereign AI platform.
+[View Complete Commit History](Docs/Axon-Commit-History-Complete.md)
+
+---
+
 ## Roadmap
 
 - [x] Multi-provider conversation system
 - [x] Allocentric + Egoic memory architecture
 - [x] Confidence-based memory scoping
-- [x] Salience injection into system prompts
-- [ ] Local proxy server for external tool integration
+- [x] **Local Proxy Server (The Bridge)**
+- [x] **VS Code Integration**
+- [x] **Video & Audio Generation**
+- [x] **Live Activities & Heartbeat**
+- [x] **Job Attestation & Cryptographic Sovereignty**
 - [ ] Semantic search with local embeddings
 - [ ] Memory tool calls (AI creates memories via JSON)
 - [ ] iCloud sync across devices
 - [ ] Custom backend support (self-hosted)
-- [ ] Cline/Kilocode/Continue integration guides
 
 ---
 

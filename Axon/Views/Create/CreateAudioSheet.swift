@@ -194,6 +194,8 @@ struct CreateAudioSheet: View {
             switch selectedProvider {
             case .apple:
                 appleInfoView
+            case .mlxAudio:
+                mlxInfoView
             case .openai:
                 openAIVoicePicker
             case .gemini:
@@ -229,6 +231,23 @@ struct CreateAudioSheet: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text("Apple TTS is for reading messages")
+                    .font(AppTypography.bodySmall(.medium))
+                    .foregroundColor(AppColors.textPrimary)
+                
+                Text("For audio file creation, switch to ElevenLabs, OpenAI, or Gemini.")
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(AppColors.textSecondary)
+            }
+        }
+    }
+
+    private var mlxInfoView: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "info.circle.fill")
+                .foregroundColor(AppColors.signalMercury)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("MLX Neural TTS is for reading messages")
                     .font(AppTypography.bodySmall(.medium))
                     .foregroundColor(AppColors.textPrimary)
                 
@@ -340,6 +359,9 @@ struct CreateAudioSheet: View {
                 case .apple:
                     // Apple TTS is for in-chat TTS only, not for gallery audio creation
                     throw DirectMediaError.generationFailed("Apple TTS is available for reading messages aloud. For audio file creation, please use ElevenLabs, OpenAI, or Gemini.")
+                case .mlxAudio:
+                    // MLX-Audio is for in-chat TTS only, not for gallery audio creation
+                    throw DirectMediaError.generationFailed("MLX Neural TTS is available for reading messages aloud. For audio file creation, please use ElevenLabs, OpenAI, or Gemini.")
                 case .openai:
                     item = try await creationService.generateAudioOpenAI(
                         text: text,

@@ -88,16 +88,23 @@ final class MLXTTSService: ObservableObject {
     // MARK: - Availability Check
 
     /// Check if F5-TTS is available on this device
+    /// NOTE: Currently disabled due to mlx-swift version incompatibility.
+    /// F5-TTS requires mlx-swift 0.18.1 but other MLX packages need newer versions.
+    /// See: https://github.com/lucasnewman/f5-tts-swift/issues/6
     static var isAvailable: Bool {
-        #if canImport(F5TTS)
-        #if targetEnvironment(simulator)
+        // Temporarily disabled until F5-TTS is updated for newer mlx-swift versions
         return false
-        #else
-        return true
-        #endif
-        #else
-        return false
-        #endif
+
+        // Original implementation (re-enable when F5-TTS is updated):
+        // #if canImport(F5TTS)
+        // #if targetEnvironment(simulator)
+        // return false
+        // #else
+        // return true
+        // #endif
+        // #else
+        // return false
+        // #endif
     }
 
     // MARK: - Model Management

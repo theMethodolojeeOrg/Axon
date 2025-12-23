@@ -1326,6 +1326,7 @@ enum APIProvider: String, CaseIterable, Identifiable {
 /// TTS provider selection - mutually exclusive
 enum TTSProvider: String, Codable, CaseIterable, Identifiable {
     case apple = "apple"          // Native Apple TTS (free, no API key required)
+    case mlxAudio = "mlxAudio"    // On-device neural TTS via F5-TTS (free, no API key required)
     case elevenlabs = "elevenlabs"
     case gemini = "gemini"
     case openai = "openai"
@@ -1335,6 +1336,7 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .apple: return "Apple (Siri)"
+        case .mlxAudio: return "F5 Neural"
         case .elevenlabs: return "ElevenLabs"
         case .gemini: return "Gemini"
         case .openai: return "OpenAI"
@@ -1344,6 +1346,7 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
     var description: String {
         switch self {
         case .apple: return "On-device Siri voices • Free • No API key"
+        case .mlxAudio: return "On-device neural TTS • Free • ~300MB model"
         case .elevenlabs: return "High-quality voices with fine-tuned controls"
         case .gemini: return "Google's TTS with expressive voices"
         case .openai: return "Promptable TTS with natural voices"
@@ -1353,6 +1356,7 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .apple: return "apple.logo"
+        case .mlxAudio: return "waveform.badge.mic"
         case .elevenlabs: return "waveform"
         case .gemini: return "sparkles"
         case .openai: return "brain.head.profile"
@@ -1362,7 +1366,7 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
     /// Whether this provider requires an API key
     var requiresAPIKey: Bool {
         switch self {
-        case .apple: return false
+        case .apple, .mlxAudio: return false
         case .elevenlabs, .gemini, .openai: return true
         }
     }
@@ -1692,6 +1696,11 @@ struct TTSSettings: Codable, Equatable {
     var openaiVoiceInstructions: String = ""
     /// Speed multiplier (0.25 to 4.0, default 1.0)
     var openaiSpeed: Double = 1.0
+
+    // MARK: - F5-TTS Settings
+    var mlxVoice: MLXTTSVoice = .defaultVoice
+    /// Speech speed (0.5 to 2.0, default 1.0)
+    var mlxSpeed: Float = 1.0
 
     // MARK: - Computed Properties for Quality Tier
 
