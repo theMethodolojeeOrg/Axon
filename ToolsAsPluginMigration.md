@@ -452,14 +452,31 @@ Master index created: `_index.json`
 - `ToolSovereigntyBridgeV2.swift` — Bridge V2 tools to existing SovereigntyService
 - `ToolExecutionRouterV2.swift` — Updated to use new bridges for approval/sovereignty checks
 
-### 🔲 Phase 6: UI Layer — PENDING
-- `ToolUIRenderer.swift`
-- `ToolSettingsViewV2.swift`
-- `ToolImportServiceV2.swift`
+### ✅ Phase 6: UI Layer — COMPLETE
+*Completed December 23, 2024*
 
-### 🔲 Phase 7: Wire Up Toggle — PENDING
-- Add V1/V2 toggle in General Settings
-- Route orchestrators to V2 when enabled
+- `ToolUIRenderer.swift` — Generates SwiftUI views from JSON `ui` config in tool manifests
+  - Widget support: text_field, textarea, slider, segmented, tag_input, toggle, picker, date_picker, stepper, color_picker
+  - Result display: header, text, code, list, keyValue, divider, spacer, image, link, badge, progress
+  - Template resolution: `{{param}}` and `{{result.field}}` syntax
+- `ToolSettingsViewV2.swift` — Browse, search, filter, and enable/disable tools
+  - V1/V2 toggle in settings
+  - Tool detail sheet with metadata
+  - Category filtering and search
+- `ToolImportServiceV2.swift` — Import from GitHub/iCloud/local files
+  - Security validation for imported tools
+  - Manifest parsing and installation to community folder
+
+### ✅ Phase 7: Wire Up Toggle — COMPLETE
+*Completed December 23, 2024*
+
+- `ToolSystemQuickToggle` added to AutomationSettingsView
+- `ToolSettingsViewV2` or `ToolSettingsView` shown based on toggle
+- `ToolRoutingService.swift` — Unified entry point for tool operations
+  - Routes to V1 or V2 based on `ToolsV2Toggle.shared.isV2Active`
+  - System prompt generation for both systems
+  - Tool execution routing
+  - Tool request parsing
 
 ---
 

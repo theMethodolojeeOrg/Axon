@@ -213,126 +213,152 @@ struct ToolUIRenderer {
     }
 
     /// Render a single result section
-    @ViewBuilder
+    /// Uses AnyView to avoid complex opaque type inference from switch statement
     static func renderResultSection(
         section: ResultSection,
         data: [String: Any]
-    ) -> some View {
+    ) -> AnyView {
         switch section.type {
         case .header:
-            HStack(spacing: 8) {
-                if let icon = section.icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 16))
-                        .foregroundColor(AppColors.signalLichen)
+            return AnyView(
+                HStack(spacing: 8) {
+                    if let icon = section.icon {
+                        Image(systemName: icon)
+                            .font(.system(size: 16))
+                            .foregroundColor(AppColors.signalLichen)
+                    }
+                    Text(resolveTemplate(section.title ?? "", with: data))
+                        .font(AppTypography.titleSmall())
+                        .foregroundColor(AppColors.textPrimary)
                 }
-                Text(resolveTemplate(section.title ?? "", with: data))
-                    .font(AppTypography.titleSmall())
-                    .foregroundColor(AppColors.textPrimary)
-            }
+            )
 
         case .text:
-            Text(resolveTemplate(section.source ?? "", with: data))
-                .font(AppTypography.bodyMedium())
-                .foregroundColor(AppColors.textPrimary)
+            return AnyView(
+                Text(resolveTemplate(section.source ?? "", with: data))
+                    .font(AppTypography.bodyMedium())
+                    .foregroundColor(AppColors.textPrimary)
+            )
 
         case .code:
-            Text(resolveTemplate(section.source ?? "", with: data))
-                .font(.system(.body, design: .monospaced))
-                .foregroundColor(AppColors.textPrimary)
-                .padding(12)
-                .background(AppColors.substrateTertiary)
-                .cornerRadius(8)
+            return AnyView(
+                Text(resolveTemplate(section.source ?? "", with: data))
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundColor(AppColors.textPrimary)
+                    .padding(12)
+                    .background(AppColors.substrateTertiary)
+                    .cornerRadius(8)
+            )
 
         case .list:
             if let items = section.items {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(AppColors.textTertiary)
-                                .frame(width: 4, height: 4)
-                            renderResultSection(section: item, data: data)
+                return AnyView(
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(AppColors.textTertiary)
+                                    .frame(width: 4, height: 4)
+                                renderResultSection(section: item, data: data)
+                            }
                         }
                     }
-                }
+                )
             }
+            return AnyView(EmptyView())
 
         case .keyValue:
-            VStack(alignment: .leading, spacing: 8) {
-                if let title = section.title {
-                    Text(title)
-                        .font(AppTypography.labelMedium())
-                        .foregroundColor(AppColors.textSecondary)
-                }
-                if let items = section.items {
-                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                        HStack {
-                            Text(item.title ?? "")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
-                            Spacer()
-                            Text(resolveTemplate(item.source ?? "", with: data))
-                                .font(AppTypography.bodySmall(.medium))
-                                .foregroundColor(AppColors.textPrimary)
+            return AnyView(
+                VStack(alignment: .leading, spacing: 8) {
+                    if let title = section.title {
+                        Text(title)
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                    if let items = section.items {
+                        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                            HStack {
+                                Text(item.title ?? "")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textSecondary)
+                                Spacer()
+                                Text(resolveTemplate(item.source ?? "", with: data))
+                                    .font(AppTypography.bodySmall(.medium))
+                                    .foregroundColor(AppColors.textPrimary)
+                            }
                         }
                     }
                 }
-            }
+            )
 
         case .divider:
-            Divider()
-                .background(AppColors.divider)
+            return AnyView(
+                Divider()
+                    .background(AppColors.divider)
+            )
 
         case .spacer:
-            Spacer()
-                .frame(height: 8)
+            return AnyView(
+                Spacer()
+                    .frame(height: 8)
+            )
 
         case .image:
             if let source = section.source,
                let url = URL(string: resolveTemplate(source, with: data)) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .cornerRadius(8)
-                } placeholder: {
-                    ProgressView()
-                }
-                .frame(maxHeight: 200)
+                return AnyView(
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .cornerRadius(8)
+                    } placeholder: {
+                        ProgressView()
+                    }
+                    .frame(maxHeight: 200)
+                )
             }
+            return AnyView(EmptyView())
 
         case .link:
             if let source = section.source {
                 let urlString = resolveTemplate(source, with: data)
                 if let url = URL(string: urlString) {
-                    Link(destination: url) {
-                        HStack {
-                            Text(section.title ?? urlString)
-                                .font(AppTypography.bodyMedium())
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 12))
+                    return AnyView(
+                        Link(destination: url) {
+                            HStack {
+                                Text(section.title ?? urlString)
+                                    .font(AppTypography.bodyMedium())
+                                Image(systemName: "arrow.up.right")
+                                    .font(.system(size: 12))
+                            }
+                            .foregroundColor(AppColors.signalMercury)
                         }
-                        .foregroundColor(AppColors.signalMercury)
-                    }
+                    )
                 }
             }
+            return AnyView(EmptyView())
 
         case .badge:
-            Text(resolveTemplate(section.source ?? "", with: data))
-                .font(AppTypography.labelSmall())
-                .foregroundColor(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(AppColors.signalCopper)
-                .cornerRadius(4)
+            return AnyView(
+                Text(resolveTemplate(section.source ?? "", with: data))
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(AppColors.signalCopper)
+                    .cornerRadius(4)
+            )
 
         case .progress:
             if let source = section.source,
                let value = Double(resolveTemplate(source, with: data)) {
-                ProgressView(value: value)
-                    .progressViewStyle(LinearProgressViewStyle(tint: AppColors.signalLichen))
+                return AnyView(
+                    ProgressView(value: value)
+                        .progressViewStyle(LinearProgressViewStyle(tint: AppColors.signalLichen))
+                )
             }
+            return AnyView(EmptyView())
         }
     }
 
@@ -541,7 +567,7 @@ private struct TagInputWidget: View {
         VStack(alignment: .leading, spacing: 8) {
             // Tag display
             if !tags.isEmpty {
-                FlowLayout(spacing: 6) {
+                ToolUIFlowLayout(spacing: 6) {
                     ForEach(tags, id: \.self) { tag in
                         TagChip(tag: tag) {
                             removeTag(tag)
@@ -609,8 +635,8 @@ private struct TagChip: View {
     }
 }
 
-/// Flow layout for tags
-private struct FlowLayout: Layout {
+/// Flow layout for tags in tool UI
+private struct ToolUIFlowLayout: Layout {
     var spacing: CGFloat = 8
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import Combine
 import os.log
 
 // MARK: - Tool Routing Service
@@ -122,10 +123,26 @@ final class ToolRoutingService: ObservableObject {
             context: context
         )
 
+        // Convert metadata to dictionary if present
+        var metadataDict: [String: Any]?
+        if let metadata = result.metadata {
+            var dict: [String: Any] = [
+                "executionTimeMs": metadata.executionTimeMs,
+                "handlerUsed": metadata.handlerUsed
+            ]
+            if let approvalId = metadata.approvalRecordId {
+                dict["approvalRecordId"] = approvalId
+            }
+            if let extra = metadata.extra {
+                dict["extra"] = extra
+            }
+            metadataDict = dict
+        }
+
         return ToolExecutionResult(
             success: result.success,
             output: result.output,
-            metadata: result.metadata,
+            metadata: metadataDict,
             groundingSources: nil // V2 sources would need conversion
         )
     }

@@ -124,10 +124,10 @@ struct ToolSettingsViewV2: View {
                 .padding(.top, 8)
 
             VStack(alignment: .leading, spacing: 8) {
-                FeatureRow(icon: "folder.badge.gearshape", text: "JSON-based tool definitions")
-                FeatureRow(icon: "icloud", text: "Import tools from iCloud")
-                FeatureRow(icon: "square.and.arrow.down", text: "Community tool sharing")
-                FeatureRow(icon: "arrow.clockwise", text: "Hot-reload support")
+                ToolsV2FeatureRow(icon: "folder.badge.gearshape", text: "JSON-based tool definitions")
+                ToolsV2FeatureRow(icon: "icloud", text: "Import tools from iCloud")
+                ToolsV2FeatureRow(icon: "square.and.arrow.down", text: "Community tool sharing")
+                ToolsV2FeatureRow(icon: "arrow.clockwise", text: "Hot-reload support")
             }
         }
         .padding(24)
@@ -555,9 +555,9 @@ private struct EmptyToolsView: View {
     }
 }
 
-// MARK: - Feature Row
+// MARK: - V2 Feature Row
 
-private struct FeatureRow: View {
+private struct ToolsV2FeatureRow: View {
     let icon: String
     let text: String
 
@@ -639,7 +639,7 @@ private struct ToolDetailSheet: View {
                                 .font(AppTypography.labelMedium())
                                 .foregroundColor(AppColors.textSecondary)
 
-                            FlowLayout(spacing: 6) {
+                            ToolSettingsFlowLayout(spacing: 6) {
                                 ForEach(tags, id: \.self) { tag in
                                     Text(tag)
                                         .font(AppTypography.labelSmall())
@@ -714,7 +714,9 @@ private struct ToolDetailSheet: View {
             }
             .background(AppColors.substratePrimary)
             .navigationTitle("Tool Details")
+#if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+#endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
@@ -748,8 +750,8 @@ private struct ToolDetailSheet: View {
     }
 }
 
-// Flow layout for tags (used by both ToolUIRenderer and here)
-private struct FlowLayout: Layout {
+// Flow layout for tags in tool settings V2
+private struct ToolSettingsFlowLayout: Layout {
     var spacing: CGFloat = 8
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
@@ -801,3 +803,4 @@ private struct FlowLayout: Layout {
     }
     .background(AppColors.substratePrimary)
 }
+
