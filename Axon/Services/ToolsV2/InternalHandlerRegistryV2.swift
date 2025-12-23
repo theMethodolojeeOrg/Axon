@@ -100,15 +100,23 @@ final class InternalHandlerRegistryV2: ObservableObject {
     // MARK: - Built-in Handlers
     
     /// Register all built-in handlers
-    ///
-    /// Handlers will be implemented in Phase 3. For now, this is a placeholder
-    /// that will be populated as handlers are created.
     private func registerBuiltInHandlers() {
-        // Phase 3 will add handlers here, for example:
-        // registerHandler(MemoryToolHandler())
-        // registerHandler(AgentStateToolHandler())
-        // registerHandler(HeartbeatToolHandler())
-        // etc.
+        // Core handlers (Phase 3)
+        registerHandler(MemoryHandler())
+        registerHandler(AgentStateHandler())
+        registerHandler(HeartbeatHandler())
+        registerHandler(SovereigntyHandler())
+        registerHandler(SystemStateHandler())
+        registerHandler(NotificationHandler())
+        registerHandler(TemporalHandler())
+        registerHandler(SubAgentHandler())
+        registerHandler(DiscoveryHandler())
+        registerHandler(DevicePresenceHandler())
+        registerHandler(BridgeHandler())
+        
+        // Provider-specific handlers (to be added):
+        // registerHandler(OpenAIHandler())
+        // registerHandler(GeminiHandler())
         
         logger.info("Built-in handlers registered: \(self.handlers.count)")
     }

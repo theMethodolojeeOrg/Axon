@@ -756,10 +756,28 @@ enum BridgeMethod: String, CaseIterable {
     case guestChatWithContext = "guest/chatWithContext"
     case guestDisconnect = "guest/disconnect"
 
+    // Mac System operations (for iOS → Mac remote control)
+    case systemInfo = "system/info"
+    case systemProcesses = "system/processes"
+    case systemDiskUsage = "system/disk_usage"
+    case clipboardRead = "clipboard/read"
+    case clipboardWrite = "clipboard/write"
+    case notificationSend = "notification/send"
+    case spotlightSearch = "spotlight/search"
+    case fileFind = "file/find"
+    case fileMetadata = "file/metadata"
+    case appList = "app/list"
+    case appLaunch = "app/launch"
+    case screenshot = "screenshot/capture"
+    case networkInfo = "network/info"
+    case networkPing = "network/ping"
+    case shellExecute = "shell/execute"
+
     /// Whether this method requires user approval
     var requiresApproval: Bool {
         switch self {
-        case .fileWrite, .terminalRun:
+        case .fileWrite, .terminalRun,
+             .clipboardWrite, .appLaunch, .shellExecute:
             return true
         case .hello,
              .getPairingInfo,
@@ -771,7 +789,19 @@ enum BridgeMethod: String, CaseIterable {
              .guestQueryMemories,
              .guestGetContext,
              .guestChatWithContext,
-             .guestDisconnect:
+             .guestDisconnect,
+             .systemInfo,
+             .systemProcesses,
+             .systemDiskUsage,
+             .clipboardRead,
+             .notificationSend,
+             .spotlightSearch,
+             .fileFind,
+             .fileMetadata,
+             .appList,
+             .screenshot,
+             .networkInfo,
+             .networkPing:
             return false
         }
     }
@@ -782,7 +812,12 @@ enum BridgeMethod: String, CaseIterable {
         case .guestQueryMemories, .guestGetContext, .guestChatWithContext, .guestDisconnect, .hello:
             return true
         case .getPairingInfo, .chatListConversations, .chatGetMessages,
-             .fileRead, .fileWrite, .fileList, .terminalRun, .workspaceInfo:
+             .fileRead, .fileWrite, .fileList, .terminalRun, .workspaceInfo,
+             .systemInfo, .systemProcesses, .systemDiskUsage,
+             .clipboardRead, .clipboardWrite, .notificationSend,
+             .spotlightSearch, .fileFind, .fileMetadata,
+             .appList, .appLaunch, .screenshot,
+             .networkInfo, .networkPing, .shellExecute:
             return false
         }
     }
@@ -816,6 +851,37 @@ enum BridgeMethod: String, CaseIterable {
             return "Chat with AI using host's learned patterns"
         case .guestDisconnect:
             return "End guest session"
+        // Mac System operations
+        case .systemInfo:
+            return "Get Mac system information (CPU, memory, uptime)"
+        case .systemProcesses:
+            return "List running processes"
+        case .systemDiskUsage:
+            return "Get disk usage statistics"
+        case .clipboardRead:
+            return "Read clipboard content"
+        case .clipboardWrite:
+            return "Write to clipboard"
+        case .notificationSend:
+            return "Send a system notification"
+        case .spotlightSearch:
+            return "Search files using Spotlight"
+        case .fileFind:
+            return "Find files by pattern"
+        case .fileMetadata:
+            return "Get file metadata"
+        case .appList:
+            return "List running applications"
+        case .appLaunch:
+            return "Launch an application"
+        case .screenshot:
+            return "Capture a screenshot"
+        case .networkInfo:
+            return "Get network interface information"
+        case .networkPing:
+            return "Ping a host"
+        case .shellExecute:
+            return "Execute a shell command"
         }
     }
 

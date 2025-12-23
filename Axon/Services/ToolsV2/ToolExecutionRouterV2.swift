@@ -177,7 +177,7 @@ final class ToolExecutionRouterV2: ObservableObject {
             return try parsePipeDelimitedV2(rawInput, manifest: manifest)
         case .json:
             return try parseJSONInputV2(rawInput)
-        case .plain:
+        case .freeform, .positional:
             return ["query": rawInput]
         case .keyValue:
             return try parseKeyValueV2(rawInput)
@@ -340,7 +340,7 @@ final class ToolExecutionRouterV2: ObservableObject {
             id: manifest.tool.id,
             name: manifest.tool.name,
             description: manifest.tool.description,
-            category: .system, // V2 tools use a different category system
+            category: .utility, // V2 tools use a different category system
             enabled: true,
             icon: manifest.tool.icon?.resolvedIcon ?? "questionmark",
             requiredSecrets: [],
@@ -356,9 +356,9 @@ final class ToolExecutionRouterV2: ObservableObject {
         )
         
         switch result {
-        case .approved:
+        case .approved, .approvedForSession, .approvedViaTrustTier:
             return true
-        case .denied, .blocked, .expired:
+        case .denied, .blocked, .timeout, .cancelled, .stop, .error:
             return false
         }
     }

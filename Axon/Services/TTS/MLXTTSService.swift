@@ -10,10 +10,13 @@
 import Foundation
 import Combine
 
-#if canImport(F5TTS)
-import F5TTS
-import MLX
-#endif
+// F5-TTS package temporarily disabled due to swift-transformers version conflict
+// between f5-tts-swift (requires 0.x) and mlx-swift-lm (requires 1.x)
+// Uncomment when dependency conflict is resolved:
+// #if canImport(F5TTS)
+// import F5TTS
+// import MLX
+// #endif
 
 // MARK: - MLX TTS Voice Options
 
@@ -49,9 +52,11 @@ enum MLXTTSVoice: String, Codable, CaseIterable, Identifiable {
 final class MLXTTSService: ObservableObject {
     static let shared = MLXTTSService()
 
-    #if canImport(F5TTS)
-    private var f5tts: F5TTS?
-    #endif
+    // F5-TTS package temporarily disabled
+    // Uncomment when dependency conflict is resolved:
+    // #if canImport(F5TTS)
+    // private var f5tts: F5TTS?
+    // #endif
 
     @Published var isModelLoaded = false
     @Published var isDownloading = false
@@ -111,56 +116,17 @@ final class MLXTTSService: ObservableObject {
 
     /// Load the F5-TTS model
     func loadModel() async throws {
-        #if canImport(F5TTS)
-        #if targetEnvironment(simulator)
-        throw MLXTTSError.simulatorNotSupported
-        #endif
-
-        guard !isModelLoaded else {
-            print("[MLXTTSService] Model already loaded")
-            return
-        }
-
-        isDownloading = true
-        loadingStatus = "Downloading F5-TTS model..."
-
-        defer {
-            isDownloading = false
-        }
-
-        do {
-            print("[MLXTTSService] Loading F5-TTS from pretrained model...")
-
-            f5tts = try await F5TTS.fromPretrained(repoId: "lucasnewman/f5-tts-mlx") { [weak self] progress in
-                Task { @MainActor in
-                    self?.downloadProgress = progress.fractionCompleted
-                    self?.loadingStatus = "Downloading: \(Int(progress.fractionCompleted * 100))%"
-                }
-            }
-
-            isModelLoaded = true
-            loadingStatus = "Model loaded"
-            print("[MLXTTSService] F5-TTS model loaded successfully")
-
-        } catch {
-            loadingStatus = "Failed to load model"
-            print("[MLXTTSService] Failed to load F5-TTS: \(error)")
-            throw MLXTTSError.modelLoadFailed(error.localizedDescription)
-        }
-        #else
+        // F5-TTS package temporarily disabled
         throw MLXTTSError.notAvailable
-        #endif
     }
 
     /// Unload the model to free memory
     func unloadModel() {
-        #if canImport(F5TTS)
-        f5tts = nil
+        // F5-TTS package temporarily disabled
         isModelLoaded = false
         loadingStatus = ""
         downloadProgress = 0.0
-        print("[MLXTTSService] Model unloaded")
-        #endif
+        print("[MLXTTSService] Model unloaded (F5-TTS disabled)")
     }
 
     // MARK: - Speech Generation
@@ -176,53 +142,8 @@ final class MLXTTSService: ObservableObject {
         voice: MLXTTSVoice = .defaultVoice,
         speed: Float = 1.0
     ) async throws -> Data {
-        #if canImport(F5TTS)
-        #if targetEnvironment(simulator)
-        throw MLXTTSError.simulatorNotSupported
-        #endif
-
-        // Load model if not already loaded
-        if !isModelLoaded || f5tts == nil {
-            try await loadModel()
-        }
-
-        guard let f5tts = f5tts else {
-            throw MLXTTSError.modelNotLoaded
-        }
-
-        print("[MLXTTSService] Generating speech for text: \(text.prefix(50))...")
-
-        do {
-            // Generate audio using F5-TTS
-            // Uses built-in reference audio for voice cloning
-            let audioArray = try await f5tts.generate(
-                text: text,
-                speed: Double(speed)
-            ) { progress in
-                print("[MLXTTSService] Generation progress: \(Int(progress * 100))%")
-            }
-
-            // Convert MLXArray to Float array
-            let floatArray = audioArray.asArray(Float.self)
-
-            print("[MLXTTSService] Generated \(floatArray.count) samples @ \(F5TTS.sampleRate) Hz")
-
-            // Convert to WAV data
-            let wavData = createWAVData(
-                from: floatArray,
-                sampleRate: F5TTS.sampleRate
-            )
-
-            print("[MLXTTSService] Created WAV data: \(wavData.count) bytes")
-            return wavData
-
-        } catch {
-            print("[MLXTTSService] Generation failed: \(error)")
-            throw MLXTTSError.generationFailed(error.localizedDescription)
-        }
-        #else
+        // F5-TTS package temporarily disabled
         throw MLXTTSError.notAvailable
-        #endif
     }
 
     // MARK: - Audio Conversion

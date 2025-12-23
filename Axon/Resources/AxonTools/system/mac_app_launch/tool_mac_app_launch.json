@@ -1,0 +1,58 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_app_launch",
+    "name": "Mac Launch App",
+    "description": "Launch an application on the Mac.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "arrow.up.forward.app"
+    },
+    "requiresApproval": true,
+    "trustTierCategory": "system_app_control",
+    "tags": ["mac", "apps", "launch", "open"]
+  },
+
+  "parameters": {
+    "appName": {
+      "type": "string",
+      "required": true,
+      "description": "Application name or bundle identifier"
+    },
+    "arguments": {
+      "type": "array",
+      "required": false,
+      "description": "Command line arguments to pass to the app",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "app/launch"
+  },
+
+  "ai": {
+    "systemPromptSection": "### mac_app_launch\nLaunch an application on the Mac.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_app_launch\", \"query\": \"{\\\"appName\\\": \\\"Safari\\\"}\"}\n```\n\n**Parameters:**\n- appName: App name or bundle ID (required)\n- arguments: Optional command line args\n\n**Returns:** success, pid, bundleIdentifier, errorMessage",
+    "whenToUse": [
+      "User asks to open an app",
+      "Need to launch a specific application"
+    ],
+    "whenNotToUse": [
+      "User didn't explicitly ask to open an app"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "system_app_control",
+    "approvalDescription": "Launch application: {{appName}}",
+    "scopes": ["app.launch"],
+    "riskLevel": "medium"
+  }
+}

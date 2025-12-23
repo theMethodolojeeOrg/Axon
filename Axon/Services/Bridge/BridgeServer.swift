@@ -546,6 +546,38 @@ class BridgeServer: ObservableObject {
         case .chatGetMessages:
             await handleChatGetMessages(request, on: connection)
 
+        // Mac System operations (iOS → Mac remote control)
+        case .systemInfo:
+            await handleSystemInfo(request, on: connection)
+        case .systemProcesses:
+            await handleSystemProcesses(request, on: connection)
+        case .systemDiskUsage:
+            await handleSystemDiskUsage(request, on: connection)
+        case .clipboardRead:
+            await handleClipboardRead(request, on: connection)
+        case .clipboardWrite:
+            await handleClipboardWrite(request, on: connection)
+        case .notificationSend:
+            await handleNotificationSend(request, on: connection)
+        case .spotlightSearch:
+            await handleSpotlightSearch(request, on: connection)
+        case .fileFind:
+            await handleFileFind(request, on: connection)
+        case .fileMetadata:
+            await handleFileMetadata(request, on: connection)
+        case .appList:
+            await handleAppList(request, on: connection)
+        case .appLaunch:
+            await handleAppLaunch(request, on: connection)
+        case .screenshot:
+            await handleScreenshot(request, on: connection)
+        case .networkInfo:
+            await handleNetworkInfo(request, on: connection)
+        case .networkPing:
+            await handleNetworkPing(request, on: connection)
+        case .shellExecute:
+            await handleShellExecute(request, on: connection)
+
         // Everything else is not allowed FROM VS Code.
         default:
             let error = BridgeError(code: .methodNotFound, message: "Unexpected request from client")
@@ -972,6 +1004,320 @@ class BridgeServer: ObservableObject {
         sendResponse(BridgeResponse.success(id: request.id, result: result), on: connection)
 
         connection.cancel()
+    }
+
+    // MARK: - Mac System Operations Handlers
+
+    private func handleSystemInfo(_ request: BridgeRequest, on connection: NWConnection) async {
+        do {
+            let result = try await MacSystemService.shared.getSystemInfo()
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleSystemProcesses(_ request: BridgeRequest, on connection: NWConnection) async {
+        do {
+            var limit = 20
+            if let params = request.params,
+               let paramsData = try? JSONEncoder().encode(params),
+               let decoded = try? JSONDecoder().decode(ProcessListParams.self, from: paramsData) {
+                limit = decoded.limit ?? 20
+            }
+
+            let result = try await MacSystemService.shared.getRunningProcesses(limit: limit)
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleSystemDiskUsage(_ request: BridgeRequest, on connection: NWConnection) async {
+        do {
+            var path = "/"
+            if let params = request.params,
+               let paramsData = try? JSONEncoder().encode(params),
+               let decoded = try? JSONDecoder().decode(DiskUsageParams.self, from: paramsData) {
+                path = decoded.path
+            }
+
+            let result = try await MacSystemService.shared.getDiskUsage(path: path)
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleClipboardRead(_ request: BridgeRequest, on connection: NWConnection) async {
+        do {
+            let result = try await MacSystemService.shared.getClipboardContent()
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleClipboardWrite(_ request: BridgeRequest, on connection: NWConnection) async {
+        guard let params = request.params else {
+            let error = BridgeError(code: .invalidParams, message: "Missing content parameter")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            return
+        }
+
+        do {
+            let paramsData = try JSONEncoder().encode(params)
+            let decoded = try JSONDecoder().decode(ClipboardWriteParams.self, from: paramsData)
+
+            let result = try await MacSystemService.shared.setClipboardContent(decoded.content)
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleNotificationSend(_ request: BridgeRequest, on connection: NWConnection) async {
+        guard let params = request.params else {
+            let error = BridgeError(code: .invalidParams, message: "Missing notification parameters")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            return
+        }
+
+        do {
+            let paramsData = try JSONEncoder().encode(params)
+            let decoded = try JSONDecoder().decode(NotificationSendParams.self, from: paramsData)
+
+            let result = try await MacSystemService.shared.sendNotification(
+                title: decoded.title,
+                message: decoded.message,
+                subtitle: decoded.subtitle,
+                soundName: decoded.soundName
+            )
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleSpotlightSearch(_ request: BridgeRequest, on connection: NWConnection) async {
+        guard let params = request.params else {
+            let error = BridgeError(code: .invalidParams, message: "Missing query parameter")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            return
+        }
+
+        do {
+            let paramsData = try JSONEncoder().encode(params)
+            let decoded = try JSONDecoder().decode(SpotlightSearchParams.self, from: paramsData)
+
+            let result = try await MacSystemService.shared.spotlightSearch(
+                query: decoded.query,
+                limit: decoded.limit ?? 20,
+                contentType: decoded.contentType
+            )
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleFileFind(_ request: BridgeRequest, on connection: NWConnection) async {
+        guard let params = request.params else {
+            let error = BridgeError(code: .invalidParams, message: "Missing pattern parameter")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            return
+        }
+
+        do {
+            let paramsData = try JSONEncoder().encode(params)
+            let decoded = try JSONDecoder().decode(FileFindParams.self, from: paramsData)
+
+            let result = try await MacSystemService.shared.findFiles(
+                pattern: decoded.pattern,
+                directory: decoded.directory ?? "~",
+                maxDepth: decoded.maxDepth ?? 3
+            )
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleFileMetadata(_ request: BridgeRequest, on connection: NWConnection) async {
+        guard let params = request.params else {
+            let error = BridgeError(code: .invalidParams, message: "Missing path parameter")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            return
+        }
+
+        do {
+            let paramsData = try JSONEncoder().encode(params)
+            let decoded = try JSONDecoder().decode(FileMetadataParams.self, from: paramsData)
+
+            let result = try await MacSystemService.shared.getFileMetadata(path: decoded.path)
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleAppList(_ request: BridgeRequest, on connection: NWConnection) async {
+        do {
+            let result = try await MacSystemService.shared.getRunningApplications()
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleAppLaunch(_ request: BridgeRequest, on connection: NWConnection) async {
+        guard let params = request.params else {
+            let error = BridgeError(code: .invalidParams, message: "Missing appName parameter")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            return
+        }
+
+        do {
+            let paramsData = try JSONEncoder().encode(params)
+            let decoded = try JSONDecoder().decode(AppLaunchParams.self, from: paramsData)
+
+            let result = try await MacSystemService.shared.launchApplication(
+                name: decoded.appName,
+                arguments: decoded.arguments
+            )
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleScreenshot(_ request: BridgeRequest, on connection: NWConnection) async {
+        do {
+            var path: String?
+            var display: Int?
+            var includeWindows = true
+
+            if let params = request.params,
+               let paramsData = try? JSONEncoder().encode(params),
+               let decoded = try? JSONDecoder().decode(ScreenshotParams.self, from: paramsData) {
+                path = decoded.path
+                display = decoded.display
+                includeWindows = decoded.includeWindows ?? true
+            }
+
+            let result = try await MacSystemService.shared.takeScreenshot(
+                path: path,
+                display: display,
+                includeWindows: includeWindows
+            )
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleNetworkInfo(_ request: BridgeRequest, on connection: NWConnection) async {
+        do {
+            let result = try await MacSystemService.shared.getNetworkInfo()
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleNetworkPing(_ request: BridgeRequest, on connection: NWConnection) async {
+        guard let params = request.params else {
+            let error = BridgeError(code: .invalidParams, message: "Missing host parameter")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            return
+        }
+
+        do {
+            let paramsData = try JSONEncoder().encode(params)
+            let decoded = try JSONDecoder().decode(PingParams.self, from: paramsData)
+
+            let result = try await MacSystemService.shared.pingHost(
+                host: decoded.host,
+                count: decoded.count ?? 4,
+                timeout: decoded.timeout ?? 5000
+            )
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleShellExecute(_ request: BridgeRequest, on connection: NWConnection) async {
+        guard let params = request.params else {
+            let error = BridgeError(code: .invalidParams, message: "Missing command parameter")
+            sendResponse(BridgeResponse.failure(id: request.id, error: error), on: connection)
+            return
+        }
+
+        do {
+            let paramsData = try JSONEncoder().encode(params)
+            let decoded = try JSONDecoder().decode(ShellExecuteParams.self, from: paramsData)
+
+            let result = try await MacSystemService.shared.executeShellCommand(
+                command: decoded.command,
+                timeout: decoded.timeout ?? 30000,
+                workingDirectory: decoded.workingDirectory
+            )
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(code: .internalError, message: error.localizedDescription)
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
     }
 }
 

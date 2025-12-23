@@ -11,7 +11,7 @@ import Foundation
 // MARK: - Tool Result
 
 /// Result from V2 tool execution
-struct ToolResultV2: Sendable {
+struct ToolResultV2: @unchecked Sendable {
     /// The tool ID that produced this result
     let toolId: String
     
@@ -22,7 +22,7 @@ struct ToolResultV2: Sendable {
     let output: String
     
     /// Optional structured output for programmatic access
-    let structuredOutput: [String: AnySendable]?
+    let structuredOutput: [String: Any]?
     
     /// Optional metadata about execution
     let metadata: ToolResultMetadataV2?
@@ -44,7 +44,7 @@ struct ToolResultV2: Sendable {
     static func success(
         toolId: String,
         output: String,
-        structured: [String: AnySendable]? = nil,
+        structured: [String: Any]? = nil,
         metadata: ToolResultMetadataV2? = nil
     ) -> ToolResultV2 {
         ToolResultV2(

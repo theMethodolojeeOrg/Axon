@@ -214,6 +214,7 @@ struct ToolExecution: Codable, Equatable {
     let urlTemplate: String?
     let urlScheme: String?
     let shortcutName: String?
+    let bridgeMethod: String?  // For bridge execution type (e.g., "system/info", "clipboard/read")
 
     enum ExecutionType: String, Codable, Equatable {
         case internalHandler = "internal_handler"
@@ -221,6 +222,7 @@ struct ToolExecution: Codable, Equatable {
         case providerNative = "provider_native"
         case urlScheme = "url_scheme"
         case shortcut
+        case bridge  // Routes to connected Mac via bridge protocol
     }
 }
 
@@ -586,6 +588,10 @@ extension ToolManifest {
         case .shortcut:
             if execution.shortcutName == nil || execution.shortcutName?.isEmpty == true {
                 issues.append(.error("Shortcut execution requires a shortcut name"))
+            }
+        case .bridge:
+            if execution.bridgeMethod == nil || execution.bridgeMethod?.isEmpty == true {
+                issues.append(.error("Bridge execution requires a bridgeMethod (e.g., 'system/info')"))
             }
         }
 

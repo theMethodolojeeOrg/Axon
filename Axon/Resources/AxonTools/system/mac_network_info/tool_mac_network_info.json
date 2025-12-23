@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_network_info",
+    "name": "Mac Network Info",
+    "description": "Get network interface information including IP addresses and WiFi details.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "network"
+    },
+    "requiresApproval": false,
+    "tags": ["mac", "network", "wifi", "ip"]
+  },
+
+  "parameters": {},
+
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "network/info"
+  },
+
+  "ai": {
+    "systemPromptSection": "### mac_network_info\nGet network interface information.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_network_info\", \"query\": \"\"}\n```\n\n**Returns:** interfaces (name, ipv4Address, ipv6Address, isUp, isLoopback), wifiSSID",
+    "whenToUse": [
+      "User asks about network status",
+      "Need IP address information",
+      "Checking WiFi connection"
+    ]
+  }
+}
