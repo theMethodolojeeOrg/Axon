@@ -4,7 +4,7 @@
     "id": "query_device_presence",
     "name": "Query Device Presence",
     "description": "Query current device and multi-device presence status.",
-    "category": "device_presence",
+    "category": "system",
     "icon": { "sfSymbol": "iphone.and.arrow.forward" },
     "requiresApproval": false,
     "tags": ["device", "presence", "multi-device", "handoff"]

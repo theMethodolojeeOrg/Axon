@@ -37,9 +37,9 @@
             "type": "integer",
             "description": "Duration of the video in seconds",
             "enum": [
-                4,
-                6,
-                8
+                "4",
+                "6",
+                "8"
             ],
             "default": 4
         },

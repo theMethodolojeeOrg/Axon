@@ -57,7 +57,7 @@
       "style": "card",
       "sections": [
         { "type": "header", "title": "Covenant Status", "icon": "checkmark.shield" },
-        { "type": "markdown", "source": "{{output}}" }
+        { "type": "text", "source": "{{output}}" }
       ]
     }
   },

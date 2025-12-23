@@ -4,7 +4,7 @@
     "id": "request_device_switch",
     "name": "Request Device Switch",
     "description": "Request to switch focus to another device.",
-    "category": "device_presence",
+    "category": "system",
     "icon": { "sfSymbol": "arrow.left.arrow.right" },
     "requiresApproval": true,
     "tags": ["device", "switch", "handoff", "multi-device"]

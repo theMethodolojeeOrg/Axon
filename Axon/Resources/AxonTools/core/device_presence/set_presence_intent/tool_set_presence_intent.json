@@ -4,7 +4,7 @@
     "id": "set_presence_intent",
     "name": "Set Presence Intent",
     "description": "Declare preferred device intent for routing decisions.",
-    "category": "device_presence",
+    "category": "system",
     "icon": { "sfSymbol": "location.fill" },
     "requiresApproval": false,
     "tags": ["device", "intent", "presence", "routing"]

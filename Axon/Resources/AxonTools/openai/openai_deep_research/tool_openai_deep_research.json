@@ -4,7 +4,7 @@
     "id": "openai_deep_research",
     "name": "OpenAI Deep Research",
     "description": "Comprehensive multi-step research using reasoning models with web search.",
-    "category": "research",
+    "category": "provider",
     "icon": { "sfSymbol": "brain.head.profile" },
     "requiresApproval": true,
     "tags": ["research", "deep", "analysis", "reasoning", "comprehensive"]
@@ -72,8 +72,8 @@
       "style": "card",
       "sections": [
         { "type": "header", "title": "Research Complete", "icon": "brain.head.profile" },
-        { "type": "markdown", "source": "{{output}}" },
-        { "type": "list", "title": "Sources", "source": "{{annotations}}" }
+        { "type": "text", "source": "{{output}}" },
+        { "type": "text", "title": "Sources", "source": "{{annotations}}" }
       ]
     }
   },

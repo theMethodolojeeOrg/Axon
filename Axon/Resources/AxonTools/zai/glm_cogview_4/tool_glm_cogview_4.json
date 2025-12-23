@@ -4,7 +4,7 @@
         "id": "glm_cogview_4",
         "name": "CogView-4",
         "description": "Generates high-quality images from text descriptions using the CogView-4 model.",
-        "category": "creative",
+        "category": "provider",
         "icon": {
             "sfSymbol": "paintpalette.fill"
         },

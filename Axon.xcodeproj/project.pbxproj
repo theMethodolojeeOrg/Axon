@@ -136,6 +136,9 @@
 				E25EA2FC2EB5A6270058351E /* Exceptions for "Axon" folder in "AxonUITests" target */,
 				E26F52102EF3D509000E55BD /* Exceptions for "Axon" folder in "AxonLiveActivityExtension" target */,
 			);
+			explicitFolders = (
+				Resources/AxonTools,
+			);
 			path = Axon;
 			sourceTree = "<group>";
 		};

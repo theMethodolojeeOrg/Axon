@@ -4,7 +4,7 @@
     "id": "change_system_state",
     "name": "Change System State",
     "description": "Request changes to system configuration (requires user approval).",
-    "category": "system_state",
+    "category": "system",
     "icon": { "sfSymbol": "gearshape.arrow.triangle.2.circlepath" },
     "requiresApproval": true,
     "tags": ["system", "configuration", "change", "model"]

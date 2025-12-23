@@ -47,7 +47,7 @@
       "submitLabel": "Search"
     },
     "resultDisplay": {
-      "style": "list",
+      "style": "card",
       "sections": [
         { "type": "header", "title": "Search Results", "icon": "magnifyingglass" },
         { "type": "text", "source": "{{output}}" }

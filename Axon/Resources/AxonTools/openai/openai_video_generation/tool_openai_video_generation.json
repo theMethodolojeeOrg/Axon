@@ -4,7 +4,7 @@
         "id": "openai_video_generation",
         "name": "Video Generation",
         "description": "Generates videos based on text prompts using Sora models.",
-        "category": "creative",
+        "category": "provider",
         "icon": {
             "sfSymbol": "film.fill"
         },

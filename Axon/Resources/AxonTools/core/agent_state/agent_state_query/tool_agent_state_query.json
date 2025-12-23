@@ -73,7 +73,7 @@
       "submitLabel": "Query"
     },
     "resultDisplay": {
-      "style": "list",
+      "style": "card",
       "sections": [
         { "type": "header", "title": "Internal Thread Entries", "icon": "doc.text.magnifyingglass" },
         { "type": "text", "source": "{{output}}" }

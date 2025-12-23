@@ -4,7 +4,7 @@
         "id": "grok_image_generation",
         "name": "Image Generation",
         "description": "Generates images based on text descriptions using the Grok-2 Image model.",
-        "category": "creative",
+        "category": "provider",
         "icon": {
             "sfSymbol": "paintbrush.fill"
         },

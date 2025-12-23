@@ -4,7 +4,7 @@
         "id": "gemini_text_to_speech",
         "name": "Text to Speech",
         "description": "Converts text into natural-sounding speech using Gemini models.",
-        "category": "creative",
+        "category": "provider",
         "icon": {
             "sfSymbol": "speaker.wave.2.fill"
         },

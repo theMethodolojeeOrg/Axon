@@ -4,7 +4,7 @@
     "id": "query_system_state",
     "name": "Query System State",
     "description": "Query current system configuration including provider, model, tools, and permissions.",
-    "category": "system_state",
+    "category": "system",
     "icon": { "sfSymbol": "gearshape.2" },
     "requiresApproval": false,
     "tags": ["system", "configuration", "status", "query"]

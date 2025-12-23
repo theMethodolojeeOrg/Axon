@@ -52,8 +52,9 @@ final class ToolPluginLoader: ObservableObject {
     private let decoder = ToolManifestDecoder.shared
     private let fileManager = FileManager.default
 
-    /// Tool manifest filename
-    private let manifestFilename = "tool.json"
+    /// Tool manifest filename prefix (matches tool.json or tool_*.json)
+    private let manifestFilenamePrefix = "tool"
+    private let manifestFileExtension = "json"
 
     /// Root folder name for tools
     private let toolsFolderName = "AxonTools"
@@ -116,11 +117,24 @@ final class ToolPluginLoader: ObservableObject {
     }
 
     /// Load a single tool from a specific path
-    /// - Parameter url: URL to the tool folder (containing tool.json)
+    /// - Parameter url: URL to the tool folder (containing tool.json or tool_*.json)
     /// - Returns: The loaded tool or nil if loading fails
     func loadTool(from url: URL) async -> LoadedTool? {
-        let manifestURL = url.appendingPathComponent(manifestFilename)
-        return loadManifest(at: manifestURL, source: .custom, folderPath: url)
+        // First try tool.json, then look for tool_*.json pattern
+        let toolJsonURL = url.appendingPathComponent("tool.json")
+        if fileManager.fileExists(atPath: toolJsonURL.path) {
+            return loadManifest(at: toolJsonURL, source: .custom, folderPath: url)
+        }
+
+        // Look for tool_*.json pattern
+        if let contents = try? fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil),
+           let manifestURL = contents.first(where: {
+               $0.lastPathComponent.hasPrefix("tool_") && $0.pathExtension == "json"
+           }) {
+            return loadManifest(at: manifestURL, source: .custom, folderPath: url)
+        }
+
+        return nil
     }
 
     /// Get a tool by ID
@@ -159,8 +173,24 @@ final class ToolPluginLoader: ObservableObject {
     /// Load tools bundled with the app
     private func loadBundledTools() async -> [LoadedTool] {
         guard let bundleURL = Bundle.main.resourceURL?.appendingPathComponent(toolsFolderName) else {
-            logger.warning("Bundle tools folder not found")
+            logger.warning("Bundle tools folder not found - resourceURL is nil")
             return []
+        }
+
+        // Debug: Log the path being checked
+        logger.info("Looking for bundled tools at: \(bundleURL.path)")
+        logger.info("Directory exists: \(self.fileManager.fileExists(atPath: bundleURL.path))")
+
+        // If directory doesn't exist, list what IS in the bundle resources
+        if !self.fileManager.fileExists(atPath: bundleURL.path) {
+            if let resourceURL = Bundle.main.resourceURL {
+                logger.warning("AxonTools folder not found in bundle. Available resources:")
+                if let contents = try? self.fileManager.contentsOfDirectory(at: resourceURL, includingPropertiesForKeys: nil) {
+                    for item in contents.prefix(20) {
+                        logger.info("  - \(item.lastPathComponent)")
+                    }
+                }
+            }
         }
 
         return await discoverTools(in: bundleURL, source: .bundled)
@@ -236,8 +266,13 @@ final class ToolPluginLoader: ObservableObject {
         }
 
         for case let fileURL as URL in enumerator {
-            // Check if this is a tool.json file
-            if fileURL.lastPathComponent == manifestFilename {
+            // Check if this is a tool manifest file (tool.json or tool_*.json)
+            let filename = fileURL.lastPathComponent
+            let isToolManifest = fileURL.pathExtension == manifestFileExtension &&
+                (filename == "tool.json" ||
+                 (filename.hasPrefix("tool_") && filename.hasSuffix(".json")))
+
+            if isToolManifest {
                 let folderPath = fileURL.deletingLastPathComponent()
                 if let tool = loadManifest(at: fileURL, source: source, folderPath: folderPath) {
                     tools.append(tool)

@@ -45,7 +45,7 @@
       "submitLabel": "Query"
     },
     "resultDisplay": {
-      "style": "list",
+      "style": "card",
       "sections": [
         { "type": "header", "title": "Job Status", "icon": "list.clipboard" },
         { "type": "text", "source": "{{output}}" }

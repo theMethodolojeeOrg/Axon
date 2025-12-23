@@ -4,7 +4,7 @@
         "id": "glm_cogvideo_3",
         "name": "CogVideoX-3",
         "description": "Generates high-quality videos from text or images using the CogVideoX-3 model.",
-        "category": "creative",
+        "category": "provider",
         "icon": {
             "sfSymbol": "film.stack.fill"
         },
@@ -65,8 +65,8 @@
             "type": "integer",
             "description": "Frame rate (30 or 60)",
             "enum": [
-                30,
-                60
+                "30",
+                "60"
             ],
             "default": 30,
             "required": false

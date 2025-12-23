@@ -45,7 +45,7 @@
       "submitLabel": "Discover"
     },
     "resultDisplay": {
-      "style": "list",
+      "style": "card",
       "sections": [
         { "type": "header", "title": "External App Ports", "icon": "app.connected.to.app.below.fill" },
         { "type": "text", "source": "{{output}}" }

@@ -4,7 +4,7 @@
         "id": "openai_text_to_speech",
         "name": "Text to Speech",
         "description": "Converts text into lifelike spoken audio.",
-        "category": "creative",
+        "category": "provider",
         "icon": {
             "sfSymbol": "speaker.wave.2.fill"
         },

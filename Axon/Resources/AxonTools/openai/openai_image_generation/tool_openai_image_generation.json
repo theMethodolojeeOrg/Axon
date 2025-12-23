@@ -4,7 +4,7 @@
         "id": "openai_image_generation",
         "name": "Image Generation",
         "description": "Generates images based on text descriptions using DALL·E or GPT Image models.",
-        "category": "creative",
+        "category": "provider",
         "icon": {
             "sfSymbol": "paintbrush.fill"
         },

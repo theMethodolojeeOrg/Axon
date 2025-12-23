@@ -4,7 +4,7 @@
     "id": "save_state_checkpoint",
     "name": "Save State Checkpoint",
     "description": "Save current state checkpoint for device handoff.",
-    "category": "device_presence",
+    "category": "system",
     "icon": { "sfSymbol": "arrow.down.doc" },
     "requiresApproval": false,
     "tags": ["checkpoint", "state", "handoff", "save"]

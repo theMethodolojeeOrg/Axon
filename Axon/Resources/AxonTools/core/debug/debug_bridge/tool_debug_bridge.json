@@ -4,7 +4,7 @@
     "id": "debug_bridge",
     "name": "Debug Bridge",
     "description": "Debug the bridge connection and communication status.",
-    "category": "debug",
+    "category": "system",
     "icon": { "sfSymbol": "ladybug" },
     "requiresApproval": false,
     "tags": ["debug", "bridge", "diagnostics", "connection"]
