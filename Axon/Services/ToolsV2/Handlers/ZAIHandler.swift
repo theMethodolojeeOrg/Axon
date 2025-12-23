@@ -388,9 +388,11 @@ final class ZAIHandler: ToolHandlerV2 {
     // MARK: - Helpers
 
     private func getZAIApiKey() -> String? {
-        let settings = AppSettings.shared
-        let key = settings.zhipuApiKey
-        return key.isEmpty ? nil : key
+        guard let key = try? APIKeysStorage.shared.getAPIKey(for: .zai),
+              !key.isEmpty else {
+            return nil
+        }
+        return key
     }
 }
 

@@ -60,55 +60,55 @@ final class GeminiHandler: ToolHandlerV2 {
         }
 
         switch toolId {
-        // Search tools
+        // Search tools (index: google_search, gemini_google_search)
         case "google_search", "gemini_google_search":
             return await executeGoogleSearch(inputs: inputs, apiKey: apiKey, toolId: toolId)
 
-        // Code execution
+        // Code execution (index: code_execution, gemini_code_execution)
         case "code_execution", "gemini_code_execution":
             return await executeCodeExecution(inputs: inputs, apiKey: apiKey, toolId: toolId)
 
-        // URL/Web content
+        // URL/Web content (index: url_context, gemini_url_context)
         case "url_context", "gemini_url_context":
             return await executeUrlContext(inputs: inputs, apiKey: apiKey, toolId: toolId)
 
-        // Maps/Location
+        // Maps/Location (index: google_maps, gemini_google_maps)
         case "google_maps", "gemini_google_maps":
             return await executeGoogleMaps(inputs: inputs, apiKey: apiKey, toolId: toolId)
 
-        // File/Document search
+        // File/Document search (index: file_search, gemini_file_search)
         case "file_search", "gemini_file_search":
             return await executeFileSearch(inputs: inputs, apiKey: apiKey, toolId: toolId)
 
-        // Video generation (Veo)
-        case "gemini_video_gen", "gemini_veo":
+        // Video generation - Veo (index: gemini_veo)
+        case "gemini_veo", "gemini_video_gen":
             return await executeVideoGeneration(inputs: inputs, apiKey: apiKey, toolId: toolId)
 
-        // Image generation (Imagen)
+        // Image generation - Imagen (index: gemini_image_generation)
         case "gemini_image_generation":
             return await executeImageGeneration(inputs: inputs, apiKey: apiKey, toolId: toolId)
 
-        // Deep research
+        // Deep research (index: gemini_deep_research)
         case "gemini_deep_research":
             return await executeDeepResearch(inputs: inputs, apiKey: apiKey, toolId: toolId)
 
-        // Computer use
+        // Computer use (index: gemini_computer_use)
         case "gemini_computer_use":
             return await executeComputerUse(inputs: inputs, apiKey: apiKey, toolId: toolId)
 
-        // Embeddings
+        // Embeddings (index: gemini_embeddings)
         case "gemini_embeddings":
             return await executeEmbeddings(inputs: inputs, apiKey: apiKey, toolId: toolId)
 
-        // Speech to text
+        // Speech to text (index: gemini_speech_to_text)
         case "gemini_speech_to_text":
             return await executeSpeechToText(inputs: inputs, apiKey: apiKey, toolId: toolId)
 
-        // Text to speech
+        // Text to speech (index: gemini_text_to_speech)
         case "gemini_text_to_speech":
             return await executeTextToSpeech(inputs: inputs, apiKey: apiKey, toolId: toolId)
 
-        // Video understanding
+        // Video understanding (index: gemini_video_understanding)
         case "gemini_video_understanding":
             return await executeVideoUnderstanding(inputs: inputs, apiKey: apiKey, toolId: toolId)
 
@@ -133,7 +133,7 @@ final class GeminiHandler: ToolHandlerV2 {
         logger.info("Executing Google Search: \(query)")
 
         do {
-            let message = Message(role: .user, content: query)
+            let message = Message(conversationId: "", role: .user, content: query)
             let response = try await geminiToolService.generateWithTools(
                 apiKey: apiKey,
                 model: "gemini-2.0-flash",
@@ -175,7 +175,7 @@ final class GeminiHandler: ToolHandlerV2 {
         logger.info("Executing Code Execution request")
 
         do {
-            let message = Message(role: .user, content: query)
+            let message = Message(conversationId: "", role: .user, content: query)
             let response = try await geminiToolService.generateWithTools(
                 apiKey: apiKey,
                 model: "gemini-2.0-flash",
@@ -213,7 +213,7 @@ final class GeminiHandler: ToolHandlerV2 {
                 content += "\n\nPlease analyze these URLs:\n" + urls.joined(separator: "\n")
             }
 
-            let message = Message(role: .user, content: content)
+            let message = Message(conversationId: "", role: .user, content: content)
             let response = try await geminiToolService.generateWithTools(
                 apiKey: apiKey,
                 model: "gemini-2.0-flash",
@@ -245,7 +245,7 @@ final class GeminiHandler: ToolHandlerV2 {
         logger.info("Executing Google Maps: \(query)")
 
         do {
-            let message = Message(role: .user, content: query)
+            let message = Message(conversationId: "", role: .user, content: query)
             let response = try await geminiToolService.generateWithTools(
                 apiKey: apiKey,
                 model: "gemini-2.0-flash",
@@ -278,7 +278,7 @@ final class GeminiHandler: ToolHandlerV2 {
         logger.info("Executing File Search: \(query)")
 
         do {
-            let message = Message(role: .user, content: query)
+            let message = Message(conversationId: "", role: .user, content: query)
             let response = try await geminiToolService.generateWithTools(
                 apiKey: apiKey,
                 model: "gemini-2.0-flash",
@@ -302,32 +302,38 @@ final class GeminiHandler: ToolHandlerV2 {
         toolId: String
     ) async -> ToolResultV2 {
         let prompt = (inputs["prompt"] as? String) ?? ""
-        let negativePrompt = inputs["negative_prompt"] as? String
-        let durationStr = (inputs["duration_seconds"] as? String) ?? (inputs["duration"] as? String) ?? "4"
+        let durationStr = (inputs["duration_seconds"] as? String) ?? (inputs["duration"] as? String) ?? "8"
         let aspectRatio = (inputs["aspect_ratio"] as? String) ?? "16:9"
+        let resolution = (inputs["resolution"] as? String) ?? "720p"
 
         guard !prompt.isEmpty else {
             return ToolResultV2.failure(toolId: toolId, error: "Video prompt cannot be empty")
         }
 
-        let duration = Int(durationStr) ?? 4
+        let duration = Int(durationStr) ?? 8
 
         logger.info("Executing Gemini Video Generation: \(prompt)")
 
         do {
             let videoService = GeminiVideoService.shared
-            let result = try await videoService.generateVideo(
+            let videoData = try await videoService.generateVideo(
+                apiKey: apiKey,
                 prompt: prompt,
-                negativePrompt: negativePrompt,
-                durationSeconds: duration,
                 aspectRatio: aspectRatio,
-                apiKey: apiKey
+                durationSeconds: duration,
+                resolution: resolution
             )
+
+            // Save video to temp file
+            let tempDir = FileManager.default.temporaryDirectory
+            let fileName = "veo_\(UUID().uuidString).mp4"
+            let fileURL = tempDir.appendingPathComponent(fileName)
+            try videoData.write(to: fileURL)
 
             return ToolResultV2.success(
                 toolId: toolId,
-                output: "Video generated successfully.\nURI: \(result.videoUri ?? "pending")",
-                structured: ["videoUri": result.videoUri ?? "", "status": result.status]
+                output: "Video generated successfully.\nFile: \(fileURL.path)\nSize: \(videoData.count) bytes",
+                structured: ["filePath": fileURL.path, "size": videoData.count]
             )
         } catch {
             logger.error("Video Generation failed: \(error.localizedDescription)")
@@ -414,7 +420,7 @@ final class GeminiHandler: ToolHandlerV2 {
 
         // Deep research uses the grounding API with extended search
         do {
-            let message = Message(role: .user, content: "Please conduct comprehensive research on the following topic: \(query)")
+            let message = Message(conversationId: "", role: .user, content: "Please conduct comprehensive research on the following topic: \(query)")
             let response = try await geminiToolService.generateWithTools(
                 apiKey: apiKey,
                 model: "gemini-2.0-flash",
@@ -587,8 +593,10 @@ final class GeminiHandler: ToolHandlerV2 {
     // MARK: - Helpers
 
     private func getGeminiApiKey() -> String? {
-        let settings = AppSettings.shared
-        let key = settings.geminiApiKey
-        return key.isEmpty ? nil : key
+        guard let key = try? APIKeysStorage.shared.getAPIKey(for: .gemini),
+              !key.isEmpty else {
+            return nil
+        }
+        return key
     }
 }

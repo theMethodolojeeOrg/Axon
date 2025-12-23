@@ -99,7 +99,7 @@ struct ProvidersSettingsView: View {
             } label: {
                 SettingsCategoryRow(
                     icon: "waveform.circle.fill",
-                    iconColor: AppColors.signalIndigo,
+                    iconColor: AppColors.signalMercury,
                     title: "Realtime Voice",
                     subtitle: "Configure live session providers and voices"
                 )

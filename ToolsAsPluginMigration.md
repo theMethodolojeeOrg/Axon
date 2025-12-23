@@ -524,3 +524,18 @@ Updated `_index.json` with **31 provider tools** (up from 12):
 
 **Total tools: 80** (33 core + 16 system + 31 provider)
 
+### Provider Native Execution Flow
+
+The `ToolExecutionRouterV2` routes `provider_native` tools automatically:
+
+1. Tool manifest specifies `execution.type = "provider_native"` and `execution.provider = "gemini"` (or `openai`, `xai`, `zai`)
+2. Router looks up handler by provider name in `InternalHandlerRegistryV2`
+3. Handler receives the full `ToolManifest` and uses `manifest.tool.id` to determine specific tool behavior
+4. Handler retrieves API key from `APIKeysStorage.shared.getAPIKey(for: .provider)`
+5. Handler executes the appropriate API call and returns `ToolResultV2`
+
+This design means:
+- Tool JSON manifests define the tool ID and metadata
+- Handlers use the manifest's tool ID to dispatch to the correct implementation
+- No need to modify handlers when adding new tool aliases - just update the switch statement
+

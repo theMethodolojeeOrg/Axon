@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 import MarkdownUI
 
 enum MainView {
@@ -21,6 +22,7 @@ struct AppContainerView: View {
     @StateObject private var costService = CostService.shared
     @StateObject private var taglineManager = TaglineManager.shared
     @StateObject private var liveService = LiveSessionService.shared
+    @StateObject private var settingsViewModel = SettingsViewModel.shared
 
     @State private var showSidebar = false
     @State private var selectedConversation: Conversation?
@@ -238,7 +240,7 @@ struct AppContainerView: View {
                                 Button(action: startLiveSession) {
                                     Image(systemName: "waveform.circle")
                                         .font(.system(size: 20))
-                                        .foregroundColor(AppColors.signalIndigo)
+                                        .foregroundColor(AppColors.signalMercury)
                                 }
                             }
                         }
@@ -1937,3 +1939,4 @@ struct VSCodeBridgeBanner: View {
 #Preview {
     AppContainerView()
 }
+

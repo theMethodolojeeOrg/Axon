@@ -405,9 +405,11 @@ final class XAIHandler: ToolHandlerV2 {
     // MARK: - Helpers
 
     private func getXAIApiKey() -> String? {
-        let settings = AppSettings.shared
-        let key = settings.xaiApiKey
-        return key.isEmpty ? nil : key
+        guard let key = try? APIKeysStorage.shared.getAPIKey(for: .xai),
+              !key.isEmpty else {
+            return nil
+        }
+        return key
     }
 }
 

@@ -204,7 +204,7 @@ extension Data {
                     // Safely copy
                     for i in 0..<Int(buffer.frameLength) {
                         if i < bytes.count {
-                             channel0[i] = bytes[i]
+                            channel0[i] = bytes[i]
                         }
                     }
                 }
@@ -212,3 +212,4 @@ extension Data {
         }
         return buffer
     }
+}

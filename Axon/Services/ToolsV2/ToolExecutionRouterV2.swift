@@ -445,7 +445,7 @@ final class ToolExecutionRouterV2: ObservableObject {
     }
     
     // MARK: - Provider Native Execution
-    
+
     private func executeProviderNativeV2(
         loadedTool: LoadedTool,
         inputs: [String: Any]
@@ -455,12 +455,23 @@ final class ToolExecutionRouterV2: ObservableObject {
                 "provider_native type requires 'provider' field"
             )
         }
-        
-        logger.warning("Provider native execution not fully implemented yet: \(provider)")
-        
-        return ToolResultV2.failure(
-            toolId: loadedTool.id,
-            error: "Provider native execution type coming in Phase 3"
+
+        // Map provider name to handler ID
+        // Provider handlers are registered with their provider name as the handler ID
+        guard let handler = handlerRegistry.handlerV2(for: provider) else {
+            throw ToolExecutionErrorV2.handlerNotFound(
+                "No handler registered for provider: \(provider)"
+            )
+        }
+
+        logger.info("Routing provider_native tool '\(loadedTool.id)' to handler '\(provider)'")
+
+        // Execute via the provider handler
+        // The handler receives the full manifest and can use the tool ID to determine behavior
+        return try await handler.executeV2(
+            inputs: inputs,
+            manifest: loadedTool.manifest,
+            context: .empty
         )
     }
     

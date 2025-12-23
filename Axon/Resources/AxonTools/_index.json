@@ -7,7 +7,9 @@
     "memory": {
       "name": "Memory",
       "description": "Long-term memory and conversation management",
-      "icon": { "sfSymbol": "brain" },
+      "icon": {
+        "sfSymbol": "brain"
+      },
       "tools": [
         "core/memory/create_memory/tool_create_memory.json",
         "core/memory/conversation_search/tool_conversation_search.json",
@@ -17,7 +19,9 @@
     "agent_state": {
       "name": "Agent State",
       "description": "Session state management and persistence",
-      "icon": { "sfSymbol": "note.text" },
+      "icon": {
+        "sfSymbol": "note.text"
+      },
       "tools": [
         "core/agent_state/agent_state_append/tool_agent_state_append.json",
         "core/agent_state/agent_state_query/tool_agent_state_query.json",
@@ -28,7 +32,9 @@
     "heartbeat": {
       "name": "Heartbeat",
       "description": "Background task scheduling and autonomous actions",
-      "icon": { "sfSymbol": "heart.fill" },
+      "icon": {
+        "sfSymbol": "heart.fill"
+      },
       "tools": [
         "core/heartbeat/heartbeat_configure/tool_heartbeat_configure.json",
         "core/heartbeat/heartbeat_run_once/tool_heartbeat_run_once.json",
@@ -39,7 +45,9 @@
     "discovery": {
       "name": "Discovery",
       "description": "Tool and port discovery and invocation",
-      "icon": { "sfSymbol": "magnifyingglass" },
+      "icon": {
+        "sfSymbol": "magnifyingglass"
+      },
       "tools": [
         "core/discovery/list_tools/tool_list_tools.json",
         "core/discovery/get_tool_details/tool_get_tool_details.json",
@@ -50,7 +58,9 @@
     "notification": {
       "name": "Notification",
       "description": "User notification delivery",
-      "icon": { "sfSymbol": "bell" },
+      "icon": {
+        "sfSymbol": "bell"
+      },
       "tools": [
         "core/notification/notify_user/tool_notify_user.json"
       ]
@@ -58,7 +68,9 @@
     "system_state": {
       "name": "System State",
       "description": "Query and modify system configuration",
-      "icon": { "sfSymbol": "gearshape.2" },
+      "icon": {
+        "sfSymbol": "gearshape.2"
+      },
       "tools": [
         "core/system_state/query_system_state/tool_query_system_state.json",
         "core/system_state/change_system_state/tool_change_system_state.json"
@@ -67,7 +79,9 @@
     "temporal": {
       "name": "Temporal",
       "description": "Time awareness and synchronization",
-      "icon": { "sfSymbol": "clock" },
+      "icon": {
+        "sfSymbol": "clock"
+      },
       "tools": [
         "core/temporal/temporal_sync/tool_temporal_sync.json",
         "core/temporal/temporal_drift/tool_temporal_drift.json",
@@ -77,7 +91,9 @@
     "device_presence": {
       "name": "Device Presence",
       "description": "Multi-device presence and state management",
-      "icon": { "sfSymbol": "iphone.and.arrow.forward" },
+      "icon": {
+        "sfSymbol": "iphone.and.arrow.forward"
+      },
       "tools": [
         "core/device_presence/query_device_presence/tool_query_device_presence.json",
         "core/device_presence/request_device_switch/tool_request_device_switch.json",
@@ -88,7 +104,9 @@
     "sub_agents": {
       "name": "Sub-Agents",
       "description": "Spawn and manage autonomous sub-agents",
-      "icon": { "sfSymbol": "person.2" },
+      "icon": {
+        "sfSymbol": "person.2"
+      },
       "tools": [
         "core/sub_agents/spawn_scout/tool_spawn_scout.json",
         "core/sub_agents/spawn_mechanic/tool_spawn_mechanic.json",
@@ -101,7 +119,9 @@
     "sovereignty": {
       "name": "Sovereignty",
       "description": "Co-sovereignty covenant management",
-      "icon": { "sfSymbol": "checkmark.shield" },
+      "icon": {
+        "sfSymbol": "checkmark.shield"
+      },
       "tools": [
         "core/sovereignty/query_covenant/tool_query_covenant.json",
         "core/sovereignty/propose_covenant_change/tool_propose_covenant_change.json"
@@ -110,7 +130,9 @@
     "debug": {
       "name": "Debug",
       "description": "Debugging and diagnostics tools",
-      "icon": { "sfSymbol": "ladybug" },
+      "icon": {
+        "sfSymbol": "ladybug"
+      },
       "tools": [
         "core/debug/debug_bridge/tool_debug_bridge.json"
       ]
@@ -118,7 +140,9 @@
     "mac_system": {
       "name": "Mac System",
       "description": "macOS system integration tools",
-      "icon": { "sfSymbol": "desktopcomputer" },
+      "icon": {
+        "sfSymbol": "desktopcomputer"
+      },
       "tools": [
         "system/mac_system_info/tool_mac_system_info.json",
         "system/mac_processes/tool_mac_processes.json",
@@ -140,14 +164,10 @@
     "googlegemini": {
       "name": "Google Gemini",
       "description": "Gemini provider-native tools",
-      "icon": { "sfSymbol": "sparkles" },
+      "icon": {
+        "sfSymbol": "sparkles"
+      },
       "tools": [
-        "googlegemini/google_search/tool_google_search.json",
-        "googlegemini/code_execution/tool_code_execution.json",
-        "googlegemini/url_context/tool_url_context.json",
-        "googlegemini/google_maps/tool_google_maps.json",
-        "googlegemini/file_search/tool_file_search.json",
-        "googlegemini/video_generation/tool_gemini_video_gen.json",
         "googlegemini/gemini_google_search/tool_gemini_google_search.json",
         "googlegemini/gemini_code_execution/tool_gemini_code_execution.json",
         "googlegemini/gemini_url_context/tool_gemini_url_context.json",
@@ -165,12 +185,11 @@
     "openai": {
       "name": "OpenAI",
       "description": "OpenAI provider-native tools",
-      "icon": { "sfSymbol": "brain" },
+      "icon": {
+        "sfSymbol": "brain"
+      },
       "tools": [
-        "openai/web_search/tool_openai_web_search.json",
-        "openai/image_generation/tool_openai_image_gen.json",
-        "openai/deep_research/tool_openai_deep_research.json",
-        "openai/video_generation/tool_openai_video_gen.json",
+        "openai/openai_deep_research/tool_openai_deep_research.json",
         "openai/openai_web_search/tool_openai_web_search.json",
         "openai/openai_image_generation/tool_openai_image_generation.json",
         "openai/openai_video_generation/tool_openai_video_generation.json",
@@ -183,9 +202,10 @@
     "xai": {
       "name": "xAI",
       "description": "xAI/Grok provider-native tools",
-      "icon": { "sfSymbol": "xmark.circle" },
+      "icon": {
+        "sfSymbol": "xmark.circle"
+      },
       "tools": [
-        "xai/web_search/tool_xai_web_search.json",
         "xai/grok_web_search/tool_grok_web_search.json",
         "xai/grok_code_execution/tool_grok_code_execution.json",
         "xai/grok_image_generation/tool_grok_image_generation.json",
@@ -195,9 +215,10 @@
     "zai": {
       "name": "zAI",
       "description": "zAI/GLM provider-native tools",
-      "icon": { "sfSymbol": "z.circle" },
+      "icon": {
+        "sfSymbol": "z.circle"
+      },
       "tools": [
-        "zai/web_search/tool_zai_web_search.json",
         "zai/glm_web_search/tool_glm_web_search.json",
         "zai/glm_cogview_4/tool_glm_cogview_4.json",
         "zai/glm_cogvideo_3/tool_glm_cogvideo_3.json",
@@ -213,21 +234,124 @@
     "toolsRequiringApproval": 17
   },
   "handlers": {
-    "memory": ["create_memory", "conversation_search", "reflect_on_conversation"],
-    "agent_state": ["agent_state_append", "agent_state_query", "agent_state_clear", "persistence_disable"],
-    "heartbeat": ["heartbeat_configure", "heartbeat_run_once", "heartbeat_set_delivery_profile", "heartbeat_update_profile"],
-    "discovery": ["list_tools", "get_tool_details", "discover_ports", "invoke_port"],
-    "notification": ["notify_user"],
-    "system_state": ["query_system_state", "change_system_state"],
-    "temporal": ["temporal_sync", "temporal_drift", "temporal_status"],
-    "device_presence": ["query_device_presence", "request_device_switch", "set_presence_intent", "save_state_checkpoint"],
-    "sub_agent": ["spawn_scout", "spawn_mechanic", "spawn_designer", "query_job_status", "accept_job_result", "terminate_job"],
-    "sovereignty": ["query_covenant", "propose_covenant_change"],
-    "bridge": ["debug_bridge"],
-    "mac_system": ["mac_system_info", "mac_processes", "mac_disk_usage", "mac_clipboard_read", "mac_clipboard_write", "mac_notification", "mac_spotlight_search", "mac_file_find", "mac_file_metadata", "mac_app_list", "mac_app_launch", "mac_screenshot", "mac_network_info", "mac_ping", "mac_shell"],
-    "gemini": ["google_search", "gemini_google_search", "code_execution", "gemini_code_execution", "url_context", "gemini_url_context", "google_maps", "gemini_google_maps", "file_search", "gemini_file_search", "gemini_veo", "gemini_image_generation", "gemini_deep_research", "gemini_computer_use", "gemini_embeddings", "gemini_speech_to_text", "gemini_text_to_speech", "gemini_video_understanding"],
-    "openai": ["openai_web_search", "openai_image_gen", "openai_image_generation", "openai_deep_research", "openai_video_gen", "openai_video_generation", "openai_computer_use", "openai_embeddings", "openai_speech_to_text", "openai_text_to_speech"],
-    "xai": ["xai_web_search", "grok_web_search", "grok_code_execution", "grok_image_generation", "grok_x_search"],
-    "zai": ["zai_web_search", "glm_web_search", "glm_cogview_4", "glm_cogvideo_3", "glm_speech_to_text"]
+    "memory": [
+      "create_memory",
+      "conversation_search",
+      "reflect_on_conversation"
+    ],
+    "agent_state": [
+      "agent_state_append",
+      "agent_state_query",
+      "agent_state_clear",
+      "persistence_disable"
+    ],
+    "heartbeat": [
+      "heartbeat_configure",
+      "heartbeat_run_once",
+      "heartbeat_set_delivery_profile",
+      "heartbeat_update_profile"
+    ],
+    "discovery": [
+      "list_tools",
+      "get_tool_details",
+      "discover_ports",
+      "invoke_port"
+    ],
+    "notification": [
+      "notify_user"
+    ],
+    "system_state": [
+      "query_system_state",
+      "change_system_state"
+    ],
+    "temporal": [
+      "temporal_sync",
+      "temporal_drift",
+      "temporal_status"
+    ],
+    "device_presence": [
+      "query_device_presence",
+      "request_device_switch",
+      "set_presence_intent",
+      "save_state_checkpoint"
+    ],
+    "sub_agent": [
+      "spawn_scout",
+      "spawn_mechanic",
+      "spawn_designer",
+      "query_job_status",
+      "accept_job_result",
+      "terminate_job"
+    ],
+    "sovereignty": [
+      "query_covenant",
+      "propose_covenant_change"
+    ],
+    "bridge": [
+      "debug_bridge"
+    ],
+    "mac_system": [
+      "mac_system_info",
+      "mac_processes",
+      "mac_disk_usage",
+      "mac_clipboard_read",
+      "mac_clipboard_write",
+      "mac_notification",
+      "mac_spotlight_search",
+      "mac_file_find",
+      "mac_file_metadata",
+      "mac_app_list",
+      "mac_app_launch",
+      "mac_screenshot",
+      "mac_network_info",
+      "mac_ping",
+      "mac_shell"
+    ],
+    "gemini": [
+      "google_search",
+      "gemini_google_search",
+      "code_execution",
+      "gemini_code_execution",
+      "url_context",
+      "gemini_url_context",
+      "google_maps",
+      "gemini_google_maps",
+      "file_search",
+      "gemini_file_search",
+      "gemini_veo",
+      "gemini_image_generation",
+      "gemini_deep_research",
+      "gemini_computer_use",
+      "gemini_embeddings",
+      "gemini_speech_to_text",
+      "gemini_text_to_speech",
+      "gemini_video_understanding"
+    ],
+    "openai": [
+      "openai_web_search",
+      "openai_image_gen",
+      "openai_image_generation",
+      "openai_deep_research",
+      "openai_video_gen",
+      "openai_video_generation",
+      "openai_computer_use",
+      "openai_embeddings",
+      "openai_speech_to_text",
+      "openai_text_to_speech"
+    ],
+    "xai": [
+      "xai_web_search",
+      "grok_web_search",
+      "grok_code_execution",
+      "grok_image_generation",
+      "grok_x_search"
+    ],
+    "zai": [
+      "zai_web_search",
+      "glm_web_search",
+      "glm_cogview_4",
+      "glm_cogvideo_3",
+      "glm_speech_to_text"
+    ]
   }
 }
