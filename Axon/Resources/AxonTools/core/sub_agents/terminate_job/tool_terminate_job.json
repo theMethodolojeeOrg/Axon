@@ -5,9 +5,16 @@
     "name": "Terminate Job",
     "description": "Terminate a running sub-agent job.",
     "category": "sub_agents",
-    "icon": { "sfSymbol": "xmark.circle" },
+    "icon": {
+      "sfSymbol": "xmark.circle"
+    },
     "requiresApproval": true,
-    "tags": ["sub-agent", "job", "terminate", "cancel"]
+    "tags": [
+      "sub-agent",
+      "job",
+      "terminate",
+      "cancel"
+    ]
   },
   "parameters": {
     "job_id": {
@@ -21,7 +28,9 @@
       "description": "Reason for termination"
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "sub_agent"
@@ -29,8 +38,14 @@
   "ai": {
     "systemPromptSection": "### terminate_job\nTerminate running job.\n\n**Format:**\n```tool_request\n{\"tool\": \"terminate_job\", \"query\": \"{\\\"job_id\\\": \\\"job-abc\\\", \\\"reason\\\": \\\"No longer needed\\\"}\"}\n```\n\n**Parameters:**\n- job_id: Required\n- reason: Why terminating",
     "usageExamples": [
-      { "description": "Cancel job", "input": "{\"job_id\": \"job-abc123\", \"reason\": \"No longer needed\"}" },
-      { "description": "Timeout", "input": "{\"job_id\": \"job-abc123\", \"reason\": \"Taking too long\"}" }
+      {
+        "description": "Cancel job",
+        "input": "{\"job_id\": \"job-abc123\", \"reason\": \"No longer needed\"}"
+      },
+      {
+        "description": "Timeout",
+        "input": "{\"job_id\": \"job-abc123\", \"reason\": \"Taking too long\"}"
+      }
     ],
     "whenToUse": [
       "Job no longer needed",
@@ -44,8 +59,19 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "job_id", "widget": "text_field", "label": "Job ID", "placeholder": "job-..." },
-        { "param": "reason", "widget": "textarea", "label": "Reason", "placeholder": "Why terminate?", "rows": 2 }
+        {
+          "param": "job_id",
+          "widget": "text_field",
+          "label": "Job ID",
+          "placeholder": "job-..."
+        },
+        {
+          "param": "reason",
+          "widget": "textarea",
+          "label": "Reason",
+          "placeholder": "Why terminate?",
+          "rows": 2
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Terminate"
@@ -53,15 +79,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Job Terminated", "icon": "xmark.circle" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Job Terminated",
+          "icon": "xmark.circle"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "agent_terminate",
     "approvalDescription": "Terminate job: {{job_id}}",
-    "scopes": ["agent.terminate"],
+    "scopes": [
+      "agent.terminate"
+    ],
     "riskLevel": "medium"
   }
 }

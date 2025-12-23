@@ -66,20 +66,109 @@ final class ToolRoutingService: ObservableObject {
                 await pluginLoader.loadAllTools()
             }
         }
-
-        let prompt = indexService.generateSystemPrompt()
-
-        // Add tool call format instructions
-        let formatInstructions = """
-
-        To use a tool, respond with a JSON tool request block:
-        ```tool_request
-        {"tool": "tool_id", "query": "your input or parameters"}
-        ```
-
+        
+        // Get settings for max tool calls
+        let maxToolCalls = SettingsStorage.shared.loadSettingsOrDefault().toolSettings.maxToolCallsPerTurn
+        
+        // Categorize tools
+        let enabledTools = pluginLoader.loadedTools.filter { $0.isEnabled }
+        let totalCount = enabledTools.count
+        
+        // Group by category
+        var categoryCount: [String: Int] = [:]
+        for tool in enabledTools {
+            let category = tool.manifest.tool.category.displayName
+            categoryCount[category, default: 0] += 1
+        }
+        
+        // Build discovery prompt similar to V1's generateMinimalToolSystemPrompt
+        var prompt = """
+        
+        ## Tool Discovery System
+        
+        You have access to \(totalCount) tool\(totalCount == 1 ? "" : "s") across the following categories:
         """
-
-        return formatInstructions + prompt
+        
+        // Sort categories for consistent output
+        for (category, count) in categoryCount.sorted(by: { $0.key < $1.key }) {
+            prompt += "\n- **\(category)**: \(count) tool\(count == 1 ? "" : "s")"
+        }
+        
+        prompt += """
+        
+        
+        **Tool Call Limit:** You may use up to \(maxToolCalls) tool call\(maxToolCalls == 1 ? "" : "s") per response.
+        
+        To discover and use these tools, use the following discovery tools:
+        
+        ### list_tools
+        Get a compact catalog of available tools. Returns tool IDs, names, categories, and brief descriptions.
+        
+        **Query options:**
+        - `enabled` (default) - Show only enabled tools
+        - `all` - Show all tools (enabled and disabled)
+        - Category name (e.g., `memory`, `search`) - Filter by category
+        
+        Example:
+        ```tool_request
+        {"tool": "list_tools", "query": "enabled"}
+        ```
+        
+        ### get_tool_details
+        Fetch full details (usage instructions, parameters, examples) for a specific tool by its ID.
+        
+        Example:
+        ```tool_request
+        {"tool": "get_tool_details", "query": "google_search"}
+        ```
+        
+        **Workflow:** Use `list_tools` first to discover what's available, then use `get_tool_details` to get full usage instructions for any tool you want to use.
+        
+        **Important:** Only request ONE tool at a time. Wait for results before continuing.
+        
+        """
+        
+        // Add dynamic tools section if available
+        prompt += DynamicToolConfigurationService.shared.generateSystemPromptSection()
+        
+        // Add VS Code bridge tools if connected
+        if let workspace = BridgeToolExecutor.shared.workspaceInfo {
+            prompt += BridgeToolId.generateSystemPrompt(
+                workspaceName: workspace.name,
+                workspaceRoot: workspace.root
+            )
+        }
+        
+        // Add port tools section
+        prompt += generatePortToolsSection()
+        
+        return prompt
+    }
+    
+    /// Generate port tools section for V2 system prompt
+    private func generatePortToolsSection() -> String {
+        let availablePorts = PortRegistry.shared.enabledPorts
+        guard !availablePorts.isEmpty else { return "" }
+        
+        var section = """
+        
+        ### External App Integration (Ports)
+        
+        You can discover and invoke external apps via ports:
+        
+        **discover_ports** - List available external app integrations
+        ```tool_request
+        {"tool": "discover_ports", "query": "all"}
+        ```
+        
+        **invoke_port** - Invoke a registered port action
+        ```tool_request
+        {"tool": "invoke_port", "query": "port_id|param1|param2"}
+        ```
+        
+        """
+        
+        return section
     }
 
     /// Generate V1 system prompt via ToolProxyService
@@ -143,7 +232,8 @@ final class ToolRoutingService: ObservableObject {
             success: result.success,
             output: result.output,
             metadata: metadataDict,
-            groundingSources: nil // V2 sources would need conversion
+            groundingSources: nil, // V2 sources would need conversion
+            memoryOperation: nil // V2 memory ops would need conversion
         )
     }
 
@@ -152,11 +242,36 @@ final class ToolRoutingService: ObservableObject {
         toolId: String,
         query: String
     ) async throws -> ToolExecutionResult {
-        // V1 execution goes through ToolProxyService and GeminiToolService
-        // This is the existing path in OnDeviceConversationOrchestrator
-        // For now, throw an error indicating V1 should use existing path
-        throw ToolRoutingError.v1PathNotRouted(
-            "V1 tool execution should use existing OnDeviceConversationOrchestrator path"
+        // V1 execution goes through ToolProxyService
+        // Get API keys from settings
+        let settings = await MainActor.run { SettingsStorage.shared.loadSettingsOrDefault() }
+        let geminiKey = (try? APIKeysStorage.shared.getAPIKey(for: .gemini)) ?? ""
+        
+        let toolRequest = ToolRequest(tool: toolId, query: query)
+        let toolResult = try await ToolProxyService.shared.executeToolRequest(
+            toolRequest,
+            geminiApiKey: geminiKey,
+            conversationContext: nil
+        )
+        
+        // Convert V1 ToolResult to ToolExecutionResult
+        var groundingSources: [MessageGroundingSource]?
+        if let sources = toolResult.sources {
+            groundingSources = sources.map { source in
+                MessageGroundingSource(
+                    title: source.title,
+                    url: source.url,
+                    sourceType: toolId == "google_maps" ? .maps : .web
+                )
+            }
+        }
+        
+        return ToolExecutionResult(
+            success: toolResult.success,
+            output: toolResult.result,
+            metadata: nil,
+            groundingSources: groundingSources,
+            memoryOperation: toolResult.memoryOperation
         )
     }
 
@@ -230,6 +345,7 @@ struct ToolExecutionResult {
     let output: String
     let metadata: [String: Any]?
     let groundingSources: [MessageGroundingSource]?
+    let memoryOperation: MessageMemoryOperation?  // For create_memory tool results
 }
 
 /// Parsed tool request from AI response

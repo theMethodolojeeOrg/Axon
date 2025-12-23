@@ -10,9 +10,12 @@
     },
     "requiresApproval": true,
     "trustTierCategory": "system_clipboard",
-    "tags": ["mac", "clipboard", "copy"]
+    "tags": [
+      "mac",
+      "clipboard",
+      "copy"
+    ]
   },
-
   "parameters": {
     "content": {
       "type": "string",
@@ -20,16 +23,13 @@
       "description": "Text content to write to clipboard"
     }
   },
-
   "inputFormat": {
-    "style": "json"
+    "style": "freeform"
   },
-
   "execution": {
     "type": "bridge",
     "bridgeMethod": "clipboard/write"
   },
-
   "ai": {
     "systemPromptSection": "### mac_clipboard_write\nWrite text to the Mac clipboard.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_clipboard_write\", \"query\": \"{\\\"content\\\": \\\"text to copy\\\"}\"}\n```\n\n**Parameters:**\n- content: Text to write to clipboard (required)\n\n**Returns:** success boolean",
     "whenToUse": [
@@ -42,11 +42,12 @@
       "User didn't explicitly request copying"
     ]
   },
-
   "sovereignty": {
     "actionCategory": "system_clipboard",
     "approvalDescription": "Write to Mac clipboard",
-    "scopes": ["clipboard.write"],
+    "scopes": [
+      "clipboard.write"
+    ],
     "riskLevel": "low"
   }
 }

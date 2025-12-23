@@ -5,12 +5,21 @@
     "name": "Debug Bridge",
     "description": "Debug the bridge connection and communication status.",
     "category": "system",
-    "icon": { "sfSymbol": "ladybug" },
+    "icon": {
+      "sfSymbol": "ladybug"
+    },
     "requiresApproval": false,
-    "tags": ["debug", "bridge", "diagnostics", "connection"]
+    "tags": [
+      "debug",
+      "bridge",
+      "diagnostics",
+      "connection"
+    ]
   },
   "parameters": {},
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "bridge"
@@ -18,7 +27,10 @@
   "ai": {
     "systemPromptSection": "### debug_bridge\nDebug bridge connection status.\n\n**Format:**\n```tool_request\n{\"tool\": \"debug_bridge\", \"query\": \"\"}\n```\n\n**Returns:** Bridge connection status, active sessions, and diagnostics.",
     "usageExamples": [
-      { "description": "Check bridge status", "input": "{}" }
+      {
+        "description": "Check bridge status",
+        "input": "{}"
+      }
     ],
     "whenToUse": [
       "Troubleshoot connection issues",
@@ -39,15 +51,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Bridge Debug", "icon": "ladybug" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Bridge Debug",
+          "icon": "ladybug"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "debug",
     "approvalDescription": "Debug bridge connection",
-    "scopes": ["system.debug"],
+    "scopes": [
+      "system.debug"
+    ],
     "riskLevel": "low"
   }
 }

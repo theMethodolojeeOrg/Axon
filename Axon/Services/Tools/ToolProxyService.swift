@@ -1446,9 +1446,17 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             return await executeReflectOnConversation(query: query, context: context)
 
         case .listTools:
+            // Route to V2 DiscoveryHandler when V2 is active
+            if ToolsV2Toggle.shared.isV2Active {
+                return await executeV2DiscoveryTool(toolId: "list_tools", query: query)
+            }
             return await executeListTools(query: query)
 
         case .getToolDetails:
+            // Route to V2 DiscoveryHandler when V2 is active
+            if ToolsV2Toggle.shared.isV2Active {
+                return await executeV2DiscoveryTool(toolId: "get_tool_details", query: query)
+            }
             return await executeGetToolDetails(query: query)
 
         case .conversationSearch:
@@ -2414,6 +2422,35 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         )
     }
 
+    // MARK: - V2 Tool Routing Bridge
+
+    /// Execute a V2 discovery tool and convert result to V1 ToolResult format
+    /// Used to route list_tools and get_tool_details to V2 DiscoveryHandler when V2 is active
+    private func executeV2DiscoveryTool(toolId: String, query: String) async -> ToolResult {
+        do {
+            let result = try await ToolExecutionRouterV2.shared.executeToolV2(
+                toolId: toolId,
+                rawInput: query
+            )
+
+            return ToolResult(
+                tool: toolId,
+                success: result.success,
+                result: result.output,
+                sources: nil,
+                memoryOperation: nil
+            )
+        } catch {
+            return ToolResult(
+                tool: toolId,
+                success: false,
+                result: "V2 tool execution failed: \(error.localizedDescription)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+    }
+
     // MARK: - Tool Introspection Tools
 
     /// Execute the list_tools tool
@@ -2506,6 +2543,36 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             }
         }
 
+        // V2 Plugin tools (ToolPluginLoader)
+        let includeV2: Bool = {
+            switch mode {
+            case "builtin", "bridge": return false
+            default: return true
+            }
+        }()
+
+        if includeV2 {
+            let v2Tools = ToolPluginLoader.shared.loadedTools
+            for tool in v2Tools {
+                // Skip if already listed (V1 tools might have same ID as V2)
+                let existingIds = Set(lines.compactMap { line -> String? in
+                    // Extract id from format "✅ id — name (provider) :: desc"
+                    let parts = line.components(separatedBy: " — ")
+                    guard parts.count >= 1 else { return nil }
+                    return parts[0].trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "✅ ", with: "").replacingOccurrences(of: "⬜ ", with: "")
+                })
+                guard !existingIds.contains(tool.id) else { continue }
+
+                addTool(
+                    id: tool.id,
+                    name: tool.name,
+                    description: tool.description,
+                    provider: tool.category.displayName,
+                    enabled: tool.isEnabled
+                )
+            }
+        }
+
         if lines.isEmpty {
             return ToolResult(
                 tool: ToolId.listTools.rawValue,
@@ -2571,6 +2638,18 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         // 3) Bridge tool
         if let bridgeTool = BridgeToolId(rawValue: toolKey) {
             let details = buildBridgeToolDetails(bridgeTool)
+            return ToolResult(
+                tool: ToolId.getToolDetails.rawValue,
+                success: true,
+                result: details,
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+
+        // 4) V2 Plugin tool
+        if let v2Tool = ToolPluginLoader.shared.tool(byId: toolKey) {
+            let details = buildV2ToolDetails(v2Tool)
             return ToolResult(
                 tool: ToolId.getToolDetails.rawValue,
                 success: true,
@@ -2776,6 +2855,55 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         text += "### Request Schema\n\n"
         text += "Bridge tools typically accept a nested parameters object. This app also accepts {tool, query} for convenience.\n"
         text += "```tool_request\n{\"tool\":\"\(tool.rawValue)\",\"parameters\":{\"query\":\"...\"}}\n```\n"
+        return text
+    }
+
+    private func buildV2ToolDetails(_ tool: LoadedTool) -> String {
+        let manifest = tool.manifest
+        var text = "## Tool Details\n\n"
+        text += "- **id:** `\(tool.id)`\n"
+        text += "- **name:** \(tool.name)\n"
+        text += "- **category:** \(tool.category.displayName)\n"
+        text += "- **enabled:** \(tool.isEnabled ? "true" : "false")\n"
+        text += "- **requires_approval:** \(manifest.tool.effectiveRequiresApproval ? "true" : "false")\n"
+        text += "- **source:** \(tool.source.displayName)\n"
+
+        text += "\n### Description\n\n\(tool.description)\n\n"
+
+        if let params = manifest.parameters, !params.isEmpty {
+            text += "### Parameters\n\n"
+            for (key, param) in params.sorted(by: { $0.key < $1.key }) {
+                let required = param.isRequired ? " *required*" : ""
+                text += "- `\(key)` (\(param.type.rawValue))\(required)"
+                if let desc = param.description {
+                    text += " — \(desc)"
+                }
+                text += "\n"
+            }
+            text += "\n"
+        }
+
+        if let ai = manifest.ai {
+            if let examples = ai.usageExamples, !examples.isEmpty {
+                text += "### Usage Examples\n\n"
+                for example in examples {
+                    text += "**\(example.description):**\n"
+                    text += "```tool_request\n{\"tool\":\"\(tool.id)\",\"query\":\"\(example.input)\"}\n```\n\n"
+                }
+            }
+
+            if let whenToUse = ai.whenToUse, !whenToUse.isEmpty {
+                text += "### When to Use\n\n"
+                for hint in whenToUse {
+                    text += "- \(hint)\n"
+                }
+                text += "\n"
+            }
+        }
+
+        text += "### Request Schema\n\n"
+        text += "```tool_request\n{\"tool\":\"\(tool.id)\",\"query\":\"...\"}\n```\n"
+
         return text
     }
 

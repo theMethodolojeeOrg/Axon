@@ -5,9 +5,16 @@
     "name": "Update Delivery Profile",
     "description": "Create or update a heartbeat delivery profile.",
     "category": "heartbeat",
-    "icon": { "sfSymbol": "square.and.pencil" },
+    "icon": {
+      "sfSymbol": "square.and.pencil"
+    },
     "requiresApproval": false,
-    "tags": ["heartbeat", "profile", "create", "update"]
+    "tags": [
+      "heartbeat",
+      "profile",
+      "create",
+      "update"
+    ]
   },
   "parameters": {
     "id": {
@@ -29,10 +36,14 @@
       "type": "array",
       "required": false,
       "description": "Module IDs to include",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "heartbeat"
@@ -40,8 +51,14 @@
   "ai": {
     "systemPromptSection": "### heartbeat_update_profile\nCreate/update delivery profile.\n\n**Format:**\n```tool_request\n{\"tool\": \"heartbeat_update_profile\", \"query\": \"{\\\"id\\\": \\\"daily_brief\\\", \\\"name\\\": \\\"Daily Brief\\\", \\\"modules\\\": [\\\"weather\\\", \\\"tasks\\\"]}\"}\n```\n\n**Parameters:**\n- id: Profile ID (required)\n- name: Display name\n- description: Profile description\n- modules: Array of module IDs",
     "usageExamples": [
-      { "description": "Create brief profile", "input": "{\"id\": \"daily_brief\", \"name\": \"Daily Brief\", \"modules\": [\"weather\", \"calendar\", \"tasks\"]}" },
-      { "description": "Update modules", "input": "{\"id\": \"morning\", \"modules\": [\"news\", \"calendar\"]}" }
+      {
+        "description": "Create brief profile",
+        "input": "{\"id\": \"daily_brief\", \"name\": \"Daily Brief\", \"modules\": [\"weather\", \"calendar\", \"tasks\"]}"
+      },
+      {
+        "description": "Update modules",
+        "input": "{\"id\": \"morning\", \"modules\": [\"news\", \"calendar\"]}"
+      }
     ],
     "whenToUse": [
       "Create custom heartbeat format",
@@ -54,10 +71,29 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "id", "widget": "text_field", "label": "Profile ID", "placeholder": "unique_id" },
-        { "param": "name", "widget": "text_field", "label": "Name", "placeholder": "Display Name" },
-        { "param": "description", "widget": "textarea", "label": "Description", "rows": 2 },
-        { "param": "modules", "widget": "tag_input", "label": "Modules" }
+        {
+          "param": "id",
+          "widget": "text_field",
+          "label": "Profile ID",
+          "placeholder": "unique_id"
+        },
+        {
+          "param": "name",
+          "widget": "text_field",
+          "label": "Name",
+          "placeholder": "Display Name"
+        },
+        {
+          "param": "description",
+          "widget": "textarea",
+          "label": "Description",
+          "rows": 2
+        },
+        {
+          "param": "modules",
+          "widget": "tag_input",
+          "label": "Modules"
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Save Profile"
@@ -65,15 +101,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Profile Updated", "icon": "square.and.pencil" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Profile Updated",
+          "icon": "square.and.pencil"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "heartbeat_configure",
     "approvalDescription": "Update delivery profile: {{id}}",
-    "scopes": ["heartbeat.configure"],
+    "scopes": [
+      "heartbeat.configure"
+    ],
     "riskLevel": "low"
   }
 }

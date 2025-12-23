@@ -5,12 +5,21 @@
     "name": "Temporal Status",
     "description": "Get current temporal mode and session status.",
     "category": "temporal",
-    "icon": { "sfSymbol": "clock" },
+    "icon": {
+      "sfSymbol": "clock"
+    },
     "requiresApproval": false,
-    "tags": ["temporal", "status", "session", "context"]
+    "tags": [
+      "temporal",
+      "status",
+      "session",
+      "context"
+    ]
   },
   "parameters": {},
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "temporal"
@@ -18,7 +27,10 @@
   "ai": {
     "systemPromptSection": "### temporal_status\nGet temporal status.\n\n**Format:**\n```tool_request\n{\"tool\": \"temporal_status\", \"query\": \"\"}\n```\n\n**Returns:**\n- mode: sync or drift\n- session duration\n- turn count\n- context saturation percentage",
     "usageExamples": [
-      { "description": "Check status", "input": "" }
+      {
+        "description": "Check status",
+        "input": ""
+      }
     ],
     "whenToUse": [
       "User invokes /status",
@@ -32,15 +44,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Temporal Status", "icon": "clock" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Temporal Status",
+          "icon": "clock"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "temporal_query",
     "approvalDescription": "Query temporal status",
-    "scopes": ["temporal.read"],
+    "scopes": [
+      "temporal.read"
+    ],
     "riskLevel": "low"
   }
 }

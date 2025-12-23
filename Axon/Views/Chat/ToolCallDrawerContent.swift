@@ -73,10 +73,14 @@ struct ToolCallDrawerContent: View {
                         VStack(alignment: .leading, spacing: 8) {
                             // Output or error
                             if result.success {
-                                Text(result.output)
-                                    .font(AppTypography.bodySmall())
-                                    .foregroundColor(AppColors.textSecondary)
-                                    .lineLimit(showRaw ? nil : 10)
+                                ScrollView {
+                                    Text(result.output)
+                                        .font(AppTypography.bodySmall())
+                                        .foregroundColor(AppColors.textSecondary)
+                                        .textSelection(.enabled)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .frame(maxHeight: 300)
                             } else if let error = result.errorMessage {
                                 Text(error)
                                     .font(AppTypography.bodySmall())

@@ -9,9 +9,13 @@
       "sfSymbol": "internaldrive"
     },
     "requiresApproval": false,
-    "tags": ["mac", "disk", "storage", "monitoring"]
+    "tags": [
+      "mac",
+      "disk",
+      "storage",
+      "monitoring"
+    ]
   },
-
   "parameters": {
     "path": {
       "type": "string",
@@ -20,16 +24,13 @@
       "default": "/"
     }
   },
-
   "inputFormat": {
-    "style": "json"
+    "style": "freeform"
   },
-
   "execution": {
     "type": "bridge",
     "bridgeMethod": "system/disk_usage"
   },
-
   "ai": {
     "systemPromptSection": "### mac_disk_usage\nGet disk usage statistics for a path.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_disk_usage\", \"query\": \"{\\\"path\\\": \\\"/\\\"}\"}\n```\n\n**Parameters:**\n- path: Filesystem path (default: \"/\")\n\n**Returns:** totalGB, usedGB, freeGB, usagePercent",
     "whenToUse": [

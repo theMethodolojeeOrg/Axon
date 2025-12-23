@@ -10,9 +10,13 @@
     },
     "requiresApproval": true,
     "trustTierCategory": "system_app_control",
-    "tags": ["mac", "apps", "launch", "open"]
+    "tags": [
+      "mac",
+      "apps",
+      "launch",
+      "open"
+    ]
   },
-
   "parameters": {
     "appName": {
       "type": "string",
@@ -28,16 +32,13 @@
       }
     }
   },
-
   "inputFormat": {
-    "style": "json"
+    "style": "freeform"
   },
-
   "execution": {
     "type": "bridge",
     "bridgeMethod": "app/launch"
   },
-
   "ai": {
     "systemPromptSection": "### mac_app_launch\nLaunch an application on the Mac.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_app_launch\", \"query\": \"{\\\"appName\\\": \\\"Safari\\\"}\"}\n```\n\n**Parameters:**\n- appName: App name or bundle ID (required)\n- arguments: Optional command line args\n\n**Returns:** success, pid, bundleIdentifier, errorMessage",
     "whenToUse": [
@@ -48,11 +49,12 @@
       "User didn't explicitly ask to open an app"
     ]
   },
-
   "sovereignty": {
     "actionCategory": "system_app_control",
     "approvalDescription": "Launch application: {{appName}}",
-    "scopes": ["app.launch"],
+    "scopes": [
+      "app.launch"
+    ],
     "riskLevel": "medium"
   }
 }

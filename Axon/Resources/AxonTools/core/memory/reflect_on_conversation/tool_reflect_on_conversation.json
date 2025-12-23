@@ -5,12 +5,21 @@
     "name": "Reflect on Conversation",
     "description": "Meta-analysis of the current conversation to identify patterns, key themes, and potential memories to create.",
     "category": "memory",
-    "icon": { "sfSymbol": "sparkles" },
+    "icon": {
+      "sfSymbol": "sparkles"
+    },
     "requiresApproval": true,
-    "tags": ["memory", "reflection", "meta-analysis", "patterns"]
+    "tags": [
+      "memory",
+      "reflection",
+      "meta-analysis",
+      "patterns"
+    ]
   },
   "parameters": {},
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "memory"
@@ -31,15 +40,25 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Conversation Reflection", "icon": "sparkles" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Conversation Reflection",
+          "icon": "sparkles"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "memory_reflect",
     "approvalDescription": "Reflect on current conversation",
-    "scopes": ["memory.read", "conversation.analyze"],
+    "scopes": [
+      "memory.read",
+      "conversation.analyze"
+    ],
     "riskLevel": "medium"
   }
 }

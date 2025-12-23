@@ -76,8 +76,14 @@ final class ToolExecutionRouterV2: ObservableObject {
         }
         
         logger.info("Executing V2 tool: \(toolId)")
-        
-        // 1. Find loaded tool
+
+        // 1. Ensure tools are loaded
+        if pluginLoader.loadedTools.isEmpty {
+            logger.info("Tools not loaded yet, loading now...")
+            await pluginLoader.loadAllTools()
+        }
+
+        // 2. Find loaded tool
         guard let loadedTool = pluginLoader.loadedTools.first(where: { $0.id == toolId }) else {
             let error = ToolExecutionErrorV2.manifestNotFound(toolId)
             lastError = error

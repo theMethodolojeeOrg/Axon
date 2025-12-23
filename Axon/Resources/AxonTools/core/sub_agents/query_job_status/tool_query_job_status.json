@@ -5,9 +5,16 @@
     "name": "Query Job Status",
     "description": "Query status of sub-agent jobs.",
     "category": "sub_agents",
-    "icon": { "sfSymbol": "list.clipboard" },
+    "icon": {
+      "sfSymbol": "list.clipboard"
+    },
     "requiresApproval": false,
-    "tags": ["sub-agent", "job", "status", "query"]
+    "tags": [
+      "sub-agent",
+      "job",
+      "status",
+      "query"
+    ]
   },
   "parameters": {
     "query": {
@@ -17,7 +24,9 @@
       "default": "all"
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "sub_agent"
@@ -25,8 +34,14 @@
   "ai": {
     "systemPromptSection": "### query_job_status\nQuery sub-agent job status.\n\n**Format:**\n```tool_request\n{\"tool\": \"query_job_status\", \"query\": \"all\"}\n```\n\nOr specific job:\n```tool_request\n{\"tool\": \"query_job_status\", \"query\": \"job-abc123\"}\n```\n\n**Returns:** Job status, progress, and result (if complete).",
     "usageExamples": [
-      { "description": "Check all jobs", "input": "all" },
-      { "description": "Check specific job", "input": "job-abc123" }
+      {
+        "description": "Check all jobs",
+        "input": "all"
+      },
+      {
+        "description": "Check specific job",
+        "input": "job-abc123"
+      }
     ],
     "whenToUse": [
       "Check on spawned agents",
@@ -39,7 +54,12 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "query", "widget": "text_field", "label": "Job ID", "placeholder": "'all' or specific job ID" }
+        {
+          "param": "query",
+          "widget": "text_field",
+          "label": "Job ID",
+          "placeholder": "'all' or specific job ID"
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Query"
@@ -47,15 +67,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Job Status", "icon": "list.clipboard" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Job Status",
+          "icon": "list.clipboard"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "agent_query",
     "approvalDescription": "Query job status",
-    "scopes": ["agent.read"],
+    "scopes": [
+      "agent.read"
+    ],
     "riskLevel": "low"
   }
 }

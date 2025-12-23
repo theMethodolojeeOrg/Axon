@@ -5,9 +5,16 @@
     "name": "Temporal Sync",
     "description": "Enable or disable temporal sync mode for mutual time awareness.",
     "category": "temporal",
-    "icon": { "sfSymbol": "clock.badge.checkmark" },
+    "icon": {
+      "sfSymbol": "clock.badge.checkmark"
+    },
     "requiresApproval": false,
-    "tags": ["temporal", "sync", "time", "awareness"]
+    "tags": [
+      "temporal",
+      "sync",
+      "time",
+      "awareness"
+    ]
   },
   "parameters": {
     "query": {
@@ -17,7 +24,9 @@
       "default": "enable"
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "temporal"
@@ -25,8 +34,14 @@
   "ai": {
     "systemPromptSection": "### temporal_sync\nEnable/disable temporal sync.\n\n**Format:**\n```tool_request\n{\"tool\": \"temporal_sync\", \"query\": \"enable\"}\n```\n\n**Options:** enable, disable\n\n**Effect:** When enabled, you have mutual time awareness with the human.",
     "usageExamples": [
-      { "description": "Enable sync", "input": "enable" },
-      { "description": "Disable sync", "input": "disable" }
+      {
+        "description": "Enable sync",
+        "input": "enable"
+      },
+      {
+        "description": "Disable sync",
+        "input": "disable"
+      }
     ],
     "whenToUse": [
       "User invokes /sync",
@@ -39,10 +54,21 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "query", "widget": "segmented", "label": "Action", "options": [
-          { "value": "enable", "label": "Enable" },
-          { "value": "disable", "label": "Disable" }
-        ]}
+        {
+          "param": "query",
+          "widget": "segmented",
+          "label": "Action",
+          "options": [
+            {
+              "value": "enable",
+              "label": "Enable"
+            },
+            {
+              "value": "disable",
+              "label": "Disable"
+            }
+          ]
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Apply"
@@ -50,15 +76,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Temporal Sync", "icon": "clock.badge.checkmark" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Temporal Sync",
+          "icon": "clock.badge.checkmark"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "temporal_mode",
     "approvalDescription": "Enable temporal sync",
-    "scopes": ["temporal.mode"],
+    "scopes": [
+      "temporal.mode"
+    ],
     "riskLevel": "low"
   }
 }

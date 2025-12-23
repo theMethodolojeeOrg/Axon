@@ -192,16 +192,17 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         // Uses minimal discovery-based prompt to reduce context bloat - AI discovers tools via list_tools/get_tool_details
         let useToolProxy = hasGeminiTools && !isGeminiProvider
         if useToolProxy {
-            let enabledToolIds = Set(requestedGeminiTools.compactMap { ToolId(rawValue: $0) })
+            let enabledToolIds = Set(requestedGeminiTools)
             let maxToolCalls = await MainActor.run {
                 SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
             }
-            let toolPrompt = await ToolProxyService.shared.generateMinimalToolSystemPrompt(
-                enabledTools: enabledToolIds,
+            // Use unified routing service for V1/V2 system prompt generation
+            let toolPrompt = await ToolRoutingService.shared.generateToolSystemPrompt(
+                enabledToolIds: enabledToolIds,
                 maxToolCalls: maxToolCalls
             )
             systemPrompt = (systemPrompt ?? "") + toolPrompt
-            print("[OnDeviceOrchestrator] Tool proxy mode (discovery-based): injected minimal tool prompt for \(enabledToolIds.count) tools (max \(maxToolCalls) calls)")
+            print("[OnDeviceOrchestrator] Tool proxy mode (discovery-based): injected tool prompt for \(enabledToolIds.count) tools (max \(maxToolCalls) calls)")
         }
 
         // Log if any tools were filtered out for Gemini 3
@@ -493,12 +494,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         // Uses minimal discovery-based prompt to reduce context bloat
         let useToolProxy = hasGeminiTools && !isGeminiProvider
         if useToolProxy {
-            let enabledToolIds = Set(requestedGeminiTools.compactMap { ToolId(rawValue: $0) })
+            let enabledToolIds = Set(requestedGeminiTools)
             let maxToolCalls = await MainActor.run {
                 SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
             }
-            let toolPrompt = await ToolProxyService.shared.generateMinimalToolSystemPrompt(
-                enabledTools: enabledToolIds,
+            // Use unified routing service for V1/V2 system prompt generation
+            let toolPrompt = await ToolRoutingService.shared.generateToolSystemPrompt(
+                enabledToolIds: enabledToolIds,
                 maxToolCalls: maxToolCalls
             )
             systemPrompt = (systemPrompt ?? "") + toolPrompt
@@ -578,13 +580,14 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 }
             }
         } else if supportsStreaming && useToolProxy {
-            // Streaming with tool proxy - need to handle tool requests in stream
+            // Streaming with tool proxy - stream content then execute tools and feed results back
+            // Note: geminiKey is only required for Gemini-native tools, internal tools work without it
             try await streamWithToolProxy(
                 conversationId: conversationId,
                 config: config,
                 systemPrompt: systemPrompt,
                 messages: mergedMessages,
-                geminiKey: config.geminiKey!,
+                geminiKey: config.geminiKey ?? "",
                 continuation: continuation,
                 accumulatedContent: &accumulatedContent,
                 accumulatedReasoning: &accumulatedReasoning,
@@ -616,10 +619,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             }
 
             // Handle tool proxy if needed
-            if useToolProxy, let geminiKey = config.geminiKey {
+            // Note: geminiKey is only required for Gemini-native tools (code_execution, etc.)
+            // Internal tools (list_tools, create_memory, etc.) work without it
+            if useToolProxy {
                 let maxToolCalls = await MainActor.run {
                     SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
                 }
+                let geminiKey = config.geminiKey ?? ""
                 try await handleStreamingToolProxyLoop(
                     initialResponse: accumulatedContent,
                     conversationId: conversationId,
@@ -651,9 +657,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         )))
     }
 
-    /// Stream with tool proxy - simplified version that lets the UI handle tool execution
-    /// Tool requests stay in the markdown content and are auto-executed by ToolRequestCodeBlockView on render
-    /// This decouples streaming from execution, eliminating race conditions with fast models like Gemini Flash 3
+    /// Stream with tool proxy - streams content then handles tool execution and feeds results back
+    /// After streaming completes, parses tool requests, executes them, and calls the provider again
     private func streamWithToolProxy(
         conversationId: String,
         config: OrchestrationConfig,
@@ -667,8 +672,6 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         collectedSources: inout [MessageGroundingSource],
         collectedMemoryOperations: inout [MessageMemoryOperation]
     ) async throws {
-        // Simply stream the content - tool_request blocks will be rendered by the UI
-        // and auto-executed by ToolRequestCodeBlockView.onAppear
         let streamConfig = StreamingResponseHandler.StreamingConfig(
             provider: config.provider,
             apiKey: getApiKey(for: config) ?? "",
@@ -695,11 +698,27 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             }
         }
 
-        // Tool execution is now handled by the UI layer (ToolRequestCodeBlockView)
-        // when the markdown renders the tool_request code blocks.
-        // This eliminates the race condition where we were trying to parse
-        // a moving target during streaming.
-        print("[StreamToolProxy] Stream complete. Tool requests will be auto-executed by UI on render.")
+        print("[StreamToolProxy] Stream complete. Checking for tool requests...")
+
+        // After streaming completes, handle tool execution loop
+        let maxToolCalls = await MainActor.run {
+            SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
+        }
+
+        try await handleStreamingToolProxyLoop(
+            initialResponse: accumulatedContent,
+            conversationId: conversationId,
+            config: config,
+            systemPrompt: systemPrompt,
+            messages: messages,
+            geminiKey: geminiKey,
+            maxIterations: maxToolCalls,
+            continuation: continuation,
+            accumulatedContent: &accumulatedContent,
+            collectedToolCalls: &collectedToolCalls,
+            collectedSources: &collectedSources,
+            collectedMemoryOperations: &collectedMemoryOperations
+        )
     }
 
     /// Handle tool proxy loop for non-streaming providers with streaming events
@@ -738,27 +757,28 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 collectedToolCalls.append(liveToolCall)
                 continuation.yield(.toolCallStart(liveToolCall))
 
-                // Execute tool
+                // Execute tool via unified routing (V1/V2 automatic based on toggle)
                 let startTime = Date()
-                let conversationContext = ToolConversationContext(
-                    conversationId: conversationId,
-                    messages: messages
-                )
 
                 do {
-                    let toolResult = try await ToolProxyService.shared.executeToolRequest(
-                        toolRequest,
-                        geminiApiKey: geminiKey,
-                        conversationContext: conversationContext
+                    let execResult = try await ToolRoutingService.shared.executeTool(
+                        toolId: toolRequest.tool,
+                        query: toolRequest.query
                     )
 
                     let duration = Date().timeIntervalSince(startTime)
 
+                    // Convert grounding sources to streaming format
+                    var streamingSources: [StreamingToolSource]?
+                    if let sources = execResult.groundingSources {
+                        streamingSources = sources.map { StreamingToolSource(title: $0.title, url: $0.url) }
+                    }
+
                     let result = ToolCallResult(
-                        success: true,
-                        output: toolResult.result,
-                        sources: toolResult.sources?.map { StreamingToolSource(title: $0.title, url: $0.url) },
-                        memoryOperation: toolResult.memoryOperation,
+                        success: execResult.success,
+                        output: execResult.output,
+                        sources: streamingSources,
+                        memoryOperation: execResult.memoryOperation,
                         duration: duration
                     )
 
@@ -771,21 +791,27 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     continuation.yield(.toolCallComplete(liveToolCall.id, result))
 
                     // Mark as executed for deduplication in UI
-                    ToolRequestTracker.shared.markExecuted(request: toolRequest, result: toolResult.result)
+                    ToolRequestTracker.shared.markExecuted(
+                        request: ToolRequest(tool: toolRequest.tool, query: toolRequest.query),
+                        result: execResult.output
+                    )
 
                     // Collect sources and memory ops
-                    if let sources = toolResult.sources {
-                        for source in sources {
-                            collectedSources.append(MessageGroundingSource(
-                                title: source.title,
-                                url: source.url,
-                                sourceType: toolRequest.tool == "google_maps" ? .maps : .web
-                            ))
-                        }
+                    if let sources = execResult.groundingSources {
+                        collectedSources.append(contentsOf: sources)
                     }
-                    if let memOp = toolResult.memoryOperation {
+                    if let memOp = execResult.memoryOperation {
                         collectedMemoryOperations.append(memOp)
                     }
+
+                    // Convert to V1 ToolResult for formatting
+                    let toolResult = ToolResult(
+                        tool: toolRequest.tool,
+                        success: execResult.success,
+                        result: execResult.output,
+                        sources: execResult.groundingSources?.map { ToolResultSource(title: $0.title, url: $0.url) },
+                        memoryOperation: execResult.memoryOperation
+                    )
 
                     // Store for combined response
                     let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
@@ -978,28 +1004,24 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 print("[OnDeviceOrchestrator] Tool request detected: \(toolRequest.tool) - \"\(toolRequest.query)\"")
                 toolUsed = true
 
-                // Execute the tool via Gemini
-                // Provide conversation context for tools that need it (like reflect_on_conversation)
-                let conversationContext = ToolConversationContext(
-                    conversationId: conversationId,
-                    messages: messages
+                // Execute tool via unified routing (V1/V2 automatic based on toggle)
+                let execResult = try await ToolRoutingService.shared.executeTool(
+                    toolId: toolRequest.tool,
+                    query: toolRequest.query
                 )
-                let toolResult = try await ToolProxyService.shared.executeToolRequest(
-                    toolRequest,
-                    geminiApiKey: geminiKey,
-                    conversationContext: conversationContext
+                
+                // Convert to V1 ToolResult for the rest of the flow
+                let toolResult = ToolResult(
+                    tool: toolRequest.tool,
+                    success: execResult.success,
+                    result: execResult.output,
+                    sources: execResult.groundingSources?.map { ToolResultSource(title: $0.title, url: $0.url) },
+                    memoryOperation: execResult.memoryOperation
                 )
 
                 // Collect grounding sources from tool result
-                if let sources = toolResult.sources {
-                    for source in sources {
-                        let groundingSource = MessageGroundingSource(
-                            title: source.title,
-                            url: source.url,
-                            sourceType: toolRequest.tool == "google_maps" ? .maps : .web
-                        )
-                        collectedSources.append(groundingSource)
-                    }
+                if let sources = execResult.groundingSources {
+                    collectedSources.append(contentsOf: sources)
                 }
 
                 // Collect memory operations from tool result

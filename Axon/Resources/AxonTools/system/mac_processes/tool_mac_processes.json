@@ -9,9 +9,13 @@
       "sfSymbol": "list.bullet.rectangle"
     },
     "requiresApproval": false,
-    "tags": ["mac", "processes", "monitoring", "activity"]
+    "tags": [
+      "mac",
+      "processes",
+      "monitoring",
+      "activity"
+    ]
   },
-
   "parameters": {
     "limit": {
       "type": "integer",
@@ -22,16 +26,13 @@
       "maximum": 100
     }
   },
-
   "inputFormat": {
-    "style": "json"
+    "style": "freeform"
   },
-
   "execution": {
     "type": "bridge",
     "bridgeMethod": "system/processes"
   },
-
   "ai": {
     "systemPromptSection": "### mac_processes\nList running processes on the Mac.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_processes\", \"query\": \"{\\\"limit\\\": 20}\"}\n```\n\n**Parameters:**\n- limit: Maximum processes to return (default: 20)\n\n**Returns:** List of processes with pid, name, status (active/running)",
     "whenToUse": [

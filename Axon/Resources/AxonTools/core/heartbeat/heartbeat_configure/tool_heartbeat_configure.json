@@ -5,9 +5,16 @@
     "name": "Heartbeat Configure",
     "description": "Configure heartbeat settings for scheduled check-ins.",
     "category": "heartbeat",
-    "icon": { "sfSymbol": "heart.circle" },
+    "icon": {
+      "sfSymbol": "heart.circle"
+    },
     "requiresApproval": false,
-    "tags": ["heartbeat", "schedule", "configuration", "background"]
+    "tags": [
+      "heartbeat",
+      "schedule",
+      "configuration",
+      "background"
+    ]
   },
   "parameters": {
     "enabled": {
@@ -48,7 +55,9 @@
       "description": "Max tool calls per heartbeat"
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "heartbeat"
@@ -56,9 +65,18 @@
   "ai": {
     "systemPromptSection": "### heartbeat_configure\nConfigure heartbeat settings.\n\n**Format:**\n```tool_request\n{\"tool\": \"heartbeat_configure\", \"query\": \"{\\\"enabled\\\": true, \\\"interval_seconds\\\": 3600}\"}\n```\n\n**Parameters:**\n- enabled: boolean\n- interval_seconds: 60-86400\n- allow_background: boolean\n- allow_notifications: boolean\n- delivery_profile_id: string\n- max_tokens_budget: integer\n- max_tool_calls: integer",
     "usageExamples": [
-      { "description": "Enable hourly heartbeat", "input": "{\"enabled\": true, \"interval_seconds\": 3600}" },
-      { "description": "Disable heartbeat", "input": "{\"enabled\": false}" },
-      { "description": "Configure notifications", "input": "{\"allow_notifications\": true, \"allow_background\": true}" }
+      {
+        "description": "Enable hourly heartbeat",
+        "input": "{\"enabled\": true, \"interval_seconds\": 3600}"
+      },
+      {
+        "description": "Disable heartbeat",
+        "input": "{\"enabled\": false}"
+      },
+      {
+        "description": "Configure notifications",
+        "input": "{\"allow_notifications\": true, \"allow_background\": true}"
+      }
     ],
     "whenToUse": [
       "User wants periodic check-ins",
@@ -73,10 +91,29 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "enabled", "widget": "toggle", "label": "Enabled" },
-        { "param": "interval_seconds", "widget": "slider", "label": "Interval (seconds)", "min": 60, "max": 86400, "step": 60 },
-        { "param": "allow_background", "widget": "toggle", "label": "Allow Background" },
-        { "param": "allow_notifications", "widget": "toggle", "label": "Allow Notifications" }
+        {
+          "param": "enabled",
+          "widget": "toggle",
+          "label": "Enabled"
+        },
+        {
+          "param": "interval_seconds",
+          "widget": "slider",
+          "label": "Interval (seconds)",
+          "min": 60,
+          "max": 86400,
+          "step": 60
+        },
+        {
+          "param": "allow_background",
+          "widget": "toggle",
+          "label": "Allow Background"
+        },
+        {
+          "param": "allow_notifications",
+          "widget": "toggle",
+          "label": "Allow Notifications"
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Configure"
@@ -84,15 +121,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Heartbeat Configured", "icon": "heart.circle" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Heartbeat Configured",
+          "icon": "heart.circle"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "heartbeat_configure",
     "approvalDescription": "Configure heartbeat settings",
-    "scopes": ["heartbeat.configure"],
+    "scopes": [
+      "heartbeat.configure"
+    ],
     "riskLevel": "low"
   }
 }

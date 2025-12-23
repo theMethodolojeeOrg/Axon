@@ -758,16 +758,16 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
         case .gemini:
             return [
                 AIModel(
-                    id: "gemini-3-pro-preview",
-                    name: "Gemini 3 Pro Preview",
+                    id: "gemini-3-pro",
+                    name: "Gemini 3 Pro",
                     provider: .gemini,
                     contextWindow: 1_000_000,
                     modalities: ["text", "image", "video", "audio", "pdf"],
                     description: "Most powerful agentic and coding model with advanced reasoning"
                 ),
                 AIModel(
-                    id: "gemini-3-flash-preview",
-                    name: "Gemini 3 Flash Preview",
+                    id: "gemini-3-flash",
+                    name: "Gemini 3 Flash",
                     provider: .gemini,
                     contextWindow: 1_048_576,
                     modalities: ["text", "image", "video", "audio", "pdf"],

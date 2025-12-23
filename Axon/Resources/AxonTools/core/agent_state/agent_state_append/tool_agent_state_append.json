@@ -5,16 +5,29 @@
     "name": "Internal Thread Append",
     "description": "Append an entry to the internal thread (AI's private workspace for notes, observations, and plans).",
     "category": "agent_state",
-    "icon": { "sfSymbol": "doc.text.fill" },
+    "icon": {
+      "sfSymbol": "doc.text.fill"
+    },
     "requiresApproval": false,
-    "tags": ["internal-thread", "notes", "workspace", "state"]
+    "tags": [
+      "internal-thread",
+      "notes",
+      "workspace",
+      "state"
+    ]
   },
   "parameters": {
     "kind": {
       "type": "enum",
       "required": false,
       "description": "Type of entry",
-      "enum": ["note", "observation", "plan", "question", "insight"],
+      "enum": [
+        "note",
+        "observation",
+        "plan",
+        "question",
+        "insight"
+      ],
       "enumDescriptions": {
         "note": "General note or working thought",
         "observation": "Observation about user or context",
@@ -34,13 +47,19 @@
       "type": "array",
       "required": false,
       "description": "Tags for categorization and retrieval",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     },
     "visibility": {
       "type": "enum",
       "required": false,
       "description": "Who can see this entry",
-      "enum": ["userVisible", "aiOnly", "systemOnly"],
+      "enum": [
+        "userVisible",
+        "aiOnly",
+        "systemOnly"
+      ],
       "enumDescriptions": {
         "userVisible": "Visible to both user and AI",
         "aiOnly": "Only visible to AI",
@@ -49,7 +68,9 @@
       "default": "userVisible"
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "agent_state"
@@ -57,8 +78,14 @@
   "ai": {
     "systemPromptSection": "### agent_state_append\nAppend entry to internal thread.\n\n**Format:**\n```tool_request\n{\"tool\": \"agent_state_append\", \"query\": \"{\\\"kind\\\": \\\"note\\\", \\\"content\\\": \\\"Your note here\\\", \\\"tags\\\": [\\\"tag1\\\"], \\\"visibility\\\": \\\"userVisible\\\"}\"}\n```",
     "usageExamples": [
-      { "description": "Add a note", "input": "{\"kind\": \"note\", \"content\": \"User prefers detailed explanations\", \"tags\": [\"preferences\"]}" },
-      { "description": "Private observation", "input": "{\"kind\": \"observation\", \"content\": \"User seems frustrated\", \"visibility\": \"aiOnly\"}" }
+      {
+        "description": "Add a note",
+        "input": "{\"kind\": \"note\", \"content\": \"User prefers detailed explanations\", \"tags\": [\"preferences\"]}"
+      },
+      {
+        "description": "Private observation",
+        "input": "{\"kind\": \"observation\", \"content\": \"User seems frustrated\", \"visibility\": \"aiOnly\"}"
+      }
     ],
     "whenToUse": [
       "Track working notes during complex tasks",
@@ -73,10 +100,27 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "kind", "widget": "segmented", "label": "Type" },
-        { "param": "content", "widget": "textarea", "label": "Content", "rows": 3 },
-        { "param": "tags", "widget": "tag_input", "label": "Tags" },
-        { "param": "visibility", "widget": "picker", "label": "Visibility" }
+        {
+          "param": "kind",
+          "widget": "segmented",
+          "label": "Type"
+        },
+        {
+          "param": "content",
+          "widget": "textarea",
+          "label": "Content",
+          "rows": 3
+        },
+        {
+          "param": "tags",
+          "widget": "tag_input",
+          "label": "Tags"
+        },
+        {
+          "param": "visibility",
+          "widget": "picker",
+          "label": "Visibility"
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Append"
@@ -84,16 +128,28 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Entry Added", "icon": "checkmark.circle.fill" },
-        { "type": "badge", "source": "{{kind}}" },
-        { "type": "text", "source": "{{content}}" }
+        {
+          "type": "header",
+          "title": "Entry Added",
+          "icon": "checkmark.circle.fill"
+        },
+        {
+          "type": "badge",
+          "source": "{{kind}}"
+        },
+        {
+          "type": "text",
+          "source": "{{content}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "state_write",
     "approvalDescription": "Append {{kind}} to internal thread",
-    "scopes": ["state.write"],
+    "scopes": [
+      "state.write"
+    ],
     "riskLevel": "low"
   }
 }

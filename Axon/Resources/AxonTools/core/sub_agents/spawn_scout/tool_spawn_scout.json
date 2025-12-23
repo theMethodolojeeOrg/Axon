@@ -5,9 +5,16 @@
     "name": "Spawn Scout",
     "description": "Spawn a read-only reconnaissance sub-agent for exploration tasks.",
     "category": "sub_agents",
-    "icon": { "sfSymbol": "binoculars" },
+    "icon": {
+      "sfSymbol": "binoculars"
+    },
     "requiresApproval": true,
-    "tags": ["sub-agent", "scout", "exploration", "read-only"]
+    "tags": [
+      "sub-agent",
+      "scout",
+      "exploration",
+      "read-only"
+    ]
   },
   "parameters": {
     "task": {
@@ -19,13 +26,18 @@
       "type": "array",
       "required": false,
       "description": "Context tags to provide",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     },
     "model_tier": {
       "type": "enum",
       "required": false,
       "description": "Model tier to use",
-      "enum": ["capable", "fast"],
+      "enum": [
+        "capable",
+        "fast"
+      ],
       "enumDescriptions": {
         "capable": "More capable model for complex tasks",
         "fast": "Faster model for simpler tasks"
@@ -33,7 +45,9 @@
       "default": "fast"
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "sub_agent"
@@ -41,8 +55,14 @@
   "ai": {
     "systemPromptSection": "### spawn_scout\nSpawn read-only reconnaissance agent.\n\n**Format:**\n```tool_request\n{\"tool\": \"spawn_scout\", \"query\": \"{\\\"task\\\": \\\"Explore the codebase structure\\\", \\\"context_tags\\\": [\\\"architecture\\\"]}\"}\n```\n\n**Parameters:**\n- task: What the scout should explore (required)\n- context_tags: Tags to focus the exploration\n- model_tier: 'capable' or 'fast' (default: fast)\n\n**Note:** Scouts can only read - no modifications allowed.",
     "usageExamples": [
-      { "description": "Explore codebase", "input": "{\"task\": \"Map the project structure and key components\"}" },
-      { "description": "Research patterns", "input": "{\"task\": \"Find authentication patterns\", \"context_tags\": [\"auth\", \"security\"]}" }
+      {
+        "description": "Explore codebase",
+        "input": "{\"task\": \"Map the project structure and key components\"}"
+      },
+      {
+        "description": "Research patterns",
+        "input": "{\"task\": \"Find authentication patterns\", \"context_tags\": [\"auth\", \"security\"]}"
+      }
     ],
     "whenToUse": [
       "Need to gather information",
@@ -57,12 +77,33 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "task", "widget": "textarea", "label": "Task", "placeholder": "What should the scout explore?", "rows": 3 },
-        { "param": "context_tags", "widget": "tag_input", "label": "Context Tags" },
-        { "param": "model_tier", "widget": "segmented", "label": "Model Tier", "options": [
-          { "value": "fast", "label": "Fast" },
-          { "value": "capable", "label": "Capable" }
-        ]}
+        {
+          "param": "task",
+          "widget": "textarea",
+          "label": "Task",
+          "placeholder": "What should the scout explore?",
+          "rows": 3
+        },
+        {
+          "param": "context_tags",
+          "widget": "tag_input",
+          "label": "Context Tags"
+        },
+        {
+          "param": "model_tier",
+          "widget": "segmented",
+          "label": "Model Tier",
+          "options": [
+            {
+              "value": "fast",
+              "label": "Fast"
+            },
+            {
+              "value": "capable",
+              "label": "Capable"
+            }
+          ]
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Spawn Scout"
@@ -70,15 +111,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Scout Spawned", "icon": "binoculars" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Scout Spawned",
+          "icon": "binoculars"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "agent_spawn",
     "approvalDescription": "Spawn Scout sub-agent",
-    "scopes": ["agent.spawn"],
+    "scopes": [
+      "agent.spawn"
+    ],
     "riskLevel": "medium"
   }
 }

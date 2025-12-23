@@ -9,9 +9,13 @@
       "sfSymbol": "info.circle"
     },
     "requiresApproval": false,
-    "tags": ["mac", "files", "metadata", "info"]
+    "tags": [
+      "mac",
+      "files",
+      "metadata",
+      "info"
+    ]
   },
-
   "parameters": {
     "path": {
       "type": "string",
@@ -19,16 +23,13 @@
       "description": "Path to the file"
     }
   },
-
   "inputFormat": {
-    "style": "json"
+    "style": "freeform"
   },
-
   "execution": {
     "type": "bridge",
     "bridgeMethod": "file/metadata"
   },
-
   "ai": {
     "systemPromptSection": "### mac_file_metadata\nGet detailed file metadata.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_file_metadata\", \"query\": \"{\\\"path\\\": \\\"/path/to/file\\\"}\"}\n```\n\n**Parameters:**\n- path: File path (required)\n\n**Returns:** exists, isDirectory, sizeBytes, permissions, owner, createdDate, modifiedDate, contentType",
     "whenToUse": [

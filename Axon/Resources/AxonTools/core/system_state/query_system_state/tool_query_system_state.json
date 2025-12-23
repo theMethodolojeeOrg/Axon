@@ -5,9 +5,16 @@
     "name": "Query System State",
     "description": "Query current system configuration including provider, model, tools, and permissions.",
     "category": "system",
-    "icon": { "sfSymbol": "gearshape.2" },
+    "icon": {
+      "sfSymbol": "gearshape.2"
+    },
     "requiresApproval": false,
-    "tags": ["system", "configuration", "status", "query"]
+    "tags": [
+      "system",
+      "configuration",
+      "status",
+      "query"
+    ]
   },
   "parameters": {
     "query": {
@@ -17,7 +24,9 @@
       "default": "current"
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "system_state"
@@ -25,9 +34,18 @@
   "ai": {
     "systemPromptSection": "### query_system_state\nQuery system configuration.\n\n**Format:**\n```tool_request\n{\"tool\": \"query_system_state\", \"query\": \"current\"}\n```\n\n**Scopes:**\n- current: Current provider, model, and settings\n- providers: Available AI providers\n- tools: Loaded tools status\n- permissions: Co-sovereignty status\n- all: Complete system state",
     "usageExamples": [
-      { "description": "Check current config", "input": "current" },
-      { "description": "List providers", "input": "providers" },
-      { "description": "Full state", "input": "all" }
+      {
+        "description": "Check current config",
+        "input": "current"
+      },
+      {
+        "description": "List providers",
+        "input": "providers"
+      },
+      {
+        "description": "Full state",
+        "input": "all"
+      }
     ],
     "whenToUse": [
       "Understand current capabilities",
@@ -41,12 +59,29 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "query", "widget": "segmented", "label": "Scope", "options": [
-          { "value": "current", "label": "Current" },
-          { "value": "providers", "label": "Providers" },
-          { "value": "tools", "label": "Tools" },
-          { "value": "all", "label": "All" }
-        ]}
+        {
+          "param": "query",
+          "widget": "segmented",
+          "label": "Scope",
+          "options": [
+            {
+              "value": "current",
+              "label": "Current"
+            },
+            {
+              "value": "providers",
+              "label": "Providers"
+            },
+            {
+              "value": "tools",
+              "label": "Tools"
+            },
+            {
+              "value": "all",
+              "label": "All"
+            }
+          ]
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Query"
@@ -54,15 +89,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "System State", "icon": "gearshape.2" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "System State",
+          "icon": "gearshape.2"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "system_query",
     "approvalDescription": "Query system state: {{query}}",
-    "scopes": ["system.read"],
+    "scopes": [
+      "system.read"
+    ],
     "riskLevel": "low"
   }
 }

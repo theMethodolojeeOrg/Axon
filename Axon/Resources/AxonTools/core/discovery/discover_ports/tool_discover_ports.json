@@ -16,7 +16,7 @@
       "description": "Category filter (optional)"
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": { "style": "freeform" },
   "execution": {
     "type": "internal_handler",
     "handler": "discovery"

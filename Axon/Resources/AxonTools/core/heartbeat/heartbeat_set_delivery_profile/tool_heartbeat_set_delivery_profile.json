@@ -5,9 +5,15 @@
     "name": "Set Delivery Profile",
     "description": "Set the active heartbeat delivery profile.",
     "category": "heartbeat",
-    "icon": { "sfSymbol": "person.badge.clock" },
+    "icon": {
+      "sfSymbol": "person.badge.clock"
+    },
     "requiresApproval": false,
-    "tags": ["heartbeat", "profile", "delivery"]
+    "tags": [
+      "heartbeat",
+      "profile",
+      "delivery"
+    ]
   },
   "parameters": {
     "profile_id": {
@@ -16,7 +22,9 @@
       "description": "Profile ID to activate"
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "heartbeat"
@@ -24,8 +32,14 @@
   "ai": {
     "systemPromptSection": "### heartbeat_set_delivery_profile\nSet active delivery profile.\n\n**Format:**\n```tool_request\n{\"tool\": \"heartbeat_set_delivery_profile\", \"query\": \"{\\\"profile_id\\\": \\\"morning_brief\\\"}\"}\n```\n\n**Note:** Profile must already exist.",
     "usageExamples": [
-      { "description": "Set morning profile", "input": "{\"profile_id\": \"morning_brief\"}" },
-      { "description": "Set minimal profile", "input": "{\"profile_id\": \"minimal\"}" }
+      {
+        "description": "Set morning profile",
+        "input": "{\"profile_id\": \"morning_brief\"}"
+      },
+      {
+        "description": "Set minimal profile",
+        "input": "{\"profile_id\": \"minimal\"}"
+      }
     ],
     "whenToUse": [
       "Switch heartbeat content format",
@@ -38,7 +52,12 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "profile_id", "widget": "text_field", "label": "Profile ID", "placeholder": "Enter profile ID..." }
+        {
+          "param": "profile_id",
+          "widget": "text_field",
+          "label": "Profile ID",
+          "placeholder": "Enter profile ID..."
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Set Profile"
@@ -46,15 +65,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Profile Set", "icon": "person.badge.clock" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Profile Set",
+          "icon": "person.badge.clock"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "heartbeat_configure",
     "approvalDescription": "Set delivery profile: {{profile_id}}",
-    "scopes": ["heartbeat.configure"],
+    "scopes": [
+      "heartbeat.configure"
+    ],
     "riskLevel": "low"
   }
 }

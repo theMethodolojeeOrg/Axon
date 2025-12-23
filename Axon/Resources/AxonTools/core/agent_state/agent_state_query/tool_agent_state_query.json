@@ -5,9 +5,16 @@
     "name": "Internal Thread Query",
     "description": "Query entries from the internal thread with filters.",
     "category": "agent_state",
-    "icon": { "sfSymbol": "doc.text.magnifyingglass" },
+    "icon": {
+      "sfSymbol": "doc.text.magnifyingglass"
+    },
     "requiresApproval": false,
-    "tags": ["internal-thread", "query", "search", "state"]
+    "tags": [
+      "internal-thread",
+      "query",
+      "search",
+      "state"
+    ]
   },
   "parameters": {
     "limit": {
@@ -27,7 +34,9 @@
       "type": "array",
       "required": false,
       "description": "Filter by tags",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     },
     "search": {
       "type": "string",
@@ -41,7 +50,9 @@
       "default": false
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "agent_state"
@@ -49,9 +60,18 @@
   "ai": {
     "systemPromptSection": "### agent_state_query\nQuery internal thread entries.\n\n**Format:**\n```tool_request\n{\"tool\": \"agent_state_query\", \"query\": \"{\\\"limit\\\": 10, \\\"kind\\\": \\\"note\\\"}\"}\n```\n\nOr simple text search:\n```tool_request\n{\"tool\": \"agent_state_query\", \"query\": \"search text\"}\n```",
     "usageExamples": [
-      { "description": "Get recent notes", "input": "{\"limit\": 5, \"kind\": \"note\"}" },
-      { "description": "Search by tag", "input": "{\"tags\": [\"preferences\"]}" },
-      { "description": "Simple search", "input": "project structure" }
+      {
+        "description": "Get recent notes",
+        "input": "{\"limit\": 5, \"kind\": \"note\"}"
+      },
+      {
+        "description": "Search by tag",
+        "input": "{\"tags\": [\"preferences\"]}"
+      },
+      {
+        "description": "Simple search",
+        "input": "project structure"
+      }
     ],
     "whenToUse": [
       "Review previous notes on a topic",
@@ -65,9 +85,24 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "search", "widget": "text_field", "label": "Search", "placeholder": "Search entries..." },
-        { "param": "kind", "widget": "picker", "label": "Kind" },
-        { "param": "limit", "widget": "stepper", "label": "Limit", "min": 1, "max": 100 }
+        {
+          "param": "search",
+          "widget": "text_field",
+          "label": "Search",
+          "placeholder": "Search entries..."
+        },
+        {
+          "param": "kind",
+          "widget": "picker",
+          "label": "Kind"
+        },
+        {
+          "param": "limit",
+          "widget": "stepper",
+          "label": "Limit",
+          "min": 1,
+          "max": 100
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Query"
@@ -75,15 +110,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Internal Thread Entries", "icon": "doc.text.magnifyingglass" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Internal Thread Entries",
+          "icon": "doc.text.magnifyingglass"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "state_read",
     "approvalDescription": "Query internal thread",
-    "scopes": ["state.read"],
+    "scopes": [
+      "state.read"
+    ],
     "riskLevel": "low"
   }
 }

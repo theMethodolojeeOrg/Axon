@@ -5,9 +5,16 @@
     "name": "Internal Thread Clear",
     "description": "Clear entries from the internal thread (all or specific IDs).",
     "category": "agent_state",
-    "icon": { "sfSymbol": "trash" },
+    "icon": {
+      "sfSymbol": "trash"
+    },
     "requiresApproval": false,
-    "tags": ["internal-thread", "clear", "delete", "state"]
+    "tags": [
+      "internal-thread",
+      "clear",
+      "delete",
+      "state"
+    ]
   },
   "parameters": {
     "all": {
@@ -19,10 +26,14 @@
       "type": "array",
       "required": false,
       "description": "Specific entry IDs to delete",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "agent_state"
@@ -30,8 +41,14 @@
   "ai": {
     "systemPromptSection": "### agent_state_clear\nClear internal thread entries.\n\n**Clear all:**\n```tool_request\n{\"tool\": \"agent_state_clear\", \"query\": \"{\\\"all\\\": true}\"}\n```\n\n**Clear specific IDs:**\n```tool_request\n{\"tool\": \"agent_state_clear\", \"query\": \"{\\\"ids\\\": [\\\"id1\\\", \\\"id2\\\"]}\"}\n```",
     "usageExamples": [
-      { "description": "Clear all", "input": "{\"all\": true}" },
-      { "description": "Clear specific entries", "input": "{\"ids\": [\"entry-123\", \"entry-456\"]}" }
+      {
+        "description": "Clear all",
+        "input": "{\"all\": true}"
+      },
+      {
+        "description": "Clear specific entries",
+        "input": "{\"ids\": [\"entry-123\", \"entry-456\"]}"
+      }
     ],
     "whenToUse": [
       "Clean up completed task notes",
@@ -46,7 +63,11 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "all", "widget": "toggle", "label": "Clear All" }
+        {
+          "param": "all",
+          "widget": "toggle",
+          "label": "Clear All"
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Clear"
@@ -54,15 +75,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Entries Cleared", "icon": "trash" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Entries Cleared",
+          "icon": "trash"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "state_delete",
     "approvalDescription": "Clear internal thread entries",
-    "scopes": ["state.delete"],
+    "scopes": [
+      "state.delete"
+    ],
     "riskLevel": "medium"
   }
 }

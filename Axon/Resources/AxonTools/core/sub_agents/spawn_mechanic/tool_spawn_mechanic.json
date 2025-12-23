@@ -5,9 +5,16 @@
     "name": "Spawn Mechanic",
     "description": "Spawn a read+write sub-agent for modification tasks.",
     "category": "sub_agents",
-    "icon": { "sfSymbol": "wrench.and.screwdriver" },
+    "icon": {
+      "sfSymbol": "wrench.and.screwdriver"
+    },
     "requiresApproval": true,
-    "tags": ["sub-agent", "mechanic", "modification", "read-write"]
+    "tags": [
+      "sub-agent",
+      "mechanic",
+      "modification",
+      "read-write"
+    ]
   },
   "parameters": {
     "task": {
@@ -19,13 +26,18 @@
       "type": "array",
       "required": false,
       "description": "Context tags to provide",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     },
     "model_tier": {
       "type": "enum",
       "required": false,
       "description": "Model tier to use",
-      "enum": ["capable", "fast"],
+      "enum": [
+        "capable",
+        "fast"
+      ],
       "enumDescriptions": {
         "capable": "More capable model for complex tasks",
         "fast": "Faster model for simpler tasks"
@@ -33,7 +45,9 @@
       "default": "fast"
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "sub_agent"
@@ -41,8 +55,14 @@
   "ai": {
     "systemPromptSection": "### spawn_mechanic\nSpawn read+write modification agent.\n\n**Format:**\n```tool_request\n{\"tool\": \"spawn_mechanic\", \"query\": \"{\\\"task\\\": \\\"Fix the bug in auth module\\\"}\"}\n```\n\n**Parameters:**\n- task: What the mechanic should fix/modify (required)\n- context_tags: Tags to focus the work\n- model_tier: 'capable' or 'fast' (default: fast)\n\n**Note:** Mechanics can read and write - use for fixes and modifications.",
     "usageExamples": [
-      { "description": "Fix bug", "input": "{\"task\": \"Fix the authentication timeout bug\"}" },
-      { "description": "Refactor", "input": "{\"task\": \"Refactor error handling in API module\", \"model_tier\": \"capable\"}" }
+      {
+        "description": "Fix bug",
+        "input": "{\"task\": \"Fix the authentication timeout bug\"}"
+      },
+      {
+        "description": "Refactor",
+        "input": "{\"task\": \"Refactor error handling in API module\", \"model_tier\": \"capable\"}"
+      }
     ],
     "whenToUse": [
       "Need isolated fixes",
@@ -57,12 +77,33 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "task", "widget": "textarea", "label": "Task", "placeholder": "What should the mechanic fix/modify?", "rows": 3 },
-        { "param": "context_tags", "widget": "tag_input", "label": "Context Tags" },
-        { "param": "model_tier", "widget": "segmented", "label": "Model Tier", "options": [
-          { "value": "fast", "label": "Fast" },
-          { "value": "capable", "label": "Capable" }
-        ]}
+        {
+          "param": "task",
+          "widget": "textarea",
+          "label": "Task",
+          "placeholder": "What should the mechanic fix/modify?",
+          "rows": 3
+        },
+        {
+          "param": "context_tags",
+          "widget": "tag_input",
+          "label": "Context Tags"
+        },
+        {
+          "param": "model_tier",
+          "widget": "segmented",
+          "label": "Model Tier",
+          "options": [
+            {
+              "value": "fast",
+              "label": "Fast"
+            },
+            {
+              "value": "capable",
+              "label": "Capable"
+            }
+          ]
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Spawn Mechanic"
@@ -70,15 +111,25 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Mechanic Spawned", "icon": "wrench.and.screwdriver" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Mechanic Spawned",
+          "icon": "wrench.and.screwdriver"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "agent_spawn",
     "approvalDescription": "Spawn Mechanic sub-agent",
-    "scopes": ["agent.spawn", "file.write"],
+    "scopes": [
+      "agent.spawn",
+      "file.write"
+    ],
     "riskLevel": "high"
   }
 }

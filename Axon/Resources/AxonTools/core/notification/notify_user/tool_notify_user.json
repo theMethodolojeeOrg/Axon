@@ -5,9 +5,16 @@
     "name": "Notify User",
     "description": "Send a notification to the user.",
     "category": "notification",
-    "icon": { "sfSymbol": "bell.fill" },
+    "icon": {
+      "sfSymbol": "bell.fill"
+    },
     "requiresApproval": false,
-    "tags": ["notification", "alert", "message", "user"]
+    "tags": [
+      "notification",
+      "alert",
+      "message",
+      "user"
+    ]
   },
   "parameters": {
     "title": {
@@ -26,7 +33,9 @@
       "description": "Optional subtitle"
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "notification"
@@ -34,8 +43,14 @@
   "ai": {
     "systemPromptSection": "### notify_user\nSend notification.\n\n**Format:**\n```tool_request\n{\"tool\": \"notify_user\", \"query\": \"{\\\"title\\\": \\\"Title\\\", \\\"body\\\": \\\"Message body\\\"}\"}\n```\n\n**Parameters:**\n- title: Notification title (required)\n- body: Notification body (required)\n- subtitle: Optional subtitle",
     "usageExamples": [
-      { "description": "Task complete", "input": "{\"title\": \"Task Complete\", \"body\": \"Build finished successfully\"}" },
-      { "description": "Reminder", "input": "{\"title\": \"Reminder\", \"body\": \"Meeting in 10 minutes\", \"subtitle\": \"Calendar\"}" }
+      {
+        "description": "Task complete",
+        "input": "{\"title\": \"Task Complete\", \"body\": \"Build finished successfully\"}"
+      },
+      {
+        "description": "Reminder",
+        "input": "{\"title\": \"Reminder\", \"body\": \"Meeting in 10 minutes\", \"subtitle\": \"Calendar\"}"
+      }
     ],
     "whenToUse": [
       "Important information when app in background",
@@ -50,9 +65,25 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "title", "widget": "text_field", "label": "Title", "placeholder": "Notification title" },
-        { "param": "subtitle", "widget": "text_field", "label": "Subtitle", "placeholder": "Optional subtitle" },
-        { "param": "body", "widget": "textarea", "label": "Body", "placeholder": "Notification message", "rows": 2 }
+        {
+          "param": "title",
+          "widget": "text_field",
+          "label": "Title",
+          "placeholder": "Notification title"
+        },
+        {
+          "param": "subtitle",
+          "widget": "text_field",
+          "label": "Subtitle",
+          "placeholder": "Optional subtitle"
+        },
+        {
+          "param": "body",
+          "widget": "textarea",
+          "label": "Body",
+          "placeholder": "Notification message",
+          "rows": 2
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Send Notification"
@@ -60,15 +91,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Notification Sent", "icon": "bell.fill" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Notification Sent",
+          "icon": "bell.fill"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "notification_send",
     "approvalDescription": "Send notification: {{title}}",
-    "scopes": ["notification.send"],
+    "scopes": [
+      "notification.send"
+    ],
     "riskLevel": "low"
   }
 }

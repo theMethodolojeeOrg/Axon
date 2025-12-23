@@ -9,9 +9,13 @@
       "sfSymbol": "folder.badge.magnifyingglass"
     },
     "requiresApproval": false,
-    "tags": ["mac", "files", "find", "search"]
+    "tags": [
+      "mac",
+      "files",
+      "find",
+      "search"
+    ]
   },
-
   "parameters": {
     "pattern": {
       "type": "string",
@@ -31,16 +35,13 @@
       "default": 3
     }
   },
-
   "inputFormat": {
-    "style": "json"
+    "style": "freeform"
   },
-
   "execution": {
     "type": "bridge",
     "bridgeMethod": "file/find"
   },
-
   "ai": {
     "systemPromptSection": "### mac_file_find\nFind files by name pattern.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_file_find\", \"query\": \"{\\\"pattern\\\": \\\"*.swift\\\", \\\"directory\\\": \\\"~/Projects\\\"}\"}\n```\n\n**Parameters:**\n- pattern: File name pattern with * wildcard (required)\n- directory: Search directory (default: ~)\n- maxDepth: Max search depth (default: 3)\n\n**Returns:** List of files with path, name, sizeBytes, isDirectory",
     "whenToUse": [

@@ -5,9 +5,16 @@
     "name": "Disable Persistence",
     "description": "Disable persistence for the internal thread, optionally wiping existing data.",
     "category": "agent_state",
-    "icon": { "sfSymbol": "externaldrive.badge.minus" },
+    "icon": {
+      "sfSymbol": "externaldrive.badge.minus"
+    },
     "requiresApproval": false,
-    "tags": ["internal-thread", "persistence", "privacy", "state"]
+    "tags": [
+      "internal-thread",
+      "persistence",
+      "privacy",
+      "state"
+    ]
   },
   "parameters": {
     "wipe": {
@@ -17,7 +24,9 @@
       "default": false
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "agent_state"
@@ -25,8 +34,14 @@
   "ai": {
     "systemPromptSection": "### persistence_disable\nDisable internal thread persistence.\n\n**Format:**\n```tool_request\n{\"tool\": \"persistence_disable\", \"query\": \"{\\\"wipe\\\": false}\"}\n```\n\n**With wipe:**\n```tool_request\n{\"tool\": \"persistence_disable\", \"query\": \"{\\\"wipe\\\": true}\"}\n```",
     "usageExamples": [
-      { "description": "Disable only", "input": "{\"wipe\": false}" },
-      { "description": "Disable and wipe", "input": "{\"wipe\": true}" }
+      {
+        "description": "Disable only",
+        "input": "{\"wipe\": false}"
+      },
+      {
+        "description": "Disable and wipe",
+        "input": "{\"wipe\": true}"
+      }
     ],
     "whenToUse": [
       "User requests privacy mode",
@@ -39,7 +54,11 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "wipe", "widget": "toggle", "label": "Wipe Existing Data" }
+        {
+          "param": "wipe",
+          "widget": "toggle",
+          "label": "Wipe Existing Data"
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Disable Persistence"
@@ -47,15 +66,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Persistence Disabled", "icon": "externaldrive.badge.minus" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Persistence Disabled",
+          "icon": "externaldrive.badge.minus"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "state_configure",
     "approvalDescription": "Disable persistence",
-    "scopes": ["state.configure"],
+    "scopes": [
+      "state.configure"
+    ],
     "riskLevel": "medium"
   }
 }

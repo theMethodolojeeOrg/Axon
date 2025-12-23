@@ -27,6 +27,8 @@
 	<array>
 		<string>_axon-api._tcp</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Axon uses the microphone for Live Mode to enable real-time voice conversations with AI.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

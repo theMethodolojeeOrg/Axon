@@ -453,8 +453,8 @@
       "displayName": "Google Gemini",
       "models": [
         {
-          "id": "gemini-3-pro-preview",
-          "displayName": "Gemini 3 Pro Preview",
+          "id": "gemini-3-pro",
+          "displayName": "Gemini 3 Pro",
           "category": "frontier",
           "contextWindow": 1000000,
           "modalities": [
@@ -478,8 +478,8 @@
           ]
         },
         {
-          "id": "gemini-3-flash-preview",
-          "displayName": "Gemini 3 Flash Preview",
+          "id": "gemini-3-flash",
+          "displayName": "Gemini 3 Flash",
           "category": "fast",
           "contextWindow": 1048576,
           "modalities": [

@@ -16,11 +16,7 @@
       "description": "Format: port_id | param1=value1 | param2=value2"
     }
   },
-  "inputFormat": {
-    "style": "pipe_delimited",
-    "pattern": "{{port_id}}|{{params}}",
-    "delimiter": "|"
-  },
+  "inputFormat": { "style": "freeform" },
   "execution": {
     "type": "internal_handler",
     "handler": "discovery"

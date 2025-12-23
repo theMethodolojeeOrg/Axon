@@ -9,9 +9,13 @@
       "sfSymbol": "antenna.radiowaves.left.and.right"
     },
     "requiresApproval": false,
-    "tags": ["mac", "network", "ping", "connectivity"]
+    "tags": [
+      "mac",
+      "network",
+      "ping",
+      "connectivity"
+    ]
   },
-
   "parameters": {
     "host": {
       "type": "string",
@@ -31,16 +35,13 @@
       "default": 5000
     }
   },
-
   "inputFormat": {
-    "style": "json"
+    "style": "freeform"
   },
-
   "execution": {
     "type": "bridge",
     "bridgeMethod": "network/ping"
   },
-
   "ai": {
     "systemPromptSection": "### mac_ping\nPing a host to test connectivity.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_ping\", \"query\": \"{\\\"host\\\": \\\"google.com\\\", \\\"count\\\": 4}\"}\n```\n\n**Parameters:**\n- host: Hostname or IP (required)\n- count: Number of pings (default: 4)\n- timeout: Timeout in ms (default: 5000)\n\n**Returns:** success, packetsTransmitted, packetsReceived, packetLoss, minTime, avgTime, maxTime",
     "whenToUse": [

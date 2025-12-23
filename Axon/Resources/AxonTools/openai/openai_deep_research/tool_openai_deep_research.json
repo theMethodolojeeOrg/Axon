@@ -5,9 +5,17 @@
     "name": "OpenAI Deep Research",
     "description": "Comprehensive multi-step research using reasoning models with web search.",
     "category": "provider",
-    "icon": { "sfSymbol": "brain.head.profile" },
+    "icon": {
+      "sfSymbol": "brain.head.profile"
+    },
     "requiresApproval": true,
-    "tags": ["research", "deep", "analysis", "reasoning", "comprehensive"]
+    "tags": [
+      "research",
+      "deep",
+      "analysis",
+      "reasoning",
+      "comprehensive"
+    ]
   },
   "parameters": {
     "topic": {
@@ -19,7 +27,11 @@
       "type": "enum",
       "required": false,
       "description": "Depth of research",
-      "enum": ["low", "medium", "high"],
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
       "enumDescriptions": {
         "low": "Quick overview (1-2 minutes)",
         "medium": "Balanced analysis (3-5 minutes)",
@@ -28,7 +40,9 @@
       "default": "medium"
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "provider_native",
     "handler": "openai",
@@ -41,8 +55,14 @@
   "ai": {
     "systemPromptSection": "### openai_deep_research\nComprehensive multi-step research using reasoning models.\n\n**Format:**\n```tool_request\n{\"tool\": \"openai_deep_research\", \"query\": \"{\\\"topic\\\": \\\"Impact of AI on healthcare\\\", \\\"effort\\\": \\\"high\\\"}\"}\n```\n\n**Parameters:**\n- topic: Research topic (required)\n- effort: low, medium (default), or high\n\n**Note:** Requires approval. May take several minutes. Uses o3-deep-research model.",
     "usageExamples": [
-      { "description": "Quick research", "input": "{\"topic\": \"Current state of quantum computing\", \"effort\": \"low\"}" },
-      { "description": "Deep analysis", "input": "{\"topic\": \"Impact of AI on healthcare diagnostics\", \"effort\": \"high\"}" }
+      {
+        "description": "Quick research",
+        "input": "{\"topic\": \"Current state of quantum computing\", \"effort\": \"low\"}"
+      },
+      {
+        "description": "Deep analysis",
+        "input": "{\"topic\": \"Impact of AI on healthcare diagnostics\", \"effort\": \"high\"}"
+      }
     ],
     "whenToUse": [
       "Complex research questions",
@@ -58,12 +78,32 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "topic", "widget": "textarea", "label": "Research Topic", "placeholder": "What would you like to research?", "rows": 3 },
-        { "param": "effort", "widget": "segmented", "label": "Research Depth", "options": [
-          { "value": "low", "label": "Quick" },
-          { "value": "medium", "label": "Balanced" },
-          { "value": "high", "label": "Deep" }
-        ]}
+        {
+          "param": "topic",
+          "widget": "textarea",
+          "label": "Research Topic",
+          "placeholder": "What would you like to research?",
+          "rows": 3
+        },
+        {
+          "param": "effort",
+          "widget": "segmented",
+          "label": "Research Depth",
+          "options": [
+            {
+              "value": "low",
+              "label": "Quick"
+            },
+            {
+              "value": "medium",
+              "label": "Balanced"
+            },
+            {
+              "value": "high",
+              "label": "Deep"
+            }
+          ]
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Start Research"
@@ -71,16 +111,29 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Research Complete", "icon": "brain.head.profile" },
-        { "type": "text", "source": "{{output}}" },
-        { "type": "text", "title": "Sources", "source": "{{annotations}}" }
+        {
+          "type": "header",
+          "title": "Research Complete",
+          "icon": "brain.head.profile"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        },
+        {
+          "type": "text",
+          "title": "Sources",
+          "source": "{{annotations}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "research",
     "approvalDescription": "Deep research: {{topic}}",
-    "scopes": ["research.deep"],
+    "scopes": [
+      "research.deep"
+    ],
     "riskLevel": "medium"
   },
   "requirements": {

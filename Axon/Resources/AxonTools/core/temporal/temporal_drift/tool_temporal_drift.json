@@ -5,9 +5,16 @@
     "name": "Temporal Drift",
     "description": "Enable or disable drift mode (suspend temporal tracking).",
     "category": "temporal",
-    "icon": { "sfSymbol": "clock.badge.xmark" },
+    "icon": {
+      "sfSymbol": "clock.badge.xmark"
+    },
     "requiresApproval": false,
-    "tags": ["temporal", "drift", "suspend", "timeless"]
+    "tags": [
+      "temporal",
+      "drift",
+      "suspend",
+      "timeless"
+    ]
   },
   "parameters": {
     "query": {
@@ -17,7 +24,9 @@
       "default": "enable"
     }
   },
-  "inputFormat": { "style": "json" },
+  "inputFormat": {
+    "style": "freeform"
+  },
   "execution": {
     "type": "internal_handler",
     "handler": "temporal"
@@ -25,8 +34,14 @@
   "ai": {
     "systemPromptSection": "### temporal_drift\nEnable/disable drift mode.\n\n**Format:**\n```tool_request\n{\"tool\": \"temporal_drift\", \"query\": \"enable\"}\n```\n\n**Options:** enable, disable\n\n**Effect:** When enabled, temporal tracking is suspended (timeless void mode).",
     "usageExamples": [
-      { "description": "Enable drift", "input": "enable" },
-      { "description": "Disable drift", "input": "disable" }
+      {
+        "description": "Enable drift",
+        "input": "enable"
+      },
+      {
+        "description": "Disable drift",
+        "input": "disable"
+      }
     ],
     "whenToUse": [
       "User invokes /drift",
@@ -39,10 +54,21 @@
   "ui": {
     "inputForm": {
       "fields": [
-        { "param": "query", "widget": "segmented", "label": "Action", "options": [
-          { "value": "enable", "label": "Enable" },
-          { "value": "disable", "label": "Disable" }
-        ]}
+        {
+          "param": "query",
+          "widget": "segmented",
+          "label": "Action",
+          "options": [
+            {
+              "value": "enable",
+              "label": "Enable"
+            },
+            {
+              "value": "disable",
+              "label": "Disable"
+            }
+          ]
+        }
       ],
       "layout": "vertical",
       "submitLabel": "Apply"
@@ -50,15 +76,24 @@
     "resultDisplay": {
       "style": "card",
       "sections": [
-        { "type": "header", "title": "Temporal Drift", "icon": "clock.badge.xmark" },
-        { "type": "text", "source": "{{output}}" }
+        {
+          "type": "header",
+          "title": "Temporal Drift",
+          "icon": "clock.badge.xmark"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
       ]
     }
   },
   "sovereignty": {
     "actionCategory": "temporal_mode",
     "approvalDescription": "Enable temporal drift",
-    "scopes": ["temporal.mode"],
+    "scopes": [
+      "temporal.mode"
+    ],
     "riskLevel": "low"
   }
 }

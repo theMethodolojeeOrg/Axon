@@ -9,9 +9,12 @@
       "sfSymbol": "bell.fill"
     },
     "requiresApproval": false,
-    "tags": ["mac", "notification", "alert"]
+    "tags": [
+      "mac",
+      "notification",
+      "alert"
+    ]
   },
-
   "parameters": {
     "title": {
       "type": "string",
@@ -29,16 +32,13 @@
       "description": "Optional subtitle"
     }
   },
-
   "inputFormat": {
-    "style": "json"
+    "style": "freeform"
   },
-
   "execution": {
     "type": "bridge",
     "bridgeMethod": "notification/send"
   },
-
   "ai": {
     "systemPromptSection": "### mac_notification\nSend a macOS system notification.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_notification\", \"query\": \"{\\\"title\\\": \\\"Title\\\", \\\"message\\\": \\\"Body text\\\"}\"}\n```\n\n**Parameters:**\n- title: Notification title (required)\n- message: Body text (required)\n- subtitle: Optional subtitle\n\n**Returns:** success, notificationId",
     "whenToUse": [
