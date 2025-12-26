@@ -11,8 +11,12 @@ import SwiftUI
 @main
 struct AxonLiveActivityBundle: WidgetBundle {
     var body: some Widget {
+        // Live Activities
         HeartbeatLiveActivity()
         SubAgentLiveActivity()
         VideoGenerationLiveActivity()
+
+        // Home Screen Widgets
+        ConversationWidget()
     }
 }

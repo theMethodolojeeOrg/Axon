@@ -749,6 +749,13 @@ class ConversationService: ObservableObject {
                 }
             }
 
+            // Update widget data so home screen widget shows latest messages
+            if let conversation = currentConversation ?? conversations.first(where: { $0.id == conversationId }) {
+                Task { @MainActor in
+                    await WidgetDataService.shared.updateConversationAsync(conversation, messages: self.messages)
+                }
+            }
+
             return assistantMessage
         } catch {
             // Remove optimistic message on error
@@ -926,6 +933,145 @@ class ConversationService: ObservableObject {
             // Leave the existing title as-is.
             print("[ConversationService] ⚠️ Auto-title generation failed: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Message Editing & Deletion
+
+    /// Edit a user message's content (preserves edit history)
+    func editMessage(conversationId: String, messageId: String, content: String) async throws -> Message {
+        // Verify the message exists and is a user message
+        guard let existingIndex = messages.firstIndex(where: { $0.id == messageId }) else {
+            throw ConversationError.notFound
+        }
+
+        let existingMessage = messages[existingIndex]
+        guard existingMessage.role == .user else {
+            throw ConversationError.invalidData  // Can only edit user messages
+        }
+
+        // Update in local store (with edit history)
+        try localStore.updateLocalMessage(id: messageId, content: content, conversationId: conversationId)
+
+        // Build the new edit history
+        var newEditHistory = existingMessage.editHistory ?? []
+        let editEntry = MessageEdit(
+            id: UUID().uuidString,
+            content: existingMessage.content,
+            timestamp: Date(),
+            version: existingMessage.currentVersion ?? 0
+        )
+        newEditHistory.append(editEntry)
+
+        // Create updated message model
+        let updatedMessage = Message(
+            id: existingMessage.id,
+            conversationId: existingMessage.conversationId,
+            role: existingMessage.role,
+            content: content,
+            hiddenReason: existingMessage.hiddenReason,
+            timestamp: existingMessage.timestamp,
+            tokens: existingMessage.tokens,
+            artifacts: existingMessage.artifacts,
+            toolCalls: existingMessage.toolCalls,
+            isStreaming: existingMessage.isStreaming,
+            modelName: existingMessage.modelName,
+            providerName: existingMessage.providerName,
+            attachments: existingMessage.attachments,
+            groundingSources: existingMessage.groundingSources,
+            memoryOperations: existingMessage.memoryOperations,
+            reasoning: existingMessage.reasoning,
+            editHistory: newEditHistory,
+            currentVersion: (existingMessage.currentVersion ?? 0) + 1,
+            contextDebugInfo: existingMessage.contextDebugInfo,
+            liveToolCalls: existingMessage.liveToolCalls,
+            isDeleted: existingMessage.isDeleted
+        )
+
+        // Update in-memory array
+        messages[existingIndex] = updatedMessage
+
+        print("[ConversationService] Edited message: \(messageId)")
+        return updatedMessage
+    }
+
+    /// Delete a user message (soft-delete - shows placeholder)
+    func deleteMessage(conversationId: String, messageId: String) async throws {
+        // Verify the message exists and is a user message
+        guard let existingIndex = messages.firstIndex(where: { $0.id == messageId }) else {
+            throw ConversationError.notFound
+        }
+
+        let existingMessage = messages[existingIndex]
+        guard existingMessage.role == .user else {
+            throw ConversationError.invalidData  // Can only delete user messages
+        }
+
+        // Update in local store
+        try localStore.deleteLocalMessage(id: messageId, conversationId: conversationId)
+
+        // Create updated message model with isDeleted flag
+        let deletedMessage = Message(
+            id: existingMessage.id,
+            conversationId: existingMessage.conversationId,
+            role: existingMessage.role,
+            content: existingMessage.content,
+            hiddenReason: existingMessage.hiddenReason,
+            timestamp: existingMessage.timestamp,
+            tokens: existingMessage.tokens,
+            artifacts: existingMessage.artifacts,
+            toolCalls: existingMessage.toolCalls,
+            isStreaming: existingMessage.isStreaming,
+            modelName: existingMessage.modelName,
+            providerName: existingMessage.providerName,
+            attachments: existingMessage.attachments,
+            groundingSources: existingMessage.groundingSources,
+            memoryOperations: existingMessage.memoryOperations,
+            reasoning: existingMessage.reasoning,
+            editHistory: existingMessage.editHistory,
+            currentVersion: existingMessage.currentVersion,
+            contextDebugInfo: existingMessage.contextDebugInfo,
+            liveToolCalls: existingMessage.liveToolCalls,
+            isDeleted: true
+        )
+
+        // Update in-memory array
+        messages[existingIndex] = deletedMessage
+
+        print("[ConversationService] Deleted message: \(messageId)")
+    }
+
+    /// Edit a user message and regenerate the AI response (cascade delete subsequent messages)
+    func editAndRegenerate(conversationId: String, messageId: String, content: String, enabledTools: [String] = []) async throws -> Message {
+        // Verify the message exists and is a user message
+        guard let existingIndex = messages.firstIndex(where: { $0.id == messageId }) else {
+            throw ConversationError.notFound
+        }
+
+        let existingMessage = messages[existingIndex]
+        guard existingMessage.role == .user else {
+            throw ConversationError.invalidData  // Can only edit user messages
+        }
+
+        // 1. Delete all messages after this one (cascade)
+        try localStore.deleteMessagesAfter(messageId: messageId, conversationId: conversationId)
+
+        // Remove from in-memory array too
+        let messageIndex = messages.firstIndex(where: { $0.id == messageId })!
+        messages = Array(messages.prefix(through: messageIndex))
+
+        // 2. Edit the user message
+        _ = try await editMessage(conversationId: conversationId, messageId: messageId, content: content)
+
+        // 3. Regenerate AI response by sending the edited content
+        let assistantMessage = try await sendMessage(
+            conversationId: conversationId,
+            content: content,
+            attachments: existingMessage.attachments ?? [],
+            enabledTools: enabledTools
+        )
+
+        print("[ConversationService] Edit & regenerate completed for message: \(messageId)")
+        return assistantMessage
     }
 
     // MARK: - Helpers

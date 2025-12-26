@@ -60,6 +60,7 @@ enum ToolCategoryV2: String, Codable, CaseIterable, Equatable {
     case discovery
     case notification
     case system
+    case vscode
     case provider
     case port
     case custom
@@ -75,6 +76,7 @@ enum ToolCategoryV2: String, Codable, CaseIterable, Equatable {
         case .discovery: return "Discovery"
         case .notification: return "Notification"
         case .system: return "System"
+        case .vscode: return "VS Code"
         case .provider: return "Provider"
         case .port: return "External App"
         case .custom: return "Custom"
@@ -92,6 +94,7 @@ enum ToolCategoryV2: String, Codable, CaseIterable, Equatable {
         case .discovery: return "magnifyingglass"
         case .notification: return "bell.fill"
         case .system: return "gear"
+        case .vscode: return "chevron.left.forwardslash.chevron.right"
         case .provider: return "cloud.fill"
         case .port: return "app.connected.to.app.below.fill"
         case .custom: return "star.fill"
@@ -215,6 +218,7 @@ struct ToolExecution: Codable, Equatable {
     let urlScheme: String?
     let shortcutName: String?
     let bridgeMethod: String?  // For bridge execution type (e.g., "system/info", "clipboard/read")
+    let bridgeTarget: String?  // For bridge execution: "mac" (default) or "vscode"
 
     enum ExecutionType: String, Codable, Equatable {
         case internalHandler = "internal_handler"

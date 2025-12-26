@@ -135,6 +135,8 @@ fileprivate func providerColor(for provider: ModelProvider, modelName: String?) 
 struct UserMessageView: View {
     let message: Message
     let onCopy: (Message) -> Void
+    var onEdit: ((Message) -> Void)? = nil
+    var onDelete: ((Message) -> Void)? = nil
 
     /// Maximum lines shown before truncating with "Show more".
     private let collapsedLineLimit = 12
@@ -214,12 +216,42 @@ struct UserMessageView: View {
                     Button(action: { onCopy(message) }) {
                         Label("Copy All", systemImage: "doc.on.doc")
                     }
+                    if onEdit != nil {
+                        Button(action: { onEdit?(message) }) {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                    }
+                    if onDelete != nil {
+                        Button(role: .destructive, action: { onDelete?(message) }) {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 }
+                #if os(iOS)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    if onDelete != nil {
+                        Button(role: .destructive) { onDelete?(message) }
+                            label: { Label("Delete", systemImage: "trash") }
+                    }
+                    if onEdit != nil {
+                        Button { onEdit?(message) }
+                            label: { Label("Edit", systemImage: "pencil") }
+                            .tint(.orange)
+                    }
+                }
+                #endif
 
-                // Timestamp
-                Text(message.timestamp, style: .time)
-                    .font(AppTypography.labelSmall())
-                    .foregroundColor(AppColors.textTertiary)
+                // Timestamp and edited indicator
+                HStack(spacing: 6) {
+                    Text(message.timestamp, style: .time)
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                    if message.isEdited {
+                        Text("(edited)")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+                }
             }
 
             // User avatar
@@ -653,6 +685,7 @@ struct TextSelectorSheet: View {
     var body: some View {
         NavigationView {
             SelectableTextView(text: content)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
                 .background(AppColors.substratePrimary)
                 .navigationTitle("Select Text")
@@ -721,12 +754,39 @@ struct SelectableTextView: UIViewRepresentable {
     }
 }
 #else
-struct SelectableTextView: View {
+struct SelectableTextView: NSViewRepresentable {
     let text: String
 
-    var body: some View {
-        Text(text)
-            .textSelection(.enabled)
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        let textView = NSTextView()
+
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.font = NSFont.systemFont(ofSize: 14)
+        textView.textColor = NSColor(AppColors.textPrimary)
+        textView.backgroundColor = .clear
+        textView.drawsBackground = false
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainerInset = NSSize(width: 0, height: 0)
+
+        scrollView.documentView = textView
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        scrollView.autohidesScrollers = true
+
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? NSTextView else { return }
+        if textView.string != text {
+            textView.string = text
+        }
     }
 }
 #endif
@@ -739,6 +799,25 @@ struct MessageSeparator: View {
             .fill(AppColors.glassBorder.opacity(0.5))
             .frame(height: 1)
             .padding(.horizontal)
+    }
+}
+
+// MARK: - Deleted Message Placeholder
+
+struct DeletedMessageView: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "trash.circle")
+                .font(.system(size: 16))
+                .foregroundColor(AppColors.textTertiary)
+            Text("This message was deleted")
+                .font(AppTypography.bodySmall())
+                .foregroundColor(AppColors.textTertiary)
+                .italic()
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal)
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 }
 

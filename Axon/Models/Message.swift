@@ -30,6 +30,7 @@ struct Message: Codable, Identifiable, Equatable {
     let currentVersion: Int?  // Which version is currently displayed (0 = original)
     let contextDebugInfo: ContextDebugInfo?  // Token usage breakdown for this message
     let liveToolCalls: [LiveToolCall]?  // Rich tool call details with state/timing/request/result
+    let isDeleted: Bool?  // Soft-delete flag (if true, show placeholder instead of content)
 
     // Computed property to check if message has been edited
     var isEdited: Bool {
@@ -57,6 +58,7 @@ struct Message: Codable, Identifiable, Equatable {
         case currentVersion
         case contextDebugInfo
         case liveToolCalls
+        case isDeleted
     }
 
     init(
@@ -79,7 +81,8 @@ struct Message: Codable, Identifiable, Equatable {
         editHistory: [MessageEdit]? = nil,
         currentVersion: Int? = nil,
         contextDebugInfo: ContextDebugInfo? = nil,
-        liveToolCalls: [LiveToolCall]? = nil
+        liveToolCalls: [LiveToolCall]? = nil,
+        isDeleted: Bool? = nil
     ) {
         self.id = id
         self.conversationId = conversationId
@@ -101,6 +104,7 @@ struct Message: Codable, Identifiable, Equatable {
         self.currentVersion = currentVersion
         self.contextDebugInfo = contextDebugInfo
         self.liveToolCalls = liveToolCalls
+        self.isDeleted = isDeleted
     }
 
     // Custom decoder to handle timestamp conversion from milliseconds
@@ -168,6 +172,7 @@ struct Message: Codable, Identifiable, Equatable {
         currentVersion = try container.decodeIfPresent(Int.self, forKey: .currentVersion)
         contextDebugInfo = try container.decodeIfPresent(ContextDebugInfo.self, forKey: .contextDebugInfo)
         liveToolCalls = try container.decodeIfPresent([LiveToolCall].self, forKey: .liveToolCalls)
+        isDeleted = try container.decodeIfPresent(Bool.self, forKey: .isDeleted)
     }
 
     // Custom encoder to convert timestamp back to milliseconds
@@ -197,6 +202,7 @@ struct Message: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(currentVersion, forKey: .currentVersion)
         try container.encodeIfPresent(contextDebugInfo, forKey: .contextDebugInfo)
         try container.encodeIfPresent(liveToolCalls, forKey: .liveToolCalls)
+        try container.encodeIfPresent(isDeleted, forKey: .isDeleted)
     }
 }
 

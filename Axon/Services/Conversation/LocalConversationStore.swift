@@ -209,6 +209,141 @@ class LocalConversationStore: ObservableObject {
         print("[LocalConversationStore] Saved local message: \(message.id)")
     }
 
+    /// Update a message's content locally, preserving edit history
+    func updateLocalMessage(id: String, content: String, conversationId: String) throws {
+        let context = persistence.container.viewContext
+
+        let fetchRequest: NSFetchRequest<MessageEntity> = MessageEntity.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "id == %@", id)
+
+        guard let entity = try context.fetch(fetchRequest).first else {
+            throw LocalStoreError.notFound
+        }
+
+        // Get current content and version
+        let currentContent = entity.content ?? ""
+        let currentVersion = entity.currentVersion
+
+        // Build edit history entry for the previous content
+        let editEntry = MessageEdit(
+            id: UUID().uuidString,
+            content: currentContent,
+            timestamp: Date(),
+            version: Int(currentVersion)
+        )
+
+        // Decode existing edit history or create new array
+        var editHistory: [MessageEdit] = []
+        if let existingJSON = entity.editHistoryJSON,
+           let data = existingJSON.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode([MessageEdit].self, from: data) {
+            editHistory = decoded
+        }
+
+        // Append the previous version to history
+        editHistory.append(editEntry)
+
+        // Serialize updated history back to JSON
+        if let data = try? JSONEncoder().encode(editHistory),
+           let json = String(data: data, encoding: .utf8) {
+            entity.editHistoryJSON = json
+        }
+
+        // Update content and increment version
+        entity.content = content
+        entity.currentVersion = currentVersion + 1
+
+        try persistence.saveContext(context)
+        print("[LocalConversationStore] Updated message: \(id) (version \(currentVersion + 1))")
+    }
+
+    /// Soft-delete a message locally
+    func deleteLocalMessage(id: String, conversationId: String) throws {
+        let context = persistence.container.viewContext
+
+        let fetchRequest: NSFetchRequest<MessageEntity> = MessageEntity.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "id == %@", id)
+
+        guard let entity = try context.fetch(fetchRequest).first else {
+            throw LocalStoreError.notFound
+        }
+
+        // Soft delete - mark as deleted using Core Data property
+        entity.messageIsDeleted = true
+
+        // Update conversation metadata
+        let convFetch: NSFetchRequest<ConversationEntity> = ConversationEntity.fetchRequest()
+        convFetch.predicate = NSPredicate(format: "id == %@", conversationId)
+        if let convEntity = try context.fetch(convFetch).first {
+            // Decrement message count (don't go below 0)
+            if convEntity.messageCount > 0 {
+                convEntity.messageCount -= 1
+            }
+            convEntity.updatedAt = Date()
+            convEntity.locallyModified = true
+
+            // Update last message to the most recent non-deleted message
+            let msgFetch: NSFetchRequest<MessageEntity> = MessageEntity.fetchRequest()
+            msgFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                NSPredicate(format: "conversationId == %@", conversationId),
+                NSPredicate(format: "messageIsDeleted == NO OR messageIsDeleted == nil")
+            ])
+            msgFetch.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
+            msgFetch.fetchLimit = 1
+            if let lastMsg = try context.fetch(msgFetch).first {
+                convEntity.lastMessage = String((lastMsg.content ?? "").prefix(100))
+                convEntity.lastMessageAt = lastMsg.timestamp
+            } else {
+                convEntity.lastMessage = nil
+                convEntity.lastMessageAt = nil
+            }
+        }
+
+        try persistence.saveContext(context)
+        print("[LocalConversationStore] Soft-deleted message: \(id)")
+    }
+
+    /// Hard-delete messages after a given message (for edit & regenerate cascade)
+    func deleteMessagesAfter(messageId: String, conversationId: String) throws {
+        let context = persistence.container.viewContext
+
+        // First, find the target message to get its timestamp
+        let targetFetch: NSFetchRequest<MessageEntity> = MessageEntity.fetchRequest()
+        targetFetch.predicate = NSPredicate(format: "id == %@", messageId)
+
+        guard let targetMessage = try context.fetch(targetFetch).first,
+              let targetTimestamp = targetMessage.timestamp else {
+            throw LocalStoreError.notFound
+        }
+
+        // Find all messages after this one in the same conversation
+        let msgFetch: NSFetchRequest<MessageEntity> = MessageEntity.fetchRequest()
+        msgFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "conversationId == %@", conversationId),
+            NSPredicate(format: "timestamp > %@", targetTimestamp as NSDate)
+        ])
+
+        let messages = try context.fetch(msgFetch)
+        let deletedCount = messages.count
+
+        // Hard delete these messages
+        for msg in messages {
+            context.delete(msg)
+        }
+
+        // Update conversation message count
+        let convFetch: NSFetchRequest<ConversationEntity> = ConversationEntity.fetchRequest()
+        convFetch.predicate = NSPredicate(format: "id == %@", conversationId)
+        if let convEntity = try context.fetch(convFetch).first {
+            convEntity.messageCount = max(0, convEntity.messageCount - Int32(deletedCount))
+            convEntity.updatedAt = Date()
+            convEntity.locallyModified = true
+        }
+
+        try persistence.saveContext(context)
+        print("[LocalConversationStore] Deleted \(deletedCount) messages after message: \(messageId)")
+    }
+
     /// Update a conversation locally
     func updateLocalConversation(id: String, title: String) throws {
         let context = persistence.container.viewContext
@@ -324,6 +459,17 @@ class LocalConversationStore: ObservableObject {
 
     // MARK: - Load Local Data
 
+    /// Load a single conversation by ID
+    func loadConversation(id: String) throws -> Conversation? {
+        let context = persistence.container.viewContext
+        let fetchRequest: NSFetchRequest<ConversationEntity> = ConversationEntity.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "id == %@", id)
+        fetchRequest.fetchLimit = 1
+
+        let entities = try context.fetch(fetchRequest)
+        return entities.first?.toConversation()
+    }
+
     /// Load all local conversations (excludes soft-deleted and archived)
     func loadConversations() -> [Conversation] {
         let context = persistence.container.viewContext
@@ -403,6 +549,19 @@ class LocalConversationStore: ObservableObject {
                     liveToolCalls = try? JSONDecoder().decode([LiveToolCall].self, from: data)
                 }
 
+                // Load edit history from Core Data
+                var editHistory: [MessageEdit]? = nil
+                if let json = entity.editHistoryJSON,
+                   let data = json.data(using: .utf8) {
+                    editHistory = try? JSONDecoder().decode([MessageEdit].self, from: data)
+                }
+
+                // Get current version (nil if 0/default)
+                let currentVersion: Int? = entity.currentVersion > 0 ? Int(entity.currentVersion) : nil
+
+                // Get soft-delete flag
+                let isDeleted: Bool? = entity.messageIsDeleted ? true : nil
+
                 return Message(
                     id: id,
                     conversationId: conversationId,
@@ -420,14 +579,65 @@ class LocalConversationStore: ObservableObject {
                     groundingSources: groundingSources,
                     memoryOperations: memoryOperations,
                     reasoning: reasoning,
+                    editHistory: editHistory,
+                    currentVersion: currentVersion,
                     contextDebugInfo: contextDebugInfo,
-                    liveToolCalls: liveToolCalls
+                    liveToolCalls: liveToolCalls,
+                    isDeleted: isDeleted
                 )
             }
         } catch {
             print("[LocalConversationStore] Error loading messages: \(error)")
             return []
         }
+    }
+
+    /// Load messages for a conversation with optional limit (most recent N messages)
+    func loadMessages(for conversationId: String, limit: Int? = nil) throws -> [Message] {
+        let context = persistence.container.viewContext
+        let fetchRequest: NSFetchRequest<MessageEntity> = MessageEntity.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "conversationId == %@", conversationId)
+        // Sort descending to get most recent first, then reverse for chronological order
+        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
+        if let limit = limit {
+            fetchRequest.fetchLimit = limit
+        }
+
+        let entities = try context.fetch(fetchRequest)
+        let messages = entities.compactMap { entity -> Message? in
+            guard let id = entity.id,
+                  let conversationId = entity.conversationId,
+                  let roleString = entity.role,
+                  let role = MessageRole(rawValue: roleString),
+                  let content = entity.content,
+                  let timestamp = entity.timestamp else {
+                return nil
+            }
+
+            var attachments: [MessageAttachment]? = nil
+            if let json = entity.attachmentsJSON,
+               let data = json.data(using: .utf8) {
+                attachments = try? JSONDecoder().decode([MessageAttachment].self, from: data)
+            }
+
+            return Message(
+                id: id,
+                conversationId: conversationId,
+                role: role,
+                content: content,
+                hiddenReason: entity.hiddenReason,
+                timestamp: timestamp,
+                tokens: nil,
+                artifacts: nil,
+                toolCalls: nil,
+                isStreaming: nil,
+                modelName: entity.modelName,
+                providerName: entity.providerName,
+                attachments: attachments
+            )
+        }
+        // Return in chronological order (oldest first)
+        return messages.reversed()
     }
 
     // MARK: - Sync Queue Management

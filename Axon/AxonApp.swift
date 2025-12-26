@@ -96,12 +96,54 @@ struct AxonApp: App {
                 AutoSyncOrchestrator.shared.start()
                 HeartbeatService.shared.start()
 
+                // Initialize widget data from existing conversations
+                Task { @MainActor in
+                    await WidgetDataService.shared.initializeFromExistingConversations()
+                }
+
                 // If app lock is disabled, mark as unlocked
                 if !settingsViewModel.settings.appLockEnabled {
                     isUnlocked = true
                 }
             }
             .preferredColorScheme(preferredColorSchemeOverride)
+            .onOpenURL { url in
+                handleDeepLink(url)
+            }
+        }
+    }
+
+    /// Handle deep links from widgets and other sources
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme == "axon" else { return }
+
+        switch url.host {
+        case "speak":
+            // Widget "Speak" button tapped - open conversation and trigger voice
+            // Extract conversation ID from query params
+            if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+               let conversationId = components.queryItems?.first(where: { $0.name == "conversation" })?.value {
+                // Post notification to navigate to conversation and start voice input
+                NotificationCenter.default.post(
+                    name: .openConversationFromWidget,
+                    object: nil,
+                    userInfo: ["conversationId": conversationId, "startVoice": true]
+                )
+            }
+
+        case "conversation":
+            // Open specific conversation
+            if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+               let conversationId = components.queryItems?.first(where: { $0.name == "id" })?.value {
+                NotificationCenter.default.post(
+                    name: .openConversationFromWidget,
+                    object: nil,
+                    userInfo: ["conversationId": conversationId]
+                )
+            }
+
+        default:
+            break
         }
     }
 

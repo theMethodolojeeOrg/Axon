@@ -42,5 +42,16 @@
 		<key>UIImageName</key>
 		<string></string>
 	</dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.axon.deeplink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>axon</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

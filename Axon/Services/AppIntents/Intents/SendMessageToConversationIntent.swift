@@ -118,6 +118,7 @@ struct SendMessageToConversationIntent: AppIntent {
     // MARK: - Helpers
 
     /// Resolve the target conversation, creating a new one if needed
+    @MainActor
     private func resolveConversation() async throws -> (id: String, title: String) {
         // If user specified a conversation, use it
         if let conv = conversation {
@@ -141,12 +142,14 @@ struct SendMessageToConversationIntent: AppIntent {
     }
 
     /// Load existing messages from a conversation
+    @MainActor
     private func loadMessages(for conversationId: String) async throws -> [Message] {
         let store = LocalConversationStore.shared
         return try store.loadMessages(for: conversationId, limit: 20)
     }
 
     /// Persist messages to CoreData
+    @MainActor
     private func persistMessages(
         userMessage: Message,
         assistantMessage: Message,
@@ -162,6 +165,7 @@ struct SendMessageToConversationIntent: AppIntent {
     }
 
     /// Update widget data after message exchange
+    @MainActor
     private func updateWidgetData(conversationId: String) async {
         let store = LocalConversationStore.shared
 

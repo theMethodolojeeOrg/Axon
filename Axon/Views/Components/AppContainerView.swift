@@ -465,6 +465,12 @@ struct ChatContainerView: View {
     @State private var showFirstRunWelcome = false
     @ObservedObject private var settingsViewModel = SettingsViewModel.shared
 
+    // Message editing state
+    @State private var messageToEdit: Message? = nil
+    @State private var showEditSheet = false
+    @State private var messageToDelete: Message? = nil
+    @State private var showDeleteConfirmation = false
+
     var body: some View {
         ZStack {
             AppColors.substratePrimary
@@ -632,6 +638,68 @@ struct ChatContainerView: View {
             // Show first-run welcome card if user hasn't seen it yet
             showFirstRunWelcome = !settingsViewModel.settings.hasSeenFirstRunWelcome
         }
+        .sheet(isPresented: $showEditSheet) {
+            if let message = messageToEdit {
+                MessageEditSheet(
+                    message: message,
+                    onSave: { newContent in
+                        // Save without regenerating
+                        Task {
+                            if let convId = conversation?.id {
+                                _ = try? await conversationService.editMessage(
+                                    conversationId: convId,
+                                    messageId: message.id,
+                                    content: newContent
+                                )
+                            }
+                        }
+                        showEditSheet = false
+                        messageToEdit = nil
+                    },
+                    onSaveAndRegenerate: { newContent in
+                        // Save and regenerate AI response
+                        Task {
+                            if let convId = conversation?.id {
+                                let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
+                                let enabledTools = settings.toolSettings.toolsEnabled ? Array(settings.toolSettings.enabledToolIds) : []
+                                isLoading = true
+                                _ = try? await conversationService.editAndRegenerate(
+                                    conversationId: convId,
+                                    messageId: message.id,
+                                    content: newContent,
+                                    enabledTools: enabledTools
+                                )
+                                isLoading = false
+                            }
+                        }
+                        showEditSheet = false
+                        messageToEdit = nil
+                    },
+                    onCancel: {
+                        showEditSheet = false
+                        messageToEdit = nil
+                    }
+                )
+            }
+        }
+        .alert("Delete Message?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {
+                messageToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let message = messageToDelete, let convId = conversation?.id {
+                    Task {
+                        try? await conversationService.deleteMessage(
+                            conversationId: convId,
+                            messageId: message.id
+                        )
+                    }
+                }
+                messageToDelete = nil
+            }
+        } message: {
+            Text("This message will be replaced with a placeholder. This action cannot be undone.")
+        }
     }
 
     #if os(macOS)
@@ -762,13 +830,26 @@ struct ChatContainerView: View {
 
                                 // Render appropriate view based on role
                                 if message.role == .user {
-                                    UserMessageView(
-                                        message: message,
-                                        onCopy: { msg in
-                                            AppClipboard.copy(msg.content)
-                                        }
-                                    )
-                                    .padding(.vertical, 8)
+                                    // Check if message is deleted - show placeholder
+                                    if message.isDeleted == true {
+                                        DeletedMessageView()
+                                    } else {
+                                        UserMessageView(
+                                            message: message,
+                                            onCopy: { msg in
+                                                AppClipboard.copy(msg.content)
+                                            },
+                                            onEdit: { msg in
+                                                messageToEdit = msg
+                                                showEditSheet = true
+                                            },
+                                            onDelete: { msg in
+                                                messageToDelete = msg
+                                                showDeleteConfirmation = true
+                                            }
+                                        )
+                                        .padding(.vertical, 8)
+                                    }
                                 } else {
                                     AssistantMessageView(
                                         message: message,

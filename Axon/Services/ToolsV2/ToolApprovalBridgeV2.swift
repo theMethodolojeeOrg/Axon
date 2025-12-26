@@ -212,7 +212,7 @@ final class ToolApprovalBridgeV2: ObservableObject {
         switch v2Category {
         case .memory, .agentState, .heartbeat, .sovereignty, .subAgents, .temporal, .discovery, .notification:
             return .utility
-        case .system:
+        case .system, .vscode:
             return .integration
         case .provider:
             return .composite

@@ -76,5 +76,18 @@ struct AxonShortcuts: AppShortcutsProvider {
             shortTitle: "Start Chat",
             systemImageName: "plus.bubble"
         )
+
+        // MARK: - Send Message (Widget Voice Input)
+        AppShortcut(
+            intent: SendMessageToConversationIntent(),
+            phrases: [
+                "Tell \(.applicationName)",
+                "Message \(.applicationName)",
+                "Send to \(.applicationName)",
+                "Say to \(.applicationName)"
+            ],
+            shortTitle: "Send Message",
+            systemImageName: "bubble.left.and.text.bubble.right"
+        )
     }
 }
