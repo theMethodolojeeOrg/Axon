@@ -1,0 +1,66 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "run_collapse_engine",
+    "name": "Run Collapse Engine",
+    "description": "Orchestrate the Collapse Engine workflow to transform high-fidelity analogies into scoped, testable research artifacts. Run the full workflow or specific phases.",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "square.stack.3d.down.right"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "research", "analogy", "orchestration"]
+  },
+
+  "parameters": {
+    "session_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the collapse session to run"
+    },
+    "phases": {
+      "type": "array",
+      "required": false,
+      "description": "Specific phases to run (default: all remaining)"
+    },
+    "use_sub_agents": {
+      "type": "boolean",
+      "required": false,
+      "description": "Whether to spawn sub-agents for parallel constraint extraction"
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "systemPromptSection": "### run_collapse_engine\nOrchestrate the Collapse Engine workflow. Use this to check session status and get guidance on next steps.",
+    "usageExamples": [
+      {
+        "description": "Run workflow for a session",
+        "input": "{\"session_id\": \"sess-abc123\"}"
+      },
+      {
+        "description": "Run with sub-agents enabled",
+        "input": "{\"session_id\": \"sess-abc123\", \"use_sub_agents\": true}"
+      }
+    ],
+    "whenToUse": [
+      "User wants to check collapse workflow status",
+      "User wants guidance on next steps",
+      "Starting a collapse workflow session"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_run",
+    "scopes": ["collapse_engine.read"],
+    "riskLevel": "low"
+  }
+}

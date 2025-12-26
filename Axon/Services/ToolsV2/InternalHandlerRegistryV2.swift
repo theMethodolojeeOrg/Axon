@@ -114,6 +114,9 @@ final class InternalHandlerRegistryV2: ObservableObject {
         registerHandler(DevicePresenceHandler())
         registerHandler(BridgeHandler())
 
+        // Research & Discovery handlers
+        registerHandler(CollapseEngineHandler())
+
         // Provider-specific handlers
         registerHandler(GeminiHandler())
         registerHandler(OpenAIHandler())

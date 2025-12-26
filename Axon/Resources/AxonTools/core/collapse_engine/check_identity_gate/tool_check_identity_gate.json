@@ -1,0 +1,91 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "check_identity_gate",
+    "name": "Check Identity Gate",
+    "description": "Compare constraint sets from System A and B to determine structural correspondence (Phase 3). Returns IDENTICAL, SIMILAR, or DIVERGENT verdict.",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "arrow.left.arrow.right"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "identity_gate", "comparison", "phase3"]
+  },
+
+  "parameters": {
+    "session_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the collapse session"
+    },
+    "scope": {
+      "type": "string",
+      "required": true,
+      "description": "The aspect or domain being compared"
+    },
+    "matched_pairs": {
+      "type": "array",
+      "required": true,
+      "description": "Pairs of constraints that correspond between systems",
+      "items": {
+        "type": "object",
+        "properties": {
+          "constraint_a_id": { "type": "string", "required": true },
+          "constraint_b_id": { "type": "string", "required": true },
+          "match_type": { "type": "string", "required": true },
+          "justification": { "type": "string" }
+        }
+      }
+    },
+    "verdict": {
+      "type": "string",
+      "required": true,
+      "description": "Overall verdict: identical, similar, or divergent"
+    },
+    "unmatched_a": {
+      "type": "array",
+      "required": false,
+      "description": "Constraint IDs from A with no match in B"
+    },
+    "unmatched_b": {
+      "type": "array",
+      "required": false,
+      "description": "Constraint IDs from B with no match in A"
+    },
+    "notes": {
+      "type": "string",
+      "required": false,
+      "description": "Additional observations about the comparison"
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "systemPromptSection": "### check_identity_gate\nCompare constraint sets to determine structural correspondence. This is Phase 3 of the Collapse Engine workflow.",
+    "usageExamples": [
+      {
+        "description": "Check identity gate for dynamics",
+        "input": "{\"session_id\": \"sess-123\", \"scope\": \"dynamics\", \"matched_pairs\": [{\"constraint_a_id\": \"ca-1\", \"constraint_b_id\": \"cb-1\", \"match_type\": \"isomorphic\", \"justification\": \"Both express gradient descent on energy landscape\"}], \"verdict\": \"similar\", \"unmatched_a\": [\"ca-3\"], \"notes\": \"Strong correspondence in optimization dynamics\"}"
+      }
+    ],
+    "whenToUse": [
+      "After extracting constraints from both systems",
+      "Phase 3 of collapse workflow",
+      "Determining if analogy passes identity gate"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_capture",
+    "scopes": ["collapse_engine.write"],
+    "riskLevel": "low"
+  }
+}

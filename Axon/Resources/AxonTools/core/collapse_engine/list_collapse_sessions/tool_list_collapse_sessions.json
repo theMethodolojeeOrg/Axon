@@ -1,0 +1,62 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "list_collapse_sessions",
+    "name": "List Collapse Sessions",
+    "description": "List all collapse engine sessions, optionally filtered by status.",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "list.bullet.rectangle"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "session", "list"]
+  },
+
+  "parameters": {
+    "status_filter": {
+      "type": "string",
+      "required": false,
+      "description": "Filter by status (in_progress, collapsed, analogy_only, aborted)"
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "description": "Maximum number of sessions to return",
+      "minimum": 1,
+      "maximum": 100
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "usageExamples": [
+      {
+        "description": "List all sessions",
+        "input": "{}"
+      },
+      {
+        "description": "List in-progress sessions",
+        "input": "{\"status_filter\": \"in_progress\"}"
+      }
+    ],
+    "whenToUse": [
+      "User wants to see their collapse sessions",
+      "Need to find a specific session",
+      "Starting a conversation about collapse engine work"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_read",
+    "scopes": ["collapse_engine.read"],
+    "riskLevel": "low"
+  }
+}

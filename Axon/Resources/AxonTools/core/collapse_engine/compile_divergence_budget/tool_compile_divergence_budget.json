@@ -1,0 +1,84 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "compile_divergence_budget",
+    "name": "Compile Divergence Budget",
+    "description": "Aggregate all recorded divergences into a budget assessment (Phase 4). Determines if analogy can proceed despite mismatches.",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "chart.pie"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "divergence", "budget", "phase4"]
+  },
+
+  "parameters": {
+    "session_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the collapse session"
+    },
+    "total_cost": {
+      "type": "number",
+      "required": true,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Aggregate cost of all divergences (0-1 scale)"
+    },
+    "can_proceed": {
+      "type": "boolean",
+      "required": true,
+      "description": "Whether the analogy can proceed despite divergences"
+    },
+    "scope_restrictions": {
+      "type": "array",
+      "required": false,
+      "description": "Domain boundaries required to proceed"
+    },
+    "required_patches": {
+      "type": "array",
+      "required": false,
+      "description": "Patches that must be applied"
+    },
+    "fatal_blockers": {
+      "type": "array",
+      "required": false,
+      "description": "Fatal divergences that prevent collapse"
+    },
+    "summary": {
+      "type": "string",
+      "required": false,
+      "description": "Human-readable summary of the budget"
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "systemPromptSection": "### compile_divergence_budget\nAggregate divergences into a proceed/no-proceed decision. This is Phase 4 of the Collapse Engine workflow.",
+    "usageExamples": [
+      {
+        "description": "Compile budget with patchable divergences",
+        "input": "{\"session_id\": \"sess-123\", \"total_cost\": 0.3, \"can_proceed\": true, \"scope_restrictions\": [\"Valid only for overparameterized networks\"], \"required_patches\": [\"Use continuous-time SGD formulation\"], \"summary\": \"Analogy viable with scope restrictions and one patch\"}"
+      }
+    ],
+    "whenToUse": [
+      "After recording all divergences",
+      "Phase 4 completion",
+      "Making proceed/abort decision"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_capture",
+    "scopes": ["collapse_engine.write"],
+    "riskLevel": "low"
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "extract_constraints",
+    "name": "Extract Constraints",
+    "description": "Extract structural constraints from System A or System B (Phase 2). Constraints are properties that must hold for the system's behavior.",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "list.bullet.clipboard"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "constraints", "extraction", "phase2"]
+  },
+
+  "parameters": {
+    "session_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the collapse session"
+    },
+    "system": {
+      "type": "string",
+      "required": true,
+      "description": "Which system to extract constraints from (A or B)"
+    },
+    "constraints": {
+      "type": "array",
+      "required": true,
+      "description": "List of constraint objects to record",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "required": true },
+          "category": { "type": "string", "required": true },
+          "statement": { "type": "string", "required": true },
+          "formal_expression": { "type": "string" },
+          "is_structural": { "type": "boolean" },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "extraction_method": {
+      "type": "string",
+      "required": false,
+      "description": "How constraints were extracted (manual, literature, derived)"
+    },
+    "use_sub_agent": {
+      "type": "boolean",
+      "required": false,
+      "description": "Whether to spawn a sub-agent for parallel extraction"
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "systemPromptSection": "### extract_constraints\nExtract structural constraints from a system. This is Phase 2 of the Collapse Engine workflow.",
+    "usageExamples": [
+      {
+        "description": "Extract physics constraints",
+        "input": "{\"session_id\": \"sess-123\", \"system\": \"A\", \"constraints\": [{\"name\": \"Energy Conservation\", \"category\": \"conservation_law\", \"statement\": \"Total energy is conserved in isolated systems\", \"formal_expression\": \"dE/dt = 0\", \"is_structural\": true}], \"extraction_method\": \"literature\"}"
+      }
+    ],
+    "whenToUse": [
+      "Documenting constraints for System A or B",
+      "Phase 2 of collapse workflow",
+      "Building constraint sets for identity gate comparison"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_capture",
+    "scopes": ["collapse_engine.write"],
+    "riskLevel": "low"
+  }
+}

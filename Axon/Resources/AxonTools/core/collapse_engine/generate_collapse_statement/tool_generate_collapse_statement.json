@@ -1,0 +1,94 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "generate_collapse_statement",
+    "name": "Generate Collapse Statement",
+    "description": "Generate the final verdict: COLLAPSED (structural correspondence proven) or ANALOGY_ONLY (useful metaphor, not structural) (Phase 8).",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "seal"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "collapse", "statement", "verdict", "phase8"]
+  },
+
+  "parameters": {
+    "session_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the collapse session"
+    },
+    "verdict": {
+      "type": "string",
+      "required": true,
+      "description": "Final verdict: collapsed or analogy_only"
+    },
+    "title": {
+      "type": "string",
+      "required": true,
+      "description": "Title of the collapse statement"
+    },
+    "core_claim": {
+      "type": "string",
+      "required": true,
+      "description": "The central structural claim"
+    },
+    "scope": {
+      "type": "string",
+      "required": true,
+      "description": "Domain boundaries where claim holds"
+    },
+    "key_evidence": {
+      "type": "array",
+      "required": false,
+      "description": "Key supporting derivations and evidence"
+    },
+    "caveats": {
+      "type": "array",
+      "required": false,
+      "description": "Important limitations and caveats"
+    },
+    "implications": {
+      "type": "array",
+      "required": false,
+      "description": "What this collapse enables or implies"
+    },
+    "confidence": {
+      "type": "number",
+      "required": false,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Overall confidence in the verdict"
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "systemPromptSection": "### generate_collapse_statement\nGenerate the final collapse verdict. This is Phase 8 of the Collapse Engine workflow.",
+    "usageExamples": [
+      {
+        "description": "Generate a collapsed verdict",
+        "input": "{\"session_id\": \"sess-123\", \"verdict\": \"collapsed\", \"title\": \"SGD-Langevin Structural Correspondence\", \"core_claim\": \"Stochastic gradient descent in overparameterized networks is structurally equivalent to Langevin dynamics with temperature proportional to learning rate\", \"scope\": \"Continuous-time limit, overparameterized regime\", \"key_evidence\": [\"derivation-1\", \"derivation-2\"], \"caveats\": [\"Requires continuous-time approximation\", \"May not hold for adaptive optimizers\"], \"confidence\": 0.85}"
+      }
+    ],
+    "whenToUse": [
+      "Ready to make final verdict on analogy",
+      "Phase 8 of collapse workflow",
+      "After completing all verification phases"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_capture",
+    "scopes": ["collapse_engine.write"],
+    "riskLevel": "low"
+  }
+}

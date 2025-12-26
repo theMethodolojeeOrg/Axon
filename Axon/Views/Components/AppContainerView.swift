@@ -95,6 +95,13 @@ struct AppContainerView: View {
             // Ensure launch overlay is visible on first appearance
             showLaunchScreen = true
         }
+        .task {
+            // Eagerly load V2 tools at app startup so they're available immediately
+            // This runs once when the view appears and loads tools in the background
+            if ToolsV2Toggle.shared.isV2Active {
+                await ToolPluginLoader.shared.loadAllTools()
+            }
+        }
     }
 
     #if os(macOS)

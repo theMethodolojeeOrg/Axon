@@ -1,0 +1,82 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "record_divergence",
+    "name": "Record Divergence",
+    "description": "Record a mismatch or divergence between System A and B (Phase 4). Classify as OUT_OF_SCOPE, PATCHABLE, or FATAL.",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "exclamationmark.triangle"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "divergence", "mismatch", "phase4"]
+  },
+
+  "parameters": {
+    "session_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the collapse session"
+    },
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Short name for this divergence"
+    },
+    "description": {
+      "type": "string",
+      "required": true,
+      "description": "Detailed description of the mismatch"
+    },
+    "classification": {
+      "type": "string",
+      "required": true,
+      "description": "Severity classification: out_of_scope, patchable, or fatal"
+    },
+    "affected_constraints": {
+      "type": "array",
+      "required": false,
+      "description": "IDs of constraints affected by this divergence"
+    },
+    "patch_strategy": {
+      "type": "string",
+      "required": false,
+      "description": "For patchable divergences, how to address it"
+    },
+    "scope_restriction": {
+      "type": "string",
+      "required": false,
+      "description": "For out_of_scope, what domain boundaries to set"
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "systemPromptSection": "### record_divergence\nRecord a structural mismatch between systems. This is Phase 4 of the Collapse Engine workflow.",
+    "usageExamples": [
+      {
+        "description": "Record a patchable divergence",
+        "input": "{\"session_id\": \"sess-123\", \"name\": \"Discretization Mismatch\", \"description\": \"ML uses discrete parameter updates while physics has continuous dynamics\", \"classification\": \"patchable\", \"affected_constraints\": [\"ca-2\", \"cb-2\"], \"patch_strategy\": \"Take continuous time limit or use stochastic calculus formulation\"}"
+      }
+    ],
+    "whenToUse": [
+      "When analogy shows structural mismatches",
+      "Phase 4 of collapse workflow",
+      "Documenting where the analogy breaks down"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_capture",
+    "scopes": ["collapse_engine.write"],
+    "riskLevel": "low"
+  }
+}

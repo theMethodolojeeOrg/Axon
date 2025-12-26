@@ -1,0 +1,95 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "generate_paper_packet",
+    "name": "Generate Paper Packet",
+    "description": "Package the collapse results as a manuscript-ready research artifact (Phase 9). Generates structured sections for publication.",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "doc.richtext"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "paper", "manuscript", "phase9"]
+  },
+
+  "parameters": {
+    "session_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the collapse session"
+    },
+    "title": {
+      "type": "string",
+      "required": true,
+      "description": "Paper title"
+    },
+    "abstract": {
+      "type": "string",
+      "required": true,
+      "description": "Paper abstract"
+    },
+    "sections": {
+      "type": "array",
+      "required": true,
+      "description": "Paper sections",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "required": true },
+          "title": { "type": "string", "required": true },
+          "content": { "type": "string", "required": true }
+        }
+      }
+    },
+    "authors": {
+      "type": "array",
+      "required": false,
+      "description": "Author names"
+    },
+    "keywords": {
+      "type": "array",
+      "required": false,
+      "description": "Paper keywords"
+    },
+    "target_venue": {
+      "type": "string",
+      "required": false,
+      "description": "Target publication venue"
+    },
+    "format": {
+      "type": "string",
+      "required": false,
+      "description": "Output format (latex, markdown, etc.)"
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "systemPromptSection": "### generate_paper_packet\nPackage collapse results as a manuscript. This is Phase 9 of the Collapse Engine workflow.",
+    "usageExamples": [
+      {
+        "description": "Generate paper packet",
+        "input": "{\"session_id\": \"sess-123\", \"title\": \"On the Structural Equivalence of SGD and Langevin Dynamics\", \"abstract\": \"We prove that stochastic gradient descent...\", \"sections\": [{\"type\": \"introduction\", \"title\": \"Introduction\", \"content\": \"Deep learning optimization...\"}, {\"type\": \"main_result\", \"title\": \"Main Results\", \"content\": \"Theorem 1...\"}], \"keywords\": [\"deep learning\", \"statistical mechanics\", \"optimization\"], \"format\": \"latex\"}"
+      }
+    ],
+    "whenToUse": [
+      "Packaging collapse results for publication",
+      "Phase 9 of collapse workflow",
+      "Creating shareable research artifact"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_capture",
+    "scopes": ["collapse_engine.write"],
+    "riskLevel": "low"
+  }
+}

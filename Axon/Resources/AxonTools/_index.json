@@ -137,6 +137,30 @@
         "core/debug/debug_bridge/tool_debug_bridge.json"
       ]
     },
+    "collapse_engine": {
+      "name": "Collapse Engine",
+      "description": "Transform analogies into scoped, testable research artifacts",
+      "icon": {
+        "sfSymbol": "square.stack.3d.down.right"
+      },
+      "tools": [
+        "core/collapse_engine/run_collapse_engine/tool_run_collapse_engine.json",
+        "core/collapse_engine/create_collapse_session/tool_create_collapse_session.json",
+        "core/collapse_engine/query_collapse_session/tool_query_collapse_session.json",
+        "core/collapse_engine/list_collapse_sessions/tool_list_collapse_sessions.json",
+        "core/collapse_engine/capture_analog_card/tool_capture_analog_card.json",
+        "core/collapse_engine/extract_constraints/tool_extract_constraints.json",
+        "core/collapse_engine/check_identity_gate/tool_check_identity_gate.json",
+        "core/collapse_engine/record_divergence/tool_record_divergence.json",
+        "core/collapse_engine/compile_divergence_budget/tool_compile_divergence_budget.json",
+        "core/collapse_engine/check_derivation/tool_check_derivation.json",
+        "core/collapse_engine/select_gauge_anchor/tool_select_gauge_anchor.json",
+        "core/collapse_engine/record_gauge_relativity/tool_record_gauge_relativity.json",
+        "core/collapse_engine/generate_collapse_statement/tool_generate_collapse_statement.json",
+        "core/collapse_engine/generate_paper_packet/tool_generate_paper_packet.json",
+        "core/collapse_engine/query_strata_ledger/tool_query_strata_ledger.json"
+      ]
+    },
     "mac_system": {
       "name": "Mac System",
       "description": "macOS system integration tools",
@@ -227,8 +251,8 @@
     }
   },
   "stats": {
-    "totalTools": 80,
-    "coreTools": 33,
+    "totalTools": 95,
+    "coreTools": 48,
     "systemTools": 16,
     "providerTools": 31,
     "toolsRequiringApproval": 17
@@ -293,6 +317,11 @@
       "trustTierCategory": "custom_tool",
       "riskLevel": "medium",
       "requiresApproval": true
+    },
+    "collapse_engine": {
+      "trustTierCategory": "collapse_engine",
+      "riskLevel": "low",
+      "requiresApproval": false
     }
   },
   "handlers": {
@@ -414,6 +443,23 @@
       "glm_cogview_4",
       "glm_cogvideo_3",
       "glm_speech_to_text"
+    ],
+    "collapse_engine": [
+      "run_collapse_engine",
+      "create_collapse_session",
+      "query_collapse_session",
+      "list_collapse_sessions",
+      "capture_analog_card",
+      "extract_constraints",
+      "check_identity_gate",
+      "record_divergence",
+      "compile_divergence_budget",
+      "check_derivation",
+      "select_gauge_anchor",
+      "record_gauge_relativity",
+      "generate_collapse_statement",
+      "generate_paper_packet",
+      "query_strata_ledger"
     ]
   }
 }

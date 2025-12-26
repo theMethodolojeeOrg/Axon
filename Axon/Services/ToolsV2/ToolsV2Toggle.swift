@@ -88,12 +88,12 @@ final class ToolsV2Toggle: ObservableObject {
     // MARK: - Initialization
 
     private init() {
-        // Load saved version or default to V1
+        // Load saved version or default to V2 (the new plugin-based system)
         if let savedValue = UserDefaults.standard.string(forKey: userDefaultsKey),
            let version = ToolSystemVersion(rawValue: savedValue) {
             self.activeVersion = version
         } else {
-            self.activeVersion = .v1
+            self.activeVersion = .v2
         }
     }
 

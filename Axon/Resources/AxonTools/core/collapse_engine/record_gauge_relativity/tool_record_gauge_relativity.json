@@ -1,0 +1,85 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "record_gauge_relativity",
+    "name": "Record Gauge Relativity",
+    "description": "Index claims to gauge and scope (Phase 7). Document how claims transform between different representational frames.",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "arrow.triangle.2.circlepath"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "gauge", "relativity", "phase7"]
+  },
+
+  "parameters": {
+    "session_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the collapse session"
+    },
+    "claim_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the claim being indexed"
+    },
+    "gauge_anchor_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the gauge anchor"
+    },
+    "scope": {
+      "type": "string",
+      "required": true,
+      "description": "Domain scope where claim is valid"
+    },
+    "gauge_shifts": {
+      "type": "array",
+      "required": false,
+      "description": "How claim transforms to other gauges",
+      "items": {
+        "type": "object",
+        "properties": {
+          "target_gauge": { "type": "string" },
+          "transformed_claim": { "type": "string" },
+          "transformation_notes": { "type": "string" }
+        }
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "required": false,
+      "description": "Aspects of the claim that are gauge-invariant"
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "systemPromptSection": "### record_gauge_relativity\nIndex claims to gauge and scope. This is Phase 7 of the Collapse Engine workflow.",
+    "usageExamples": [
+      {
+        "description": "Record gauge relativity for a claim",
+        "input": "{\"session_id\": \"sess-123\", \"claim_id\": \"claim-1\", \"gauge_anchor_id\": \"gauge-ml\", \"scope\": \"overparameterized networks\", \"gauge_shifts\": [{\"target_gauge\": \"physics\", \"transformed_claim\": \"Learning dynamics follow Langevin equation at temperature T=learning_rate\", \"transformation_notes\": \"Replace loss with energy, learning rate with temperature\"}], \"invariants\": [\"Convergence to stationary distribution\"]}"
+      }
+    ],
+    "whenToUse": [
+      "Documenting how claims depend on representation",
+      "Phase 7 of collapse workflow",
+      "Recording scope boundaries for claims"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_capture",
+    "scopes": ["collapse_engine.write"],
+    "riskLevel": "low"
+  }
+}
