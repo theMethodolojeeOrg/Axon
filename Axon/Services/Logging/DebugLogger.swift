@@ -84,7 +84,7 @@ enum LogCategory: String, CaseIterable, Identifiable, Codable {
         case .biometricAuth: return "faceid"
         case .deviceIdentity: return "person.crop.circle.badge.checkmark"
         case .persistence: return "externaldrive"
-        case .coreDataCloudKit: return "icloud.and.arrow.up.and.arrow.down"
+        case .coreDataCloudKit: return "link.icloud.fill"
         case .localConversationStore: return "bubble.left.and.bubble.right"
         case .conversationService: return "text.bubble"
         case .iCloudKVSync: return "key.icloud"
@@ -163,6 +163,20 @@ enum LogCategoryGroup: String, CaseIterable, Identifiable {
 
 // MARK: - Debug Logger
 
+/// A single log entry for the console view
+struct DebugLogEntry: Identifiable, Equatable {
+    let id = UUID()
+    let timestamp: Date
+    let category: LogCategory
+    let message: String
+
+    var formattedTimestamp: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss.SSS"
+        return formatter.string(from: timestamp)
+    }
+}
+
 /// Centralized debug logger with category-based filtering
 @MainActor
 final class DebugLogger: ObservableObject {
@@ -178,10 +192,24 @@ final class DebugLogger: ObservableObject {
         didSet { saveSettings() }
     }
 
+    /// In-memory log buffer for console view
+    @Published var logEntries: [DebugLogEntry] = []
+
+    /// Maximum log entries to keep in memory
+    let maxLogEntries: Int = 500
+
+    /// Developer console visibility toggle
+    @Published var consoleEnabled: Bool = false {
+        didSet {
+            UserDefaults.standard.set(consoleEnabled, forKey: "developer.consoleEnabled")
+        }
+    }
+
     private let userDefaultsKey = "developer.logSettings"
 
     private init() {
         loadSettings()
+        consoleEnabled = UserDefaults.standard.bool(forKey: "developer.consoleEnabled")
     }
 
     // MARK: - Logging
@@ -189,14 +217,49 @@ final class DebugLogger: ObservableObject {
     /// Log a message if the category is enabled
     func log(_ category: LogCategory, _ message: String) {
         guard loggingEnabled && enabledCategories.contains(category) else { return }
+
+        // Print to console
         print("[\(category.rawValue)] \(message)")
+
+        // Store in buffer for in-app console
+        let entry = DebugLogEntry(timestamp: Date(), category: category, message: message)
+        logEntries.append(entry)
+
+        // Trim if over capacity
+        if logEntries.count > maxLogEntries {
+            logEntries.removeFirst(logEntries.count - maxLogEntries)
+        }
     }
 
     /// Log with formatted values
     func log(_ category: LogCategory, _ message: String, _ values: [String: Any]) {
         guard loggingEnabled && enabledCategories.contains(category) else { return }
         let formatted = values.map { "\($0.key)=\($0.value)" }.joined(separator: ", ")
-        print("[\(category.rawValue)] \(message): \(formatted)")
+        let fullMessage = "\(message): \(formatted)"
+
+        // Print to console
+        print("[\(category.rawValue)] \(fullMessage)")
+
+        // Store in buffer
+        let entry = DebugLogEntry(timestamp: Date(), category: category, message: fullMessage)
+        logEntries.append(entry)
+
+        // Trim if over capacity
+        if logEntries.count > maxLogEntries {
+            logEntries.removeFirst(logEntries.count - maxLogEntries)
+        }
+    }
+
+    /// Clear all log entries
+    func clearLogs() {
+        logEntries.removeAll()
+    }
+
+    /// Export logs as text
+    func exportLogsAsText() -> String {
+        logEntries.map { entry in
+            "[\(entry.formattedTimestamp)] [\(entry.category.rawValue)] \(entry.message)"
+        }.joined(separator: "\n")
     }
 
     // MARK: - Category Management

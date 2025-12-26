@@ -35,6 +35,14 @@ final class ToolPluginLoader: ObservableObject {
     /// Default trust tier configurations by category (loaded from _index.json)
     @Published private(set) var defaultTrustTiers: [String: TrustTierDefault] = [:]
 
+    /// Master toggle for V2 tools
+    @Published var masterToolsEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(masterToolsEnabled, forKey: masterToolsEnabledKey)
+            logger.debug("Master tools enabled set to: \(self.masterToolsEnabled)")
+        }
+    }
+
     /// Tools grouped by category
     var toolsByCategory: [ToolCategoryV2: [LoadedTool]] {
         Dictionary(grouping: loadedTools, by: { $0.category })
@@ -65,10 +73,15 @@ final class ToolPluginLoader: ObservableObject {
     /// User defaults key for enabled/disabled state
     private let enabledStateKey = "ToolsV2EnabledState"
 
+    /// User defaults key for master tools enabled
+    private let masterToolsEnabledKey = "ToolsV2MasterEnabled"
+
     // MARK: - Initialization
 
     private init() {
-        logger.debug("ToolPluginLoader initialized")
+        // Load master enabled state (defaults to true)
+        self.masterToolsEnabled = UserDefaults.standard.object(forKey: masterToolsEnabledKey) as? Bool ?? true
+        logger.debug("ToolPluginLoader initialized, masterToolsEnabled: \(self.masterToolsEnabled)")
     }
 
     // MARK: - Public API
@@ -169,6 +182,21 @@ final class ToolPluginLoader: ObservableObject {
         saveEnabledState()
 
         logger.debug("Tool '\(toolId)' enabled state set to: \(enabled)")
+    }
+
+    /// Toggle all tools in a category
+    func setCategoryEnabled(_ category: ToolCategoryV2, enabled: Bool) {
+        var modified = false
+
+        for index in loadedTools.indices where loadedTools[index].category == category {
+            loadedTools[index].isEnabled = enabled
+            modified = true
+        }
+
+        if modified {
+            saveEnabledState()
+            logger.debug("Category '\(category.rawValue)' enabled state set to: \(enabled)")
+        }
     }
 
     // MARK: - Source-Specific Loading

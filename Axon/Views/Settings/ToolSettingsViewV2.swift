@@ -27,8 +27,20 @@ struct ToolSettingsViewV2: View {
             }
 
             if toolsToggle.isV2Active {
-                // V2 Content
-                v2ContentView
+                // Master Tools Toggle
+                MasterToolsToggleCard(
+                    isEnabled: $pluginLoader.masterToolsEnabled,
+                    enabledCount: pluginLoader.stats.enabledCount,
+                    totalCount: pluginLoader.stats.totalCount
+                )
+
+                if pluginLoader.masterToolsEnabled {
+                    // V2 Content
+                    v2ContentView
+                } else {
+                    // Disabled hint
+                    toolsDisabledHintView
+                }
             } else {
                 // V1 hint
                 v1HintView
@@ -77,6 +89,9 @@ struct ToolSettingsViewV2: View {
                     },
                     onSelect: { tool in
                         showingToolDetail = tool
+                    },
+                    onCategoryToggle: { category, enabled in
+                        pluginLoader.setCategoryEnabled(category, enabled: enabled)
                     }
                 )
             }
@@ -99,6 +114,29 @@ struct ToolSettingsViewV2: View {
                 Spacer()
             }
         }
+    }
+
+    // MARK: - Tools Disabled Hint View
+
+    private var toolsDisabledHintView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "wrench.and.screwdriver")
+                .font(.system(size: 48))
+                .foregroundColor(AppColors.textTertiary)
+
+            Text("Tools Disabled")
+                .font(AppTypography.titleSmall())
+                .foregroundColor(AppColors.textPrimary)
+
+            Text("Enable the master toggle above to allow AI to use tools during conversations.")
+                .font(AppTypography.bodySmall())
+                .foregroundColor(AppColors.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+        .background(AppColors.substrateSecondary)
+        .cornerRadius(12)
     }
 
     // MARK: - V1 Hint View
@@ -222,6 +260,44 @@ private struct ToolSystemOption: View {
             )
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Master Tools Toggle Card
+
+private struct MasterToolsToggleCard: View {
+    @Binding var isEnabled: Bool
+    let enabledCount: Int
+    let totalCount: Int
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Toggle("", isOn: $isEnabled)
+                .toggleStyle(.switch)
+                .tint(AppColors.signalMercury)
+                .labelsHidden()
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Enable AI Tools")
+                    .font(AppTypography.bodyMedium(.medium))
+                    .foregroundColor(AppColors.textPrimary)
+
+                Text("Allow AI to use tools during conversations")
+                    .font(AppTypography.bodySmall())
+                    .foregroundColor(AppColors.textSecondary)
+            }
+
+            Spacer()
+
+            if isEnabled {
+                Text("\(enabledCount)/\(totalCount) active")
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(AppColors.textTertiary)
+            }
+        }
+        .padding()
+        .background(AppColors.substrateSecondary)
+        .cornerRadius(8)
     }
 }
 
@@ -351,6 +427,7 @@ private struct ToolsListView: View {
     let toolsByCategory: [ToolCategoryV2: [LoadedTool]]
     let onToggle: (LoadedTool, Bool) -> Void
     let onSelect: (LoadedTool) -> Void
+    let onCategoryToggle: (ToolCategoryV2, Bool) -> Void
 
     var body: some View {
         VStack(spacing: 16) {
@@ -360,10 +437,54 @@ private struct ToolsListView: View {
                         category: category,
                         tools: tools,
                         onToggle: onToggle,
-                        onSelect: onSelect
+                        onSelect: onSelect,
+                        onCategoryToggle: onCategoryToggle
                     )
                 }
             }
+        }
+    }
+}
+
+// MARK: - Category Toggle State
+
+enum CategoryToggleStateV2 {
+    case allEnabled
+    case partiallyEnabled
+    case allDisabled
+}
+
+// MARK: - Category Toggle Button
+
+private struct CategoryToggleButtonV2: View {
+    let state: CategoryToggleStateV2
+    let onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(backgroundColor)
+                    .frame(width: 24, height: 24)
+
+                if state != .allDisabled {
+                    Image(systemName: state == .allEnabled ? "checkmark" : "minus")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var backgroundColor: Color {
+        switch state {
+        case .allEnabled:
+            return AppColors.signalLichen
+        case .partiallyEnabled:
+            return AppColors.signalCopper
+        case .allDisabled:
+            return AppColors.textDisabled.opacity(0.3)
         }
     }
 }
@@ -373,8 +494,20 @@ private struct ToolCategorySection: View {
     let tools: [LoadedTool]
     let onToggle: (LoadedTool, Bool) -> Void
     let onSelect: (LoadedTool) -> Void
+    let onCategoryToggle: (ToolCategoryV2, Bool) -> Void
 
     @State private var isExpanded = true
+
+    private var categoryState: CategoryToggleStateV2 {
+        let enabledCount = tools.filter { $0.isEnabled }.count
+        if enabledCount == tools.count {
+            return .allEnabled
+        } else if enabledCount > 0 {
+            return .partiallyEnabled
+        } else {
+            return .allDisabled
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -385,9 +518,18 @@ private struct ToolCategorySection: View {
                 }
             } label: {
                 HStack(spacing: 12) {
+                    // Category toggle (3-state)
+                    CategoryToggleButtonV2(
+                        state: categoryState,
+                        onToggle: {
+                            let shouldEnable = categoryState != .allEnabled
+                            onCategoryToggle(category, shouldEnable)
+                        }
+                    )
+
                     Image(systemName: category.sfSymbol)
                         .font(.system(size: 18))
-                        .foregroundColor(AppColors.signalMercury)
+                        .foregroundColor(categoryState != .allDisabled ? AppColors.signalMercury : AppColors.textTertiary)
                         .frame(width: 24)
 
                     Text(category.displayName)

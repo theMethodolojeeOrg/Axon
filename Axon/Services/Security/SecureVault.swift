@@ -103,7 +103,7 @@ class SecureVault {
         // Store in Keychain for maximum security
         try storeInKeychain(item)
 
-        print("[SecureVault] Stored item: \(key)")
+        debugLog(.secureVault, "Stored item: \(key)")
     }
 
     /// Retrieve a string value
@@ -134,14 +134,14 @@ class SecureVault {
 
         let decryptedData = try ChaChaPoly.open(sealedBox, using: encryptionKey)
 
-        print("[SecureVault] Retrieved item: \(key)")
+        debugLog(.secureVault, "Retrieved item: \(key)")
         return decryptedData
     }
 
     /// Delete a stored item
     func delete(forKey key: String) throws {
         try deleteFromKeychain(key: key)
-        print("[SecureVault] Deleted item: \(key)")
+        debugLog(.secureVault, "Deleted item: \(key)")
     }
 
     /// Check if a key exists
@@ -164,7 +164,7 @@ class SecureVault {
         for key in keys {
             try delete(forKey: key)
         }
-        print("[SecureVault] Cleared all items")
+        debugLog(.secureVault, "Cleared all items")
     }
 
     /// Store a Codable object securely
@@ -198,7 +198,7 @@ class SecureVault {
         try saveKeyToKeychain(newKey)
         encryptionKey = newKey
 
-        print("[SecureVault] Regenerated encryption key")
+        debugLog(.secureVault, "Regenerated encryption key")
     }
 
     // MARK: - Private Key Management
@@ -207,7 +207,7 @@ class SecureVault {
         // Try to load existing key from Keychain
         if let existingKey = loadKeyFromKeychain() {
             encryptionKey = existingKey
-            print("[SecureVault] Loaded existing encryption key")
+            debugLog(.secureVault, "Loaded existing encryption key")
             return
         }
 
@@ -216,9 +216,9 @@ class SecureVault {
         do {
             try saveKeyToKeychain(newKey)
             encryptionKey = newKey
-            print("[SecureVault] Generated new encryption key")
+            debugLog(.secureVault, "Generated new encryption key")
         } catch {
-            print("[SecureVault] Error saving key to keychain: \(error)")
+            debugLog(.secureVault, "Error saving key to keychain: \(error)")
         }
     }
 

@@ -74,47 +74,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
     private(set) var lastToolResponse: GeminiToolResponse?
 
-    // MARK: - Tool-Capable Gemini Models
-
-    /// Prefixes of Gemini models that support native tool execution
-    /// All major Gemini series (1.5, 2.0, 2.5, 3.0) support tools
-    private static let toolCapablePrefixes = [
-        // Gemini 3 series - supports: google_search, file_search, code_execution, url_context
-        // NOTE: Does NOT support google_maps or computer_use
-        "gemini-3",
-        // Gemini 2.5 series - full tool support
-        "gemini-2.5-pro",
-        "gemini-2.5-flash",
-        // Gemini 2.0 series
-        "gemini-2.0-flash",
-        // Gemini 1.5 series
-        "gemini-1.5-pro",
-        "gemini-1.5-flash",
-    ]
-
-    /// Tools NOT supported by Gemini 3 (must be filtered out)
-    private static let gemini3UnsupportedTools: Set<String> = [
-        ToolId.googleMaps.rawValue,  // Google Maps not supported in Gemini 3
-    ]
-
-    /// Check if a Gemini model supports native tools
-    private func isToolCapableGeminiModel(_ model: String) -> Bool {
-        return Self.toolCapablePrefixes.contains { model.hasPrefix($0) }
-    }
-
-    /// Check if a model is Gemini 3 series (has different tool support)
-    private func isGemini3Model(_ model: String) -> Bool {
-        return model.hasPrefix("gemini-3")
-    }
-
-    /// Filter tools to only those supported by the specific Gemini model
-    private func filterToolsForModel(_ tools: Set<String>, model: String) -> Set<String> {
-        if isGemini3Model(model) {
-            // Gemini 3 doesn't support Google Maps
-            return tools.subtracting(Self.gemini3UnsupportedTools)
-        }
-        return tools
-    }
+    // MARK: - Message Handling
 
     func sendMessage(
         conversationId: String,
@@ -136,12 +96,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         let hasGeminiTools = !requestedGeminiTools.isEmpty && config.geminiKey != nil
         let isGeminiProvider = config.provider == "gemini"
 
-        // Check if the selected Gemini model supports native tools
-        // Models like gemini-3-pro don't support tools, so they need tool proxy
-        let geminiModelSupportsTools = isGeminiProvider && isToolCapableGeminiModel(config.model)
-
         if hasGeminiTools {
-            print("[OnDeviceOrchestrator] Gemini tools enabled: \(requestedGeminiTools), provider: \(config.provider), model: \(config.model), native support: \(geminiModelSupportsTools)")
+            print("[OnDeviceOrchestrator] Tools enabled: \(requestedGeminiTools), provider: \(config.provider), model: \(config.model)")
         }
 
         // Start a correlation context for this request
@@ -183,14 +139,10 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var systemPrompt = epistemicResult.systemPrompt
         let usedMemories = epistemicResult.usedMemories
 
-        // Filter tools based on model capabilities
-        // Gemini 3 supports most tools but NOT google_maps
-        let filteredGeminiTools = filterToolsForModel(requestedGeminiTools, model: config.model)
-        let hasFilteredTools = !filteredGeminiTools.isEmpty
-
-        // Use tool proxy for non-Gemini providers (Claude, GPT, Grok) with tools enabled
+        // Use tool proxy for all providers with tools enabled
         // Uses minimal discovery-based prompt to reduce context bloat - AI discovers tools via list_tools/get_tool_details
-        let useToolProxy = hasGeminiTools && !isGeminiProvider
+        // All providers (including Gemini) use the same unified tool proxy architecture
+        let useToolProxy = hasGeminiTools
         if useToolProxy {
             let enabledToolIds = Set(requestedGeminiTools)
             let maxToolCalls = await MainActor.run {
@@ -203,12 +155,6 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             )
             systemPrompt = (systemPrompt ?? "") + toolPrompt
             print("[OnDeviceOrchestrator] Tool proxy mode (discovery-based): injected tool prompt for \(enabledToolIds.count) tools (max \(maxToolCalls) calls)")
-        }
-
-        // Log if any tools were filtered out for Gemini 3
-        if isGemini3Model(config.model) && filteredGeminiTools.count < requestedGeminiTools.count {
-            let removed = requestedGeminiTools.subtracting(filteredGeminiTools)
-            print("[OnDeviceOrchestrator] Gemini 3 model: filtered out unsupported tools: \(removed)")
         }
 
         // MARK: - Media Proxy for Video/Audio Understanding
@@ -283,57 +229,38 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var memoryOperations: [MessageMemoryOperation] = []
         lastToolResponse = nil
 
-        // Route based on provider and tool configuration
-        // Use native Gemini tools if: Gemini provider + has filtered tools + model supports native tools
-        if hasFilteredTools && geminiModelSupportsTools, let geminiKey = config.geminiKey {
-            // Gemini provider with tool-capable model: use native Gemini tools
-            let toolResponse = try await callGeminiWithTools(
-                apiKey: geminiKey,
-                model: config.model,
-                system: systemPrompt,
-                messages: finalMessages,
-                enabledTools: filteredGeminiTools
-            )
-            responseContent = toolResponse.fullResponse
-            lastToolResponse = toolResponse
+        // Route all providers through standard path - tool proxy handles tool execution uniformly
+        let providerResult = try await callProvider(
+            provider: config.provider,
+            config: config,
+            system: systemPrompt,
+            messages: finalMessages
+        )
+        responseContent = providerResult.content
+        responseReasoning = providerResult.reasoning
 
-            // Collect grounding sources from native Gemini tools
-            if toolResponse.hasGroundingSources {
-                groundingSources = toolResponse.webSources.map { MessageGroundingSource(from: $0) }
-                print("[OnDeviceOrchestrator] Response includes \(groundingSources.count) grounding sources")
+        // If tool proxy mode, check for tool requests and execute them
+        // Note: geminiKey is only needed for Gemini-native tools proxied through Gemini
+        // Local bridge tools (mac_list_files, mac_shell, etc.) work without it
+        if useToolProxy {
+            // Get max tool calls from settings
+            let maxToolCalls = await MainActor.run {
+                SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
             }
-        } else {
-            // Non-Gemini provider (or Gemini without tools): standard routing
-            let providerResult = try await callProvider(
-                provider: config.provider,
+
+            let (finalResponse, toolUsed, sources, memOps) = try await handleToolProxyLoop(
+                initialResponse: responseContent,
+                conversationId: conversationId,
                 config: config,
-                system: systemPrompt,
-                messages: finalMessages
+                systemPrompt: systemPrompt,
+                messages: finalMessages,
+                geminiKey: config.geminiKey ?? "",
+                maxIterations: maxToolCalls
             )
-            responseContent = providerResult.content
-            responseReasoning = providerResult.reasoning
-
-            // If tool proxy mode, check for tool requests and execute them
-            if useToolProxy, let geminiKey = config.geminiKey {
-                // Get max tool calls from settings
-                let maxToolCalls = await MainActor.run {
-                    SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
-                }
-
-                let (finalResponse, toolUsed, sources, memOps) = try await handleToolProxyLoop(
-                    initialResponse: responseContent,
-                    conversationId: conversationId,
-                    config: config,
-                    systemPrompt: systemPrompt,
-                    messages: finalMessages,
-                    geminiKey: geminiKey,
-                    maxIterations: maxToolCalls
-                )
-                responseContent = finalResponse
-                usedToolProxy = toolUsed
-                groundingSources = sources
-                memoryOperations = memOps
-            }
+            responseContent = finalResponse
+            usedToolProxy = toolUsed
+            groundingSources = sources
+            memoryOperations = memOps
         }
 
         // Log successful LLM response
@@ -351,8 +278,6 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             suffixes.append("media")
         }
         if usedToolProxy {
-            suffixes.append("tools")
-        } else if hasFilteredTools && geminiModelSupportsTools {
             suffixes.append("tools")
         }
 
@@ -452,9 +377,6 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         ]
         let requestedGeminiTools = Set(enabledTools).intersection(geminiToolIds)
         let hasGeminiTools = !requestedGeminiTools.isEmpty && config.geminiKey != nil
-        let isGeminiProvider = config.provider == "gemini"
-        let geminiModelSupportsTools = isGeminiProvider && isToolCapableGeminiModel(config.model)
-
         // Start correlation
         let correlationId = predicateLogger.startCorrelation()
         defer { predicateLogger.endCorrelation() }
@@ -484,15 +406,12 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var systemPrompt = epistemicResult.systemPrompt
         let usedMemories = epistemicResult.usedMemories
 
-        // Filter tools for model
-        let filteredGeminiTools = filterToolsForModel(requestedGeminiTools, model: config.model)
-
         // Track tool prompt tokens for debug
         var toolPromptTokens = 0
 
-        // Use tool proxy for non-Gemini providers
+        // Use tool proxy for all providers with tools enabled
         // Uses minimal discovery-based prompt to reduce context bloat
-        let useToolProxy = hasGeminiTools && !isGeminiProvider
+        let useToolProxy = hasGeminiTools
         if useToolProxy {
             let enabledToolIds = Set(requestedGeminiTools)
             let maxToolCalls = await MainActor.run {
@@ -546,8 +465,24 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var collectedSources: [MessageGroundingSource] = []
         var collectedMemoryOperations: [MessageMemoryOperation] = []
 
-        if supportsStreaming && !hasGeminiTools {
-            // Pure streaming without tool proxy - stream directly
+        if supportsStreaming && useToolProxy {
+            // Streaming with tool proxy - stream content then execute tools and feed results back
+            // All providers use the same unified tool proxy architecture
+            try await streamWithToolProxy(
+                conversationId: conversationId,
+                config: config,
+                systemPrompt: systemPrompt,
+                messages: mergedMessages,
+                geminiKey: config.geminiKey ?? "",
+                continuation: continuation,
+                accumulatedContent: &accumulatedContent,
+                accumulatedReasoning: &accumulatedReasoning,
+                collectedToolCalls: &collectedToolCalls,
+                collectedSources: &collectedSources,
+                collectedMemoryOperations: &collectedMemoryOperations
+            )
+        } else if supportsStreaming {
+            // Pure streaming without tools - stream directly
             let streamConfig = StreamingResponseHandler.StreamingConfig(
                 provider: config.provider,
                 apiKey: getApiKey(for: config) ?? "",
@@ -568,7 +503,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     accumulatedReasoning += text
                     continuation.yield(.reasoningDelta(text))
 
-                case .completion(let completion):
+                case .completion:
                     // Final completion will be built at the end
                     break
 
@@ -579,22 +514,6 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     break
                 }
             }
-        } else if supportsStreaming && useToolProxy {
-            // Streaming with tool proxy - stream content then execute tools and feed results back
-            // Note: geminiKey is only required for Gemini-native tools, internal tools work without it
-            try await streamWithToolProxy(
-                conversationId: conversationId,
-                config: config,
-                systemPrompt: systemPrompt,
-                messages: mergedMessages,
-                geminiKey: config.geminiKey ?? "",
-                continuation: continuation,
-                accumulatedContent: &accumulatedContent,
-                accumulatedReasoning: &accumulatedReasoning,
-                collectedToolCalls: &collectedToolCalls,
-                collectedSources: &collectedSources,
-                collectedMemoryOperations: &collectedMemoryOperations
-            )
         } else {
             // Fallback to non-streaming with pseudo-stream events
             let providerResult = try await callProvider(
@@ -1266,27 +1185,6 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         default:
             throw APIError.networkError("Provider \(provider) not supported in On-Device mode yet.")
         }
-    }
-
-    // MARK: - Gemini Tools
-
-    private func callGeminiWithTools(
-        apiKey: String,
-        model: String,
-        system: String?,
-        messages: [Message],
-        enabledTools: Set<String>
-    ) async throws -> GeminiToolResponse {
-        // Convert tool IDs to ToolId enum
-        let toolIds: Set<ToolId> = Set(enabledTools.compactMap { ToolId(rawValue: $0) })
-
-        return try await GeminiToolService.shared.generateWithTools(
-            apiKey: apiKey,
-            model: model,
-            messages: messages,
-            system: system,
-            enabledTools: toolIds
-        )
     }
 
     // MARK: - Agent Identity

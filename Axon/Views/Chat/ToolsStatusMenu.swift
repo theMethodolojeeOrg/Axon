@@ -17,20 +17,32 @@ struct ToolsStatusMenu: View {
 
     @ObservedObject private var settingsViewModel = SettingsViewModel.shared
     @ObservedObject private var toolPluginLoader = ToolPluginLoader.shared
+    @ObservedObject private var toolsToggle = ToolsV2Toggle.shared
+
+    // MARK: - Active Tool System
+
+    /// Whether V2 plugin system is the active tool system
+    private var isV2Active: Bool {
+        toolsToggle.isV2Active
+    }
 
     // MARK: - V1 Tools (Legacy)
 
+    /// V1 tools are enabled only when V1 is active AND master toggle is on
     private var hasV1ToolsEnabled: Bool {
+        !isV2Active &&
         settingsViewModel.settings.toolSettings.toolsEnabled &&
         !settingsViewModel.settings.toolSettings.enabledToolIds.isEmpty
     }
 
     private var v1EnabledToolCount: Int {
-        settingsViewModel.settings.toolSettings.enabledToolIds.count
+        guard !isV2Active && settingsViewModel.settings.toolSettings.toolsEnabled else { return 0 }
+        return settingsViewModel.settings.toolSettings.enabledToolIds.count
     }
 
     /// Group enabled V1 tools by category for organized display
     private var groupedV1EnabledTools: [(category: ToolCategory, tools: [ToolId])] {
+        guard hasV1ToolsEnabled else { return [] }
         let enabledTools = settingsViewModel.settings.toolSettings.enabledTools
         let grouped = Dictionary(grouping: enabledTools) { $0.category }
         return grouped.keys.sorted { $0.displayName < $1.displayName }
@@ -39,16 +51,21 @@ struct ToolsStatusMenu: View {
 
     // MARK: - V2 Tools (Plugin System)
 
+    /// V2 tools are enabled only when V2 is active AND master toggle is on
     private var hasV2ToolsEnabled: Bool {
+        isV2Active &&
+        toolPluginLoader.masterToolsEnabled &&
         !toolPluginLoader.enabledTools.isEmpty
     }
 
     private var v2EnabledToolCount: Int {
-        toolPluginLoader.enabledTools.count
+        guard isV2Active && toolPluginLoader.masterToolsEnabled else { return 0 }
+        return toolPluginLoader.enabledTools.count
     }
 
     /// Group enabled V2 tools by category for organized display
     private var groupedV2EnabledTools: [(category: ToolCategoryV2, tools: [LoadedTool])] {
+        guard hasV2ToolsEnabled else { return [] }
         let grouped = Dictionary(grouping: toolPluginLoader.enabledTools) { $0.category }
         return grouped.keys.sorted { $0.displayName < $1.displayName }
             .map { (category: $0, tools: grouped[$0] ?? []) }
@@ -64,11 +81,37 @@ struct ToolsStatusMenu: View {
         v1EnabledToolCount + v2EnabledToolCount
     }
 
+    /// Status text for the menu header
+    private var statusText: String {
+        if !hasToolsEnabled {
+            if isV2Active && !toolPluginLoader.masterToolsEnabled {
+                return "Tools disabled"
+            } else if !isV2Active && !settingsViewModel.settings.toolSettings.toolsEnabled {
+                return "Tools disabled"
+            }
+            return "No tools enabled"
+        }
+        return "\(enabledToolCount) tool\(enabledToolCount == 1 ? "" : "s") enabled"
+    }
+
+    /// Which tool system is currently active
+    private var activeSystemLabel: String {
+        isV2Active ? "Plugin System (V2)" : "Classic System (V1)"
+    }
+
     var body: some View {
         Menu {
-            if hasToolsEnabled {
-                Text("\(enabledToolCount) tool\(enabledToolCount == 1 ? "" : "s") enabled")
+            // Header with status
+            Text(statusText)
+                .font(.headline)
 
+            // Show active system indicator
+            Label(activeSystemLabel, systemImage: isV2Active ? "2.circle" : "1.circle")
+                .font(.caption)
+
+            Divider()
+
+            if hasToolsEnabled {
                 // V2 Tools (Plugin System)
                 if hasV2ToolsEnabled {
                     ForEach(groupedV2EnabledTools, id: \.category) { group in
@@ -95,7 +138,18 @@ struct ToolsStatusMenu: View {
                 Text("Configure in Settings > Tools")
                     .font(.caption)
             } else {
-                Text("No tools enabled")
+                // Show reason why no tools are active
+                if isV2Active && !toolPluginLoader.masterToolsEnabled {
+                    Label("Master toggle is off", systemImage: "power")
+                        .foregroundColor(.secondary)
+                } else if !isV2Active && !settingsViewModel.settings.toolSettings.toolsEnabled {
+                    Label("Master toggle is off", systemImage: "power")
+                        .foregroundColor(.secondary)
+                } else {
+                    Label("No tools selected", systemImage: "sparkles")
+                        .foregroundColor(.secondary)
+                }
+
                 Divider()
                 Text("Enable tools in Settings > Tools")
                     .font(.caption)

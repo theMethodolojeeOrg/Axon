@@ -49,7 +49,7 @@ final class PersistenceController {
             object: nil
         )
 
-        print("[Persistence] Initialized. CloudKitEnabled=\(wantsCloudKit)")
+        debugLog(.persistence, "Initialized. CloudKitEnabled=\(wantsCloudKit)")
     }
 
     private init(inMemory: Bool, useCloudKit: Bool) {
@@ -64,7 +64,7 @@ final class PersistenceController {
             object: nil
         )
 
-        print("[Persistence] Initialized (preview). CloudKitEnabled=\(useCloudKit)")
+        debugLog(.persistence, "Initialized (preview). CloudKitEnabled=\(useCloudKit)")
     }
 
     /// Merge changes from background context saves into the view context.
@@ -82,12 +82,12 @@ final class PersistenceController {
         let updatedCount = (userInfo[NSUpdatedObjectsKey] as? Set<NSManagedObject>)?.count ?? 0
         let deletedCount = (userInfo[NSDeletedObjectsKey] as? Set<NSManagedObject>)?.count ?? 0
 
-        print("[Persistence] 🔄 Merging background context save: \(insertedCount) inserted, \(updatedCount) updated, \(deletedCount) deleted")
+        debugLog(.persistence, "🔄 Merging background context save: \(insertedCount) inserted, \(updatedCount) updated, \(deletedCount) deleted")
 
         // Merge on the main thread to avoid concurrency issues with UI
         DispatchQueue.main.async { [weak self] in
             self?.container.viewContext.mergeChanges(fromContextDidSave: notification)
-            print("[Persistence] ✅ Merged changes into viewContext")
+            debugLog(.persistence, "✅ Merged changes into viewContext")
         }
     }
 

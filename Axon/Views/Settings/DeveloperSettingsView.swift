@@ -241,6 +241,19 @@ struct DeveloperSettingsView: View {
                 .cornerRadius(8)
             }
 
+            // Debug Logging Section
+            SettingsSection(title: "Console Logging") {
+                VStack(spacing: 0) {
+                    LogSettingsSection()
+
+                    Divider()
+                        .background(AppColors.divider)
+
+                    // Developer Console Toggle & Navigation
+                    DeveloperConsoleRow()
+                }
+            }
+
             // What Gets Reset Section
             SettingsSection(title: "What Happens") {
                 VStack(alignment: .leading, spacing: 12) {

@@ -613,6 +613,9 @@ struct ChatInfoSettingsView: View {
             }
         }
 
+        // MARK: - Developer Console Quick Access
+        DeveloperConsoleQuickAccess()
+
         // MARK: - Info Note
         HStack(spacing: 12) {
             Image(systemName: "info.circle")
