@@ -449,6 +449,121 @@ final class MacSystemService {
         return name.localizedCaseInsensitiveContains(pattern)
     }
 
+    // MARK: - File Read
+
+    func readFile(path: String, maxBytes: Int? = nil, encoding: String = "utf8") async throws -> MacFileReadResult {
+        logger.info("Reading file: \(path)")
+
+        let fileManager = FileManager.default
+        let expandedPath = NSString(string: path).expandingTildeInPath
+        let url = URL(fileURLWithPath: expandedPath)
+
+        // Check if file exists
+        guard fileManager.fileExists(atPath: expandedPath) else {
+            return MacFileReadResult(
+                path: expandedPath,
+                name: url.lastPathComponent,
+                exists: false,
+                content: nil,
+                sizeBytes: nil,
+                truncated: false,
+                encoding: encoding,
+                errorMessage: "File does not exist"
+            )
+        }
+
+        // Check if it's a directory
+        var isDir: ObjCBool = false
+        fileManager.fileExists(atPath: expandedPath, isDirectory: &isDir)
+        if isDir.boolValue {
+            return MacFileReadResult(
+                path: expandedPath,
+                name: url.lastPathComponent,
+                exists: true,
+                content: nil,
+                sizeBytes: nil,
+                truncated: false,
+                encoding: encoding,
+                errorMessage: "Path is a directory, not a file"
+            )
+        }
+
+        do {
+            // Get file size
+            let attrs = try fileManager.attributesOfItem(atPath: expandedPath)
+            let fileSize = attrs[.size] as? Int ?? 0
+
+            // Default max bytes to 1MB to prevent memory issues
+            let effectiveMaxBytes = maxBytes ?? 1_000_000
+            let shouldTruncate = fileSize > effectiveMaxBytes
+
+            // Read file content
+            let data: Data
+            if shouldTruncate {
+                // Read only up to maxBytes
+                let fileHandle = try FileHandle(forReadingFrom: url)
+                data = fileHandle.readData(ofLength: effectiveMaxBytes)
+                try fileHandle.close()
+            } else {
+                data = try Data(contentsOf: url)
+            }
+
+            // Decode based on encoding
+            let content: String?
+            switch encoding.lowercased() {
+            case "utf8", "utf-8":
+                content = String(data: data, encoding: .utf8)
+            case "utf16", "utf-16":
+                content = String(data: data, encoding: .utf16)
+            case "ascii":
+                content = String(data: data, encoding: .ascii)
+            case "latin1", "iso-8859-1":
+                content = String(data: data, encoding: .isoLatin1)
+            default:
+                content = String(data: data, encoding: .utf8)
+            }
+
+            if content == nil {
+                // Binary file or encoding issue
+                return MacFileReadResult(
+                    path: expandedPath,
+                    name: url.lastPathComponent,
+                    exists: true,
+                    content: nil,
+                    sizeBytes: fileSize,
+                    truncated: shouldTruncate,
+                    encoding: encoding,
+                    errorMessage: "Could not decode file as \(encoding) - may be binary"
+                )
+            }
+
+            logger.info("File read complete: \(fileSize) bytes, truncated: \(shouldTruncate)")
+
+            return MacFileReadResult(
+                path: expandedPath,
+                name: url.lastPathComponent,
+                exists: true,
+                content: content,
+                sizeBytes: fileSize,
+                truncated: shouldTruncate,
+                encoding: encoding,
+                errorMessage: nil
+            )
+        } catch {
+            logger.error("Failed to read file: \(error.localizedDescription)")
+            return MacFileReadResult(
+                path: expandedPath,
+                name: url.lastPathComponent,
+                exists: true,
+                content: nil,
+                sizeBytes: nil,
+                truncated: false,
+                encoding: encoding,
+                errorMessage: error.localizedDescription
+            )
+        }
+    }
+
     // MARK: - File Metadata
 
     func getFileMetadata(path: String) async throws -> FileMetadataResult {
@@ -962,6 +1077,10 @@ final class MacSystemService {
 
     func findFiles(pattern: String, directory: String = "~", maxDepth: Int = 3) async throws -> FileFindResult {
         throw MacSystemError.requiresBridge("File find")
+    }
+
+    func readFile(path: String, maxBytes: Int? = nil, encoding: String = "utf8") async throws -> MacFileReadResult {
+        throw MacSystemError.requiresBridge("File read")
     }
 
     func getFileMetadata(path: String) async throws -> FileMetadataResult {

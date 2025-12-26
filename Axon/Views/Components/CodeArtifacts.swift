@@ -845,6 +845,10 @@ struct CompletedToolCallView: View {
 struct ToolRequestCodeBlockView: View {
     let code: String
 
+    /// When true, this tool request was loaded from conversation history (not newly streamed)
+    /// Tools from history should NOT auto-execute - they should only show their persisted state
+    var isFromHistory: Bool = false
+
     /// Controls whether tool requests auto-execute when they appear
     /// When true, tools execute automatically as soon as the view renders
     /// When false, user must click "Apply" to execute
@@ -1084,12 +1088,20 @@ struct ToolRequestCodeBlockView: View {
 
     /// Check if this exact tool request was already executed in this session
     /// If auto-execute is enabled and not yet executed, triggers execution automatically
+    /// IMPORTANT: Tools loaded from history (isFromHistory=true) never auto-execute
     private func checkIfAlreadyExecuted() {
         if ToolRequestTracker.shared.wasExecuted(hash: contentHash) {
+            // Tool was previously executed - show completed state with result
             executionState = .success
             executionResult = ToolRequestTracker.shared.getResult(hash: contentHash)
+        } else if isFromHistory {
+            // Tool is from conversation history but wasn't tracked as executed
+            // Don't auto-execute - just show it as not executed (user can manually run if needed)
+            // This prevents the "all tools re-execute on app rebuild" bug
+            print("[ToolRequestCodeBlockView] Skipping auto-execute for history tool: \(parsedRequest?.tool ?? "unknown")")
         } else if Self.autoExecuteEnabled && executionState == .notExecuted {
-            // Auto-execute on appear - this is the key to decoupling display from execution
+            // Newly streamed tool request - auto-execute on appear
+            // This is the key to decoupling display from execution
             // The tool request is in the markdown, the UI renders it, and we execute when ready
             executeToolRequest()
         }
@@ -1140,13 +1152,26 @@ struct ToolRequestCodeBlockView: View {
 // MARK: - Tool Request Tracker
 
 /// Tracks which tool requests have been executed in this session to prevent duplicates
+/// Persists to UserDefaults to survive app restarts
 final class ToolRequestTracker: @unchecked Sendable {
     static let shared = ToolRequestTracker()
 
     private var executedHashes: [String: String] = [:] // hash -> result
     private let lock = NSLock()
+    private let userDefaultsKey = "ToolRequestTracker.executedHashes"
 
-    private init() {}
+    private init() {
+        // Load persisted state from disk
+        if let saved = UserDefaults.standard.dictionary(forKey: userDefaultsKey) as? [String: String] {
+            executedHashes = saved
+            print("[ToolRequestTracker] Loaded \(saved.count) executed tool hashes from disk")
+        }
+    }
+
+    /// Persist current state to disk
+    private func persistToDisk() {
+        UserDefaults.standard.set(executedHashes, forKey: userDefaultsKey)
+    }
 
     func wasExecuted(hash: String) -> Bool {
         lock.lock()
@@ -1158,6 +1183,7 @@ final class ToolRequestTracker: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         executedHashes[hash] = result
+        persistToDisk()
     }
 
     func getResult(hash: String) -> String? {
@@ -1186,5 +1212,15 @@ final class ToolRequestTracker: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         executedHashes.removeAll()
+        persistToDisk()
+    }
+
+    /// Clear persisted state completely (for debugging/reset)
+    func clearPersistedState() {
+        lock.lock()
+        defer { lock.unlock() }
+        executedHashes.removeAll()
+        UserDefaults.standard.removeObject(forKey: userDefaultsKey)
+        print("[ToolRequestTracker] Cleared all persisted tool execution state")
     }
 }

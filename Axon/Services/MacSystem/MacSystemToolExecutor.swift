@@ -108,6 +108,16 @@ final class MacSystemToolExecutor {
             }
             result = try await service.getFileMetadata(path: path)
 
+        case "file/read":
+            guard let path = inputs["path"] as? String else {
+                throw MacSystemError.operationFailed("Missing path parameter")
+            }
+            result = try await service.readFile(
+                path: path,
+                maxBytes: inputs["maxBytes"] as? Int,
+                encoding: inputs["encoding"] as? String ?? "utf8"
+            )
+
         case "app/list":
             result = try await service.getRunningApplications()
 

@@ -17,6 +17,10 @@ struct AssistantMarkdownView: View {
     /// instead of trying to re-execute.
     var executedToolCalls: [LiveToolCall]?
 
+    /// When true, this content was loaded from conversation history (not newly streamed)
+    /// Used to prevent auto-execution of tool requests on app restart
+    var isFromHistory: Bool = false
+
     private var segments: [MarkdownSegment] {
         FencedCodeParser.split(content)
     }
@@ -61,7 +65,8 @@ struct AssistantMarkdownView: View {
                         if let executedCall = findExecutedToolCall(for: code) {
                             CompletedToolCallView(toolCall: executedCall)
                         } else {
-                            ToolRequestCodeBlockView(code: code)
+                            // Pass isFromHistory to prevent auto-execution on app restart
+                            ToolRequestCodeBlockView(code: code, isFromHistory: isFromHistory)
                         }
                     } else {
                         CodeBlockView(language: language, code: code) {

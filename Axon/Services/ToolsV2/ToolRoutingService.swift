@@ -180,6 +180,39 @@ final class ToolRoutingService: ObservableObject {
         )
     }
 
+    // MARK: - V1 to V2 Compatibility Aliases
+
+    /// Maps V1 tool IDs to their V2 equivalents for backward compatibility
+    private let v1ToV2Aliases: [String: String] = [
+        // VS Code bridge tools → Mac equivalents (when running on Mac without bridge)
+        "vscode_read_file": "mac_file_read",
+        "vscode_list_files": "mac_file_find",
+        // Legacy aliases
+        "google_search": "gemini_google_search",
+        "code_execution": "gemini_code_execution",
+        "url_context": "gemini_url_context",
+        "google_maps": "gemini_google_maps",
+        "file_search": "gemini_file_search",
+        "openai_image_gen": "openai_image_generation",
+        "openai_video_gen": "openai_video_generation",
+        "xai_web_search": "grok_web_search",
+        "zai_web_search": "glm_web_search",
+        "gemini_veo": "gemini_video_generation"
+    ]
+
+    /// Resolve a tool ID, checking for V1 aliases
+    private func resolveToolId(_ toolId: String) -> String {
+        // First check if this is a V1 alias that should map to V2
+        if let v2Id = v1ToV2Aliases[toolId] {
+            // Only use alias if the V2 tool exists
+            if pluginLoader.hasToolId(v2Id) {
+                logger.debug("Resolved V1 tool '\(toolId)' to V2 tool '\(v2Id)'")
+                return v2Id
+            }
+        }
+        return toolId
+    }
+
     // MARK: - Tool Execution
 
     /// Execute a tool by ID, routing to V1 or V2 based on toggle
@@ -194,7 +227,9 @@ final class ToolRoutingService: ObservableObject {
         context: ToolContextV2 = .empty
     ) async throws -> ToolExecutionResult {
         if toolsToggle.isV2Active {
-            return try await executeV2Tool(toolId: toolId, query: query, context: context)
+            // Resolve V1 aliases to V2 tool IDs
+            let resolvedId = resolveToolId(toolId)
+            return try await executeV2Tool(toolId: resolvedId, query: query, context: context)
         } else {
             return try await executeV1Tool(toolId: toolId, query: query)
         }

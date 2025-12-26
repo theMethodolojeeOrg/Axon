@@ -172,6 +172,31 @@ struct FoundFile: Codable {
     let isDirectory: Bool
 }
 
+// MARK: - File Read
+
+struct MacFileReadParams: Codable {
+    let path: String
+    let maxBytes: Int?
+    let encoding: String?
+
+    init(path: String, maxBytes: Int? = nil, encoding: String? = "utf8") {
+        self.path = path
+        self.maxBytes = maxBytes
+        self.encoding = encoding
+    }
+}
+
+struct MacFileReadResult: Codable {
+    let path: String
+    let name: String
+    let exists: Bool
+    let content: String?
+    let sizeBytes: Int?
+    let truncated: Bool
+    let encoding: String
+    let errorMessage: String?
+}
+
 // MARK: - File Metadata
 
 struct FileMetadataParams: Codable {
