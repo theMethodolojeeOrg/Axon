@@ -118,6 +118,14 @@ final class MacSystemToolExecutor {
                 encoding: inputs["encoding"] as? String ?? "utf8"
             )
 
+        case "file/list":
+            let path = inputs["path"] as? String ?? "."
+            result = try await service.listFiles(
+                path: path,
+                includeHidden: inputs["includeHidden"] as? Bool ?? false,
+                maxItems: inputs["maxItems"] as? Int ?? 100
+            )
+
         case "app/list":
             result = try await service.getRunningApplications()
 

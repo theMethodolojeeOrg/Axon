@@ -565,6 +565,7 @@ struct AssistantToolbar: View {
                         .font(.system(size: 14))
                         .foregroundColor(AppColors.textTertiary)
                 }
+                .help("Select Text")
 
                 // Quote button - inserts clipboard content as formatted quote
                 if onQuote != nil {
@@ -573,6 +574,7 @@ struct AssistantToolbar: View {
                             .font(.system(size: 14))
                             .foregroundColor(AppColors.textTertiary)
                     }
+                    .help("Quote from Clipboard")
                 }
 
                 // Copy button
@@ -581,6 +583,7 @@ struct AssistantToolbar: View {
                         .font(.system(size: 14))
                         .foregroundColor(AppColors.textTertiary)
                 }
+                .help("Copy Message")
 
                 // Regenerate button
                 Button(action: { onRegenerate(message) }) {
@@ -588,6 +591,7 @@ struct AssistantToolbar: View {
                         .font(.system(size: 14))
                         .foregroundColor(AppColors.textTertiary)
                 }
+                .help("Regenerate")
 
                 // TTS button
                 let settings = SettingsViewModel.shared.settings
@@ -605,6 +609,7 @@ struct AssistantToolbar: View {
                             .font(.system(size: 14))
                             .foregroundColor(AppColors.signalMercury)
                     }
+                    .help("Play Audio")
                 } else {
                     Button(action: {
                         Task {
@@ -619,6 +624,7 @@ struct AssistantToolbar: View {
                             .font(.system(size: 14))
                             .foregroundColor(AppColors.textTertiary)
                     }
+                    .help("Text to Speech")
                 }
             }
 
@@ -683,15 +689,50 @@ struct TextSelectorSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
+        #if os(macOS)
+        VStack(spacing: 0) {
+            // Header bar
+            HStack {
+                Button("Done") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Spacer()
+
+                Text("Select Text")
+                    .font(.headline)
+
+                Spacer()
+
+                if onQuote != nil {
+                    Button(action: quoteFromClipboard) {
+                        Label("Quote", systemImage: "text.quote")
+                    }
+                } else {
+                    // Invisible spacer to balance the header
+                    Button("Done") { }
+                        .opacity(0)
+                }
+            }
+            .padding()
+            .background(AppColors.substrateSecondary)
+
+            // Text content - fills remaining space
+            SelectableTextView(text: content)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
+                .background(AppColors.substratePrimary)
+        }
+        .frame(minWidth: 500, idealWidth: 600, minHeight: 400, idealHeight: 500)
+        #else
         NavigationView {
             SelectableTextView(text: content)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
                 .background(AppColors.substratePrimary)
                 .navigationTitle("Select Text")
-                #if !os(macOS)
                 .navigationBarTitleDisplayMode(.inline)
-                #endif
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Done") {
@@ -705,12 +746,9 @@ struct TextSelectorSheet: View {
                                 Label("Quote", systemImage: "text.quote")
                             }
                         }
+                    }
                 }
-            }
         }
-        #if os(macOS)
-        .frame(minWidth: 450, idealWidth: 550, minHeight: 350, idealHeight: 450)
-        #else
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         #endif

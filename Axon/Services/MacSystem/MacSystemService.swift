@@ -449,6 +449,73 @@ final class MacSystemService {
         return name.localizedCaseInsensitiveContains(pattern)
     }
 
+    // MARK: - File List
+
+    func listFiles(path: String = ".", includeHidden: Bool = false, maxItems: Int = 100) async throws -> MacFileListResult {
+        logger.info("Listing files: path='\(path)' includeHidden=\(includeHidden) maxItems=\(maxItems)")
+
+        let fileManager = FileManager.default
+        let expandedPath = NSString(string: path).expandingTildeInPath
+        let url = URL(fileURLWithPath: expandedPath)
+
+        // Check if directory exists
+        var isDir: ObjCBool = false
+        guard fileManager.fileExists(atPath: expandedPath, isDirectory: &isDir) else {
+            logger.error("Path does not exist: \(expandedPath)")
+            throw MacSystemError.operationFailed("Path does not exist: \(expandedPath)")
+        }
+
+        guard isDir.boolValue else {
+            logger.error("Path is not a directory: \(expandedPath)")
+            throw MacSystemError.operationFailed("Path is not a directory: \(expandedPath)")
+        }
+
+        var items: [MacFileListItem] = []
+
+        do {
+            let contents = try fileManager.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey],
+                options: includeHidden ? [] : [.skipsHiddenFiles]
+            )
+
+            for fileURL in contents.prefix(maxItems) {
+                let resourceValues = try? fileURL.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey])
+                let isDirectory = resourceValues?.isDirectory ?? false
+                let size = resourceValues?.fileSize
+                let modified = resourceValues?.contentModificationDate
+
+                items.append(MacFileListItem(
+                    name: fileURL.lastPathComponent,
+                    path: fileURL.path,
+                    isDirectory: isDirectory,
+                    sizeBytes: size,
+                    modifiedDate: modified
+                ))
+            }
+
+            // Sort: directories first, then by name
+            items.sort { item1, item2 in
+                if item1.isDirectory != item2.isDirectory {
+                    return item1.isDirectory
+                }
+                return item1.name.localizedCaseInsensitiveCompare(item2.name) == .orderedAscending
+            }
+
+            logger.info("Listed \(items.count) items in \(expandedPath)")
+
+            return MacFileListResult(
+                path: expandedPath,
+                items: items,
+                totalCount: contents.count,
+                truncated: contents.count > maxItems
+            )
+        } catch {
+            logger.error("Failed to list directory: \(error.localizedDescription)")
+            throw MacSystemError.operationFailed("Failed to list directory: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - File Read
 
     func readFile(path: String, maxBytes: Int? = nil, encoding: String = "utf8") async throws -> MacFileReadResult {
@@ -1077,6 +1144,10 @@ final class MacSystemService {
 
     func findFiles(pattern: String, directory: String = "~", maxDepth: Int = 3) async throws -> FileFindResult {
         throw MacSystemError.requiresBridge("File find")
+    }
+
+    func listFiles(path: String = ".", includeHidden: Bool = false, maxItems: Int = 100) async throws -> MacFileListResult {
+        throw MacSystemError.requiresBridge("File list")
     }
 
     func readFile(path: String, maxBytes: Int? = nil, encoding: String = "utf8") async throws -> MacFileReadResult {

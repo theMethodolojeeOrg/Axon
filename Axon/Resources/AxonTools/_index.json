@@ -175,6 +175,7 @@
         "system/mac_clipboard_write/tool_mac_clipboard_write.json",
         "system/mac_notification/tool_mac_notification.json",
         "system/mac_spotlight_search/tool_mac_spotlight_search.json",
+        "system/mac_list_files/tool_mac_list_files.json",
         "system/mac_file_find/tool_mac_file_find.json",
         "system/mac_file_read/tool_mac_file_read.json",
         "system/mac_file_metadata/tool_mac_file_metadata.json",
@@ -252,9 +253,9 @@
     }
   },
   "stats": {
-    "totalTools": 95,
+    "totalTools": 96,
     "coreTools": 48,
-    "systemTools": 16,
+    "systemTools": 17,
     "providerTools": 31,
     "toolsRequiringApproval": 17
   },
@@ -390,6 +391,7 @@
       "mac_clipboard_write",
       "mac_notification",
       "mac_spotlight_search",
+      "mac_list_files",
       "mac_file_find",
       "mac_file_read",
       "mac_file_metadata",

@@ -467,7 +467,6 @@ struct ChatContainerView: View {
 
     // Message editing state
     @State private var messageToEdit: Message? = nil
-    @State private var showEditSheet = false
     @State private var messageToDelete: Message? = nil
     @State private var showDeleteConfirmation = false
 
@@ -638,49 +637,44 @@ struct ChatContainerView: View {
             // Show first-run welcome card if user hasn't seen it yet
             showFirstRunWelcome = !settingsViewModel.settings.hasSeenFirstRunWelcome
         }
-        .sheet(isPresented: $showEditSheet) {
-            if let message = messageToEdit {
-                MessageEditSheet(
-                    message: message,
-                    onSave: { newContent in
-                        // Save without regenerating
-                        Task {
-                            if let convId = conversation?.id {
-                                _ = try? await conversationService.editMessage(
-                                    conversationId: convId,
-                                    messageId: message.id,
-                                    content: newContent
-                                )
-                            }
+        .sheet(item: $messageToEdit) { message in
+            MessageEditSheet(
+                message: message,
+                onSave: { newContent in
+                    // Save without regenerating
+                    Task {
+                        if let convId = conversation?.id {
+                            _ = try? await conversationService.editMessage(
+                                conversationId: convId,
+                                messageId: message.id,
+                                content: newContent
+                            )
                         }
-                        showEditSheet = false
-                        messageToEdit = nil
-                    },
-                    onSaveAndRegenerate: { newContent in
-                        // Save and regenerate AI response
-                        Task {
-                            if let convId = conversation?.id {
-                                let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
-                                let enabledTools = settings.toolSettings.toolsEnabled ? Array(settings.toolSettings.enabledToolIds) : []
-                                isLoading = true
-                                _ = try? await conversationService.editAndRegenerate(
-                                    conversationId: convId,
-                                    messageId: message.id,
-                                    content: newContent,
-                                    enabledTools: enabledTools
-                                )
-                                isLoading = false
-                            }
-                        }
-                        showEditSheet = false
-                        messageToEdit = nil
-                    },
-                    onCancel: {
-                        showEditSheet = false
-                        messageToEdit = nil
                     }
-                )
-            }
+                    messageToEdit = nil
+                },
+                onSaveAndRegenerate: { newContent in
+                    // Save and regenerate AI response
+                    Task {
+                        if let convId = conversation?.id {
+                            let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
+                            let enabledTools = settings.toolSettings.toolsEnabled ? Array(settings.toolSettings.enabledToolIds) : []
+                            isLoading = true
+                            _ = try? await conversationService.editAndRegenerate(
+                                conversationId: convId,
+                                messageId: message.id,
+                                content: newContent,
+                                enabledTools: enabledTools
+                            )
+                            isLoading = false
+                        }
+                    }
+                    messageToEdit = nil
+                },
+                onCancel: {
+                    messageToEdit = nil
+                }
+            )
         }
         .alert("Delete Message?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) {
@@ -834,21 +828,51 @@ struct ChatContainerView: View {
                                     if message.isDeleted == true {
                                         DeletedMessageView()
                                     } else {
-                                        UserMessageView(
-                                            message: message,
-                                            onCopy: { msg in
-                                                AppClipboard.copy(msg.content)
-                                            },
-                                            onEdit: { msg in
-                                                messageToEdit = msg
-                                                showEditSheet = true
-                                            },
-                                            onDelete: { msg in
-                                                messageToDelete = msg
-                                                showDeleteConfirmation = true
+                                        VStack(spacing: 0) {
+                                            UserMessageView(
+                                                message: message,
+                                                onCopy: { msg in
+                                                    AppClipboard.copy(msg.content)
+                                                },
+                                                onEdit: { msg in
+                                                    messageToEdit = msg
+                                                },
+                                                onDelete: { msg in
+                                                    messageToDelete = msg
+                                                    showDeleteConfirmation = true
+                                                }
+                                            )
+                                            .padding(.vertical, 8)
+                                            
+                                            // Show edit icon below most recent user message (for easier discoverability)
+                                            if index == conversationService.messages.count - 1 || 
+                                               (index < conversationService.messages.count - 1 && 
+                                                conversationService.messages[index + 1].role == .assistant) {
+                                                // This is the last user message before an assistant response
+                                                HStack {
+                                                    Spacer()
+                                                    Button {
+                                                        messageToEdit = message
+                                                    } label: {
+                                                        HStack(spacing: 4) {
+                                                            Image(systemName: "pencil")
+                                                                .font(.system(size: 12))
+                                                            Text("Edit")
+                                                                .font(AppTypography.labelSmall())
+                                                        }
+                                                        .foregroundColor(AppColors.textTertiary)
+                                                        .padding(.horizontal, 10)
+                                                        .padding(.vertical, 4)
+                                                        .background(AppColors.substrateSecondary.opacity(0.6))
+                                                        .cornerRadius(12)
+                                                    }
+                                                    .buttonStyle(.plain)
+                                                    .opacity(0.7)
+                                                    .padding(.trailing)
+                                                    .padding(.bottom, 4)
+                                                }
                                             }
-                                        )
-                                        .padding(.vertical, 8)
+                                        }
                                     }
                                 } else {
                                     AssistantMessageView(

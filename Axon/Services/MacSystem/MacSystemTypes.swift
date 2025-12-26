@@ -172,6 +172,35 @@ struct FoundFile: Codable {
     let isDirectory: Bool
 }
 
+// MARK: - File List
+
+struct MacFileListParams: Codable {
+    let path: String?
+    let includeHidden: Bool?
+    let maxItems: Int?
+
+    init(path: String? = ".", includeHidden: Bool? = false, maxItems: Int? = 100) {
+        self.path = path
+        self.includeHidden = includeHidden
+        self.maxItems = maxItems
+    }
+}
+
+struct MacFileListResult: Codable {
+    let path: String
+    let items: [MacFileListItem]
+    let totalCount: Int
+    let truncated: Bool
+}
+
+struct MacFileListItem: Codable {
+    let name: String
+    let path: String
+    let isDirectory: Bool
+    let sizeBytes: Int?
+    let modifiedDate: Date?
+}
+
 // MARK: - File Read
 
 struct MacFileReadParams: Codable {
