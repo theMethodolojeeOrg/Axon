@@ -65,10 +65,55 @@ final class ToolApprovalBridgeV2: ObservableObject {
         )
     }
 
+    /// Request approval for a custom action without a full manifest
+    /// Use this for internal actions like model/provider changes that need biometric approval
+    /// - Parameters:
+    ///   - actionDescription: Human-readable description for the approval prompt
+    ///   - toolId: Tool ID for logging/tracking
+    ///   - approvalScopes: Optional scopes for the approval
+    /// - Returns: The approval result
+    func requestApprovalForAction(
+        actionDescription: String,
+        toolId: String,
+        approvalScopes: [String]? = nil
+    ) async -> ToolApprovalResult {
+        logger.info("Requesting approval for action: \(toolId) - \(actionDescription)")
+
+        // Create a minimal config for the approval service
+        let config = DynamicToolConfig(
+            id: toolId,
+            name: toolId.replacingOccurrences(of: "_", with: " ").capitalized,
+            description: actionDescription,
+            category: .utility,
+            enabled: true,
+            icon: "gearshape.fill",
+            requiredSecrets: [],
+            pipeline: [],
+            parameters: [:],
+            outputTemplate: nil,
+            requiresApproval: true,
+            approvalScopes: approvalScopes
+        )
+
+        return await approvalService.requestApprovalWithSovereignty(
+            tool: config,
+            inputs: ["action": actionDescription],
+            timeoutSeconds: nil
+        )
+    }
+
     /// Check if a tool requires approval
     /// - Parameter manifest: The tool manifest to check
     /// - Returns: True if approval is required
     func requiresApproval(manifest: ToolManifest) -> Bool {
+        // First check if sovereignty pre-approves this tool via trust tiers
+        // If pre-approved, skip the manual approval requirement
+        let sovereigntyPermission = ToolSovereigntyBridgeV2.shared.checkPermission(manifest: manifest)
+        if case .preApproved = sovereigntyPermission {
+            logger.debug("Tool \(manifest.tool.id) pre-approved by sovereignty, skipping manual approval")
+            return false
+        }
+
         // Check explicit flag in manifest
         if manifest.tool.effectiveRequiresApproval {
             return true

@@ -181,11 +181,11 @@ final class SystemStateHandler: ToolHandlerV2 {
         
         switch category {
         case "model":
-            return changeModel(provider: target, model: value, reasoning: reasoning)
+            return await changeModel(provider: target, model: value, reasoning: reasoning)
         case "tool":
             return changeTool(toolId: target, enabled: value.lowercased() == "enable", reasoning: reasoning)
         case "provider":
-            return changeProvider(provider: target, reasoning: reasoning)
+            return await changeProvider(provider: target, reasoning: reasoning)
         default:
             return ToolResultV2.failure(
                 toolId: "change_system_state",
@@ -194,25 +194,178 @@ final class SystemStateHandler: ToolHandlerV2 {
         }
     }
     
-    private func changeModel(provider: String, model: String, reasoning: String) -> ToolResultV2 {
-        // Note: Full implementation would require biometric approval
-        // For now, just acknowledge the request
+    // MARK: - Model Change
+    
+    private func changeModel(provider providerString: String, model modelId: String, reasoning: String) async -> ToolResultV2 {
+        // 1. Parse provider
+        guard let targetProvider = parseProvider(providerString) else {
+            return ToolResultV2.failure(
+                toolId: "change_system_state",
+                error: "Unknown provider: \(providerString). Available: \(AIProvider.allCases.map { $0.rawValue }.joined(separator: ", "))"
+            )
+        }
         
+        // 2. Validate model exists for this provider
+        let availableModels = targetProvider.availableModels
+        guard availableModels.contains(where: { $0.id == modelId }) else {
+            let modelNames = availableModels.map { $0.id }.joined(separator: ", ")
+            return ToolResultV2.failure(
+                toolId: "change_system_state",
+                error: "Model '\(modelId)' not found for \(targetProvider.displayName). Available: \(modelNames)"
+            )
+        }
+        
+        // 3. Check if this is also a provider change
+        let currentProvider = settingsViewModel.settings.defaultProvider
+        let isProviderChange = targetProvider != currentProvider
+        
+        // 4. Check sovereignty permission
+        let sovereigntyService = SovereigntyService.shared
+        if isProviderChange {
+            if !sovereigntyService.isProviderChangeAllowed() {
+                let reason = sovereigntyService.providerChangeRestrictionReason() ?? "Provider change not allowed"
+                return ToolResultV2.failure(
+                    toolId: "change_system_state",
+                    error: reason
+                )
+            }
+        } else {
+            if !sovereigntyService.isModelChangeAllowed() {
+                let reason = sovereigntyService.modelChangeRestrictionReason() ?? "Model change not allowed"
+                return ToolResultV2.failure(
+                    toolId: "change_system_state",
+                    error: reason
+                )
+            }
+        }
+        
+        // 5. Request biometric approval
+        let actionDescription = isProviderChange
+            ? "Change AI provider from \(currentProvider.displayName) to \(targetProvider.displayName) and model to \(modelId)"
+            : "Change AI model to \(modelId)"
+        
+        let approvalResult = await ToolApprovalBridgeV2.shared.requestApprovalForAction(
+            actionDescription: actionDescription + (reasoning.isEmpty ? "" : " (Reason: \(reasoning))"),
+            toolId: "change_system_state",
+            approvalScopes: isProviderChange ? ["provider_change", "model_change"] : ["model_change"]
+        )
+        
+        guard approvalResult.isApprovedV2 else {
+            let failureReason = approvalResult.failureReasonV2 ?? "User denied approval"
+            logger.info("Model change denied: \(failureReason)")
+            return ToolResultV2.failure(
+                toolId: "change_system_state",
+                error: "Change denied: \(failureReason)"
+            )
+        }
+        
+        // 6. Apply the change
+        logger.info("Applying model change: \(targetProvider.rawValue) / \(modelId)")
+        
+        if isProviderChange {
+            await settingsViewModel.updateSetting(\.defaultProvider, targetProvider)
+        }
+        await settingsViewModel.updateSetting(\.defaultModel, modelId)
+        
+        // 7. Return success
+        let modelName = availableModels.first { $0.id == modelId }?.name ?? modelId
         return ToolResultV2.success(
             toolId: "change_system_state",
             output: """
-            Model change requested.
+            ✅ Model changed successfully.
             
-            **Provider:** \(provider)
-            **Model:** \(model)
-            **Reason:** \(reasoning)
+            **Provider:** \(targetProvider.displayName)
+            **Model:** \(modelName)
+            \(reasoning.isEmpty ? "" : "**Reason:** \(reasoning)")
             
-            This change requires user approval.
-            """
+            The change is now active.
+            """,
+            structured: [
+                "provider": targetProvider.rawValue,
+                "model": modelId,
+                "providerChanged": isProviderChange
+            ]
         )
     }
     
+    // MARK: - Provider Change
+    
+    private func changeProvider(provider providerString: String, reasoning: String) async -> ToolResultV2 {
+        // 1. Parse provider
+        guard let targetProvider = parseProvider(providerString) else {
+            return ToolResultV2.failure(
+                toolId: "change_system_state",
+                error: "Unknown provider: \(providerString). Available: \(AIProvider.allCases.map { $0.rawValue }.joined(separator: ", "))"
+            )
+        }
+        
+        let currentProvider = settingsViewModel.settings.defaultProvider
+        if targetProvider == currentProvider {
+            return ToolResultV2.success(
+                toolId: "change_system_state",
+                output: "Already using \(targetProvider.displayName). No change needed."
+            )
+        }
+        
+        // 2. Check sovereignty permission
+        let sovereigntyService = SovereigntyService.shared
+        if !sovereigntyService.isProviderChangeAllowed() {
+            let reason = sovereigntyService.providerChangeRestrictionReason() ?? "Provider change not allowed"
+            return ToolResultV2.failure(
+                toolId: "change_system_state",
+                error: reason
+            )
+        }
+        
+        // 3. Request biometric approval
+        let actionDescription = "Change AI provider from \(currentProvider.displayName) to \(targetProvider.displayName)"
+        
+        let approvalResult = await ToolApprovalBridgeV2.shared.requestApprovalForAction(
+            actionDescription: actionDescription + (reasoning.isEmpty ? "" : " (Reason: \(reasoning))"),
+            toolId: "change_system_state",
+            approvalScopes: ["provider_change"]
+        )
+        
+        guard approvalResult.isApprovedV2 else {
+            let failureReason = approvalResult.failureReasonV2 ?? "User denied approval"
+            logger.info("Provider change denied: \(failureReason)")
+            return ToolResultV2.failure(
+                toolId: "change_system_state",
+                error: "Change denied: \(failureReason)"
+            )
+        }
+        
+        // 4. Apply the change (use first available model for the new provider)
+        let defaultModel = targetProvider.availableModels.first?.id ?? ""
+        
+        logger.info("Applying provider change: \(targetProvider.rawValue) with model \(defaultModel)")
+        
+        await settingsViewModel.updateSetting(\.defaultProvider, targetProvider)
+        await settingsViewModel.updateSetting(\.defaultModel, defaultModel)
+        
+        // 5. Return success
+        return ToolResultV2.success(
+            toolId: "change_system_state",
+            output: """
+            ✅ Provider changed successfully.
+            
+            **Provider:** \(targetProvider.displayName)
+            **Default Model:** \(targetProvider.availableModels.first?.name ?? defaultModel)
+            \(reasoning.isEmpty ? "" : "**Reason:** \(reasoning)")
+            
+            The change is now active.
+            """,
+            structured: [
+                "provider": targetProvider.rawValue,
+                "model": defaultModel
+            ]
+        )
+    }
+    
+    // MARK: - Tool Enable/Disable (stub for now)
+    
     private func changeTool(toolId: String, enabled: Bool, reasoning: String) -> ToolResultV2 {
+        // Tool enable/disable is out of scope for this implementation
         return ToolResultV2.success(
             toolId: "change_system_state",
             output: """
@@ -222,22 +375,48 @@ final class SystemStateHandler: ToolHandlerV2 {
             **Action:** \(enabled ? "Enable" : "Disable")
             **Reason:** \(reasoning)
             
-            This change requires user approval.
+            Tool enable/disable via this interface is not yet implemented.
             """
         )
     }
     
-    private func changeProvider(provider: String, reasoning: String) -> ToolResultV2 {
-        return ToolResultV2.success(
-            toolId: "change_system_state",
-            output: """
-            Provider change requested.
-            
-            **Provider:** \(provider)
-            **Reason:** \(reasoning)
-            
-            This change requires user approval.
-            """
-        )
+    // MARK: - Helpers
+    
+    /// Parse a provider string (case-insensitive) to AIProvider
+    private func parseProvider(_ name: String) -> AIProvider? {
+        let lowercased = name.lowercased()
+        
+        // Try exact match first
+        if let provider = AIProvider(rawValue: lowercased) {
+            return provider
+        }
+        
+        // Try common aliases
+        switch lowercased {
+        case "claude", "anthropic":
+            return .anthropic
+        case "gpt", "openai", "chatgpt":
+            return .openai
+        case "gemini", "google":
+            return .gemini
+        case "grok", "xai":
+            return .xai
+        case "perplexity", "sonar":
+            return .perplexity
+        case "deepseek":
+            return .deepseek
+        case "zai", "glm":
+            return .zai
+        case "minimax":
+            return .minimax
+        case "mistral":
+            return .mistral
+        case "apple", "applefoundation", "apple_foundation", "apple-foundation":
+            return .appleFoundation
+        case "local", "mlx", "localmlx":
+            return .localMLX
+        default:
+            return nil
+        }
     }
 }

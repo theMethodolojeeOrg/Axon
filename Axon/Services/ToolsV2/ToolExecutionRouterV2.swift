@@ -233,28 +233,41 @@ final class ToolExecutionRouterV2: ObservableObject {
     }
     
     /// Parse pipe-delimited format: "value1|value2|value3"
+    /// Falls back to JSON parsing if the input looks like JSON (AI sometimes sends wrong format)
     private func parsePipeDelimitedV2(
         _ input: String,
         manifest: ToolManifest
     ) throws -> [String: Any] {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // If input looks like JSON, try parsing it as JSON first
+        // This handles cases where the AI sends {"type": "...", ...} instead of pipe-delimited
+        if trimmed.hasPrefix("{") {
+            if let data = trimmed.data(using: .utf8),
+               let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                logger.debug("Pipe-delimited tool received JSON input, parsing as JSON")
+                return dict
+            }
+        }
+
         let delimiter = manifest.inputFormat?.delimiter ?? "|"
         let parts = input.components(separatedBy: delimiter)
-        
+
         guard let fields = manifest.inputFormat?.fields else {
             throw ToolExecutionErrorV2.inputParsingFailed(
                 "Pipe-delimited format requires 'fields' in inputFormat"
             )
         }
-        
+
         var result: [String: Any] = [:]
-        
+
         for (index, field) in fields.enumerated() {
             if index < parts.count {
                 let value = parts[index].trimmingCharacters(in: .whitespaces)
                 result[field] = convertValueV2(value, forParam: field, in: manifest)
             }
         }
-        
+
         return result
     }
     
