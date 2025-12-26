@@ -233,6 +233,68 @@
     "providerTools": 31,
     "toolsRequiringApproval": 17
   },
+  "defaultTrustTiers": {
+    "memory": {
+      "trustTierCategory": "memory_add",
+      "riskLevel": "low",
+      "requiresApproval": false
+    },
+    "agent_state": {
+      "trustTierCategory": "agent_state_write",
+      "riskLevel": "low",
+      "requiresApproval": false
+    },
+    "heartbeat": {
+      "trustTierCategory": "heartbeat_control",
+      "riskLevel": "medium",
+      "requiresApproval": false
+    },
+    "discovery": {
+      "trustTierCategory": "tool_discovery",
+      "riskLevel": "low",
+      "requiresApproval": false
+    },
+    "notification": {
+      "trustTierCategory": "user_notify",
+      "riskLevel": "low",
+      "requiresApproval": false
+    },
+    "temporal": {
+      "trustTierCategory": "temporal_sync",
+      "riskLevel": "low",
+      "requiresApproval": false
+    },
+    "sub_agents": {
+      "trustTierCategory": "sub_agent_spawn",
+      "riskLevel": "medium",
+      "requiresApproval": true
+    },
+    "sovereignty": {
+      "trustTierCategory": "covenant_query",
+      "riskLevel": "low",
+      "requiresApproval": false
+    },
+    "system": {
+      "trustTierCategory": "system_execute",
+      "riskLevel": "high",
+      "requiresApproval": true
+    },
+    "provider": {
+      "trustTierCategory": "network_request",
+      "riskLevel": "medium",
+      "requiresApproval": false
+    },
+    "port": {
+      "trustTierCategory": "port_invocation",
+      "riskLevel": "medium",
+      "requiresApproval": false
+    },
+    "custom": {
+      "trustTierCategory": "custom_tool",
+      "riskLevel": "medium",
+      "requiresApproval": true
+    }
+  },
   "handlers": {
     "memory": [
       "create_memory",

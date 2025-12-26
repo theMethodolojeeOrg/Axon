@@ -32,6 +32,9 @@ final class ToolPluginLoader: ObservableObject {
     /// Last load error, if any
     @Published private(set) var lastError: ToolPluginLoaderError?
 
+    /// Default trust tier configurations by category (loaded from _index.json)
+    @Published private(set) var defaultTrustTiers: [String: TrustTierDefault] = [:]
+
     /// Tools grouped by category
     var toolsByCategory: [ToolCategoryV2: [LoadedTool]] {
         Dictionary(grouping: loadedTools, by: { $0.category })
@@ -193,7 +196,30 @@ final class ToolPluginLoader: ObservableObject {
             }
         }
 
+        // Load trust tier defaults from the bundled index
+        loadTrustTierDefaults(from: bundleURL)
+
         return await discoverTools(in: bundleURL, source: .bundled)
+    }
+
+    /// Load default trust tier configurations from _index.json
+    private func loadTrustTierDefaults(from directory: URL) {
+        let indexURL = directory.appendingPathComponent("_index.json")
+
+        guard fileManager.fileExists(atPath: indexURL.path) else {
+            logger.debug("No _index.json found at \(directory.path)")
+            return
+        }
+
+        switch decoder.decodeIndex(from: indexURL) {
+        case .success(let index):
+            if let defaults = index.defaultTrustTiers {
+                defaultTrustTiers = defaults
+                logger.info("Loaded \(defaults.count) default trust tier configurations")
+            }
+        case .failure(let error):
+            logger.warning("Failed to load trust tier defaults: \(error.localizedDescription)")
+        }
     }
 
     /// Load tools from iCloud Drive
@@ -354,7 +380,8 @@ final class ToolPluginLoader: ObservableObject {
         return ToolIndex(
             version: ToolIndex.currentVersion,
             lastUpdated: Date(),
-            tools: entries
+            tools: entries,
+            defaultTrustTiers: defaultTrustTiers.isEmpty ? nil : defaultTrustTiers
         )
     }
 
@@ -413,6 +440,88 @@ extension ToolPluginLoader {
     /// Check if a tool ID exists
     func hasToolId(_ id: String) -> Bool {
         loadedTools.contains { $0.id == id }
+    }
+
+    // MARK: - Trust Tier Inference
+
+    /// Get the effective trust tier category for a tool, applying defaults if needed
+    /// - Parameter tool: The loaded tool to check
+    /// - Returns: The trust tier category string, or nil if none is defined
+    func effectiveTrustTierCategory(for tool: LoadedTool) -> String? {
+        // 1. Check explicit trustTierCategory on the tool
+        if let explicit = tool.manifest.tool.trustTierCategory {
+            return explicit
+        }
+
+        // 2. Check sovereignty actionCategory
+        if let sovereignty = tool.manifest.sovereignty?.actionCategory {
+            return sovereignty
+        }
+
+        // 3. Fall back to category defaults from _index.json
+        let categoryKey = tool.manifest.tool.category.rawValue
+        if let defaults = defaultTrustTiers[categoryKey] {
+            return defaults.trustTierCategory
+        }
+
+        // Also check alternative category names (mac_system vs system)
+        // The index uses category names from _index.json which may differ from enum raw values
+        return nil
+    }
+
+    /// Get the effective risk level for a tool, applying defaults if needed
+    /// - Parameter tool: The loaded tool to check
+    /// - Returns: The risk level, defaulting to .medium if none defined
+    func effectiveRiskLevel(for tool: LoadedTool) -> ToolSovereigntyConfig.RiskLevel {
+        // 1. Check explicit sovereignty riskLevel
+        if let explicit = tool.manifest.sovereignty?.riskLevel {
+            return explicit
+        }
+
+        // 2. Fall back to category defaults
+        let categoryKey = tool.manifest.tool.category.rawValue
+        if let defaults = defaultTrustTiers[categoryKey] {
+            return defaults.riskLevel
+        }
+
+        // 3. Default to medium
+        return .medium
+    }
+
+    /// Get whether a tool effectively requires approval, applying defaults if needed
+    /// - Parameter tool: The loaded tool to check
+    /// - Returns: True if the tool requires user approval
+    func effectiveRequiresApproval(for tool: LoadedTool) -> Bool {
+        // 1. Check explicit requiresApproval on the tool
+        if let explicit = tool.manifest.tool.requiresApproval {
+            return explicit
+        }
+
+        // 2. Check sovereignty risk level (high/critical requires approval)
+        if let riskLevel = tool.manifest.sovereignty?.riskLevel {
+            switch riskLevel {
+            case .high, .critical:
+                return true
+            case .low, .medium:
+                return false
+            }
+        }
+
+        // 3. Fall back to category defaults
+        let categoryKey = tool.manifest.tool.category.rawValue
+        if let defaults = defaultTrustTiers[categoryKey] {
+            return defaults.requiresApproval
+        }
+
+        // 4. Default to no approval required
+        return false
+    }
+
+    /// Get the full trust tier default for a category
+    /// - Parameter category: The category to look up
+    /// - Returns: The default trust tier configuration, or nil if not defined
+    func trustTierDefault(for category: ToolCategoryV2) -> TrustTierDefault? {
+        defaultTrustTiers[category.rawValue]
     }
 
     /// Get tool IDs for enabled tools

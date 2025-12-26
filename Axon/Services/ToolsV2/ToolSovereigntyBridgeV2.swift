@@ -29,6 +29,7 @@ final class ToolSovereigntyBridgeV2: ObservableObject {
     // MARK: - Dependencies
 
     private let sovereigntyService = SovereigntyService.shared
+    private let pluginLoader = ToolPluginLoader.shared
 
     // MARK: - Properties
 
@@ -89,9 +90,30 @@ final class ToolSovereigntyBridgeV2: ObservableObject {
         }
     }
 
-    /// Get effective trust tier for a tool
+    /// Get effective trust tier for a tool, including category defaults
     func effectiveTrustTier(manifest: ToolManifest) -> String? {
-        manifest.tool.trustTierCategory
+        // 1. Check explicit trustTierCategory on the tool
+        if let explicit = manifest.tool.trustTierCategory {
+            return explicit
+        }
+
+        // 2. Check sovereignty actionCategory
+        if let sovereignty = manifest.sovereignty?.actionCategory {
+            return sovereignty
+        }
+
+        // 3. Fall back to category defaults from _index.json
+        let categoryKey = manifest.tool.category.rawValue
+        if let defaults = pluginLoader.defaultTrustTiers[categoryKey] {
+            return defaults.trustTierCategory
+        }
+
+        return nil
+    }
+
+    /// Get effective trust tier for a loaded tool (convenience)
+    func effectiveTrustTier(for tool: LoadedTool) -> String? {
+        pluginLoader.effectiveTrustTierCategory(for: tool)
     }
 
     /// Check if tool can skip approval via trust tier
@@ -138,16 +160,11 @@ final class ToolSovereigntyBridgeV2: ObservableObject {
 
     // MARK: - Private: Mapping
 
-    /// Map V2 manifest to SovereignAction
+    /// Map V2 manifest to SovereignAction, using category defaults if needed
     private func mapToSovereignAction(manifest: ToolManifest) -> SovereignAction {
-        // Use trustTierCategory if specified
-        if let trustTier = manifest.tool.trustTierCategory {
+        // Use effective trust tier (includes category defaults)
+        if let trustTier = effectiveTrustTier(manifest: manifest) {
             return .specific(.toolInvocation, action: trustTier)
-        }
-
-        // Use sovereignty.actionCategory if specified
-        if let actionCategory = manifest.sovereignty?.actionCategory {
-            return .specific(.toolInvocation, action: actionCategory)
         }
 
         // Fallback: use tool ID as action

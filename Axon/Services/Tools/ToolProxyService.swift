@@ -4965,10 +4965,9 @@ struct ToolRequest: Decodable {
                     return
                 }
 
-                throw DecodingError.keyNotFound(
-                    CodingKeys.query,
-                    DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "No valid query key found (tried: query, memory, content, input, data)")
-                )
+                // For tools that don't require parameters (e.g., mac_system_info, list_tools),
+                // default to empty string rather than throwing an error
+                query = ""
             }
             separateContent = nil
         }

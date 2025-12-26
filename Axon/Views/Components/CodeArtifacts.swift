@@ -861,15 +861,37 @@ struct ToolRequestCodeBlockView: View {
         case failure
     }
 
-    /// Parse the JSON to extract tool name and query
+    /// Parse the JSON to extract tool name and query (query is optional for parameter-less tools)
     private var parsedRequest: (tool: String, query: String)? {
         guard let data = code.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tool = json["tool"] as? String,
-              let query = json["query"] as? String else {
+              let tool = json["tool"] as? String else {
             return nil
         }
+        // Query is optional - default to empty string for parameter-less tools
+        let query = json["query"] as? String ?? ""
         return (tool, query)
+    }
+    
+    /// Get detailed error info for display when parsing fails
+    private var parseError: String? {
+        guard let data = code.data(using: .utf8) else {
+            return "Invalid UTF-8 encoding"
+        }
+        
+        do {
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return "Not a valid JSON object"
+            }
+            
+            if json["tool"] == nil {
+                return "Missing 'tool' field in JSON"
+            }
+            
+            return nil // No error
+        } catch {
+            return "JSON parse error: \(error.localizedDescription)"
+        }
     }
 
     /// Generate a hash for deduplication
@@ -1010,14 +1032,37 @@ struct ToolRequestCodeBlockView: View {
     @ViewBuilder
     private var expandedContent: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Query preview
+            // Query preview (or show it's parameter-less)
             if let parsed = parsedRequest {
-                Text(parsed.query)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundColor(AppColors.textSecondary)
-                    .lineLimit(3)
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
+                if parsed.query.isEmpty {
+                    Text("(No parameters required)")
+                        .font(.system(.caption))
+                        .italic()
+                        .foregroundColor(AppColors.textTertiary)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 8)
+                } else {
+                    Text(parsed.query)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(AppColors.textSecondary)
+                        .lineLimit(3)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 8)
+                }
+            } else {
+                // Show raw JSON for debugging when parsing fails
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Raw JSON:")
+                        .font(.system(.caption2))
+                        .foregroundColor(AppColors.textTertiary)
+                    Text(code)
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundColor(AppColors.textSecondary)
+                        .lineLimit(5)
+                        .textSelection(.enabled)
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
             }
 
             // Result if available
@@ -1028,6 +1073,7 @@ struct ToolRequestCodeBlockView: View {
                 Text(result)
                     .font(.system(.caption, design: .monospaced))
                     .foregroundColor(executionState == .failure ? AppColors.signalHematite : AppColors.textSecondary)
+                    .textSelection(.enabled)
                     .padding(.horizontal, 12)
                     .padding(.bottom, 8)
             }
@@ -1053,7 +1099,8 @@ struct ToolRequestCodeBlockView: View {
     private func executeToolRequest() {
         guard let parsed = parsedRequest else {
             executionState = .failure
-            executionResult = "Failed to parse tool request"
+            // Show detailed parse error for debugging
+            executionResult = parseError ?? "Failed to parse tool request (unknown error)"
             return
         }
 
@@ -1061,27 +1108,23 @@ struct ToolRequestCodeBlockView: View {
 
         Task {
             do {
-                let request = ToolRequest(tool: parsed.tool, query: parsed.query)
-
-                // Get Gemini API key for tool execution
-                let geminiKey = await MainActor.run {
-                    SettingsViewModel.shared.getAPIKey(.gemini) ?? ""
-                }
-
-                let result = try await ToolProxyService.shared.executeToolRequest(
-                    request,
-                    geminiApiKey: geminiKey,
-                    conversationContext: nil
+                // Use unified routing service for V1/V2 compatible execution
+                let result = try await ToolRoutingService.shared.executeTool(
+                    toolId: parsed.tool,
+                    query: parsed.query
                 )
 
                 await MainActor.run {
                     if result.success {
                         executionState = .success
-                        executionResult = result.result
-                        ToolRequestTracker.shared.markExecuted(hash: contentHash, result: result.result)
+                        executionResult = result.output
+                        ToolRequestTracker.shared.markExecuted(
+                            hash: contentHash,
+                            result: result.output
+                        )
                     } else {
                         executionState = .failure
-                        executionResult = result.result
+                        executionResult = result.output
                     }
                 }
             } catch {

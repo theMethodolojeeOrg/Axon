@@ -443,8 +443,16 @@ struct ToolIndex: Codable {
     let version: String
     let lastUpdated: Date?
     let tools: [ToolIndexEntry]?
+    let defaultTrustTiers: [String: TrustTierDefault]?
 
     static let currentVersion = "1.0.0"
+}
+
+/// Default trust tier configuration for a category
+struct TrustTierDefault: Codable, Equatable {
+    let trustTierCategory: String
+    let riskLevel: ToolSovereigntyConfig.RiskLevel
+    let requiresApproval: Bool
 }
 
 /// Entry in the tool index

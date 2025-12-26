@@ -311,10 +311,12 @@ final class ToolRoutingService: ObservableObject {
 
     /// Parse tool request from AI response
     /// Works for both V1 and V2 (same format)
+    /// Now matches V1's flexible parsing: supports multiple field names, nested parameters, and backticks in content
     func parseToolRequests(from response: String) -> [ParsedToolRequest] {
-        // Use existing parsing logic - format is the same for both systems
-        let pattern = #"```tool_request\s*\n(\{[^`]+\})\s*\n```"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) else {
+        // Match V1's regex pattern - captures any content between fences (not just {[^`]+})
+        // This allows backticks inside JSON string values
+        let pattern = "```tool_request\\s*\\n?([\\s\\S]*?)\\n?```"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
             return []
         }
 
@@ -323,7 +325,7 @@ final class ToolRoutingService: ObservableObject {
 
         return matches.compactMap { match -> ParsedToolRequest? in
             guard let jsonRange = Range(match.range(at: 1), in: response) else { return nil }
-            let jsonString = String(response[jsonRange])
+            let jsonString = String(response[jsonRange]).trimmingCharacters(in: .whitespacesAndNewlines)
 
             guard let data = jsonString.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -331,9 +333,67 @@ final class ToolRoutingService: ObservableObject {
                 return nil
             }
 
-            let query = json["query"] as? String ?? ""
-            return ParsedToolRequest(toolId: tool, query: query)
+            // Extract query with V1-compatible field name fallbacks and nested parameters support
+            let query = extractQuery(from: json, toolId: tool)
+            let content = extractContent(from: json)
+
+            return ParsedToolRequest(toolId: tool, query: query, content: content)
         }
+    }
+
+    /// Extract query value with V1-compatible fallbacks
+    /// Supports: query, memory, content, input, data, path keys
+    /// Also handles nested {"tool": "x", "parameters": {"query": "..."}} format
+    private func extractQuery(from json: [String: Any], toolId: String) -> String {
+        // Check for nested parameters object first (common AI format)
+        if let params = json["parameters"] as? [String: Any] {
+            if let q = params["query"] as? String { return q }
+            if let q = params["path"] as? String { return q }
+            if let q = params["input"] as? String { return q }
+        }
+
+        // Flat format: try multiple possible key names (matching V1's ToolRequest decoder)
+        if let q = json["query"] as? String { return q }
+        if let q = json["memory"] as? String { return q }
+        if let q = json["path"] as? String { return q }
+        if let q = json["input"] as? String { return q }
+        if let q = json["data"] as? String { return q }
+
+        // Special case: reflect_on_conversation sends options as top-level fields
+        // Reconstruct them as JSON query (matching V1 behavior)
+        if toolId == "reflect_on_conversation" {
+            var optionsDict: [String: Any] = [:]
+            for (key, value) in json where key != "tool" {
+                optionsDict[key] = value
+            }
+            if !optionsDict.isEmpty,
+               let jsonData = try? JSONSerialization.data(withJSONObject: optionsDict, options: []),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                return jsonString
+            }
+        }
+
+        // For content-only requests, use content as query if no query field
+        if let c = json["content"] as? String { return c }
+
+        // Default to empty string for tools that don't require parameters
+        return ""
+    }
+
+    /// Extract separate content field if present (for write operations)
+    private func extractContent(from json: [String: Any]) -> String? {
+        // Check nested parameters first
+        if let params = json["parameters"] as? [String: Any],
+           let content = params["content"] as? String {
+            return content
+        }
+
+        // Check flat format - only return content if query also exists (to distinguish from content-as-query)
+        if json["query"] != nil || json["path"] != nil || json["input"] != nil {
+            return json["content"] as? String
+        }
+
+        return nil
     }
 }
 
@@ -352,6 +412,13 @@ struct ToolExecutionResult {
 struct ParsedToolRequest {
     let toolId: String
     let query: String
+    let content: String?  // Separate content field for write operations (e.g., file writes)
+
+    init(toolId: String, query: String, content: String? = nil) {
+        self.toolId = toolId
+        self.query = query
+        self.content = content
+    }
 }
 
 /// Errors from tool routing

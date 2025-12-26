@@ -226,7 +226,14 @@ final class ToolExecutionRouterV2: ObservableObject {
     
     /// Parse JSON input
     private func parseJSONInputV2(_ input: String) throws -> [String: Any] {
-        guard let data = input.data(using: .utf8) else {
+        // Handle empty input gracefully - tools without required parameters
+        // send empty query strings which should parse as empty dictionaries
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return [:]
+        }
+        
+        guard let data = trimmed.data(using: .utf8) else {
             throw ToolExecutionErrorV2.inputParsingFailed("Invalid UTF-8 string")
         }
         
@@ -564,14 +571,22 @@ final class ToolExecutionRouterV2: ObservableObject {
         inputs: [String: Any],
         context: ToolContextV2
     ) async throws -> ToolResultV2 {
-        // Bridge execution routes to Mac via BridgeService
-        // This is a complex feature that integrates with the VS Code extension
+        // Bridge execution routes to BridgeHandler for Mac system tools
+        guard let handler = handlerRegistry.handlerV2(for: "bridge") else {
+            throw ToolExecutionErrorV2.handlerNotFound("bridge")
+        }
         
-        logger.warning("Bridge execution not fully implemented yet")
+        // Validate inputs via handler
+        let validationErrors = handler.validateInputs(inputs, manifest: loadedTool.manifest)
+        if !validationErrors.isEmpty {
+            throw ToolExecutionErrorV2.validationFailed(validationErrors)
+        }
         
-        return ToolResultV2.failure(
-            toolId: loadedTool.id,
-            error: "Bridge execution type deferred - requires BridgeService integration"
+        // Execute via BridgeHandler
+        return try await handler.executeV2(
+            inputs: inputs,
+            manifest: loadedTool.manifest,
+            context: context
         )
     }
 }
