@@ -1,0 +1,110 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "vscode_list_directory",
+        "name": "VS Code List Directory",
+        "description": "List the contents of a directory in the connected VS Code workspace.",
+        "category": "vscode",
+        "icon": {
+            "sfSymbol": "folder.fill"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "vscode",
+            "files",
+            "directory",
+            "list",
+            "workspace",
+            "bridge"
+        ]
+    },
+    "parameters": {
+        "path": {
+            "type": "string",
+            "required": true,
+            "description": "Path to the directory to list (relative to workspace or absolute, use '.' for workspace root)"
+        },
+        "includeHidden": {
+            "type": "boolean",
+            "required": false,
+            "description": "Include hidden files (starting with .)",
+            "default": false
+        }
+    },
+    "inputFormat": {
+        "style": "json"
+    },
+    "execution": {
+        "type": "bridge",
+        "bridgeMethod": "file/list",
+        "bridgeTarget": "vscode"
+    },
+    "ai": {
+        "systemPromptSection": "### vscode_list_directory\nList directory contents in the connected VS Code workspace.\n\n**Format:**\n```tool_request\n{\"tool\": \"vscode_list_directory\", \"query\": \"{\\\"path\\\": \\\".\\\"}\"}\n```\n\n**Parameters:**\n- path: Directory path relative to workspace or absolute (required). Use '.' for workspace root\n- includeHidden: Include hidden files starting with . (default: false)\n\n**Returns:** List of files and directories with names, types, sizes, and modification times",
+        "usageExamples": [
+            {
+                "description": "List workspace root",
+                "input": "{\"path\": \".\"}"
+            },
+            {
+                "description": "List src directory",
+                "input": "{\"path\": \"src\"}"
+            },
+            {
+                "description": "List with hidden files",
+                "input": "{\"path\": \".\", \"includeHidden\": true}"
+            }
+        ],
+        "whenToUse": [
+            "Exploring VS Code workspace structure",
+            "Finding files in a project directory",
+            "Understanding project layout"
+        ],
+        "whenNotToUse": [
+            "VS Code bridge not connected",
+            "Listing Mac filesystem directories (use mac_file_find)"
+        ]
+    },
+    "ui": {
+        "inputForm": {
+            "fields": [
+                {
+                    "param": "path",
+                    "widget": "text_field",
+                    "label": "Directory Path",
+                    "placeholder": "."
+                },
+                {
+                    "param": "includeHidden",
+                    "widget": "toggle",
+                    "label": "Include Hidden Files"
+                }
+            ],
+            "layout": "vertical",
+            "submitLabel": "List Directory"
+        },
+        "resultDisplay": {
+            "style": "list",
+            "sections": [
+                {
+                    "type": "header",
+                    "title": "Directory Contents",
+                    "icon": "folder.fill"
+                },
+                {
+                    "type": "list",
+                    "source": "{{files}}",
+                    "itemTemplate": "{{type}} {{name}} ({{size}})"
+                }
+            ]
+        }
+    },
+    "sovereignty": {
+        "actionCategory": "file_read",
+        "approvalDescription": "List directory in VS Code workspace",
+        "scopes": [
+            "vscode.file.read"
+        ],
+        "riskLevel": "low"
+    }
+}

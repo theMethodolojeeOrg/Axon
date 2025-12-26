@@ -1,0 +1,120 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "vscode_read_file",
+        "name": "VS Code Read File",
+        "description": "Read the contents of a file from the connected VS Code workspace.",
+        "category": "vscode",
+        "icon": {
+            "sfSymbol": "doc.text.fill"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "vscode",
+            "files",
+            "read",
+            "workspace",
+            "bridge"
+        ]
+    },
+    "parameters": {
+        "path": {
+            "type": "string",
+            "required": true,
+            "description": "Path to the file to read (relative to workspace or absolute)"
+        },
+        "encoding": {
+            "type": "string",
+            "required": false,
+            "description": "Text encoding (utf-8, utf-16, ascii)",
+            "default": "utf-8"
+        },
+        "maxSize": {
+            "type": "integer",
+            "required": false,
+            "description": "Maximum bytes to read (default: 10MB)",
+            "default": 10485760
+        }
+    },
+    "inputFormat": {
+        "style": "json"
+    },
+    "execution": {
+        "type": "bridge",
+        "bridgeMethod": "file/read",
+        "bridgeTarget": "vscode"
+    },
+    "ai": {
+        "systemPromptSection": "### vscode_read_file\nRead file contents from the connected VS Code workspace.\n\n**Format:**\n```tool_request\n{\"tool\": \"vscode_read_file\", \"query\": \"{\\\"path\\\": \\\"src/index.ts\\\"}\"}\n```\n\n**Parameters:**\n- path: File path relative to workspace or absolute (required)\n- encoding: Text encoding - utf-8, utf-16, ascii (default: utf-8)\n- maxSize: Max bytes to read (default: 10MB)\n\n**Returns:** File content, size, encoding, and resolved path",
+        "usageExamples": [
+            {
+                "description": "Read a TypeScript file",
+                "input": "{\"path\": \"src/index.ts\"}"
+            },
+            {
+                "description": "Read package.json",
+                "input": "{\"path\": \"package.json\"}"
+            },
+            {
+                "description": "Read with path",
+                "input": "{\"path\": \"/Users/tom/project/README.md\"}"
+            }
+        ],
+        "whenToUse": [
+            "Need to read source code from VS Code workspace",
+            "Viewing configuration files in the connected editor",
+            "Reading text files from the developer's project"
+        ],
+        "whenNotToUse": [
+            "VS Code bridge not connected",
+            "Reading files from Mac filesystem directly (use mac_file_read)"
+        ]
+    },
+    "ui": {
+        "inputForm": {
+            "fields": [
+                {
+                    "param": "path",
+                    "widget": "text_field",
+                    "label": "File Path",
+                    "placeholder": "src/index.ts"
+                },
+                {
+                    "param": "encoding",
+                    "widget": "picker",
+                    "label": "Encoding",
+                    "options": [
+                        "utf-8",
+                        "utf-16",
+                        "ascii"
+                    ]
+                }
+            ],
+            "layout": "vertical",
+            "submitLabel": "Read File"
+        },
+        "resultDisplay": {
+            "style": "code",
+            "sections": [
+                {
+                    "type": "header",
+                    "title": "File Contents",
+                    "icon": "doc.text.fill"
+                },
+                {
+                    "type": "code",
+                    "source": "{{content}}",
+                    "language": "auto"
+                }
+            ]
+        }
+    },
+    "sovereignty": {
+        "actionCategory": "file_read",
+        "approvalDescription": "Read file from VS Code workspace",
+        "scopes": [
+            "vscode.file.read"
+        ],
+        "riskLevel": "low"
+    }
+}

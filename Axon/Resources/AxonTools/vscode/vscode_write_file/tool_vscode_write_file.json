@@ -1,0 +1,123 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "vscode_write_file",
+        "name": "VS Code Write File",
+        "description": "Write or create a file in the connected VS Code workspace.",
+        "category": "vscode",
+        "icon": {
+            "sfSymbol": "doc.badge.plus"
+        },
+        "requiresApproval": true,
+        "tags": [
+            "vscode",
+            "files",
+            "write",
+            "create",
+            "workspace",
+            "bridge"
+        ]
+    },
+    "parameters": {
+        "path": {
+            "type": "string",
+            "required": true,
+            "description": "Path to the file to write (relative to workspace or absolute)"
+        },
+        "content": {
+            "type": "string",
+            "required": true,
+            "description": "Content to write to the file"
+        },
+        "encoding": {
+            "type": "string",
+            "required": false,
+            "description": "Text encoding (utf-8, utf-16, ascii)",
+            "default": "utf-8"
+        },
+        "createIfMissing": {
+            "type": "boolean",
+            "required": false,
+            "description": "Create file and parent directories if they don't exist",
+            "default": true
+        }
+    },
+    "inputFormat": {
+        "style": "json"
+    },
+    "execution": {
+        "type": "bridge",
+        "bridgeMethod": "file/write",
+        "bridgeTarget": "vscode"
+    },
+    "ai": {
+        "systemPromptSection": "### vscode_write_file\nWrite or create a file in the connected VS Code workspace.\n\n**Format:**\n```tool_request\n{\"tool\": \"vscode_write_file\", \"query\": \"{\\\"path\\\": \\\"src/utils.ts\\\", \\\"content\\\": \\\"export function helper() {}\\\"}\"}  \n```\n\n**Parameters:**\n- path: File path relative to workspace or absolute (required)\n- content: Content to write (required)\n- encoding: Text encoding (default: utf-8)\n- createIfMissing: Create file/dirs if missing (default: true)\n\n**Returns:** Success status, bytes written, whether file was created",
+        "usageExamples": [
+            {
+                "description": "Create a new file",
+                "input": "{\"path\": \"src/new-file.ts\", \"content\": \"// New file\"}"
+            },
+            {
+                "description": "Update existing file",
+                "input": "{\"path\": \"README.md\", \"content\": \"# Updated README\"}"
+            }
+        ],
+        "whenToUse": [
+            "Creating new source files in VS Code workspace",
+            "Updating existing code files",
+            "Writing configuration or documentation files"
+        ],
+        "whenNotToUse": [
+            "VS Code bridge not connected",
+            "Writing to Mac filesystem directly (use mac_file_write)",
+            "Writing binary files"
+        ]
+    },
+    "ui": {
+        "inputForm": {
+            "fields": [
+                {
+                    "param": "path",
+                    "widget": "text_field",
+                    "label": "File Path",
+                    "placeholder": "src/utils.ts"
+                },
+                {
+                    "param": "content",
+                    "widget": "text_area",
+                    "label": "Content",
+                    "placeholder": "File content..."
+                },
+                {
+                    "param": "createIfMissing",
+                    "widget": "toggle",
+                    "label": "Create if Missing"
+                }
+            ],
+            "layout": "vertical",
+            "submitLabel": "Write File"
+        },
+        "resultDisplay": {
+            "style": "card",
+            "sections": [
+                {
+                    "type": "header",
+                    "title": "File Written",
+                    "icon": "checkmark.circle.fill"
+                },
+                {
+                    "type": "text",
+                    "source": "Wrote {{bytesWritten}} bytes to {{path}}"
+                }
+            ]
+        }
+    },
+    "sovereignty": {
+        "actionCategory": "file_write",
+        "approvalDescription": "Write file to VS Code workspace",
+        "scopes": [
+            "vscode.file.write"
+        ],
+        "riskLevel": "medium"
+    }
+}
