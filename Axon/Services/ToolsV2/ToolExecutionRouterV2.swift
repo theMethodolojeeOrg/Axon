@@ -185,17 +185,51 @@ final class ToolExecutionRouterV2: ObservableObject {
         manifest: ToolManifest
     ) throws -> [String: Any] {
         let style = manifest.inputFormat?.style ?? .json
-        
+
         switch style {
         case .pipeDelimited:
             return try parsePipeDelimitedV2(rawInput, manifest: manifest)
         case .json:
-            return try parseJSONInputV2(rawInput)
+            return try parseJSONInputV2(rawInput, manifest: manifest)
         case .freeform, .positional:
-            return ["query": rawInput]
+            return parseFreeformInputV2(rawInput, manifest: manifest)
         case .keyValue:
             return try parseKeyValueV2(rawInput)
         }
+    }
+
+    /// Parse freeform input, mapping to primary parameter if applicable
+    /// If the manifest has a single required parameter, maps the raw input to it
+    /// Otherwise returns ["query": rawInput] for generic handling
+    private func parseFreeformInputV2(
+        _ rawInput: String,
+        manifest: ToolManifest
+    ) -> [String: Any] {
+        // First, try to parse as JSON in case the AI sent structured input
+        if let data = rawInput.data(using: .utf8),
+           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return dict
+        }
+
+        // Find the primary parameter - the single required parameter or first parameter
+        if let params = manifest.parameters {
+            let requiredParams = params.filter { $0.value.required == true }
+
+            // If there's exactly one required parameter, map the input to it
+            if requiredParams.count == 1 {
+                let paramName = requiredParams.first!.key
+                return [paramName: rawInput]
+            }
+
+            // If there's only one parameter total, use that
+            if params.count == 1 {
+                let paramName = params.first!.key
+                return [paramName: rawInput]
+            }
+        }
+
+        // Default fallback - use "query" key
+        return ["query": rawInput]
     }
     
     /// Parse pipe-delimited format: "value1|value2|value3"
@@ -225,18 +259,19 @@ final class ToolExecutionRouterV2: ObservableObject {
     }
     
     /// Parse JSON input
-    private func parseJSONInputV2(_ input: String) throws -> [String: Any] {
+    /// Falls back to freeform parsing if input is not valid JSON
+    private func parseJSONInputV2(_ input: String, manifest: ToolManifest? = nil) throws -> [String: Any] {
         // Handle empty input gracefully - tools without required parameters
         // send empty query strings which should parse as empty dictionaries
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
             return [:]
         }
-        
+
         guard let data = trimmed.data(using: .utf8) else {
             throw ToolExecutionErrorV2.inputParsingFailed("Invalid UTF-8 string")
         }
-        
+
         do {
             if let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 return dict
@@ -244,6 +279,12 @@ final class ToolExecutionRouterV2: ObservableObject {
                 throw ToolExecutionErrorV2.inputParsingFailed("Expected JSON object")
             }
         } catch {
+            // If JSON parsing fails and we have a manifest, fall back to freeform parsing
+            // This handles cases where the AI sends a raw value instead of JSON
+            if let manifest = manifest {
+                logger.debug("JSON parsing failed, falling back to freeform: \(error.localizedDescription)")
+                return parseFreeformInputV2(input, manifest: manifest)
+            }
             throw ToolExecutionErrorV2.inputParsingFailed(error.localizedDescription)
         }
     }

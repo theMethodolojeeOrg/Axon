@@ -365,26 +365,41 @@ final class MacSystemService {
     // MARK: - File Find
 
     func findFiles(pattern: String, directory: String = "~", maxDepth: Int = 3) async throws -> FileFindResult {
-        logger.debug("Finding files: \(pattern) in \(directory)")
+        logger.info("Finding files: pattern='\(pattern)' in directory='\(directory)' maxDepth=\(maxDepth)")
 
         let fileManager = FileManager.default
         let expandedPath = NSString(string: directory).expandingTildeInPath
 
+        logger.info("Expanded path: \(expandedPath)")
+
+        // Check if directory exists
+        var isDir: ObjCBool = false
+        guard fileManager.fileExists(atPath: expandedPath, isDirectory: &isDir), isDir.boolValue else {
+            logger.error("Directory does not exist or is not a directory: \(expandedPath)")
+            throw MacSystemError.operationFailed("Directory does not exist: \(expandedPath)")
+        }
+
         var foundFiles: [FoundFile] = []
+        var filesEnumerated = 0
 
         guard let enumerator = fileManager.enumerator(
             at: URL(fileURLWithPath: expandedPath),
             includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey],
             options: [.skipsHiddenFiles]
         ) else {
+            logger.error("Cannot create enumerator for: \(expandedPath)")
             throw MacSystemError.operationFailed("Cannot enumerate directory: \(directory)")
         }
 
         for case let fileURL as URL in enumerator {
+            filesEnumerated += 1
+
             // Check depth
             let components = fileURL.pathComponents
             let baseComponents = URL(fileURLWithPath: expandedPath).pathComponents
-            if components.count - baseComponents.count > maxDepth {
+            let currentDepth = components.count - baseComponents.count
+
+            if currentDepth > maxDepth {
                 enumerator.skipDescendants()
                 continue
             }
@@ -392,7 +407,9 @@ final class MacSystemService {
             let fileName = fileURL.lastPathComponent
 
             // Simple pattern matching (supports * wildcard)
-            if matchesPattern(fileName, pattern: pattern) {
+            let matches = matchesPattern(fileName, pattern: pattern)
+
+            if matches {
                 let resourceValues = try? fileURL.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey])
                 let isDirectory = resourceValues?.isDirectory ?? false
                 let size = resourceValues?.fileSize
@@ -405,10 +422,13 @@ final class MacSystemService {
                 ))
 
                 if foundFiles.count >= 100 {
+                    logger.info("Reached 100 file limit")
                     break
                 }
             }
         }
+
+        logger.info("File find complete: enumerated=\(filesEnumerated), matched=\(foundFiles.count)")
 
         return FileFindResult(
             files: foundFiles,

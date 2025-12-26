@@ -32,17 +32,20 @@ final class BridgeHandler: ToolHandlerV2 {
         context: ToolContextV2
     ) async throws -> ToolResultV2 {
         let toolId = manifest.tool.id
-        
-        // Check bridge connection
+
+        #if os(macOS)
+        // On macOS, execute locally via MacSystemService - no bridge connection needed
+        return try await executeBridgeTool(toolId: toolId, inputs: inputs, manifest: manifest)
+        #else
+        // On iOS, require bridge connection to a Mac or VS Code instance
         guard connectionManager.isConnected else {
             return ToolResultV2.failure(
                 toolId: toolId,
                 error: "Bridge not connected. Please connect to a Mac or VS Code instance first."
             )
         }
-        
-        // Route to MacSystemToolExecutor
         return try await executeBridgeTool(toolId: toolId, inputs: inputs, manifest: manifest)
+        #endif
     }
     
     // MARK: - Bridge Tool Execution

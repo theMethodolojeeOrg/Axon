@@ -24,7 +24,7 @@
     }
   },
   "inputFormat": {
-    "style": "freeform"
+    "style": "json"
   },
   "execution": {
     "type": "bridge",
