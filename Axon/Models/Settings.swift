@@ -1329,7 +1329,8 @@ enum APIProvider: String, CaseIterable, Identifiable {
 /// TTS provider selection - mutually exclusive
 enum TTSProvider: String, Codable, CaseIterable, Identifiable {
     case apple = "apple"          // Native Apple TTS (free, no API key required)
-    case mlxAudio = "mlxAudio"    // On-device neural TTS via F5-TTS (free, no API key required)
+    case kokoro = "kokoro"        // On-device neural TTS via Kokoro (free, no API key required)
+    case mlxAudio = "mlxAudio"    // On-device neural TTS via F5-TTS (free, no API key required) - DISABLED
     case elevenlabs = "elevenlabs"
     case gemini = "gemini"
     case openai = "openai"
@@ -1339,6 +1340,7 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .apple: return "Apple (Siri)"
+        case .kokoro: return "Kokoro Neural"
         case .mlxAudio: return "F5 Neural"
         case .elevenlabs: return "ElevenLabs"
         case .gemini: return "Gemini"
@@ -1349,6 +1351,7 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
     var description: String {
         switch self {
         case .apple: return "On-device Siri voices • Free • No API key"
+        case .kokoro: return "On-device neural TTS • Free • ~600MB model"
         case .mlxAudio: return "On-device neural TTS • Free • ~300MB model"
         case .elevenlabs: return "High-quality voices with fine-tuned controls"
         case .gemini: return "Google's TTS with expressive voices"
@@ -1359,6 +1362,7 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .apple: return "apple.logo"
+        case .kokoro: return "waveform.badge.magnifyingglass"
         case .mlxAudio: return "waveform.badge.mic"
         case .elevenlabs: return "waveform"
         case .gemini: return "sparkles"
@@ -1369,7 +1373,7 @@ enum TTSProvider: String, Codable, CaseIterable, Identifiable {
     /// Whether this provider requires an API key
     var requiresAPIKey: Bool {
         switch self {
-        case .apple, .mlxAudio: return false
+        case .apple, .kokoro, .mlxAudio: return false
         case .elevenlabs, .gemini, .openai: return true
         }
     }
@@ -1704,6 +1708,13 @@ struct TTSSettings: Codable, Equatable {
     var mlxVoice: MLXTTSVoice = .defaultVoice
     /// Speech speed (0.5 to 2.0, default 1.0)
     var mlxSpeed: Float = 1.0
+
+    // MARK: - Kokoro TTS Settings
+    var kokoroVoice: KokoroTTSVoice = .af_heart
+    /// Speech speed (0.5 to 2.0, default 1.0)
+    var kokoroSpeed: Float = 1.0
+    /// Set of downloaded voice IDs (for tracking which voices have been downloaded)
+    var downloadedKokoroVoices: Set<String> = []
 
     // MARK: - Computed Properties for Quality Tier
 

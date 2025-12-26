@@ -210,11 +210,14 @@ final class KokoroTTSService: ObservableObject {
     static var isAvailable: Bool {
         #if canImport(KokoroSwift)
         #if targetEnvironment(simulator)
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] isAvailable: false (simulator)")
         return false
         #else
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] isAvailable: true (KokoroSwift imported)")
         return true
         #endif
         #else
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] isAvailable: false (KokoroSwift not available)")
         return false
         #endif
     }
@@ -222,9 +225,18 @@ final class KokoroTTSService: ObservableObject {
     // MARK: - Path Management
 
     /// Get the path to the Kokoro model file
-    /// Checks App Bundle first, then Documents/KokoroModels/
+    /// Checks App Bundle first (in KokoroTTS/Model subdirectory), then Documents/KokoroModels/
     func getModelPath() -> URL? {
-        // Check App Bundle first
+        // Check App Bundle first - in KokoroTTS/Model subdirectory
+        if let bundlePath = Bundle.main.url(
+            forResource: "kokoro-v1_0",
+            withExtension: "safetensors",
+            subdirectory: "KokoroTTS/Model"
+        ) {
+            return bundlePath
+        }
+
+        // Also check without subdirectory (for flexibility)
         if let bundlePath = Bundle.main.url(forResource: "kokoro-v1_0", withExtension: "safetensors") {
             return bundlePath
         }
@@ -248,7 +260,17 @@ final class KokoroTTSService: ObservableObject {
 
     /// Get path to built-in voices file (bundled with app)
     func getBuiltInVoicesPath() -> URL? {
-        Bundle.main.url(forResource: "voices_builtin", withExtension: "npz")
+        // Check in KokoroTTS/Voices subdirectory first
+        if let path = Bundle.main.url(
+            forResource: "voices_builtin",
+            withExtension: "npz",
+            subdirectory: "KokoroTTS/Voices"
+        ) {
+            return path
+        }
+
+        // Also check without subdirectory (for flexibility)
+        return Bundle.main.url(forResource: "voices_builtin", withExtension: "npz")
     }
 
     /// Check if the model is available (either in bundle or documents)
@@ -260,41 +282,60 @@ final class KokoroTTSService: ObservableObject {
 
     /// Load the Kokoro TTS model
     func loadModel() async throws {
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] loadModel() called")
+
         #if canImport(KokoroSwift)
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] KokoroSwift is available, checking device...")
+
         guard Self.isAvailable else {
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] Device not supported (simulator)")
             throw KokoroTTSError.simulatorNotSupported
         }
 
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] Looking for model path...")
         guard let modelPath = getModelPath() else {
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] Model path not found!")
             throw KokoroTTSError.modelNotFound
         }
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] Found model at: \(modelPath.path)")
 
         loadingStatus = "Loading Kokoro model..."
         isDownloading = true
 
         do {
             // Initialize Kokoro TTS with model path
-            // The model path should be the directory containing the safetensors file
-            let modelDirectory = modelPath.deletingLastPathComponent()
-            kokoroTTS = KokoroTTS(modelPath: modelDirectory, g2p: .misaki)
+            // KokoroTTS expects the file URL directly (not directory)
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] Initializing KokoroTTS with model file: \(modelPath.path)")
+
+            kokoroTTS = KokoroTTS(modelPath: modelPath, g2p: .misaki)
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] KokoroTTS initialized successfully")
 
             // Load built-in voice embeddings
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] Loading built-in voices...")
             try await loadBuiltInVoices()
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] Built-in voices loaded")
 
             // Load any downloaded voices
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] Loading downloaded voices...")
             try await loadDownloadedVoices()
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] Downloaded voices loaded")
+
+            // Log available voices for verification
+            let availableVoiceNames = Array(voiceEmbeddings.keys).sorted()
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] Available voice embeddings: \(availableVoiceNames)")
 
             isModelLoaded = true
             loadingStatus = "Model loaded"
-            debugLog("[KokoroTTSService] Model loaded successfully", category: .tts)
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] ✅ Model loaded successfully!")
         } catch {
             loadingStatus = "Failed to load model"
-            debugLog("[KokoroTTSService] Failed to load model: \(error)", category: .tts)
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] ❌ Failed to load model: \(error)")
             throw KokoroTTSError.generationFailed(error.localizedDescription)
         }
 
         isDownloading = false
         #else
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] KokoroSwift not available in this build")
         throw KokoroTTSError.notAvailable
         #endif
     }
@@ -308,7 +349,7 @@ final class KokoroTTSService: ObservableObject {
         isModelLoaded = false
         loadingStatus = ""
         downloadProgress = 0.0
-        debugLog("[KokoroTTSService] Model unloaded", category: .tts)
+        debugLog(.ttsPlayback, "[KokoroTTSService] Model unloaded")
     }
 
     // MARK: - Voice Management
@@ -316,16 +357,24 @@ final class KokoroTTSService: ObservableObject {
     /// Load built-in voice embeddings from bundled npz file
     private func loadBuiltInVoices() async throws {
         #if canImport(KokoroSwift)
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] Looking for built-in voices file...")
         guard let voicesPath = getBuiltInVoicesPath() else {
-            debugLog("[KokoroTTSService] Built-in voices file not found", category: .tts)
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] ⚠️ Built-in voices file not found")
             return
         }
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] Found voices file at: \(voicesPath.path)")
 
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] Reading NPZ file...")
         if let arrays = NpyzReader.read(fileFromPath: voicesPath) {
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] NPZ file contains \(arrays.count) voice(s)")
             for (name, array) in arrays {
-                voiceEmbeddings[name] = array
-                debugLog("[KokoroTTSService] Loaded built-in voice: \(name)", category: .tts)
+                // Strip .npy extension if present (NPZ files store with .npy suffix)
+                let voiceName = name.replacingOccurrences(of: ".npy", with: "")
+                voiceEmbeddings[voiceName] = array
+                debugLog(.ttsPlayback, "🗣️ [Kokoro] Loaded built-in voice: \(voiceName)")
             }
+        } else {
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] ⚠️ Failed to read NPZ file")
         }
         #endif
     }
@@ -333,30 +382,54 @@ final class KokoroTTSService: ObservableObject {
     /// Load downloaded voice embeddings from Documents directory
     private func loadDownloadedVoices() async throws {
         #if canImport(KokoroSwift)
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] Checking for downloaded voices...")
         let fileManager = FileManager.default
 
         // Create voices directory if it doesn't exist
         if !fileManager.fileExists(atPath: voicesDirectory.path) {
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] Creating voices directory: \(voicesDirectory.path)")
             try fileManager.createDirectory(at: voicesDirectory, withIntermediateDirectories: true)
         }
 
         // Load each .npz file in the voices directory
         let contents = try fileManager.contentsOfDirectory(at: voicesDirectory, includingPropertiesForKeys: nil)
-        for fileURL in contents where fileURL.pathExtension == "npz" {
+        let npzFiles = contents.filter { $0.pathExtension == "npz" }
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] Found \(npzFiles.count) downloaded voice file(s)")
+
+        for fileURL in npzFiles {
+            debugLog(.ttsPlayback, "🗣️ [Kokoro] Loading: \(fileURL.lastPathComponent)")
             if let arrays = NpyzReader.read(fileFromPath: fileURL) {
+                debugLog(.ttsPlayback, "🗣️ [Kokoro] NPZ file contains \(arrays.count) array(s)")
                 for (name, array) in arrays {
-                    voiceEmbeddings[name] = array
-                    debugLog("[KokoroTTSService] Loaded downloaded voice: \(name)", category: .tts)
+                    // Strip .npy extension if present (NPZ files store with .npy suffix)
+                    let voiceName = name.replacingOccurrences(of: ".npy", with: "")
+                    voiceEmbeddings[voiceName] = array
+                    debugLog(.ttsPlayback, "🗣️ [Kokoro] Loaded downloaded voice: \(voiceName)")
                 }
+            } else {
+                debugLog(.ttsPlayback, "🗣️ [Kokoro] ⚠️ Failed to read NPZ file: \(fileURL.lastPathComponent)")
             }
         }
         #endif
     }
 
-    /// Check if a specific voice is available (loaded)
+    /// Check if a specific voice is available (loaded or built-in with bundled files)
     func isVoiceAvailable(_ voice: KokoroTTSVoice) -> Bool {
         #if canImport(KokoroSwift)
-        return voiceEmbeddings[voice.rawValue] != nil
+        // If model is loaded, check actual embeddings
+        if isModelLoaded {
+            return voiceEmbeddings[voice.rawValue] != nil
+        }
+        // If model isn't loaded yet, built-in voices are considered available if model files exist
+        if voice.isBuiltIn && isModelAvailable && getBuiltInVoicesPath() != nil {
+            return true
+        }
+        // Downloaded voices - check if their file exists
+        if !voice.isBuiltIn {
+            let voiceFile = voicesDirectory.appendingPathComponent("\(voice.rawValue).npz")
+            return FileManager.default.fileExists(atPath: voiceFile.path)
+        }
+        return false
         #else
         return false
         #endif
@@ -365,7 +438,27 @@ final class KokoroTTSService: ObservableObject {
     /// Get list of currently available voices
     func getAvailableVoices() -> [KokoroTTSVoice] {
         #if canImport(KokoroSwift)
-        return KokoroTTSVoice.allCases.filter { voiceEmbeddings[$0.rawValue] != nil }
+        // If model is loaded, return voices with loaded embeddings
+        if isModelLoaded {
+            return KokoroTTSVoice.allCases.filter { voiceEmbeddings[$0.rawValue] != nil }
+        }
+        // If model isn't loaded yet, return built-in voices if model files are bundled
+        if isModelAvailable && getBuiltInVoicesPath() != nil {
+            var voices = KokoroTTSVoice.builtInVoices
+            // Also include any downloaded voices
+            let fileManager = FileManager.default
+            if fileManager.fileExists(atPath: voicesDirectory.path),
+               let contents = try? fileManager.contentsOfDirectory(at: voicesDirectory, includingPropertiesForKeys: nil) {
+                for fileURL in contents where fileURL.pathExtension == "npz" {
+                    let voiceName = fileURL.deletingPathExtension().lastPathComponent
+                    if let voice = KokoroTTSVoice(rawValue: voiceName), !voice.isBuiltIn {
+                        voices.append(voice)
+                    }
+                }
+            }
+            return voices
+        }
+        return []
         #else
         return []
         #endif
@@ -400,13 +493,15 @@ final class KokoroTTSService: ObservableObject {
             #if canImport(KokoroSwift)
             if let arrays = NpyzReader.read(fileFromPath: destinationURL) {
                 for (name, array) in arrays {
-                    voiceEmbeddings[name] = array
+                    // Strip .npy extension if present (NPZ files store with .npy suffix)
+                    let voiceName = name.replacingOccurrences(of: ".npy", with: "")
+                    voiceEmbeddings[voiceName] = array
                 }
             }
             #endif
 
             voiceDownloadProgress[voice.rawValue] = 1.0
-            debugLog("[KokoroTTSService] Downloaded voice: \(voice.rawValue)", category: .tts)
+            debugLog(.ttsPlayback, "[KokoroTTSService] Downloaded voice: \(voice.rawValue)")
         } catch {
             voiceDownloadProgress.removeValue(forKey: voice.rawValue)
             throw KokoroTTSError.downloadFailed(error.localizedDescription)
@@ -428,10 +523,14 @@ final class KokoroTTSService: ObservableObject {
         voiceEmbeddings.removeValue(forKey: voice.rawValue)
         #endif
 
-        debugLog("[KokoroTTSService] Deleted voice: \(voice.rawValue)", category: .tts)
+        debugLog(.ttsPlayback, "[KokoroTTSService] Deleted voice: \(voice.rawValue)")
     }
 
     // MARK: - Speech Generation
+
+    /// Maximum characters per chunk for text splitting
+    /// Kokoro has a 510 token limit; ~4 chars per token on average, with margin for phoneme expansion
+    private static let maxCharsPerChunk = 400
 
     /// Generate speech audio from text
     /// - Parameters:
@@ -456,31 +555,159 @@ final class KokoroTTSService: ObservableObject {
         // Determine language based on voice accent
         let language: Language = voice.accent == .british ? .enGB : .enUS
 
-        do {
-            // Generate audio samples
-            let (audioSamples, _) = try tts.generateAudio(
-                voice: voiceEmbedding,
-                language: language,
-                text: text,
-                speed: speed
-            )
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] Generating speech for \(text.count) chars with voice \(voice.rawValue)...")
 
-            // Convert to WAV format
-            let wavData = createWAVData(
-                from: audioSamples,
-                sampleRate: KokoroTTS.Constants.samplingRate,
-                channels: 1,
-                bitsPerSample: 16
-            )
+        // Split long text into chunks to avoid token limit (510 tokens max)
+        let chunks = splitTextIntoChunks(text, maxChars: Self.maxCharsPerChunk)
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] Split into \(chunks.count) chunk(s)")
 
-            debugLog("[KokoroTTSService] Generated \(wavData.count) bytes of audio for \(text.count) chars", category: .tts)
-            return wavData
-        } catch {
-            throw KokoroTTSError.generationFailed(error.localizedDescription)
+        var allAudioSamples: [Float] = []
+
+        for (index, chunk) in chunks.enumerated() {
+            do {
+                debugLog(.ttsPlayback, "🗣️ [Kokoro] Processing chunk \(index + 1)/\(chunks.count) (\(chunk.count) chars)...")
+
+                // Generate audio samples for this chunk
+                let (audioSamples, _) = try tts.generateAudio(
+                    voice: voiceEmbedding,
+                    language: language,
+                    text: chunk,
+                    speed: speed
+                )
+
+                debugLog(.ttsPlayback, "🗣️ [Kokoro] Chunk \(index + 1) generated \(audioSamples.count) samples")
+                allAudioSamples.append(contentsOf: audioSamples)
+
+                // Add a small pause between chunks (0.15 seconds at 24kHz)
+                if index < chunks.count - 1 {
+                    let pauseSamples = Int(0.15 * Float(KokoroTTS.Constants.samplingRate))
+                    allAudioSamples.append(contentsOf: [Float](repeating: 0, count: pauseSamples))
+                }
+            } catch {
+                debugLog(.ttsPlayback, "🗣️ [Kokoro] ❌ Chunk \(index + 1) failed: \(error)")
+                debugLog(.ttsPlayback, "🗣️ [Kokoro] ❌ Error type: \(type(of: error))")
+                debugLog(.ttsPlayback, "🗣️ [Kokoro] ❌ Error description: \(String(describing: error))")
+                throw KokoroTTSError.generationFailed(error.localizedDescription)
+            }
         }
+
+        debugLog(.ttsPlayback, "🗣️ [Kokoro] Total audio samples: \(allAudioSamples.count)")
+
+        // Convert to WAV format
+        let wavData = createWAVData(
+            from: allAudioSamples,
+            sampleRate: KokoroTTS.Constants.samplingRate,
+            channels: 1,
+            bitsPerSample: 16
+        )
+
+        debugLog(.ttsPlayback, "[KokoroTTSService] Generated \(wavData.count) bytes of audio for \(text.count) chars")
+        return wavData
         #else
         throw KokoroTTSError.notAvailable
         #endif
+    }
+
+    /// Split text into chunks at sentence boundaries
+    /// - Parameters:
+    ///   - text: The text to split
+    ///   - maxChars: Maximum characters per chunk
+    /// - Returns: Array of text chunks
+    private func splitTextIntoChunks(_ text: String, maxChars: Int) -> [String] {
+        // If text is short enough, return as single chunk
+        guard text.count > maxChars else {
+            return [text]
+        }
+
+        var chunks: [String] = []
+        var currentChunk = ""
+
+        // Split by sentences (period, exclamation, question mark followed by space or end)
+        let sentencePattern = #"[^.!?]*[.!?]+\s*"#
+        let regex = try? NSRegularExpression(pattern: sentencePattern, options: [])
+        let range = NSRange(text.startIndex..., in: text)
+
+        var lastEnd = text.startIndex
+        regex?.enumerateMatches(in: text, options: [], range: range) { match, _, _ in
+            guard let match = match, let matchRange = Range(match.range, in: text) else { return }
+
+            let sentence = String(text[matchRange])
+
+            // Check if adding this sentence would exceed the limit
+            if currentChunk.count + sentence.count > maxChars {
+                // Save current chunk if not empty
+                if !currentChunk.isEmpty {
+                    chunks.append(currentChunk.trimmingCharacters(in: .whitespaces))
+                    currentChunk = ""
+                }
+
+                // If a single sentence is too long, split it further
+                if sentence.count > maxChars {
+                    let subChunks = splitLongSentence(sentence, maxChars: maxChars)
+                    chunks.append(contentsOf: subChunks.dropLast())
+                    currentChunk = subChunks.last ?? ""
+                } else {
+                    currentChunk = sentence
+                }
+            } else {
+                currentChunk += sentence
+            }
+
+            lastEnd = matchRange.upperBound
+        }
+
+        // Handle remaining text (if any text after the last sentence match)
+        if lastEnd < text.endIndex {
+            let remaining = String(text[lastEnd...])
+            if currentChunk.count + remaining.count > maxChars {
+                if !currentChunk.isEmpty {
+                    chunks.append(currentChunk.trimmingCharacters(in: .whitespaces))
+                }
+                if remaining.count > maxChars {
+                    chunks.append(contentsOf: splitLongSentence(remaining, maxChars: maxChars))
+                } else {
+                    chunks.append(remaining.trimmingCharacters(in: .whitespaces))
+                }
+            } else {
+                currentChunk += remaining
+                if !currentChunk.isEmpty {
+                    chunks.append(currentChunk.trimmingCharacters(in: .whitespaces))
+                }
+            }
+        } else if !currentChunk.isEmpty {
+            chunks.append(currentChunk.trimmingCharacters(in: .whitespaces))
+        }
+
+        // Filter out empty chunks
+        return chunks.filter { !$0.isEmpty }
+    }
+
+    /// Split a long sentence at word boundaries
+    private func splitLongSentence(_ sentence: String, maxChars: Int) -> [String] {
+        var chunks: [String] = []
+        var currentChunk = ""
+
+        let words = sentence.split(separator: " ", omittingEmptySubsequences: true)
+        for word in words {
+            let wordStr = String(word)
+            if currentChunk.count + wordStr.count + 1 > maxChars {
+                if !currentChunk.isEmpty {
+                    chunks.append(currentChunk.trimmingCharacters(in: .whitespaces))
+                    currentChunk = ""
+                }
+            }
+            if currentChunk.isEmpty {
+                currentChunk = wordStr
+            } else {
+                currentChunk += " " + wordStr
+            }
+        }
+
+        if !currentChunk.isEmpty {
+            chunks.append(currentChunk.trimmingCharacters(in: .whitespaces))
+        }
+
+        return chunks
     }
 
     // MARK: - Audio Conversion

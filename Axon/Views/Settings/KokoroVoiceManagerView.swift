@@ -107,7 +107,7 @@ struct KokoroVoiceManagerView: View {
             downloaded.insert(voice.rawValue)
             await viewModel.updateTTSSetting(\.downloadedKokoroVoices, downloaded)
         } catch {
-            debugLog("[KokoroVoiceManagerView] Failed to download voice: \(error)", category: .tts)
+            debugLog(.ttsPlayback, "[KokoroVoiceManagerView] Failed to download voice: \(error)")
         }
     }
 
@@ -119,7 +119,7 @@ struct KokoroVoiceManagerView: View {
             downloaded.remove(voice.rawValue)
             Task { await viewModel.updateTTSSetting(\.downloadedKokoroVoices, downloaded) }
         } catch {
-            debugLog("[KokoroVoiceManagerView] Failed to delete voice: \(error)", category: .tts)
+            debugLog(.ttsPlayback, "[KokoroVoiceManagerView] Failed to delete voice: \(error)")
         }
     }
 
@@ -127,7 +127,7 @@ struct KokoroVoiceManagerView: View {
         do {
             try await ttsService.previewKokoroVoice(voice, settings: viewModel.settings)
         } catch {
-            debugLog("[KokoroVoiceManagerView] Failed to preview voice: \(error)", category: .tts)
+            debugLog(.ttsPlayback, "[KokoroVoiceManagerView] Failed to preview voice: \(error)")
         }
     }
 }

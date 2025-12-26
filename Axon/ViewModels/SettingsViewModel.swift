@@ -353,6 +353,10 @@ class SettingsViewModel: ObservableObject {
         isAPIKeyConfigured(.openai)
     }
 
+    var isKokoroTTSConfigured: Bool {
+        KokoroTTSService.shared.isModelAvailable
+    }
+
     // MARK: - Current Model
 
     var currentModel: AIModel? {

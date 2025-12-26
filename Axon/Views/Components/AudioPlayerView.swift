@@ -20,6 +20,7 @@ struct AudioPlayerView: View {
 
     var body: some View {
         VStack {
+            let _ = debugLog(.ttsPlayback, "🔊 [AudioPlayerView] isGenerating=\(ttsService.isGenerating), currentMessageId=\(ttsService.currentMessageId ?? "nil")")
             if ttsService.isGenerating || ttsService.currentMessageId != nil {
                 HStack(spacing: 16) {
                     if ttsService.isGenerating {

@@ -392,6 +392,7 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         duration = 0
         let token = UUID()
         generationToken = token
+        debugLog(.ttsPlayback, "🎙️ [TTSPlaybackService] UI state primed: isGenerating=\(isGenerating), currentMessageId=\(currentMessageId ?? "nil")")
 
         do {
             var audioData: Data
@@ -418,6 +419,19 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
                     audioData = try await generateAppleTTSAudio(text: processedText, settings: settings)
                     audioFormat = .caf
 
+                case .kokoro:
+                    // Kokoro on-device neural TTS
+                    let kokoroAvailable = KokoroTTSService.isAvailable
+                    debugLog(.ttsPlayback, "[TTSPlaybackService] Kokoro isAvailable: \(kokoroAvailable)")
+                    if kokoroAvailable {
+                        audioData = try await generateKokoroAudio(text: processedText, settings: settings)
+                        audioFormat = .wav
+                    } else {
+                        debugLog(.ttsPlayback, "[TTSPlaybackService] Kokoro unavailable, falling back to Apple TTS")
+                        audioData = try await generateAppleTTSAudio(text: processedText, settings: settings)
+                        audioFormat = .caf
+                    }
+
                 case .mlxAudio:
                     // F5-TTS currently unavailable due to library compatibility issue
                     // Fall back to Apple TTS
@@ -425,7 +439,7 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
                         audioData = try await generateMLXAudio(text: processedText, settings: settings)
                         audioFormat = .wav
                     } else {
-                        print("[TTSPlaybackService] F5-TTS unavailable, falling back to Apple TTS")
+                        debugLog(.ttsPlayback, "F5-TTS unavailable, falling back to Apple TTS")
                         audioData = try await generateAppleTTSAudio(text: processedText, settings: settings)
                         audioFormat = .caf
                     }
@@ -463,6 +477,9 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
                         case .apple:
                             voiceId = settings.ttsSettings.appleVoice.rawValue
                             voiceName = settings.ttsSettings.appleVoice.displayName
+                        case .kokoro:
+                            voiceId = settings.ttsSettings.kokoroVoice.rawValue
+                            voiceName = settings.ttsSettings.kokoroVoice.displayName
                         case .mlxAudio:
                             voiceId = settings.ttsSettings.mlxVoice.rawValue
                             voiceName = settings.ttsSettings.mlxVoice.displayName
@@ -634,10 +651,30 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         let voice = settings.ttsSettings.mlxVoice
         let speed = settings.ttsSettings.mlxSpeed
 
-        print("[TTSPlaybackService] Using MLX-Audio voice: \(voice.displayName)")
-        print("[TTSPlaybackService] Requesting audio generation from MLX-Audio...")
+        debugLog(.ttsPlayback, "Using MLX-Audio voice: \(voice.displayName)")
+        debugLog(.ttsPlayback, "Requesting audio generation from MLX-Audio...")
 
         return try await MLXTTSService.shared.generateSpeech(
+            text: text,
+            voice: voice,
+            speed: speed
+        )
+    }
+
+    private func generateKokoroAudio(text: String, settings: AppSettings) async throws -> Data {
+        let voice = settings.ttsSettings.kokoroVoice
+        let speed = settings.ttsSettings.kokoroSpeed
+
+        debugLog(.ttsPlayback, "Using Kokoro voice: \(voice.displayName)")
+        debugLog(.ttsPlayback, "Requesting audio generation from Kokoro...")
+
+        // Ensure model is loaded
+        if !KokoroTTSService.shared.isModelLoaded {
+            debugLog(.ttsPlayback, "Loading Kokoro model...")
+            try await KokoroTTSService.shared.loadModel()
+        }
+
+        return try await KokoroTTSService.shared.generateSpeech(
             text: text,
             voice: voice,
             speed: speed
@@ -688,6 +725,8 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         switch provider {
         case .apple:
             companyName = "Apple"
+        case .kokoro:
+            companyName = "Kokoro"
         case .mlxAudio:
             companyName = "MLX"
         case .elevenlabs:
@@ -772,7 +811,7 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
 
     /// Preview an Apple (Siri) voice
     func previewAppleVoice(_ voice: AppleTTSVoice, settings: AppSettings) async throws {
-        print("[TTSPlaybackService] Previewing Apple voice: \(voice.displayName)")
+        debugLog(.ttsPlayback, "Previewing Apple voice: \(voice.displayName)")
 
         stop()
         isGenerating = true
@@ -788,6 +827,36 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
             )
             isGenerating = false
             try await playAudio(audioData, messageId: currentMessageId, format: .caf)
+        } catch {
+            isGenerating = false
+            throw error
+        }
+    }
+
+    /// Preview a Kokoro voice
+    func previewKokoroVoice(_ voice: KokoroTTSVoice, settings: AppSettings) async throws {
+        debugLog(.ttsPlayback, "Previewing Kokoro voice: \(voice.displayName)")
+
+        stop()
+        isGenerating = true
+        currentMessageId = "preview_kokoro_\(voice.rawValue)"
+
+        let previewText = Self.previewText(for: .kokoro, voiceName: voice.displayName)
+
+        do {
+            // Ensure model is loaded
+            if !KokoroTTSService.shared.isModelLoaded {
+                debugLog(.ttsPlayback, "Loading Kokoro model for preview...")
+                try await KokoroTTSService.shared.loadModel()
+            }
+
+            let audioData = try await KokoroTTSService.shared.generateSpeech(
+                text: previewText,
+                voice: voice,
+                speed: settings.ttsSettings.kokoroSpeed
+            )
+            isGenerating = false
+            try await playAudio(audioData, messageId: currentMessageId, format: .wav)
         } catch {
             isGenerating = false
             throw error
