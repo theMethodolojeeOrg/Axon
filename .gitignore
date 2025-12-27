@@ -490,16 +490,6 @@ Desktop.ini
 # Project specific
 # Add any project-specific ignores below this line
 
-# Large model files (managed separately)
-# Kokoro TTS Model
-Axon/Resources/KokoroTTS/Model/*.safetensors
-
-# MLX Models
-Axon/Resources/MLXModels/**/*.safetensors
-
-# All safetensors files in Resources (just in case)
-*.safetensors
-
 # Documentation (contains internal notes and backend code samples)
 Docs/
 
@@ -673,3 +663,5 @@ scripts/dev/
 dev-config/
 local-config/
 local.properties
+Axon/Resources/KokoroTTS/Model/kokoro-v1_0.safetensors
+Axon/Resources/MLXModels/mlx-community_Qwen3-VL-2B-Instruct-4bit/model.safetensors
