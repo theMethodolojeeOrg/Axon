@@ -29,6 +29,8 @@
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Axon uses the microphone for Live Mode to enable real-time voice conversations with AI.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Axon uses speech recognition to transcribe your voice during Live Sessions for real-time AI conversations.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
