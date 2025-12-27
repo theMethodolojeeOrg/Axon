@@ -665,3 +665,4 @@ local-config/
 local.properties
 Axon/Resources/KokoroTTS/Model/kokoro-v1_0.safetensors
 Axon/Resources/MLXModels/mlx-community_Qwen3-VL-2B-Instruct-4bit/model.safetensors
+Axon/Resources/KokoroTTS/Voices/voices_builtin.npz
