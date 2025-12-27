@@ -13,7 +13,6 @@ import Combine
 #if canImport(KokoroSwift)
 import KokoroSwift
 import MLX
-import MLXUtilsLibrary
 #endif
 
 // MARK: - Kokoro TTS Voice Options

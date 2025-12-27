@@ -35,7 +35,6 @@
 		E27FB5F32ECD5E2F003C52BF /* SodiumNIOCompat in Frameworks */ = {isa = PBXBuildFile; productRef = E27FB5F22ECD5E2F003C52BF /* SodiumNIOCompat */; };
 		E2E5FD802EFF401E00E4835C /* KokoroSwift in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FD7F2EFF401E00E4835C /* KokoroSwift */; };
 		E2E5FD812EFF401E00E4835C /* KokoroSwift in Embed Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FD7F2EFF401E00E4835C /* KokoroSwift */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		E2E5FD852EFF41DF00E4835C /* MLXUtilsLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FD842EFF41DF00E4835C /* MLXUtilsLibrary */; };
 		E2E5FD882EFF4F8F00E4835C /* HuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FD872EFF4F8F00E4835C /* HuggingFace */; };
 		E2E5FDAF2EFF5A6800E4835C /* MLXEmbedders in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDAE2EFF5A6800E4835C /* MLXEmbedders */; };
 		E2E5FDB12EFF5A6800E4835C /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDB02EFF5A6800E4835C /* MLXLLM */; };
@@ -196,7 +195,6 @@
 				E27FB5F12ECD5E2F003C52BF /* SodiumFoundationCompat in Frameworks */,
 				E22498CA2ED5D1880053D459 /* MarkdownUI in Frameworks */,
 				E2E5FDB52EFF5A6800E4835C /* MLXMNIST in Frameworks */,
-				E2E5FD852EFF41DF00E4835C /* MLXUtilsLibrary in Frameworks */,
 				E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */,
 				E23FFFA32EB23493009B116D /* FirebaseMessaging in Frameworks */,
 				E217D4352EEA4BFF00D3DAB2 /* CryptoTokenKit.framework in Frameworks */,
@@ -330,7 +328,6 @@
 				E27FB5F22ECD5E2F003C52BF /* SodiumNIOCompat */,
 				E22498C92ED5D1880053D459 /* MarkdownUI */,
 				E2E5FD7F2EFF401E00E4835C /* KokoroSwift */,
-				E2E5FD842EFF41DF00E4835C /* MLXUtilsLibrary */,
 				E2E5FD872EFF4F8F00E4835C /* HuggingFace */,
 				E2E5FDAE2EFF5A6800E4835C /* MLXEmbedders */,
 				E2E5FDB02EFF5A6800E4835C /* MLXLLM */,
@@ -447,7 +444,6 @@
 				E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */,
 				E22498C82ED5D1880053D459 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 				E21FCC002EFA24B1009EF882 /* XCRemoteSwiftPackageReference "kokoro-ios" */,
-				E2E5FD832EFF41DF00E4835C /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */,
 				E2E5FD862EFF4F8F00E4835C /* XCRemoteSwiftPackageReference "swift-huggingface" */,
 				E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
 			);
@@ -1036,14 +1032,6 @@
 				kind = branch;
 			};
 		};
-		E2E5FD832EFF41DF00E4835C /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/mlalma/MLXUtilsLibrary";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.6;
-			};
-		};
 		E2E5FD862EFF4F8F00E4835C /* XCRemoteSwiftPackageReference "swift-huggingface" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/huggingface/swift-huggingface";
@@ -1157,11 +1145,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E21FCC002EFA24B1009EF882 /* XCRemoteSwiftPackageReference "kokoro-ios" */;
 			productName = KokoroSwift;
-		};
-		E2E5FD842EFF41DF00E4835C /* MLXUtilsLibrary */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E2E5FD832EFF41DF00E4835C /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */;
-			productName = MLXUtilsLibrary;
 		};
 		E2E5FD872EFF4F8F00E4835C /* HuggingFace */ = {
 			isa = XCSwiftPackageProductDependency;
