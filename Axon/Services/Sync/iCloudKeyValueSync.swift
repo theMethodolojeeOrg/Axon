@@ -198,7 +198,18 @@ struct SyncableSettings: Codable {
     var epistemicEnabled: Bool
     var epistemicVerbose: Bool
     var learningLoopEnabled: Bool
+    var predicateLoggingEnabled: Bool
     var predicateLoggingVerbosity: String
+
+    // Internal Thread Settings
+    var internalThreadEnabled: Bool
+    var internalThreadRetentionDays: Int
+
+    // Notifications
+    var notificationsEnabled: Bool
+
+    // Analytics
+    var memoryAnalyticsEnabled: Bool
 
     // TTS Settings (complete voice preferences)
     var ttsProvider: String
@@ -264,6 +275,7 @@ struct SyncableSettings: Codable {
 
     // Sovereignty Settings (excluding biometric-specific settings)
     var sovereigntyEnabled: Bool
+    var sovereigntyConsentProviderHasBeenSetByUser: Bool
     var sovereigntyConsentProvider: String
     var sovereigntyConsentModel: String
     var sovereigntyShowDetailedReasoning: Bool
@@ -296,7 +308,18 @@ struct SyncableSettings: Codable {
         self.epistemicEnabled = settings.epistemicEnabled
         self.epistemicVerbose = settings.epistemicVerbose
         self.learningLoopEnabled = settings.learningLoopEnabled
+        self.predicateLoggingEnabled = settings.predicateLoggingEnabled
         self.predicateLoggingVerbosity = settings.predicateLoggingVerbosity.rawValue
+
+        // Internal Thread Settings
+        self.internalThreadEnabled = settings.internalThreadEnabled
+        self.internalThreadRetentionDays = settings.internalThreadRetentionDays
+
+        // Notifications
+        self.notificationsEnabled = settings.notificationsEnabled
+
+        // Analytics
+        self.memoryAnalyticsEnabled = settings.memoryAnalyticsEnabled
 
         // TTS Settings (complete)
         self.ttsProvider = settings.ttsSettings.provider.rawValue
@@ -355,6 +378,7 @@ struct SyncableSettings: Codable {
 
         // Sovereignty Settings (excluding biometric)
         self.sovereigntyEnabled = settings.sovereigntySettings.enabled
+        self.sovereigntyConsentProviderHasBeenSetByUser = settings.sovereigntySettings.consentProviderHasBeenSetByUser
         self.sovereigntyConsentProvider = settings.sovereigntySettings.consentProvider.rawValue
         self.sovereigntyConsentModel = settings.sovereigntySettings.consentModel
         self.sovereigntyShowDetailedReasoning = settings.sovereigntySettings.showDetailedReasoning
@@ -392,9 +416,20 @@ struct SyncableSettings: Codable {
         settings.epistemicEnabled = epistemicEnabled
         settings.epistemicVerbose = epistemicVerbose
         settings.learningLoopEnabled = learningLoopEnabled
+        settings.predicateLoggingEnabled = predicateLoggingEnabled
         if let verbosity = PredicateVerbosity(rawValue: predicateLoggingVerbosity) {
             settings.predicateLoggingVerbosity = verbosity
         }
+
+        // Internal Thread Settings
+        settings.internalThreadEnabled = internalThreadEnabled
+        settings.internalThreadRetentionDays = internalThreadRetentionDays
+
+        // Notifications
+        settings.notificationsEnabled = notificationsEnabled
+
+        // Analytics
+        settings.memoryAnalyticsEnabled = memoryAnalyticsEnabled
 
         // TTS Settings (complete)
         if let provider = TTSProvider(rawValue: ttsProvider) {
@@ -474,6 +509,7 @@ struct SyncableSettings: Codable {
 
         // Sovereignty Settings (preserve biometric settings)
         settings.sovereigntySettings.enabled = sovereigntyEnabled
+        settings.sovereigntySettings.consentProviderHasBeenSetByUser = sovereigntyConsentProviderHasBeenSetByUser
         if let provider = AIProvider(rawValue: sovereigntyConsentProvider) {
             settings.sovereigntySettings.consentProvider = provider
         }

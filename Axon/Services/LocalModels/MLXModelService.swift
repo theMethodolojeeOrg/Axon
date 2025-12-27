@@ -55,11 +55,12 @@ enum MLXModelError: LocalizedError {
 }
 
 /// Available local MLX models
-/// The default bundled model (Qwen3-VL) is included in the app bundle.
+/// The default bundled models (Qwen3-VL and Gemma3 270M) are included in the app bundle.
 /// Other models are downloaded on demand from Hugging Face.
 enum LocalMLXModel: String, CaseIterable {
     // Bundled in app - ready immediately
     case qwen3VL = "mlx-community/Qwen3-VL-2B-Instruct-4bit"
+    case gemma3_270m = "lmstudio-community/gemma-3-270m-it-MLX-8bit"
 
     // Downloadable models
     case smolLM = "mlx-community/SmolLM2-1.7B-Instruct-4bit"
@@ -73,7 +74,7 @@ enum LocalMLXModel: String, CaseIterable {
     /// Whether this model is bundled in the app (no download required)
     var isBundled: Bool {
         switch self {
-        case .qwen3VL: return true
+        case .qwen3VL, .gemma3_270m: return true
         default: return false
         }
     }
@@ -81,6 +82,7 @@ enum LocalMLXModel: String, CaseIterable {
     var displayName: String {
         switch self {
         case .qwen3VL: return "Qwen3 VL 2B"
+        case .gemma3_270m: return "Gemma3 270M"
         case .smolLM: return "SmolLM2 1.7B"
         case .qwen3: return "Qwen3 1.7B"
         case .phi4Mini: return "Phi-4 Mini"
@@ -91,6 +93,7 @@ enum LocalMLXModel: String, CaseIterable {
     var description: String {
         switch self {
         case .qwen3VL: return "Vision-language model. Bundled in app - ready instantly."
+        case .gemma3_270m: return "Google's ultra-compact model. Fastest option. Bundled in app - ready instantly."
         case .smolLM: return "HuggingFace's efficient small model. ~1GB download."
         case .qwen3: return "Alibaba's multilingual model. ~1GB download."
         case .phi4Mini: return "Microsoft's capable small model. ~2GB download."
@@ -102,6 +105,7 @@ enum LocalMLXModel: String, CaseIterable {
     var contextWindow: Int {
         switch self {
         case .qwen3VL: return 8_192
+        case .gemma3_270m: return 8_192
         case .smolLM: return 8_192
         case .qwen3: return 32_768
         case .phi4Mini: return 16_384

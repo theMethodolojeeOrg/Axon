@@ -2962,7 +2962,7 @@ struct LiveSettings: Codable, Equatable, Sendable {
     var defaultProvider: AIProvider = .gemini
 
     /// Default model ID for Live sessions
-    var defaultModelId: String = "gemini-2.5-flash-native-audio-preview-09-2025"
+    var defaultModelId: String = "gemini-2.5-flash-native-audio-preview-12-2025"
 
     /// OpenAI-specific voice (default: marin)
     var openAIVoice: String = "marin"

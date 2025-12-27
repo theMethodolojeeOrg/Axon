@@ -9,15 +9,12 @@ import SwiftUI
 import PhotosUI
 import Combine
 import UniformTypeIdentifiers
-import os.log
 
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
 import AppKit
 #endif
-
-private let attachmentLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Axon", category: "Attachments")
 
 // MARK: - Custom Text Editor with Enter/Shift+Enter handling
 
@@ -342,10 +339,10 @@ struct MessageInputBar: View {
         let resolved: ConversationModelResolver.ResolvedProviderModel
         if let conversationId {
             resolved = ConversationModelResolver.resolve(conversationId: conversationId, settings: settings)
-            attachmentLog.debug("Resolved provider for conversation \(conversationId): \(resolved.normalizedProvider) / \(resolved.modelId)")
+            debugLog(.providerResolution, "Resolved provider for conversation \(conversationId): \(resolved.normalizedProvider) / \(resolved.modelId)")
         } else {
             resolved = ConversationModelResolver.resolveGlobal(settings: settings)
-            attachmentLog.debug("Resolved global provider: \(resolved.normalizedProvider) / \(resolved.modelId)")
+            debugLog(.providerResolution, "Resolved global provider: \(resolved.normalizedProvider) / \(resolved.modelId)")
         }
 
         // Check if Gemini tools are enabled - if so, we can proxy media through Gemini
@@ -373,7 +370,7 @@ struct MessageInputBar: View {
 
         case "gemini":
             // Gemini supports images, documents, video, and audio.
-            attachmentLog.info("Gemini provider detected - all attachment types enabled (images, documents, video, audio)")
+            debugLog(.attachments, "Gemini provider detected - all attachment types enabled (images, documents, video, audio)")
             return AttachmentCapability(
                 images: true,
                 documents: true,
@@ -697,26 +694,26 @@ struct MessageInputBar: View {
         }
         // State change observers for debugging
         .onChange(of: showFileImporter) { _, newValue in
-            attachmentLog.info("showFileImporter changed to \(newValue)")
+            debugLog(.attachments, "showFileImporter changed to \(newValue)")
         }
         .onChange(of: showVideoImporter) { _, newValue in
-            attachmentLog.info("showVideoImporter changed to \(newValue)")
+            debugLog(.attachments, "showVideoImporter changed to \(newValue)")
         }
         .onChange(of: showAudioImporter) { _, newValue in
-            attachmentLog.info("showAudioImporter changed to \(newValue)")
+            debugLog(.attachments, "showAudioImporter changed to \(newValue)")
         }
         .onChange(of: showPhotoPicker) { _, newValue in
-            attachmentLog.info("showPhotoPicker changed to \(newValue)")
+            debugLog(.attachments, "showPhotoPicker changed to \(newValue)")
         }
         .onChange(of: showAttachmentOptions) { _, newValue in
-            attachmentLog.info("showAttachmentOptions (action sheet) changed to \(newValue)")
+            debugLog(.attachments, "showAttachmentOptions (action sheet) changed to \(newValue)")
         }
         .fileImporter(
             isPresented: $showFileImporter,
             allowedContentTypes: attachmentCapability.documents ? [.pdf, .text, .plainText, .rtf, .image, .item] : [.item],
             allowsMultipleSelection: false
         ) { result in
-            attachmentLog.info("fileImporter (document) callback triggered")
+            debugLog(.attachments, "fileImporter (document) callback triggered")
             handleFileImport(result, type: .document)
         }
         .fileImporter(
@@ -724,7 +721,7 @@ struct MessageInputBar: View {
             allowedContentTypes: [.movie, .video, .mpeg4Movie, .quickTimeMovie, .avi, .mpeg, .mpeg2Video],
             allowsMultipleSelection: false
         ) { result in
-            attachmentLog.info("fileImporter (video) callback triggered")
+            debugLog(.attachments, "fileImporter (video) callback triggered")
             handleFileImport(result, type: .video)
         }
         .fileImporter(
@@ -732,7 +729,7 @@ struct MessageInputBar: View {
             allowedContentTypes: [.audio, .mp3, .wav, .aiff, .mpeg4Audio],
             allowsMultipleSelection: false
         ) { result in
-            attachmentLog.info("fileImporter (audio) callback triggered")
+            debugLog(.attachments, "fileImporter (audio) callback triggered")
             handleFileImport(result, type: .audio)
         }
         // Mac: Any file picker
@@ -741,7 +738,7 @@ struct MessageInputBar: View {
             allowedContentTypes: [.item],
             allowsMultipleSelection: false
         ) { result in
-            attachmentLog.info("fileImporter (any file) callback triggered")
+            debugLog(.attachments, "fileImporter (any file) callback triggered")
             handleAnyFileImport(result)
         }
         // Tool Invocation Sheet (for /use command)
@@ -773,34 +770,34 @@ struct MessageInputBar: View {
             titleVisibility: .visible
         ) {
             let capability = attachmentCapability
-            let _ = attachmentLog.info("confirmationDialog opened - capabilities: images=\(capability.images), docs=\(capability.documents), video=\(capability.video), audio=\(capability.audio)")
+            debugLog(.attachments, "confirmationDialog opened - capabilities: images=\(capability.images), docs=\(capability.documents), video=\(capability.video), audio=\(capability.audio)")
 
             if capability.images {
                 Button("Photo Library") {
-                    attachmentLog.info("User tapped Photo Library")
+                    debugLog(.attachments, "User tapped Photo Library")
                     showPhotoPicker = true
                 }
             }
             if capability.video {
                 Button("Video") {
-                    attachmentLog.info("User tapped Video - setting showVideoImporter=true")
+                    debugLog(.attachments, "User tapped Video - setting showVideoImporter=true")
                     showVideoImporter = true
                 }
             }
             if capability.audio {
                 Button("Audio") {
-                    attachmentLog.info("User tapped Audio - setting showAudioImporter=true")
+                    debugLog(.attachments, "User tapped Audio - setting showAudioImporter=true")
                     showAudioImporter = true
                 }
             }
             if capability.documents {
                 Button("Document") {
-                    attachmentLog.info("User tapped Document - setting showFileImporter=true")
+                    debugLog(.attachments, "User tapped Document - setting showFileImporter=true")
                     showFileImporter = true
                 }
             }
             Button("Cancel", role: .cancel) {
-                attachmentLog.debug("User cancelled attachment selection")
+                debugLog(.attachments, "User cancelled attachment selection")
             }
         } message: {
             Text(attachmentCapability.description)
@@ -884,7 +881,7 @@ struct MessageInputBar: View {
         #if os(iOS)
         // iOS: Use button that triggers confirmationDialog (avoids UIContextMenu timing issues)
         Button {
-            attachmentLog.info("Attachment button tapped - opening action sheet")
+            debugLog(.attachments, "Attachment button tapped - opening action sheet")
             showAttachmentOptions = true
         } label: {
             HStack(spacing: 2) {
@@ -1107,21 +1104,21 @@ struct MessageInputBar: View {
     }
     
     private func handleFileImport(_ result: Result<[URL], Error>, type: MessageAttachment.AttachmentType) {
-        attachmentLog.info("handleFileImport called for type: \(String(describing: type))")
+        debugLog(.attachments, "handleFileImport called for type: \(String(describing: type))")
         switch result {
         case .success(let urls):
-            attachmentLog.info("File import success - got \(urls.count) URL(s)")
+            debugLog(.attachments, "File import success - got \(urls.count) URL(s)")
             guard let url = urls.first else {
-                attachmentLog.error("File import: No URL returned")
+                debugLog(.attachments, "File import: No URL returned")
                 return
             }
-            attachmentLog.info("Attempting to access security-scoped resource: \(url.lastPathComponent)")
+            debugLog(.attachments, "Attempting to access security-scoped resource: \(url.lastPathComponent)")
             guard url.startAccessingSecurityScopedResource() else {
-                attachmentLog.error("Failed to access security-scoped resource: \(url.lastPathComponent)")
+                debugLog(.attachments, "Failed to access security-scoped resource: \(url.lastPathComponent)")
                 return
             }
             defer { url.stopAccessingSecurityScopedResource() }
-            attachmentLog.info("Security-scoped resource access granted for: \(url.lastPathComponent)")
+            debugLog(.attachments, "Security-scoped resource access granted for: \(url.lastPathComponent)")
 
             do {
                 let data = try Data(contentsOf: url)
@@ -1145,30 +1142,30 @@ struct MessageInputBar: View {
                 withAnimation(.easeOut(duration: 0.2)) {
                     attachments.append(attachment)
                 }
-                attachmentLog.info("Successfully added \(String(describing: type)): \(url.lastPathComponent) (\(data.count) bytes)")
+                debugLog(.attachments, "Successfully added \(String(describing: type)): \(url.lastPathComponent) (\(data.count) bytes)")
             } catch {
-                attachmentLog.error("Failed to read file data: \(error.localizedDescription)")
+                debugLog(.attachments, "Failed to read file data: \(error.localizedDescription)")
             }
         case .failure(let error):
-            attachmentLog.error("File import FAILED: \(error.localizedDescription)")
+            debugLog(.attachments, "File import FAILED: \(error.localizedDescription)")
         }
     }
 
     private func handleAnyFileImport(_ result: Result<[URL], Error>) {
-        attachmentLog.info("handleAnyFileImport called")
+        debugLog(.attachments, "handleAnyFileImport called")
         switch result {
         case .success(let urls):
-            attachmentLog.info("Any file import success - got \(urls.count) URL(s)")
+            debugLog(.attachments, "Any file import success - got \(urls.count) URL(s)")
             guard let url = urls.first else {
-                attachmentLog.error("Any file import: No URL returned")
+                debugLog(.attachments, "Any file import: No URL returned")
                 return
             }
             guard url.startAccessingSecurityScopedResource() else {
-                attachmentLog.error("Failed to access security-scoped resource: \(url.lastPathComponent)")
+                debugLog(.attachments, "Failed to access security-scoped resource: \(url.lastPathComponent)")
                 return
             }
             defer { url.stopAccessingSecurityScopedResource() }
-            attachmentLog.info("Security-scoped access granted for: \(url.lastPathComponent)")
+            debugLog(.attachments, "Security-scoped access granted for: \(url.lastPathComponent)")
 
             do {
                 let data = try Data(contentsOf: url)
@@ -1185,12 +1182,12 @@ struct MessageInputBar: View {
                 withAnimation(.easeOut(duration: 0.2)) {
                     attachments.append(attachment)
                 }
-                attachmentLog.info("Successfully added file: \(url.lastPathComponent) (\(data.count) bytes, type: \(String(describing: type)))")
+                debugLog(.attachments, "Successfully added file: \(url.lastPathComponent) (\(data.count) bytes, type: \(String(describing: type)))")
             } catch {
-                attachmentLog.error("Failed to read file data: \(error.localizedDescription)")
+                debugLog(.attachments, "Failed to read file data: \(error.localizedDescription)")
             }
         case .failure(let error):
-            attachmentLog.error("Any file import FAILED: \(error.localizedDescription)")
+            debugLog(.attachments, "Any file import FAILED: \(error.localizedDescription)")
         }
     }
 

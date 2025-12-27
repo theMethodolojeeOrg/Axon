@@ -42,11 +42,16 @@ enum LogCategory: String, CaseIterable, Identifiable, Codable {
     // Media
     case ttsPlayback = "TTSPlaybackService"
     case mlxModel = "MLXModelService"
+    case liveSession = "LiveSession"
     
     // Tools
     case toolPluginLoader = "ToolPluginLoader"
     case toolExecution = "ToolExecution"
-    
+
+    // Chat
+    case attachments = "Attachments"
+    case providerResolution = "ProviderResolution"
+
     // Developer
     case developerSettings = "DeveloperSettings"
 
@@ -72,8 +77,11 @@ enum LogCategory: String, CaseIterable, Identifiable, Codable {
         case .draftMessage: return "Draft Message"
         case .ttsPlayback: return "TTS Playback"
         case .mlxModel: return "MLX Models"
+        case .liveSession: return "Live Session"
         case .toolPluginLoader: return "Tool Plugin Loader"
         case .toolExecution: return "Tool Execution"
+        case .attachments: return "Attachments"
+        case .providerResolution: return "Provider Resolution"
         case .developerSettings: return "Developer Settings"
         }
     }
@@ -98,8 +106,11 @@ enum LogCategory: String, CaseIterable, Identifiable, Codable {
         case .draftMessage: return "doc.text"
         case .ttsPlayback: return "speaker.wave.2"
         case .mlxModel: return "cpu"
+        case .liveSession: return "waveform.circle"
         case .toolPluginLoader: return "shippingbox"
         case .toolExecution: return "wrench.and.screwdriver"
+        case .attachments: return "paperclip"
+        case .providerResolution: return "arrow.triangle.branch"
         case .developerSettings: return "hammer"
         }
     }
@@ -117,10 +128,12 @@ enum LogCategory: String, CaseIterable, Identifiable, Codable {
             return .config
         case .memoryService, .widgetData, .devicePresence, .draftMessage:
             return .services
-        case .ttsPlayback, .mlxModel:
+        case .ttsPlayback, .mlxModel, .liveSession:
             return .media
         case .toolPluginLoader, .toolExecution:
             return .tools
+        case .attachments, .providerResolution:
+            return .chat
         case .developerSettings:
             return .developer
         }
@@ -137,6 +150,7 @@ enum LogCategoryGroup: String, CaseIterable, Identifiable {
     case services = "Services"
     case media = "Media"
     case tools = "Tools"
+    case chat = "Chat"
     case developer = "Developer"
 
     var id: String { rawValue }
@@ -152,6 +166,7 @@ enum LogCategoryGroup: String, CaseIterable, Identifiable {
         case .services: return "square.grid.2x2.fill"
         case .media: return "waveform"
         case .tools: return "wrench.and.screwdriver.fill"
+        case .chat: return "bubble.left.and.bubble.right.fill"
         case .developer: return "hammer.fill"
         }
     }

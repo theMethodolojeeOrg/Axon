@@ -1,9 +1,6 @@
 import SwiftUI
 import AVFoundation
 import Combine
-import os.log
-
-private let liveLog = Logger(subsystem: "com.axon.app", category: "LiveSession")
 
 @MainActor
 class LiveSessionService: ObservableObject, LiveProviderDelegate {
@@ -13,7 +10,7 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
 
     @Published var status: LiveSessionStatus = .idle {
         didSet {
-            print("[LiveSession] Status changed: \(oldValue) → \(status)")
+            debugLog(.liveSession, "Status changed: \(oldValue) → \(status)")
         }
     }
     @Published var isMicEnabled: Bool = true
@@ -34,6 +31,9 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
     private var inputNode: AVAudioInputNode?
     private var playerNode: AVAudioPlayerNode?
 
+    /// Output audio format for playback (24kHz mono Int16 - Gemini/OpenAI standard)
+    private let outputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 24000, channels: 1, interleaved: false)!
+
     private let factory = LiveProviderFactory.shared
     private var cancellables = Set<AnyCancellable>()
 
@@ -46,34 +46,34 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
     ///   - config: Session configuration (model, voice, system instruction, etc.)
     ///   - providerType: The AI provider to use
     func startSession(config: LiveSessionConfig, providerType: AIProvider) async {
-        liveLog.info("startSession called with provider: \(providerType.displayName), model: \(config.modelId)")
+        debugLog(.liveSession, "startSession called with provider: \(providerType.displayName), model: \(config.modelId)")
 
         guard status == .idle || status == .disconnected else {
-            liveLog.warning("startSession blocked - current status: \(String(describing: self.status))")
+            debugLog(.liveSession, "startSession blocked - current status: \(String(describing: self.status))")
             return
         }
 
         status = .connecting
         latestTranscript = ""  // Reset transcript
-        liveLog.info("Status changed to connecting")
+        debugLog(.liveSession, "Status changed to connecting")
 
         // Detect capabilities for this provider/model combination
         let capabilities = factory.detectCapabilities(for: providerType, modelId: config.modelId)
         currentCapabilities = capabilities
         activeExecutionMode = capabilities.executionMode
-        liveLog.info("Detected execution mode: \(capabilities.executionMode.displayName)")
+        debugLog(.liveSession, "Detected execution mode: \(capabilities.executionMode.displayName)")
 
         // Get API key (not needed for on-device)
         var apiKey = ""
         if capabilities.executionMode != .onDeviceMLX {
             guard let apiProvider = providerType.apiProvider,
                   let key = SettingsViewModel.shared.getAPIKey(apiProvider), !key.isEmpty else {
-                liveLog.error("Missing API Key for \(providerType.displayName)")
+                debugLog(.liveSession, "Missing API Key for \(providerType.displayName)")
                 status = .error("Missing API Key for \(providerType.displayName)")
                 return
             }
             apiKey = key
-            liveLog.debug("API Key retrieved successfully")
+            debugLog(.liveSession, "API Key retrieved successfully")
         }
 
         // Build full config with API key
@@ -94,7 +94,7 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
 
         do {
             // Create provider using factory
-            liveLog.info("Creating provider via factory...")
+            debugLog(.liveSession, "Creating provider via factory...")
             self.provider = try factory.createProvider(
                 for: providerType,
                 modelId: config.modelId,
@@ -102,17 +102,16 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
             )
             self.provider?.delegate = self
 
-            liveLog.info("Starting audio engine...")
+            debugLog(.liveSession, "Starting audio engine...")
             try await startAudioEngine()
-            liveLog.info("Audio engine started successfully")
+            debugLog(.liveSession, "Audio engine started successfully")
 
-            liveLog.info("Connecting to provider...")
+            debugLog(.liveSession, "Connecting to provider...")
             try await self.provider?.connect(config: fullConfig)
-            liveLog.info("Provider connection initiated")
+            debugLog(.liveSession, "Provider connection initiated")
             // status update handled by delegate
         } catch {
-            liveLog.error("Connection failed: \(error.localizedDescription)")
-            print("[LiveSession] ❌ Connection failed: \(error)")
+            debugLog(.liveSession, "❌ Connection failed: \(error.localizedDescription)")
             status = .error(error.localizedDescription)
             // Don't call stopSession() here - it sets status to .disconnected which hides the overlay
             // Instead, just clean up the provider
@@ -124,20 +123,20 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
     }
     
     func stopSession() {
-        liveLog.info("stopSession called")
+        debugLog(.liveSession, "stopSession called")
         provider?.disconnect()
         stopAudioEngine()
         status = .disconnected
         provider = nil
         activeExecutionMode = nil
         currentCapabilities = nil
-        liveLog.info("Session stopped and cleaned up")
+        debugLog(.liveSession, "Session stopped and cleaned up")
     }
 
     /// Send text input to the current provider
     func sendText(_ text: String) {
         guard status == .connected else {
-            liveLog.warning("Cannot send text - not connected")
+            debugLog(.liveSession, "Cannot send text - not connected")
             return
         }
         provider?.sendText(text)
@@ -145,54 +144,52 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
 
     func toggleMic() {
         isMicEnabled.toggle()
-        liveLog.info("Mic toggled: \(self.isMicEnabled ? "enabled" : "disabled")")
+        debugLog(.liveSession, "Mic toggled: \(self.isMicEnabled ? "enabled" : "disabled")")
     }
 
     private func startAudioEngine() async throws {
-        liveLog.info("Initializing AVAudioEngine...")
-        print("[LiveSession] 🎤 Starting audio engine...")
+        debugLog(.liveSession, "🎤 Initializing AVAudioEngine...")
 
         // Request microphone permission first
-        liveLog.info("Requesting microphone permission...")
+        debugLog(.liveSession, "Requesting microphone permission...")
         let permissionGranted = await requestMicrophonePermission()
         guard permissionGranted else {
-            liveLog.error("Microphone permission denied by user")
-            print("[LiveSession] ❌ Microphone permission denied")
+            debugLog(.liveSession, "❌ Microphone permission denied by user")
             throw NSError(domain: "LiveSession", code: -1, userInfo: [NSLocalizedDescriptionKey: "Microphone permission denied. Please enable in Settings."])
         }
-        print("[LiveSession] ✅ Microphone permission granted")
-        liveLog.info("Microphone permission granted")
+        debugLog(.liveSession, "✅ Microphone permission granted")
 
         audioEngine = AVAudioEngine()
         guard let engine = audioEngine else {
-            liveLog.error("Failed to create AVAudioEngine")
+            debugLog(.liveSession, "Failed to create AVAudioEngine")
             return
         }
 
-        liveLog.info("Getting input node...")
+        debugLog(.liveSession, "Getting input node...")
         inputNode = engine.inputNode
         playerNode = AVAudioPlayerNode()
 
         guard let input = inputNode, let player = playerNode else {
-            liveLog.error("Failed to get inputNode or playerNode")
+            debugLog(.liveSession, "Failed to get inputNode or playerNode")
             return
         }
 
-        liveLog.info("Attaching player node to engine...")
+        debugLog(.liveSession, "Attaching player node to engine...")
         engine.attach(player)
-        engine.connect(player, to: engine.mainMixerNode, format: nil)
+        // Connect with explicit 24kHz mono format for Gemini/OpenAI audio output
+        engine.connect(player, to: engine.mainMixerNode, format: outputFormat)
 
         // Input Format (Hardware)
         let inputFormat = input.inputFormat(forBus: 0)
-        liveLog.info("Input format: \(inputFormat.sampleRate) Hz, \(inputFormat.channelCount) ch, \(inputFormat.commonFormat.rawValue)")
+        debugLog(.liveSession, "Input format: \(inputFormat.sampleRate) Hz, \(inputFormat.channelCount) ch, \(inputFormat.commonFormat.rawValue)")
 
         // Check for valid sample rate (0 Hz indicates microphone permission issue)
         guard inputFormat.sampleRate > 0 else {
-            liveLog.error("Invalid input format - sample rate is 0. Check microphone permissions.")
+            debugLog(.liveSession, "Invalid input format - sample rate is 0. Check microphone permissions.")
             throw NSError(domain: "LiveSession", code: -1, userInfo: [NSLocalizedDescriptionKey: "Microphone access denied or unavailable. Please check permissions in Settings."])
         }
 
-        liveLog.info("Installing tap on input node...")
+        debugLog(.liveSession, "Installing tap on input node...")
         input.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, time in
             guard let self = self, self.isMicEnabled else { return }
 
@@ -206,26 +203,26 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
             self.provider?.sendAudio(buffer: buffer)
         }
 
-        liveLog.info("Starting audio engine...")
+        debugLog(.liveSession, "Starting audio engine...")
         try engine.start()
-        liveLog.info("Audio engine started")
+        debugLog(.liveSession, "Audio engine started")
 
         player.play()
-        liveLog.info("Player node started")
+        debugLog(.liveSession, "Player node started")
     }
 
     private func requestMicrophonePermission() async -> Bool {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
-        liveLog.info("Current microphone authorization status: \(status.rawValue)")
+        debugLog(.liveSession, "Current microphone authorization status: \(status.rawValue)")
 
         switch status {
         case .authorized:
             return true
         case .notDetermined:
-            liveLog.info("Requesting microphone authorization...")
+            debugLog(.liveSession, "Requesting microphone authorization...")
             return await AVCaptureDevice.requestAccess(for: .audio)
         case .denied, .restricted:
-            liveLog.warning("Microphone access denied or restricted")
+            debugLog(.liveSession, "Microphone access denied or restricted")
             return false
         @unknown default:
             return false
@@ -233,13 +230,13 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
     }
     
     private func stopAudioEngine() {
-        liveLog.info("Stopping audio engine...")
+        debugLog(.liveSession, "Stopping audio engine...")
         inputNode?.removeTap(onBus: 0)
         audioEngine?.stop()
         audioEngine = nil
         inputNode = nil
         playerNode = nil
-        liveLog.info("Audio engine stopped and cleaned up")
+        debugLog(.liveSession, "Audio engine stopped and cleaned up")
     }
     
     private func calculateRMS(buffer: AVAudioPCMBuffer) -> Float {
@@ -253,45 +250,43 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
     // MARK: - LiveProviderDelegate
 
     func onAudioData(_ data: Data) {
-        liveLog.debug("Received audio data: \(data.count) bytes")
+        debugLog(.liveSession, "Received audio data: \(data.count) bytes")
         playAudio(data: data)
     }
 
     func onTextDelta(_ text: String) {
-        liveLog.debug("Text delta: \(text)")
+        debugLog(.liveSession, "Text delta: \(text)")
         latestTranscript += text
     }
 
     func onTranscript(_ text: String, role: String) {
-        liveLog.info("Transcript (\(role)): \(text)")
+        debugLog(.liveSession, "Transcript (\(role)): \(text)")
     }
 
     func onStatusChange(_ status: LiveSessionStatus) {
-        liveLog.info("Status changed: \(String(describing: status))")
+        debugLog(.liveSession, "Status changed: \(String(describing: status))")
         self.status = status
     }
 
     func onError(_ error: Error) {
-        liveLog.error("Provider error: \(error.localizedDescription)")
+        debugLog(.liveSession, "Provider error: \(error.localizedDescription)")
         self.status = .error(error.localizedDescription)
     }
 
     func onToolCall(name: String, args: [String : Any], id: String) {
-        liveLog.info("Tool call received: \(name), id: \(id)")
+        debugLog(.liveSession, "Tool call received: \(name), id: \(id)")
     }
     
     // MARK: - Audio Playback
 
     private func playAudio(data: Data) {
         guard let player = playerNode, let engine = audioEngine else {
-            liveLog.warning("playAudio called but player or engine is nil")
+            debugLog(.liveSession, "playAudio called but player or engine is nil")
             return
         }
 
-        // Assume 24kHz 1ch Int16 PCM (OpenAI/Gemini standard)
-        let format = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 24000, channels: 1, interleaved: false)!
-
-        if let buffer = data.toPCMBuffer(format: format) {
+        // Use the same format we connected the player with (24kHz mono Int16)
+        if let buffer = data.toPCMBuffer(format: outputFormat) {
             player.scheduleBuffer(buffer, at: nil, options: [], completionHandler: nil)
 
             // rudimentary level meter for output
@@ -302,7 +297,7 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
                 }
             }
         } else {
-            liveLog.warning("Failed to convert data to PCM buffer")
+            debugLog(.liveSession, "Failed to convert data to PCM buffer")
         }
     }
 }

@@ -1,8 +1,5 @@
 import Foundation
 import AVFoundation
-import os.log
-
-private let geminiLog = Logger(subsystem: "com.axon.app", category: "GeminiLive")
 
 class GeminiLiveProvider: LiveProviderProtocol {
     let id = "gemini"
@@ -15,81 +12,89 @@ class GeminiLiveProvider: LiveProviderProtocol {
 
     private var webSocketTask: URLSessionWebSocketTask?
     private var isConnected = false
+    private var isSetupComplete = false  // Wait for setupComplete before sending audio
     private let queue = DispatchQueue(label: "com.axon.gemini.live", qos: .userInitiated)
-    
+
     // Config
     private var currentConfig: LiveSessionConfig?
     
     func connect(config: LiveSessionConfig) async throws {
-        geminiLog.info("connect called with model: \(config.modelId)")
-        print("[GeminiLive] 🔌 connect() called with model: \(config.modelId)")
+        debugLog(.liveSession, "[GeminiLive] 🔌 connect() called with model: \(config.modelId)")
         self.currentConfig = config
 
-        // Construct URL
-        let baseUrl = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent"
+        // Construct URL - Note: v1beta is required for Live API
+        let baseUrl = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
         guard let url = URL(string: "\(baseUrl)?key=\(config.apiKey.prefix(8))...") else {
-            geminiLog.error("Invalid URL construction")
-            print("[GeminiLive] ❌ Invalid URL")
+            debugLog(.liveSession, "[GeminiLive] ❌ Invalid URL construction")
             throw LiveSessionError.invalidURL
         }
 
-        geminiLog.info("Creating WebSocket connection...")
-        print("[GeminiLive] 🌐 Creating WebSocket...")
+        debugLog(.liveSession, "[GeminiLive] 🌐 Creating WebSocket...")
         let request = URLRequest(url: URL(string: "\(baseUrl)?key=\(config.apiKey)")!)
         let session = URLSession(configuration: .default)
         webSocketTask = session.webSocketTask(with: request)
 
         isConnected = true
-        print("[GeminiLive] 📡 Calling delegate?.onStatusChange(.connecting)")
-        delegate?.onStatusChange(.connecting)
+        debugLog(.liveSession, "[GeminiLive] 📡 Calling delegate?.onStatusChange(.connecting)")
+        await MainActor.run {
+            delegate?.onStatusChange(.connecting)
+        }
 
         webSocketTask?.resume()
-        geminiLog.info("WebSocket resumed, starting listener...")
-        print("[GeminiLive] ▶️ WebSocket resumed")
+        debugLog(.liveSession, "[GeminiLive] ▶️ WebSocket resumed")
 
         // Start receiving messages
         listen()
 
+        // Give the WebSocket a moment to fully connect before sending setup
+        try await Task.sleep(nanoseconds: 100_000_000)  // 100ms
+
         // Send Setup Message
-        geminiLog.info("Sending setup message...")
-        print("[GeminiLive] 📤 Sending setup message...")
+        debugLog(.liveSession, "[GeminiLive] 📤 Sending setup message...")
         try await sendSetupMessage(config: config)
 
-        geminiLog.info("Connection established successfully")
-        print("[GeminiLive] ✅ Calling delegate?.onStatusChange(.connected)")
-        delegate?.onStatusChange(.connected)
+        debugLog(.liveSession, "[GeminiLive] ✅ Connection established successfully")
+        await MainActor.run {
+            delegate?.onStatusChange(.connected)
+        }
     }
 
     func disconnect() {
-        geminiLog.info("disconnect called")
-        print("[GeminiLive] 🔴 disconnect() called")
+        debugLog(.liveSession, "[GeminiLive] 🔴 disconnect() called")
         isConnected = false
+        isSetupComplete = false  // Reset for next connection
         webSocketTask?.cancel(with: .normalClosure, reason: nil)
         webSocketTask = nil
-        print("[GeminiLive] 📡 Calling delegate?.onStatusChange(.disconnected)")
-        delegate?.onStatusChange(.disconnected)
-        geminiLog.info("Disconnected")
+        debugLog(.liveSession, "[GeminiLive] 📡 Calling delegate?.onStatusChange(.disconnected)")
+        DispatchQueue.main.async {
+            self.delegate?.onStatusChange(.disconnected)
+        }
     }
     
     func sendAudio(buffer: AVAudioPCMBuffer) {
-        guard isConnected, let task = webSocketTask else { return }
-        
-        // Convert PCM buffer to Data
-        let audioData = buffer.toData()
+        // Don't send audio until setup is complete - prevents flooding the socket
+        guard isConnected, isSetupComplete, let task = webSocketTask else { return }
+
+        // Convert to 16kHz Int16 PCM (Gemini requirement)
+        guard let audioData = buffer.toGeminiFormat() else {
+            debugLog(.liveSession, "[GeminiLive] Failed to convert audio to Gemini format")
+            return
+        }
+
         let base64Audio = audioData.base64EncodedString()
-        
-        // Construct JSON message
+
+        // Construct JSON message - note the rate parameter in MIME type
         let messageDict: [String: Any] = [
             "realtime_input": [
                 "media_chunks": [
                     [
-                        "mime_type": "audio/pcm",
+                        "mime_type": "audio/pcm;rate=16000",
                         "data": base64Audio
                     ]
                 ]
             ]
         ]
-        
+
         sendJSON(messageDict)
     }
     
@@ -122,21 +127,22 @@ class GeminiLiveProvider: LiveProviderProtocol {
 
     private func listen() {
         guard isConnected, let task = webSocketTask else {
-            geminiLog.warning("listen called but not connected or no task")
+            debugLog(.liveSession, "[GeminiLive] listen called but not connected or no task")
             return
         }
 
         task.receive { [weak self] result in
             guard let self = self, self.isConnected else {
-                print("[GeminiLive] ⚠️ receive callback but not connected or self is nil")
+                debugLog(.liveSession, "[GeminiLive] ⚠️ receive callback but not connected or self is nil")
                 return
             }
 
             switch result {
             case .failure(let error):
-                geminiLog.error("WebSocket receive error: \(error.localizedDescription)")
-                print("[GeminiLive] ❌ WebSocket receive error: \(error)")
-                self.delegate?.onError(error)
+                debugLog(.liveSession, "[GeminiLive] ❌ WebSocket receive error: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.delegate?.onError(error)
+                }
                 self.disconnect()
             case .success(let message):
                 self.handleMessage(message)
@@ -158,22 +164,22 @@ class GeminiLiveProvider: LiveProviderProtocol {
         }
 
         guard let jsonData = data else {
-            geminiLog.warning("Received empty message")
+            debugLog(.liveSession, "[GeminiLive] Received empty message")
             return
         }
 
         do {
             if let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
                 // Log the top-level keys for debugging
-                geminiLog.debug("Received message keys: \(json.keys.joined(separator: ", "))")
+                debugLog(.liveSession, "[GeminiLive] Received message keys: \(json.keys.joined(separator: ", "))")
 
                 if let serverContent = json["serverContent"] as? [String: Any] {
                     if let modelTurn = serverContent["modelTurn"] as? [String: Any],
                        let parts = modelTurn["parts"] as? [[String: Any]] {
-                        geminiLog.debug("Processing \(parts.count) parts from model turn")
+                        debugLog(.liveSession, "[GeminiLive] Processing \(parts.count) parts from model turn")
                         for part in parts {
                             if let text = part["text"] as? String {
-                                geminiLog.debug("Text part received: \(text.prefix(50))...")
+                                debugLog(.liveSession, "[GeminiLive] Text part received: \(text.prefix(50))...")
                                 DispatchQueue.main.async {
                                     self.delegate?.onTextDelta(text)
                                 }
@@ -183,7 +189,7 @@ class GeminiLiveProvider: LiveProviderProtocol {
                                mimeType.hasPrefix("audio"),
                                let base64Data = inlineData["data"] as? String,
                                let audioData = Data(base64Encoded: base64Data) {
-                                geminiLog.debug("Audio data received: \(audioData.count) bytes")
+                                debugLog(.liveSession, "[GeminiLive] Audio data received: \(audioData.count) bytes")
                                 DispatchQueue.main.async {
                                     self.delegate?.onAudioData(audioData)
                                 }
@@ -192,25 +198,29 @@ class GeminiLiveProvider: LiveProviderProtocol {
                     }
                 }
 
-                if let setupComplete = json["setupComplete"] {
-                    geminiLog.info("Setup complete received")
+                if json["setupComplete"] != nil {
+                    debugLog(.liveSession, "[GeminiLive] ✅ setupComplete received - now accepting audio")
+                    self.isSetupComplete = true
                 }
 
                 if let error = json["error"] as? [String: Any] {
                     let message = error["message"] as? String ?? "Unknown error"
-                    geminiLog.error("Gemini API error: \(message)")
+                    debugLog(.liveSession, "[GeminiLive] Gemini API error: \(message)")
                 }
             }
         } catch {
-            geminiLog.error("JSON parse error: \(error.localizedDescription)")
+            debugLog(.liveSession, "[GeminiLive] JSON parse error: \(error.localizedDescription)")
         }
     }
     
     private func sendSetupMessage(config: LiveSessionConfig) async throws {
-        geminiLog.info("Sending setup message with model: \(config.modelId), voice: \(config.voice)")
+        // Model format must be "models/{model_id}" per API docs
+        let modelPath = config.modelId.hasPrefix("models/") ? config.modelId : "models/\(config.modelId)"
+        debugLog(.liveSession, "[GeminiLive] 📋 Sending setup with model: \(modelPath), voice: \(config.voice)")
+
         var messageDict: [String: Any] = [
             "setup": [
-                "model": config.modelId,
+                "model": modelPath,
                 "generation_config": [
                     "response_modalities": ["AUDIO"],
                     "speech_config": [
@@ -225,7 +235,7 @@ class GeminiLiveProvider: LiveProviderProtocol {
         ]
 
         if let systemInstruction = config.systemInstruction {
-            geminiLog.debug("Adding system instruction")
+            debugLog(.liveSession, "[GeminiLive] Adding system instruction")
             if var setup = messageDict["setup"] as? [String: Any] {
                 setup["system_instruction"] = [
                     "parts": [
@@ -241,20 +251,20 @@ class GeminiLiveProvider: LiveProviderProtocol {
 
     private func sendJSON(_ dict: [String: Any]) {
         guard let task = webSocketTask else {
-            geminiLog.warning("sendJSON called but no webSocketTask")
+            debugLog(.liveSession, "[GeminiLive] sendJSON called but no webSocketTask")
             return
         }
         do {
             let data = try JSONSerialization.data(withJSONObject: dict)
-            geminiLog.debug("Sending JSON message (\(data.count) bytes)")
+            debugLog(.liveSession, "[GeminiLive] Sending JSON message (\(data.count) bytes)")
             let message = URLSessionWebSocketTask.Message.data(data)
             task.send(message) { error in
                 if let error = error {
-                    geminiLog.error("Send error: \(error.localizedDescription)")
+                    debugLog(.liveSession, "[GeminiLive] Send error: \(error.localizedDescription)")
                 }
             }
         } catch {
-            geminiLog.error("JSON serialization error: \(error.localizedDescription)")
+            debugLog(.liveSession, "[GeminiLive] JSON serialization error: \(error.localizedDescription)")
         }
     }
 }
@@ -264,8 +274,51 @@ enum LiveSessionError: Error {
 }
 
 extension AVAudioPCMBuffer {
+    /// Convert audio buffer to Gemini Live API format: 16kHz, Int16, mono, little-endian
+    func toGeminiFormat() -> Data? {
+        guard let floatData = self.floatChannelData else { return nil }
+
+        let inputSampleRate = self.format.sampleRate
+        let inputFrameLength = Int(self.frameLength)
+
+        // Target: 16kHz
+        let targetSampleRate: Double = 16000
+
+        // Calculate output frame count after resampling
+        let resampleRatio = targetSampleRate / inputSampleRate
+        let outputFrameCount = Int(Double(inputFrameLength) * resampleRatio)
+
+        // Get input samples (channel 0 only - mono)
+        let inputSamples = UnsafeBufferPointer(start: floatData[0], count: inputFrameLength)
+
+        // Resample using linear interpolation and convert Float32 → Int16
+        var int16Samples = [Int16](repeating: 0, count: outputFrameCount)
+
+        for i in 0..<outputFrameCount {
+            // Map output index back to input
+            let inputIndex = Double(i) / resampleRatio
+            let index0 = Int(inputIndex)
+            let index1 = min(index0 + 1, inputFrameLength - 1)
+            let fraction = Float(inputIndex - Double(index0))
+
+            // Linear interpolation
+            let sample0 = inputSamples[index0]
+            let sample1 = inputSamples[index1]
+            let interpolatedSample = sample0 + (sample1 - sample0) * fraction
+
+            // Clamp and convert to Int16 (-32768 to 32767)
+            let clampedSample = max(-1.0, min(1.0, interpolatedSample))
+            int16Samples[i] = Int16(clampedSample * 32767)
+        }
+
+        // Convert to Data (little-endian, which is native on Apple Silicon/Intel)
+        return int16Samples.withUnsafeBufferPointer { bufferPointer in
+            Data(buffer: bufferPointer)
+        }
+    }
+
+    /// Original toData for compatibility
     func toData() -> Data {
-        let channelCount = 1
         let channels = UnsafeBufferPointer(start: self.floatChannelData, count: Int(self.format.channelCount))
         let ch0 = channels[0]
         let frameLength = Int(self.frameLength)

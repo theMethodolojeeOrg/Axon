@@ -1,8 +1,5 @@
 import Foundation
 import AVFoundation
-import os.log
-
-private let openAILog = Logger(subsystem: "com.axon.app", category: "OpenAILive")
 
 class OpenAILiveProvider: LiveProviderProtocol {
     let id = "openai"
@@ -20,15 +17,15 @@ class OpenAILiveProvider: LiveProviderProtocol {
     private var currentConfig: LiveSessionConfig?
     
     func connect(config: LiveSessionConfig) async throws {
-        openAILog.info("connect called with model: \(config.modelId)")
+        debugLog(.liveSession, "[OpenAILive] connect called with model: \(config.modelId)")
         self.currentConfig = config
 
         // Construct URL
         let model = config.modelId.isEmpty ? "gpt-4o-realtime-preview-2024-10-01" : config.modelId
-        openAILog.info("Using model: \(model)")
+        debugLog(.liveSession, "[OpenAILive] Using model: \(model)")
 
         guard let url = URL(string: "wss://api.openai.com/v1/realtime?model=\(model)") else {
-            openAILog.error("Invalid URL for model: \(model)")
+            debugLog(.liveSession, "[OpenAILive] Invalid URL for model: \(model)")
             throw LiveSessionError.invalidURL
         }
 
@@ -36,7 +33,7 @@ class OpenAILiveProvider: LiveProviderProtocol {
         request.addValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
         request.addValue("realtime=v1", forHTTPHeaderField: "OpenAI-Beta")
 
-        openAILog.info("Creating WebSocket connection...")
+        debugLog(.liveSession, "[OpenAILive] Creating WebSocket connection...")
         let session = URLSession(configuration: .default)
         webSocketTask = session.webSocketTask(with: request)
 
@@ -44,24 +41,24 @@ class OpenAILiveProvider: LiveProviderProtocol {
         delegate?.onStatusChange(.connecting)
 
         webSocketTask?.resume()
-        openAILog.info("WebSocket resumed, starting listener...")
+        debugLog(.liveSession, "[OpenAILive] WebSocket resumed, starting listener...")
         listen()
 
         // Send session.update to set voice and instructions
-        openAILog.info("Sending session update...")
+        debugLog(.liveSession, "[OpenAILive] Sending session update...")
         try await sendSessionUpdate(config: config)
 
-        openAILog.info("Connection established successfully")
+        debugLog(.liveSession, "[OpenAILive] Connection established successfully")
         delegate?.onStatusChange(.connected)
     }
 
     func disconnect() {
-        openAILog.info("disconnect called")
+        debugLog(.liveSession, "[OpenAILive] disconnect called")
         isConnected = false
         webSocketTask?.cancel(with: .normalClosure, reason: nil)
         webSocketTask = nil
         delegate?.onStatusChange(.disconnected)
-        openAILog.info("Disconnected")
+        debugLog(.liveSession, "[OpenAILive] Disconnected")
     }
     
     func sendAudio(buffer: AVAudioPCMBuffer) {
@@ -143,7 +140,7 @@ class OpenAILiveProvider: LiveProviderProtocol {
     
     private func listen() {
         guard isConnected, let task = webSocketTask else {
-            openAILog.warning("listen called but not connected or no task")
+            debugLog(.liveSession, "[OpenAILive] listen called but not connected or no task")
             return
         }
 
@@ -152,7 +149,7 @@ class OpenAILiveProvider: LiveProviderProtocol {
 
             switch result {
             case .failure(let error):
-                openAILog.error("WebSocket receive error: \(error.localizedDescription)")
+                debugLog(.liveSession, "[OpenAILive] WebSocket receive error: \(error.localizedDescription)")
                 self.delegate?.onError(error)
                 self.disconnect()
             case .success(let message):
@@ -171,27 +168,27 @@ class OpenAILiveProvider: LiveProviderProtocol {
         }
 
         guard let jsonData = data else {
-            openAILog.warning("Received empty message")
+            debugLog(.liveSession, "[OpenAILive] Received empty message")
             return
         }
 
         do {
             if let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
                 guard let type = json["type"] as? String else {
-                    openAILog.warning("Message missing 'type' field")
+                    debugLog(.liveSession, "[OpenAILive] Message missing 'type' field")
                     return
                 }
 
-                openAILog.debug("Received message type: \(type)")
+                debugLog(.liveSession, "[OpenAILive] Received message type: \(type)")
 
                 switch type {
                 case "error":
                     if let error = json["error"] as? [String: Any], let message = error["message"] as? String {
-                        openAILog.error("OpenAI API error: \(message)")
+                        debugLog(.liveSession, "[OpenAILive] OpenAI API error: \(message)")
                         delegate?.onError(NSError(domain: "OpenAI", code: -1, userInfo: [NSLocalizedDescriptionKey: message]))
                     }
                 case "session.created":
-                    openAILog.info("Session created successfully")
+                    debugLog(.liveSession, "[OpenAILive] Session created successfully")
 
                 case "response.audio.delta":
                     if let delta = json["delta"] as? String,
@@ -203,28 +200,28 @@ class OpenAILiveProvider: LiveProviderProtocol {
 
                 case "response.text.delta":
                     if let delta = json["delta"] as? String {
-                        openAILog.debug("Text delta received: \(delta.prefix(50))...")
+                        debugLog(.liveSession, "[OpenAILive] Text delta received: \(delta.prefix(50))...")
                         DispatchQueue.main.async {
                             self.delegate?.onTextDelta(delta)
                         }
                     }
 
                 case "response.function_call_arguments.done":
-                    openAILog.info("Function call arguments complete")
+                    debugLog(.liveSession, "[OpenAILive] Function call arguments complete")
                     break
 
                 default:
-                    openAILog.debug("Unhandled message type: \(type)")
+                    debugLog(.liveSession, "[OpenAILive] Unhandled message type: \(type)")
                     break
                 }
             }
         } catch {
-            openAILog.error("JSON parse error: \(error.localizedDescription)")
+            debugLog(.liveSession, "[OpenAILive] JSON parse error: \(error.localizedDescription)")
         }
     }
     
     private func sendSessionUpdate(config: LiveSessionConfig) async throws {
-        openAILog.info("Sending session update with voice: \(config.voice)")
+        debugLog(.liveSession, "[OpenAILive] Sending session update with voice: \(config.voice)")
         let event: [String: Any] = [
             "type": "session.update",
             "session": [
@@ -237,22 +234,22 @@ class OpenAILiveProvider: LiveProviderProtocol {
 
     private func sendJSON(_ dict: [String: Any]) {
         guard let task = webSocketTask else {
-            openAILog.warning("sendJSON called but no webSocketTask")
+            debugLog(.liveSession, "[OpenAILive] sendJSON called but no webSocketTask")
             return
         }
         do {
             let data = try JSONSerialization.data(withJSONObject: dict)
             if let type = dict["type"] as? String {
-                openAILog.debug("Sending message type: \(type)")
+                debugLog(.liveSession, "[OpenAILive] Sending message type: \(type)")
             }
             let message = URLSessionWebSocketTask.Message.data(data)
             task.send(message) { error in
                 if let error = error {
-                    openAILog.error("Send error: \(error.localizedDescription)")
+                    debugLog(.liveSession, "[OpenAILive] Send error: \(error.localizedDescription)")
                 }
             }
         } catch {
-            openAILog.error("JSON serialization error: \(error.localizedDescription)")
+            debugLog(.liveSession, "[OpenAILive] JSON serialization error: \(error.localizedDescription)")
         }
     }
 }

@@ -362,6 +362,7 @@ private struct DebugLogEntryRow: View {
         case .services: return .green
         case .media: return .pink
         case .tools: return .yellow
+        case .chat: return .teal
         case .developer: return .red
         }
     }

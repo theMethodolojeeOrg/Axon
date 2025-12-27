@@ -47,10 +47,10 @@ struct AppContainerView: View {
                 LiveSessionOverlay()
                     .zIndex(200) // Ensure visibility
                     .onAppear {
-                        print("[LiveOverlay] Overlay appeared, status: \(liveService.status)")
+                        debugLog(.liveSession, "[LiveOverlay] Overlay appeared, status: \(liveService.status)")
                     }
                     .onDisappear {
-                        print("[LiveOverlay] Overlay disappeared, status: \(liveService.status)")
+                        debugLog(.liveSession, "[LiveOverlay] Overlay disappeared, status: \(liveService.status)")
                     }
             }
 
@@ -161,7 +161,10 @@ struct AppContainerView: View {
                         }
 
                         ToolbarItem {
-                            Button(action: startLiveSession) {
+                            Button(action: {
+                                debugLog(.liveSession, "🔘 Live button tapped!")
+                                startLiveSession()
+                            }) {
                                 Label("Live", systemImage: "waveform.circle")
                             }
                             .help("Start Live voice session")
@@ -389,11 +392,11 @@ struct AppContainerView: View {
 
     private func startLiveSession() {
         guard let conversation = selectedConversation else {
-            print("[LiveSession] ⚠️ startLiveSession called but no selectedConversation")
+            debugLog(.liveSession, "⚠️ startLiveSession called but no selectedConversation")
             return
         }
 
-        print("[LiveSession] 🎬 startLiveSession called for conversation: \(conversation.id), isEphemeral: \(conversationService.isEphemeral(conversation.id))")
+        debugLog(.liveSession, "🎬 startLiveSession called for conversation: \(conversation.id), isEphemeral: \(conversationService.isEphemeral(conversation.id))")
 
         let settings = settingsViewModel.settings.liveSettings
         var provider: AIProvider = settings.defaultProvider
@@ -424,7 +427,7 @@ struct AppContainerView: View {
              tools: nil
         )
 
-        print("[LiveSession] 🚀 Starting Live session with provider: \(provider), model: \(modelId), voice: \(voice)")
+        debugLog(.liveSession, "🚀 Starting Live session with provider: \(provider), model: \(modelId), voice: \(voice)")
 
         Task {
             await liveService.startSession(config: config, providerType: provider)
