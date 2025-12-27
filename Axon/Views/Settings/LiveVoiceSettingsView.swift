@@ -87,7 +87,7 @@ struct LiveVoiceSettingsView: View {
             if viewModel.settings.liveSettings.useOnDeviceModels {
                 Section {
                     Picker("MLX Model", selection: mlxModelBinding) {
-                        Text("Default (Qwen3-VL)").tag("")
+                        Text("Default (Gemma3)").tag("")
                         ForEach(availableMLXModels, id: \.self) { model in
                             Text(model).tag(model)
                         }

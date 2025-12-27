@@ -1032,6 +1032,15 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
             return [
                 // Default bundled model (first in list)
                 AIModel(
+                    id: "lmstudio-community/gemma-3-270m-it-MLX-8bit",
+                    name: "Gemma3 270M",
+                    provider: .localMLX,
+                    contextWindow: 8_192,
+                    modalities: ["text"],
+                    description: "Google's ultra-compact model. Fastest option. Bundled in app - ready instantly. Private, offline, free."
+                ),
+                // Downloadable models
+                AIModel(
                     id: "mlx-community/Qwen3-VL-2B-Instruct-4bit",
                     name: "Qwen3 VL 2B",
                     provider: .localMLX,
@@ -1039,7 +1048,6 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     modalities: ["text", "vision"],
                     description: "Vision-language model. Bundled in app - ready instantly. Private, offline, free."
                 ),
-                // Downloadable models
                 AIModel(
                     id: "mlx-community/SmolLM2-1.7B-Instruct-4bit",
                     name: "SmolLM2 1.7B",
@@ -2162,7 +2170,7 @@ struct SmallModelOptimization: Codable, Equatable, Sendable {
         "1B", "1.7B", "2B", "3B",           // Parameter counts
         "4bit", "3bit",                      // Heavy quantization
         "SmolLM", "Phi-4-mini",              // Known small models
-        "Qwen3-VL-2B", "Llama-3.2-1B"        // Specific small models
+        "gemma-3-270m", "Qwen3-VL-2B", "Llama-3.2-1B"        // Specific small models
     ]
 
     /// Check if a model identifier matches small model patterns

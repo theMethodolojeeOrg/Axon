@@ -299,7 +299,7 @@ final class OnDeviceMLXProvider: LiveProviderProtocol {
     private func getDefaultMLXModelId() -> String {
         // Return the default bundled model or first available
         // This should match LocalMLXModel.defaultModel
-        return "mlx-community/Qwen3-VL-2B-Instruct-4bit"
+        return "lmstudio-community/gemma-3-270m-it-MLX-8bit"
     }
 
     private func vadSensitivityFromLatencyMode(_ mode: LatencyMode) -> Float? {

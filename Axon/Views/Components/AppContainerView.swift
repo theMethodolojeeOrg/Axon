@@ -418,19 +418,40 @@ struct AppContainerView: View {
         
         // Update voice based on provider if not overridden specifically (simplified logic)
         // Ideally we should check if voice matches provider context, but we trust the user/logic here.
-        
-        let config = LiveSessionConfig(
-             apiKey: "", // Resolved by Service
-             modelId: modelId,
-             voice: voice,
-             systemInstruction: "You are a helpful assistant.",
-             tools: nil
-        )
 
         debugLog(.liveSession, "🚀 Starting Live session with provider: \(provider), model: \(modelId), voice: \(voice)")
 
         Task {
+            // Build full Axon context with personality and memories
+            let userName = await getUserDisplayName()
+            let systemInstruction = await LiveContextBuilder.shared.buildLiveSystemInstruction(
+                userName: userName,
+                tokenBudget: 1500 // Keep concise for voice latency
+            )
+
+            // Debug: log what we're injecting
+            let debugInfo = await LiveContextBuilder.shared.debugContextInfo(userName: userName)
+            debugLog(.liveSession, debugInfo)
+
+            let config = LiveSessionConfig(
+                 apiKey: "", // Resolved by Service
+                 modelId: modelId,
+                 voice: voice,
+                 systemInstruction: systemInstruction,
+                 tools: nil
+            )
+
             await liveService.startSession(config: config, providerType: provider)
+        }
+    }
+
+    /// Get user's display name for personalization
+    private func getUserDisplayName() async -> String? {
+        return await withCheckedContinuation { continuation in
+            Task { @MainActor in
+                let name = SettingsViewModel.shared.settings.userDisplayName
+                continuation.resume(returning: name.isEmpty ? nil : name)
+            }
         }
     }
 }

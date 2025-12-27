@@ -69,7 +69,7 @@ enum LocalMLXModel: String, CaseIterable {
     case llama32 = "mlx-community/Llama-3.2-1B-Instruct-4bit"
 
     /// The recommended default model - bundled in app
-    static var defaultModel: LocalMLXModel { .qwen3VL }
+    static var defaultModel: LocalMLXModel { .gemma3_270m }
 
     /// Whether this model is bundled in the app (no download required)
     var isBundled: Bool {

@@ -103,7 +103,7 @@ struct NativeLiveSettingsView: View {
     private var onDeviceSettingsSection: some View {
         Section {
             Picker("MLX Model", selection: mlxModelBinding) {
-                Text("Default (Qwen3-VL)").tag("")
+                Text("Default (Gemma3)").tag("")
                 // Add more models as they become available
                 ForEach(availableMLXModels, id: \.self) { model in
                     Text(model).tag(model)
