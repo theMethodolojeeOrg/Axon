@@ -2002,6 +2002,40 @@ struct HeartbeatDeliveryProfile: Codable, Equatable, Identifiable, Sendable {
     ]
 }
 
+// MARK: - Heartbeat Execution Mode
+
+/// Determines how heartbeat triggers execute - silently or as visible solo threads
+enum HeartbeatExecutionMode: String, Codable, CaseIterable, Sendable {
+    /// Current behavior: silent reflection, no tools, no visible thread
+    case internalThread
+    
+    /// Visible conversation with tool access and turn allocation
+    case soloThread
+    
+    var displayName: String {
+        switch self {
+        case .internalThread: return "Internal Thread"
+        case .soloThread: return "Solo Thread"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .internalThread:
+            return "Quiet reflection and note-taking in the internal thread"
+        case .soloThread:
+            return "Visible conversation with tool access and turn allocation"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .internalThread: return "text.bubble"
+        case .soloThread: return "bolt.circle.fill"
+        }
+    }
+}
+
 struct HeartbeatSettings: Codable, Equatable, Sendable {
     var enabled: Bool = false
     var intervalSeconds: Int = 3600
@@ -2013,9 +2047,52 @@ struct HeartbeatSettings: Codable, Equatable, Sendable {
     var liveActivityEnabled: Bool = true
     var quietHours: TimeRestrictions? = nil
     var deliveryProfiles: [HeartbeatDeliveryProfile] = HeartbeatDeliveryProfile.defaultProfiles
+    
+    // MARK: - Solo Thread Configuration
+    
+    /// Execution mode for heartbeat triggers
+    var executionMode: HeartbeatExecutionMode = .internalThread
+    
+    /// Number of turns allocated per solo thread session
+    var soloTurnsPerSession: Int = 5
+    
+    /// Maximum solo sessions per day
+    var soloMaxSessionsPerDay: Int = 3
+    
+    /// Tool categories allowed in solo threads
+    var soloAllowedToolCategories: [ToolCategory] = [
+        .memoryReflection, .internalThread, .toolDiscovery
+    ]
+    
+    /// Number of solo sessions completed today (resets daily)
+    var soloSessionsToday: Int = 0
+    
+    /// Date of last solo session count reset
+    var soloSessionsResetDate: Date?
 
     func profile(for id: String) -> HeartbeatDeliveryProfile? {
         deliveryProfiles.first { $0.id == id }
+    }
+    
+    /// Whether more solo sessions are available today
+    var canStartSoloSession: Bool {
+        soloSessionsToday < soloMaxSessionsPerDay
+    }
+    
+    /// Reset daily session count if it's a new day
+    mutating func resetDailyCountIfNeeded() {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        if let resetDate = soloSessionsResetDate {
+            let lastReset = calendar.startOfDay(for: resetDate)
+            if lastReset < today {
+                soloSessionsToday = 0
+                soloSessionsResetDate = Date()
+            }
+        } else {
+            soloSessionsResetDate = Date()
+        }
     }
 }
 
@@ -2114,7 +2191,7 @@ struct HeuristicsSettings: Codable, Equatable, Sendable {
 }
 
 /// Categories for organizing tools in the UI
-enum ToolCategory: String, CaseIterable, Identifiable, Sendable {
+enum ToolCategory: String, Codable, CaseIterable, Identifiable, Sendable {
     case geminiTools = "gemini_tools"
     case openaiTools = "openai_tools"
     case memoryReflection = "memory_reflection"

@@ -24,6 +24,9 @@ struct Conversation: Codable, Identifiable, Equatable {
     let tags: [String]?
     let isPinned: Bool?
     let isPrivate: Bool?  // Private threads don't invoke AI
+    
+    // Solo thread configuration (nil for normal conversations)
+    var soloThreadConfig: SoloThreadConfig?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -40,6 +43,7 @@ struct Conversation: Codable, Identifiable, Equatable {
         case isPinned
         case archived
         case isPrivate
+        case soloThreadConfig
     }
 
     init(
@@ -56,7 +60,8 @@ struct Conversation: Codable, Identifiable, Equatable {
         lastMessage: String? = nil,
         tags: [String]? = nil,
         isPinned: Bool? = false,
-        isPrivate: Bool? = false
+        isPrivate: Bool? = false,
+        soloThreadConfig: SoloThreadConfig? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -72,6 +77,27 @@ struct Conversation: Codable, Identifiable, Equatable {
         self.tags = tags
         self.isPinned = isPinned
         self.isPrivate = isPrivate
+        self.soloThreadConfig = soloThreadConfig
+    }
+    
+    // MARK: - Solo Thread Helpers
+    
+    /// Whether this is a solo thread conversation
+    var isSoloThread: Bool {
+        soloThreadConfig != nil
+    }
+    
+    /// Whether this solo thread is currently active
+    var isSoloActive: Bool {
+        soloThreadConfig?.status == .active
+    }
+    
+    /// Icon for this conversation (different for solo threads)
+    var conversationIcon: String {
+        if let config = soloThreadConfig {
+            return config.status.icon
+        }
+        return isPrivate == true ? "lock.fill" : "bubble.left.and.bubble.right"
     }
 
     // Custom decoder to handle timestamp conversion
@@ -107,6 +133,7 @@ struct Conversation: Codable, Identifiable, Equatable {
         tags = try container.decodeIfPresent([String].self, forKey: .tags)
         isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned)
         isPrivate = try container.decodeIfPresent(Bool.self, forKey: .isPrivate)
+        soloThreadConfig = try container.decodeIfPresent(SoloThreadConfig.self, forKey: .soloThreadConfig)
     }
 
     // Custom encoder to convert dates back to timestamps
@@ -135,6 +162,7 @@ struct Conversation: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(tags, forKey: .tags)
         try container.encodeIfPresent(isPinned, forKey: .isPinned)
         try container.encodeIfPresent(isPrivate, forKey: .isPrivate)
+        try container.encodeIfPresent(soloThreadConfig, forKey: .soloThreadConfig)
     }
 }
 
