@@ -9,21 +9,38 @@ private let liveLog = Logger(subsystem: "com.axon.app", category: "LiveSession")
 class LiveSessionService: ObservableObject, LiveProviderDelegate {
     static let shared = LiveSessionService()
 
+    // MARK: - Published State
+
     @Published var status: LiveSessionStatus = .idle
     @Published var isMicEnabled: Bool = true
     @Published var inputLevel: Float = 0.0
     @Published var outputLevel: Float = 0.0
     @Published var latestTranscript: String = ""
-    
+
+    /// Current execution mode (WebSocket, HTTP Streaming, or MLX)
+    @Published var activeExecutionMode: ExecutionMode?
+
+    /// Current provider capabilities
+    @Published var currentCapabilities: LiveProviderCapabilities?
+
+    // MARK: - Private State
+
     private var provider: LiveProviderProtocol?
     private var audioEngine: AVAudioEngine?
     private var inputNode: AVAudioInputNode?
     private var playerNode: AVAudioPlayerNode?
-    
+
+    private let factory = LiveProviderFactory.shared
     private var cancellables = Set<AnyCancellable>()
-    
+
     init() {}
     
+    // MARK: - Session Management
+
+    /// Start a Live session with the specified provider and configuration
+    /// - Parameters:
+    ///   - config: Session configuration (model, voice, system instruction, etc.)
+    ///   - providerType: The AI provider to use
     func startSession(config: LiveSessionConfig, providerType: AIProvider) async {
         liveLog.info("startSession called with provider: \(providerType.displayName), model: \(config.modelId)")
 
@@ -33,43 +50,54 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
         }
 
         status = .connecting
+        latestTranscript = ""  // Reset transcript
         liveLog.info("Status changed to connecting")
 
-        // Retrieve API Key
-        guard let apiProvider = providerType.apiProvider,
-              let apiKey = SettingsViewModel.shared.getAPIKey(apiProvider), !apiKey.isEmpty else {
-            liveLog.error("Missing API Key for \(providerType.displayName)")
-            status = .error("Missing API Key for \(providerType.displayName)")
-            return
+        // Detect capabilities for this provider/model combination
+        let capabilities = factory.detectCapabilities(for: providerType, modelId: config.modelId)
+        currentCapabilities = capabilities
+        activeExecutionMode = capabilities.executionMode
+        liveLog.info("Detected execution mode: \(capabilities.executionMode.displayName)")
+
+        // Get API key (not needed for on-device)
+        var apiKey = ""
+        if capabilities.executionMode != .onDeviceMLX {
+            guard let apiProvider = providerType.apiProvider,
+                  let key = SettingsViewModel.shared.getAPIKey(apiProvider), !key.isEmpty else {
+                liveLog.error("Missing API Key for \(providerType.displayName)")
+                status = .error("Missing API Key for \(providerType.displayName)")
+                return
+            }
+            apiKey = key
+            liveLog.debug("API Key retrieved successfully")
         }
-        liveLog.debug("API Key retrieved successfully")
-        
-        // Inject API Key into config
+
+        // Build full config with API key
         let fullConfig = LiveSessionConfig(
             apiKey: apiKey,
             modelId: config.modelId,
             voice: config.voice,
             systemInstruction: config.systemInstruction,
-            tools: config.tools
+            tools: config.tools,
+            executionMode: config.executionMode ?? capabilities.executionMode,
+            latencyMode: config.latencyMode,
+            useLocalVAD: config.useLocalVAD,
+            useOnDeviceSTT: config.useOnDeviceSTT,
+            fallbackTTSEngine: config.fallbackTTSEngine,
+            fallbackTTSVoice: config.fallbackTTSVoice,
+            mlxModelId: config.mlxModelId
         )
-        
-        // Select provider
-        switch providerType {
-        case .gemini:
-            liveLog.info("Creating GeminiLiveProvider")
-            self.provider = GeminiLiveProvider()
-        case .openai:
-            liveLog.info("Creating OpenAILiveProvider")
-            self.provider = OpenAILiveProvider()
-        default:
-            liveLog.error("Unsupported provider: \(providerType.displayName)")
-            status = .error("Unsupported provider")
-            return
-        }
-
-        self.provider?.delegate = self
 
         do {
+            // Create provider using factory
+            liveLog.info("Creating provider via factory...")
+            self.provider = try factory.createProvider(
+                for: providerType,
+                modelId: config.modelId,
+                config: fullConfig
+            )
+            self.provider?.delegate = self
+
             liveLog.info("Starting audio engine...")
             try await startAudioEngine()
             liveLog.info("Audio engine started successfully")
@@ -91,7 +119,18 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
         stopAudioEngine()
         status = .disconnected
         provider = nil
+        activeExecutionMode = nil
+        currentCapabilities = nil
         liveLog.info("Session stopped and cleaned up")
+    }
+
+    /// Send text input to the current provider
+    func sendText(_ text: String) {
+        guard status == .connected else {
+            liveLog.warning("Cannot send text - not connected")
+            return
+        }
+        provider?.sendText(text)
     }
 
     func toggleMic() {

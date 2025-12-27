@@ -440,6 +440,54 @@ private struct AllTagsSheet: View {
     }
 
     var body: some View {
+        #if os(macOS)
+        ZStack {
+            AppColors.substratePrimary
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                MemorySearchBar(text: $searchText)
+                    .padding()
+
+                List {
+                    ForEach(filteredTags) { tagInfo in
+                        Button(action: {
+                            selectedTag = tagInfo.tag
+                            onDismiss()
+                        }) {
+                            HStack {
+                                Text("#\(tagInfo.tag)")
+                                    .font(AppTypography.bodyMedium())
+                                    .foregroundColor(AppColors.textPrimary)
+
+                                Spacer()
+
+                                Text("\(tagInfo.count) memories")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+
+                                if selectedTag == tagInfo.tag {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(AppColors.signalMercury)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .listRowBackground(AppColors.substrateSecondary)
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+        .navigationTitle("All Tags")
+        .toolbar {
+            ToolbarItem {
+                Button("Done") { onDismiss() }
+                    .foregroundColor(AppColors.signalMercury)
+            }
+        }
+        .frame(minWidth: 400, idealWidth: 450, minHeight: 400, idealHeight: 500)
+        #else
         NavigationView {
             ZStack {
                 AppColors.substratePrimary
@@ -490,8 +538,6 @@ private struct AllTagsSheet: View {
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 400, idealWidth: 450, minHeight: 400, idealHeight: 500)
         #endif
     }
 }
@@ -725,6 +771,98 @@ struct NewMemorySheet: View {
     @State private var tagsText = ""
 
     var body: some View {
+        #if os(macOS)
+        ZStack {
+            AppColors.substratePrimary
+                .ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                // Content
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Content")
+                        .font(AppTypography.labelMedium())
+                        .foregroundColor(AppColors.textSecondary)
+
+                    TextEditor(text: $content)
+                        .font(AppTypography.bodyMedium())
+                        .foregroundColor(AppColors.textPrimary)
+                        .frame(height: 120)
+                        .padding(8)
+                        .background(AppColors.substrateTertiary)
+                        .cornerRadius(8)
+                }
+
+                // Type
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Type")
+                        .font(AppTypography.labelMedium())
+                        .foregroundColor(AppColors.textSecondary)
+
+                    Picker("Type", selection: $selectedType) {
+                        ForEach(MemoryType.selectableCases, id: \.self) { type in
+                            Text(type.displayName).tag(type)
+                        }
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                }
+
+                // Tags
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Tags (comma separated)")
+                        .font(AppTypography.labelMedium())
+                        .foregroundColor(AppColors.textSecondary)
+
+                    TextField("work, project, idea", text: $tagsText)
+                        .font(AppTypography.bodyMedium())
+                        .foregroundColor(AppColors.textPrimary)
+                        .padding(12)
+                        .background(AppColors.substrateTertiary)
+                        .cornerRadius(8)
+                }
+
+                // Confidence
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Confidence")
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        Spacer()
+
+                        Text("\(Int(confidence * 100))%")
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textPrimary)
+                    }
+
+                    Slider(value: $confidence, in: 0...1)
+                        .accentColor(AppColors.signalMercury)
+                }
+
+                Button(action: createMemory) {
+                    Text("Create Memory")
+                        .font(AppTypography.titleMedium())
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(AppColors.signalMercury)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                }
+                .disabled(content.trimmingCharacters(in: .whitespaces).isEmpty)
+                .opacity(content.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1.0)
+
+                Spacer()
+            }
+            .padding()
+        }
+        .navigationTitle("New Memory")
+        .toolbar {
+            ToolbarItem {
+                Button("Cancel") { dismiss() }
+                    .foregroundColor(AppColors.textSecondary)
+            }
+        }
+        .frame(minWidth: 400, idealWidth: 450, minHeight: 450, idealHeight: 550)
+        #else
         NavigationView {
             ZStack {
                 AppColors.substratePrimary
@@ -814,15 +952,11 @@ struct NewMemorySheet: View {
             #endif
             .toolbar {
                 ToolbarItem {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(AppColors.textSecondary)
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(AppColors.textSecondary)
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 400, idealWidth: 450, minHeight: 450, idealHeight: 550)
         #endif
     }
 

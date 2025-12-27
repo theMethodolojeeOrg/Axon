@@ -7,7 +7,12 @@ private let geminiLog = Logger(subsystem: "com.axon.app", category: "GeminiLive"
 class GeminiLiveProvider: LiveProviderProtocol {
     let id = "gemini"
     weak var delegate: LiveProviderDelegate?
-    
+
+    /// Gemini Live capabilities - native real-time duplex audio
+    var capabilities: LiveProviderCapabilities {
+        .geminiLive
+    }
+
     private var webSocketTask: URLSessionWebSocketTask?
     private var isConnected = false
     private let queue = DispatchQueue(label: "com.axon.gemini.live", qos: .userInitiated)

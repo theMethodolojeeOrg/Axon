@@ -43,55 +43,10 @@ struct CreateVideoSheet: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                AppColors.substratePrimary
-                    .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Header
-                        headerSection
-                        
-                        // Provider selector
-                        if availableProviders.count > 1 {
-                            providerSection
-                        }
-                        
-                        // Prompt input
-                        promptSection
-                        
-                        // Options
-                        optionsSection
-                        
-                        // Generate button
-                        generateButton
-                        
-                        // Active jobs section
-                        if !videoService.activeJobs.isEmpty {
-                            activeJobsSection
-                        }
-                        
-                        // Error display
-                        if let error = errorMessage {
-                            errorView(error)
-                        }
-                    }
-                    .padding()
-                }
-            }
-            .navigationTitle("Generate Video")
-            #if !os(macOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(AppColors.textSecondary)
-                }
-            }
+        #if os(macOS)
+        // macOS: Direct content without NavigationStack to avoid sidebar-like behavior
+        sheetContent
+            .frame(minWidth: 500, idealWidth: 600, minHeight: 550, idealHeight: 700)
             .alert("Start Video Generation?", isPresented: $showConfirmation) {
                 Button("Cancel", role: .cancel) {}
                 Button("Generate") {
@@ -100,11 +55,91 @@ struct CreateVideoSheet: View {
             } message: {
                 Text("This will generate a \(selectedDuration.displayName) video using \(selectedProvider.displayName).\n\nEstimated cost: \(MediaCostEstimator.formattedCost(estimatedCost))")
             }
+            .onAppear {
+                if let first = availableProviders.first {
+                    selectedProvider = first
+                }
+            }
+        #else
+        // iOS: Keep NavigationStack for proper navigation
+        NavigationStack {
+            sheetContent
+                .navigationTitle("Generate Video")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                        .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+                .alert("Start Video Generation?", isPresented: $showConfirmation) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Generate") {
+                        startGeneration()
+                    }
+                } message: {
+                    Text("This will generate a \(selectedDuration.displayName) video using \(selectedProvider.displayName).\n\nEstimated cost: \(MediaCostEstimator.formattedCost(estimatedCost))")
+                }
         }
         .onAppear {
-            // Select first available provider
             if let first = availableProviders.first {
                 selectedProvider = first
+            }
+        }
+        #endif
+    }
+
+    private var sheetContent: some View {
+        ZStack {
+            AppColors.substratePrimary
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 24) {
+                    #if os(macOS)
+                    // macOS header with title and cancel button
+                    HStack {
+                        Text("Generate Video")
+                            .font(AppTypography.titleMedium())
+                            .foregroundColor(AppColors.textPrimary)
+                        Spacer()
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                        .foregroundColor(AppColors.textSecondary)
+                    }
+                    #endif
+
+                    // Header
+                    headerSection
+
+                    // Provider selector
+                    if availableProviders.count > 1 {
+                        providerSection
+                    }
+
+                    // Prompt input
+                    promptSection
+
+                    // Options
+                    optionsSection
+
+                    // Generate button
+                    generateButton
+
+                    // Active jobs section
+                    if !videoService.activeJobs.isEmpty {
+                        activeJobsSection
+                    }
+
+                    // Error display
+                    if let error = errorMessage {
+                        errorView(error)
+                    }
+                }
+                .padding()
             }
         }
     }

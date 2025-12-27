@@ -33,71 +33,106 @@ struct CreateAudioSheet: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                AppColors.substratePrimary
-                    .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Header
-                        headerSection
-                        
-                        // Text input
-                        textSection
-                        
-                        // Provider selection
-                        if availableProviders.count > 1 {
-                            providerSection
-                        }
-                        
-                        // Voice selection
-                        voiceSection
-                        
-                        // Generate button
-                        generateButton
-                        
-                        // Error display
-                        if let error = errorMessage {
-                            errorView(error)
-                        }
-                    }
-                    .padding()
-                }
-            }
-            .navigationTitle("Generate Audio")
-            #if !os(macOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(AppColors.textSecondary)
-                }
-            }
+        #if os(macOS)
+        // macOS: Direct content without NavigationStack to avoid sidebar-like behavior
+        sheetContent
+            .frame(minWidth: 500, idealWidth: 600, minHeight: 500, idealHeight: 650)
             .onAppear {
-                // Set default provider to first available
-                if let firstProvider = availableProviders.first {
-                    selectedProvider = firstProvider
-                }
-
-                // Load ElevenLabs voices if needed
-                if creationService.hasElevenLabsKey {
-                    Task {
-                        await settingsViewModel.refreshElevenLabsCatalog()
-                        if let first = settingsViewModel.availableVoices.first {
-                            selectedElevenLabsVoiceId = first.id
-                            selectedElevenLabsVoiceName = first.name
-                        }
-                    }
-                }
+                setupOnAppear()
             }
             .sheet(isPresented: $showDetailSheet) {
                 if let item = generatedItem {
                     CreativeItemDetailView(item: item)
                 }
+            }
+        #else
+        // iOS: Keep NavigationStack for proper navigation
+        NavigationStack {
+            sheetContent
+                .navigationTitle("Generate Audio")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                        .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+                .sheet(isPresented: $showDetailSheet) {
+                    if let item = generatedItem {
+                        CreativeItemDetailView(item: item)
+                    }
+                }
+        }
+        .onAppear {
+            setupOnAppear()
+        }
+        #endif
+    }
+
+    private func setupOnAppear() {
+        // Set default provider to first available
+        if let firstProvider = availableProviders.first {
+            selectedProvider = firstProvider
+        }
+
+        // Load ElevenLabs voices if needed
+        if creationService.hasElevenLabsKey {
+            Task {
+                await settingsViewModel.refreshElevenLabsCatalog()
+                if let first = settingsViewModel.availableVoices.first {
+                    selectedElevenLabsVoiceId = first.id
+                    selectedElevenLabsVoiceName = first.name
+                }
+            }
+        }
+    }
+
+    private var sheetContent: some View {
+        ZStack {
+            AppColors.substratePrimary
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 24) {
+                    #if os(macOS)
+                    // macOS header with title and cancel button
+                    HStack {
+                        Text("Generate Audio")
+                            .font(AppTypography.titleMedium())
+                            .foregroundColor(AppColors.textPrimary)
+                        Spacer()
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                        .foregroundColor(AppColors.textSecondary)
+                    }
+                    #endif
+
+                    // Header
+                    headerSection
+
+                    // Text input
+                    textSection
+
+                    // Provider selection
+                    if availableProviders.count > 1 {
+                        providerSection
+                    }
+
+                    // Voice selection
+                    voiceSection
+
+                    // Generate button
+                    generateButton
+
+                    // Error display
+                    if let error = errorMessage {
+                        errorView(error)
+                    }
+                }
+                .padding()
             }
         }
     }

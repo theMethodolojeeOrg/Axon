@@ -24,49 +24,77 @@ struct CreateImageSheet: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                AppColors.substratePrimary
-                    .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Header
-                        headerSection
-                        
-                        // Prompt input
-                        promptSection
-                        
-                        // Options
-                        optionsSection
-                        
-                        // Generate button
-                        generateButton
-                        
-                        // Error display
-                        if let error = errorMessage {
-                            errorView(error)
-                        }
-                    }
-                    .padding()
-                }
-            }
-            .navigationTitle("Generate Image")
-            #if !os(macOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(AppColors.textSecondary)
-                }
-            }
+        #if os(macOS)
+        // macOS: Direct content without NavigationStack to avoid sidebar-like behavior
+        sheetContent
+            .frame(minWidth: 500, idealWidth: 600, minHeight: 500, idealHeight: 650)
             .sheet(isPresented: $showDetailSheet) {
                 if let item = generatedItem {
                     CreativeItemDetailView(item: item)
                 }
+            }
+        #else
+        // iOS: Keep NavigationStack for proper navigation
+        NavigationStack {
+            sheetContent
+                .navigationTitle("Generate Image")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                        .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+                .sheet(isPresented: $showDetailSheet) {
+                    if let item = generatedItem {
+                        CreativeItemDetailView(item: item)
+                    }
+                }
+        }
+        #endif
+    }
+
+    private var sheetContent: some View {
+        ZStack {
+            AppColors.substratePrimary
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 24) {
+                    #if os(macOS)
+                    // macOS header with title and cancel button
+                    HStack {
+                        Text("Generate Image")
+                            .font(AppTypography.titleMedium())
+                            .foregroundColor(AppColors.textPrimary)
+                        Spacer()
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                        .foregroundColor(AppColors.textSecondary)
+                    }
+                    #endif
+
+                    // Header
+                    headerSection
+
+                    // Prompt input
+                    promptSection
+
+                    // Options
+                    optionsSection
+
+                    // Generate button
+                    generateButton
+
+                    // Error display
+                    if let error = errorMessage {
+                        errorView(error)
+                    }
+                }
+                .padding()
             }
         }
     }

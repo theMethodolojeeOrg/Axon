@@ -18,102 +18,29 @@ struct MessageEditSheet: View {
     @FocusState private var isTextEditorFocused: Bool
     
     var body: some View {
+        #if os(macOS)
+        // macOS: Direct content without NavigationView to avoid sidebar-like behavior
+        sheetContent
+            .frame(minWidth: 500, idealWidth: 600, minHeight: 400, idealHeight: 500)
+            .onAppear {
+                editedContent = message.content
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    isTextEditorFocused = true
+                }
+            }
+        #else
+        // iOS: Keep NavigationView for proper navigation
         NavigationView {
-            VStack(spacing: 0) {
-                // Edit history disclosure (if message has been edited before)
-                if message.isEdited, let history = message.editHistory, !history.isEmpty {
-                    Button {
-                        showHistory.toggle()
-                    } label: {
-                        HStack {
-                            Image(systemName: showHistory ? "chevron.down" : "chevron.right")
-                                .font(.system(size: 12))
-                            Text("View \(history.count) previous version\(history.count == 1 ? "" : "s")")
-                                .font(AppTypography.labelSmall())
-                            Spacer()
+            sheetContent
+                .navigationTitle("Edit Message")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            onCancel()
                         }
-                        .foregroundColor(AppColors.textSecondary)
-                        .padding(.horizontal)
-                        .padding(.vertical, 8)
-                    }
-                    .buttonStyle(.plain)
-                    
-                    if showHistory {
-                        EditHistoryView(
-                            editHistory: history,
-                            currentVersion: message.currentVersion ?? 0,
-                            onSelectVersion: { version in
-                                // Load selected version content into editor
-                                if let historyItem = history.first(where: { $0.version == version }) {
-                                    editedContent = historyItem.content
-                                }
-                            }
-                        )
-                        .padding(.bottom, 8)
-                    }
-                    
-                    Divider()
-                }
-                
-                // Text editor for editing message content
-                TextEditor(text: $editedContent)
-                    .font(AppTypography.bodyMedium())
-                    .foregroundColor(AppColors.textPrimary)
-                    .scrollContentBackground(.hidden)
-                    .background(AppColors.substratePrimary)
-                    .focused($isTextEditorFocused)
-                    .padding()
-                
-                Divider()
-                
-                // Action buttons
-                VStack(spacing: 12) {
-                    // Save & Regenerate - primary action
-                    Button {
-                        onSaveAndRegenerate(editedContent)
-                    } label: {
-                        HStack {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                            Text("Save & Regenerate")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(AppColors.signalLichen)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                    }
-                    .disabled(editedContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    
-                    // Save only - secondary action
-                    Button {
-                        onSave(editedContent)
-                    } label: {
-                        HStack {
-                            Image(systemName: "checkmark")
-                            Text("Save Only")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(AppColors.substrateSecondary)
-                        .foregroundColor(AppColors.textPrimary)
-                        .cornerRadius(10)
-                    }
-                    .disabled(editedContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                .padding()
-            }
-            .background(AppColors.substratePrimary)
-            .navigationTitle("Edit Message")
-            #if !os(macOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        onCancel()
                     }
                 }
-            }
         }
         .onAppear {
             editedContent = message.content
@@ -121,12 +48,113 @@ struct MessageEditSheet: View {
                 isTextEditorFocused = true
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 500, idealWidth: 600, minHeight: 400, idealHeight: 500)
-        #else
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         #endif
+    }
+
+    private var sheetContent: some View {
+        VStack(spacing: 0) {
+            #if os(macOS)
+            // macOS header with title and cancel button
+            HStack {
+                Text("Edit Message")
+                    .font(AppTypography.titleMedium())
+                    .foregroundColor(AppColors.textPrimary)
+                Spacer()
+                Button("Cancel") {
+                    onCancel()
+                }
+                .foregroundColor(AppColors.textSecondary)
+            }
+            .padding()
+
+            Divider()
+            #endif
+
+            // Edit history disclosure (if message has been edited before)
+            if message.isEdited, let history = message.editHistory, !history.isEmpty {
+                Button {
+                    showHistory.toggle()
+                } label: {
+                    HStack {
+                        Image(systemName: showHistory ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 12))
+                        Text("View \(history.count) previous version\(history.count == 1 ? "" : "s")")
+                            .font(AppTypography.labelSmall())
+                        Spacer()
+                    }
+                    .foregroundColor(AppColors.textSecondary)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+
+                if showHistory {
+                    EditHistoryView(
+                        editHistory: history,
+                        currentVersion: message.currentVersion ?? 0,
+                        onSelectVersion: { version in
+                            // Load selected version content into editor
+                            if let historyItem = history.first(where: { $0.version == version }) {
+                                editedContent = historyItem.content
+                            }
+                        }
+                    )
+                    .padding(.bottom, 8)
+                }
+
+                Divider()
+            }
+
+            // Text editor for editing message content
+            TextEditor(text: $editedContent)
+                .font(AppTypography.bodyMedium())
+                .foregroundColor(AppColors.textPrimary)
+                .scrollContentBackground(.hidden)
+                .background(AppColors.substratePrimary)
+                .focused($isTextEditorFocused)
+                .padding()
+
+            Divider()
+
+            // Action buttons
+            VStack(spacing: 12) {
+                // Save & Regenerate - primary action
+                Button {
+                    onSaveAndRegenerate(editedContent)
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                        Text("Save & Regenerate")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(AppColors.signalLichen)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+                .disabled(editedContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                // Save only - secondary action
+                Button {
+                    onSave(editedContent)
+                } label: {
+                    HStack {
+                        Image(systemName: "checkmark")
+                        Text("Save Only")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(AppColors.substrateSecondary)
+                    .foregroundColor(AppColors.textPrimary)
+                    .cornerRadius(10)
+                }
+                .disabled(editedContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .padding()
+        }
+        .background(AppColors.substratePrimary)
     }
 }
 

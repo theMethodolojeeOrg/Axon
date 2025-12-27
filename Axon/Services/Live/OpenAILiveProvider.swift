@@ -7,10 +7,15 @@ private let openAILog = Logger(subsystem: "com.axon.app", category: "OpenAILive"
 class OpenAILiveProvider: LiveProviderProtocol {
     let id = "openai"
     weak var delegate: LiveProviderDelegate?
-    
+
+    /// OpenAI Realtime capabilities - native real-time duplex audio
+    var capabilities: LiveProviderCapabilities {
+        .openAIRealtime
+    }
+
     private var webSocketTask: URLSessionWebSocketTask?
     private var isConnected = false
-    
+
     // Config
     private var currentConfig: LiveSessionConfig?
     

@@ -66,52 +66,82 @@ struct ToolInvocationSheet: View {
     }
 
     var body: some View {
+        #if os(macOS)
+        // macOS: Direct content without NavigationStack to avoid sidebar-like behavior
+        sheetContent
+            .frame(minWidth: 480, idealWidth: 560, minHeight: 400, idealHeight: 550)
+            .onAppear {
+                isQueryFocused = true
+            }
+        #else
+        // iOS: Keep NavigationStack for proper navigation
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Tool Header
-                    toolHeader
-
-                    Divider()
-                        .background(AppColors.divider)
-
-                    // Input Section (varies by tool type)
-                    if isUserSpecialTool {
-                        userSpecialInputSection
-                    } else if needsUrlField {
-                        urlInputSection
-                    } else {
-                        queryInputSection
-                    }
-
-                    // Result Section (if executed)
-                    if executionState != .idle {
-                        resultSection
+            sheetContent
+                .navigationTitle(isUserSpecialTool ? "User Action" : "Run Tool")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            onDismiss()
+                        }
                     }
                 }
-            }
-            .safeAreaInset(edge: .bottom) {
-                // Action Buttons pinned to bottom
-                actionButtons
-            }
-            .background(AppColors.substratePrimary)
-            .navigationTitle(isUserSpecialTool ? "User Action" : "Run Tool")
-            #if !os(macOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        onDismiss()
-                    }
-                }
-            }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .onAppear {
             isQueryFocused = true
         }
+        #endif
+    }
+
+    private var sheetContent: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                #if os(macOS)
+                // macOS header with title and cancel button
+                HStack {
+                    Text(isUserSpecialTool ? "User Action" : "Run Tool")
+                        .font(AppTypography.titleMedium())
+                        .foregroundColor(AppColors.textPrimary)
+                    Spacer()
+                    Button("Cancel") {
+                        onDismiss()
+                    }
+                    .foregroundColor(AppColors.textSecondary)
+                }
+                .padding()
+
+                Divider()
+                    .background(AppColors.divider)
+                #endif
+
+                // Tool Header
+                toolHeader
+
+                Divider()
+                    .background(AppColors.divider)
+
+                // Input Section (varies by tool type)
+                if isUserSpecialTool {
+                    userSpecialInputSection
+                } else if needsUrlField {
+                    urlInputSection
+                } else {
+                    queryInputSection
+                }
+
+                // Result Section (if executed)
+                if executionState != .idle {
+                    resultSection
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            // Action Buttons pinned to bottom
+            actionButtons
+        }
+        .background(AppColors.substratePrimary)
     }
 
     // MARK: - Tool Header
