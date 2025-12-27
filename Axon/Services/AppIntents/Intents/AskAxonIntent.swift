@@ -169,7 +169,8 @@ struct AskAxonIntent: AppIntent {
             minimaxKey: try? apiKeys.getAPIKey(for: .minimax),
             mistralKey: try? apiKeys.getAPIKey(for: .mistral),
             customBaseUrl: customBaseUrl,
-            customApiKey: customApiKey
+            customApiKey: customApiKey,
+            modelParams: settings.modelGenerationSettings
         )
     }
 }

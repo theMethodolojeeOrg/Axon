@@ -682,7 +682,8 @@ class ConversationService: ObservableObject {
             minimaxKey: minimaxKey,
             mistralKey: mistralKey,
             customBaseUrl: customBaseUrl,
-            customApiKey: customApiKey
+            customApiKey: customApiKey,
+            modelParams: settings.modelGenerationSettings
         )
 
         do {
@@ -831,7 +832,8 @@ class ConversationService: ObservableObject {
             minimaxKey: minimaxKey,
             mistralKey: mistralKey,
             customBaseUrl: customBaseUrl,
-            customApiKey: customApiKey
+            customApiKey: customApiKey,
+            modelParams: settings.modelGenerationSettings
         )
 
         do {

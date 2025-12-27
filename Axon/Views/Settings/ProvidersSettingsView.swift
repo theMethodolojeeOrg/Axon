@@ -44,6 +44,16 @@ struct ProvidersSettingsView: View {
         }
     }
 
+    private var modelTuningSubtitle: String {
+        let settings = viewModel.settings.modelGenerationSettings
+        var active: [String] = []
+        if settings.temperatureEnabled { active.append("temp \(String(format: "%.1f", settings.temperature))") }
+        if settings.topPEnabled { active.append("top-p") }
+        if settings.topKEnabled { active.append("top-k") }
+        if settings.systemPromptSuffixEnabled { active.append("custom prompt") }
+        return active.isEmpty ? "Default parameters" : active.joined(separator: ", ")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // API Keys
@@ -102,6 +112,21 @@ struct ProvidersSettingsView: View {
                     iconColor: AppColors.signalMercury,
                     title: "Realtime Voice",
                     subtitle: "Configure live session providers and voices"
+                )
+            }
+            .buttonStyle(.plain)
+
+            // Model Tuning
+            NavigationLink {
+                SettingsSubviewContainer {
+                    ModelConfigurationView(viewModel: viewModel)
+                }
+            } label: {
+                SettingsCategoryRow(
+                    icon: "slider.horizontal.below.rectangle",
+                    iconColor: AppColors.signalLichen,
+                    title: "Model Tuning",
+                    subtitle: modelTuningSubtitle
                 )
             }
             .buttonStyle(.plain)

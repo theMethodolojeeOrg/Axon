@@ -177,7 +177,8 @@ final class ConversationTitleOrchestrator {
             minimaxKey: minimaxKey,
             mistralKey: mistralKey,
             customBaseUrl: customBaseUrl,
-            customApiKey: customApiKey
+            customApiKey: customApiKey,
+            modelParams: nil  // Title generation uses hardcoded low temperature
         )
 
         // Minimal prompt. No salience/memory/tools/internal thread.

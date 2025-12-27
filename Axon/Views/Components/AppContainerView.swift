@@ -1562,7 +1562,8 @@ struct ChatContainerView: View {
             minimaxKey: minimaxKey,
             mistralKey: mistralKey,
             customBaseUrl: customBaseUrl,
-            customApiKey: customApiKey
+            customApiKey: customApiKey,
+            modelParams: settings.modelGenerationSettings
         )
 
         // Get all messages for context

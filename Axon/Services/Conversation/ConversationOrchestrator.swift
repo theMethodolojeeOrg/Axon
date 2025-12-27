@@ -43,6 +43,8 @@ struct OrchestrationConfig {
     // Custom Provider
     let customBaseUrl: String?
     let customApiKey: String?
+    // Model Generation Parameters
+    let modelParams: ModelGenerationSettings?
 }
 
 // MARK: - Shared Types

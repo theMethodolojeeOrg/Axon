@@ -542,10 +542,18 @@ final class MLXModelService: ObservableObject {
     // MARK: - Text Generation
 
     /// Generate a response using the loaded model
+    /// - Parameters:
+    ///   - systemPrompt: Optional system prompt
+    ///   - messages: Conversation messages
+    ///   - maxTokens: Maximum tokens to generate
+    ///   - repetitionPenalty: Penalty for repeated tokens (1.0 = no penalty, higher = stronger penalty)
+    ///   - repetitionContextSize: Number of tokens to look back for repetition detection
     func generate(
         systemPrompt: String?,
         messages: [Message],
-        maxTokens: Int = 2048
+        maxTokens: Int = 2048,
+        repetitionPenalty: Double = 1.2,
+        repetitionContextSize: Int = 64
     ) async throws -> String {
         #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon) && canImport(MLXVLM)
 
@@ -559,11 +567,13 @@ final class MLXModelService: ObservableObject {
         // Create UserInput with chat messages
         let userInput = UserInput(chat: chatMessages)
 
-        // Create generation parameters
+        // Create generation parameters with repetition penalty to prevent runaway loops
         let generateParams = GenerateParameters(
             maxTokens: maxTokens,
             temperature: 0.7,
-            topP: 0.9
+            topP: 0.9,
+            repetitionPenalty: Float(repetitionPenalty),
+            repetitionContextSize: repetitionContextSize
         )
 
         // Generate response
@@ -590,10 +600,19 @@ final class MLXModelService: ObservableObject {
     }
 
     /// Generate a streaming response
+    /// - Parameters:
+    ///   - systemPrompt: Optional system prompt
+    ///   - messages: Conversation messages
+    ///   - maxTokens: Maximum tokens to generate
+    ///   - repetitionPenalty: Penalty for repeated tokens (1.0 = no penalty, higher = stronger penalty)
+    ///   - repetitionContextSize: Number of tokens to look back for repetition detection
+    ///   - onToken: Callback for each generated token
     func generateStreaming(
         systemPrompt: String?,
         messages: [Message],
         maxTokens: Int = 2048,
+        repetitionPenalty: Double = 1.2,
+        repetitionContextSize: Int = 64,
         onToken: @escaping @Sendable (String) -> Void
     ) async throws {
         #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon) && canImport(MLXVLM)
@@ -608,11 +627,13 @@ final class MLXModelService: ObservableObject {
         // Create UserInput with chat messages
         let userInput = UserInput(chat: chatMessages)
 
-        // Create generation parameters
+        // Create generation parameters with repetition penalty to prevent runaway loops
         let generateParams = GenerateParameters(
             maxTokens: maxTokens,
             temperature: 0.7,
-            topP: 0.9
+            topP: 0.9,
+            repetitionPenalty: Float(repetitionPenalty),
+            repetitionContextSize: repetitionContextSize
         )
 
         // Use the AsyncStream-based generate API for streaming

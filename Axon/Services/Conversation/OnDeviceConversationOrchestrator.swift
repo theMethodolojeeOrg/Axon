@@ -195,6 +195,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             systemPrompt = (systemPrompt ?? "") + "\n\n" + mediaContext
         }
 
+        // Inject custom system prompt suffix from user settings
+        if let suffix = config.modelParams?.effectiveSystemPromptSuffix {
+            systemPrompt = (systemPrompt ?? "") + "\n\n" + suffix
+        }
+
         // Update merged messages with processed attachments
         var finalMessages = mergedMessages
         if usedMediaProxy, let lastIndex = finalMessages.lastIndex(where: { $0.role == .user }) {
@@ -2580,10 +2585,20 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             // Load the specific model (will download if not cached)
             try await MLXModelService.shared.loadModel(modelId: modelId)
 
+            // Get repetition penalty settings from user preferences
+            let genSettings = await MainActor.run {
+                SettingsViewModel.shared.settings.modelGenerationSettings
+            }
+
+            let repetitionPenalty = genSettings.repetitionPenaltyEnabled ? genSettings.repetitionPenalty : 1.0
+            let repetitionContextSize = genSettings.repetitionPenaltyEnabled ? genSettings.repetitionContextSize : 64
+
             let response = try await MLXModelService.shared.generate(
                 systemPrompt: system,
                 messages: messages,
-                maxTokens: 2048
+                maxTokens: 2048,
+                repetitionPenalty: repetitionPenalty,
+                repetitionContextSize: repetitionContextSize
             )
             return response
         } catch let error as MLXModelError {

@@ -122,6 +122,9 @@ struct AppSettings: Codable, Equatable, Sendable {
     // Multi-Device Presence
     var presenceSettings: PresenceSettings = PresenceSettings()
 
+    // Model Generation Parameters (temperature, top-p, top-k, etc.)
+    var modelGenerationSettings: ModelGenerationSettings = ModelGenerationSettings()
+
     // Temporal Symmetry (mutual time/turn awareness)
     var temporalSettings: TemporalSettings = TemporalSettings()
 
