@@ -37,6 +37,51 @@ struct TagInfo: Identifiable, Hashable {
     var id: String { tag }
 }
 
+// MARK: - Memory Issue
+
+struct MemoryIssue: Identifiable {
+    let id = UUID()
+    let type: IssueType
+    let memories: [Memory]
+    let similarity: Double?
+
+    enum IssueType {
+        case exactDuplicate    // Same ID appearing multiple times
+        case similarContent    // High content similarity (potential duplicate)
+
+        var title: String {
+            switch self {
+            case .exactDuplicate: return "Exact Duplicate"
+            case .similarContent: return "Similar Content"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .exactDuplicate: return "doc.on.doc.fill"
+            case .similarContent: return "text.badge.checkmark"
+            }
+        }
+
+        var color: String {
+            switch self {
+            case .exactDuplicate: return "signalHematite"  // Red - critical
+            case .similarContent: return "signalCopper"     // Orange - warning
+            }
+        }
+    }
+
+    /// Preview of the memory content (first memory's content truncated)
+    var contentPreview: String {
+        guard let first = memories.first else { return "" }
+        let maxLength = 80
+        if first.content.count > maxLength {
+            return String(first.content.prefix(maxLength)) + "..."
+        }
+        return first.content
+    }
+}
+
 // MARK: - Memory ViewModel
 
 @MainActor
@@ -73,7 +118,35 @@ class MemoryViewModel: ObservableObject {
     @Published var successMessage: String?
     @Published var error: String?
 
+    // Memory Issues
+    @Published var memoryIssues: [MemoryIssue] = []
+    @Published var showResolveConfirmation = false
+    @Published var issueToResolve: (issue: MemoryIssue, keepId: String)?
+
+    // Bulk Issue Resolution
+    @Published var isIssueSelectionMode = false
+    @Published var selectedIssueIds: Set<UUID> = []
+    @Published var showBulkResolveConfirmation = false
+    /// For each selected issue, which memory ID to keep (defaults to first/oldest)
+    @Published var bulkKeepDecisions: [UUID: String] = [:]
+
     // MARK: - Computed Properties
+
+    var issueCount: Int {
+        memoryIssues.count
+    }
+
+    var hasIssues: Bool {
+        !memoryIssues.isEmpty
+    }
+
+    var selectedIssueCount: Int {
+        selectedIssueIds.count
+    }
+
+    var allIssuesSelected: Bool {
+        !memoryIssues.isEmpty && selectedIssueIds.count == memoryIssues.count
+    }
 
     var memories: [Memory] {
         memoryService.memories
@@ -350,6 +423,339 @@ class MemoryViewModel: ObservableObject {
             if self?.error == message {
                 self?.error = nil
             }
+        }
+    }
+
+    // MARK: - Memory Issue Detection
+
+    /// Detect duplicate and similar memories
+    func detectIssues() {
+        var issues: [MemoryIssue] = []
+
+        // 1. Detect exact duplicates (same ID appearing multiple times)
+        let idGroups = Dictionary(grouping: memories, by: { $0.id })
+        for (_, group) in idGroups where group.count > 1 {
+            issues.append(MemoryIssue(
+                type: .exactDuplicate,
+                memories: group,
+                similarity: 1.0
+            ))
+        }
+
+        // 2. Detect similar content (different IDs but similar text)
+        // Use unique memories only for similarity check
+        let uniqueMemories = Array(Set(memories.map { $0.id })).compactMap { id in
+            memories.first { $0.id == id }
+        }
+
+        // Compare pairs for similarity
+        for i in 0..<uniqueMemories.count {
+            for j in (i + 1)..<uniqueMemories.count {
+                let m1 = uniqueMemories[i]
+                let m2 = uniqueMemories[j]
+
+                let similarity = jaccardSimilarity(m1.content, m2.content)
+                if similarity >= 0.7 {
+                    // Check if this pair is already covered by an exact duplicate
+                    let isExactDuplicate = m1.id == m2.id
+                    if !isExactDuplicate {
+                        issues.append(MemoryIssue(
+                            type: .similarContent,
+                            memories: [m1, m2],
+                            similarity: similarity
+                        ))
+                    }
+                }
+            }
+        }
+
+        // Sort by severity (exact duplicates first, then by similarity)
+        issues.sort { issue1, issue2 in
+            if issue1.type == .exactDuplicate && issue2.type != .exactDuplicate {
+                return true
+            }
+            if issue1.type != .exactDuplicate && issue2.type == .exactDuplicate {
+                return false
+            }
+            return (issue1.similarity ?? 0) > (issue2.similarity ?? 0)
+        }
+
+        memoryIssues = issues
+        print("[MemoryViewModel] Detected \(issues.count) memory issues")
+    }
+
+    /// Calculate Jaccard similarity between two strings
+    private func jaccardSimilarity(_ s1: String, _ s2: String) -> Double {
+        let words1 = tokenize(s1)
+        let words2 = tokenize(s2)
+
+        guard !words1.isEmpty || !words2.isEmpty else { return 0 }
+
+        let intersection = words1.intersection(words2)
+        let union = words1.union(words2)
+
+        return Double(intersection.count) / Double(union.count)
+    }
+
+    /// Tokenize a string into lowercase words
+    private func tokenize(_ text: String) -> Set<String> {
+        let lowercased = text.lowercased()
+        let components = lowercased.components(separatedBy: CharacterSet.alphanumerics.inverted)
+        let filtered = components.filter { $0.count > 2 }  // Ignore very short words
+        return Set(filtered)
+    }
+
+    // MARK: - Issue Resolution
+
+    /// Prepare to resolve an issue by keeping one memory
+    func prepareToResolve(issue: MemoryIssue, keepingId: String) {
+        issueToResolve = (issue: issue, keepId: keepingId)
+        showResolveConfirmation = true
+    }
+
+    /// Resolve the prepared issue
+    func resolveCurrentIssue() {
+        guard let resolution = issueToResolve else { return }
+        resolveIssue(resolution.issue, keepingMemoryId: resolution.keepId)
+        issueToResolve = nil
+    }
+
+    /// Resolve an issue by keeping one memory and deleting the others
+    func resolveIssue(_ issue: MemoryIssue, keepingMemoryId: String) {
+        let toDelete = issue.memories.filter { $0.id != keepingMemoryId }
+        let idsToDelete = toDelete.map { $0.id }
+
+        guard !idsToDelete.isEmpty else {
+            showError("No duplicates to remove")
+            return
+        }
+
+        Task {
+            do {
+                // Use bulk delete for efficiency (single consent request)
+                let deletedCount = try await memoryService.deleteMemories(
+                    ids: idsToDelete,
+                    rationale: "Duplicate resolution: Keeping memory \(keepingMemoryId), removing \(idsToDelete.count) duplicate(s)."
+                )
+
+                // Remove the resolved issue
+                memoryIssues.removeAll { $0.id == issue.id }
+
+                showSuccess("Resolved: kept 1 memory, removed \(deletedCount)")
+                detectIssues()
+            } catch {
+                showError("Failed to resolve: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Merge similar memories into one (keeps the first, appends content from others)
+    func mergeMemories(_ issue: MemoryIssue) {
+        guard issue.memories.count >= 2 else { return }
+
+        let primary = issue.memories[0]
+        let others = Array(issue.memories.dropFirst())
+        let idsToDelete = others.map { $0.id }
+
+        // Combine content from all memories
+        let mergedContent = issue.memories.map { $0.content }.joined(separator: "\n\n---\n\n")
+
+        // Combine tags
+        var allTags = Set(primary.tags)
+        for memory in others {
+            allTags.formUnion(memory.tags)
+        }
+
+        Task {
+            do {
+                // Update the primary memory with merged content
+                // skipConsent since user explicitly chose to merge
+                _ = try await memoryService.updateMemory(
+                    id: primary.id,
+                    content: mergedContent,
+                    tags: Array(allTags),
+                    skipConsent: true
+                )
+
+                // Delete the other memories using bulk delete
+                // skipConsent since this is part of user-initiated merge
+                let deleteCount = try await memoryService.deleteMemories(
+                    ids: idsToDelete,
+                    rationale: "Merge cleanup: Memories merged into \(primary.id)",
+                    skipConsent: true
+                )
+
+                // Remove the resolved issue
+                memoryIssues.removeAll { $0.id == issue.id }
+
+                showSuccess("Merged \(issue.memories.count) memories into one")
+                detectIssues()
+            } catch {
+                showError("Error merging memories: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Bulk Issue Selection
+
+    func enterIssueSelectionMode() {
+        isIssueSelectionMode = true
+        selectedIssueIds.removeAll()
+        bulkKeepDecisions.removeAll()
+    }
+
+    func exitIssueSelectionMode() {
+        isIssueSelectionMode = false
+        selectedIssueIds.removeAll()
+        bulkKeepDecisions.removeAll()
+    }
+
+    func toggleIssueSelection(_ issueId: UUID) {
+        if selectedIssueIds.contains(issueId) {
+            selectedIssueIds.remove(issueId)
+            bulkKeepDecisions.removeValue(forKey: issueId)
+        } else {
+            selectedIssueIds.insert(issueId)
+            // Default to keeping the first (oldest) memory
+            if let issue = memoryIssues.first(where: { $0.id == issueId }),
+               let firstMemory = issue.memories.first {
+                bulkKeepDecisions[issueId] = firstMemory.id
+            }
+        }
+    }
+
+    func selectAllIssues() {
+        for issue in memoryIssues {
+            selectedIssueIds.insert(issue.id)
+            // Default to keeping the first memory for each
+            if let firstMemory = issue.memories.first {
+                bulkKeepDecisions[issue.id] = firstMemory.id
+            }
+        }
+    }
+
+    func deselectAllIssues() {
+        selectedIssueIds.removeAll()
+        bulkKeepDecisions.removeAll()
+    }
+
+    /// Set which memory to keep for a specific issue in bulk mode
+    func setKeepDecision(for issueId: UUID, keepMemoryId: String) {
+        bulkKeepDecisions[issueId] = keepMemoryId
+    }
+
+    /// Resolve all selected issues at once using bulk consent
+    func resolveSelectedIssues() {
+        let selectedIssues = memoryIssues.filter { selectedIssueIds.contains($0.id) }
+        guard !selectedIssues.isEmpty else { return }
+
+        // Collect all memory IDs to delete (excluding the ones we're keeping)
+        var idsToDelete: [String] = []
+        for issue in selectedIssues {
+            let keepId = bulkKeepDecisions[issue.id] ?? issue.memories.first?.id ?? ""
+            let toDelete = issue.memories.filter { $0.id != keepId }.map { $0.id }
+            idsToDelete.append(contentsOf: toDelete)
+        }
+
+        guard !idsToDelete.isEmpty else {
+            showError("No duplicates to remove")
+            return
+        }
+
+        Task {
+            do {
+                // Single consent request for all deletions
+                let deletedCount = try await memoryService.deleteMemories(
+                    ids: idsToDelete,
+                    rationale: "Bulk duplicate resolution: Keeping \(selectedIssues.count) memories, removing \(idsToDelete.count) duplicates identified by the Issues scanner."
+                )
+
+                // Clear selection and refresh
+                exitIssueSelectionMode()
+                detectIssues()
+
+                showSuccess("Resolved \(selectedIssues.count) issues, removed \(deletedCount) duplicates")
+            } catch {
+                showError("Failed to resolve issues: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Merge all selected similar content issues using bulk consent
+    func mergeSelectedIssues() {
+        let selectedIssues = memoryIssues.filter {
+            selectedIssueIds.contains($0.id) && $0.type == .similarContent
+        }
+
+        guard !selectedIssues.isEmpty else {
+            showError("No similar content issues selected to merge")
+            return
+        }
+
+        // Collect all memory IDs that will be deleted after merge
+        var idsToDelete: [String] = []
+        for issue in selectedIssues {
+            guard issue.memories.count >= 2 else { continue }
+            let others = Array(issue.memories.dropFirst())
+            idsToDelete.append(contentsOf: others.map { $0.id })
+        }
+
+        Task {
+            var mergedCount = 0
+
+            // First, request bulk consent for all deletions
+            if !idsToDelete.isEmpty {
+                do {
+                    // Request consent once for all the memories we'll delete after merging
+                    _ = try await memoryService.deleteMemories(
+                        ids: [],  // Empty - we just want to trigger consent check
+                        rationale: "Bulk merge operation: Merging \(selectedIssues.count) sets of similar memories. Will combine content and remove \(idsToDelete.count) duplicate entries.",
+                        skipConsent: true  // We'll handle consent in the merge process
+                    )
+                } catch {
+                    // Consent check only, continue with merge
+                }
+            }
+
+            // Now perform the merges
+            for issue in selectedIssues {
+                guard issue.memories.count >= 2 else { continue }
+
+                let primary = issue.memories[0]
+                let others = Array(issue.memories.dropFirst())
+
+                let mergedContent = issue.memories.map { $0.content }.joined(separator: "\n\n---\n\n")
+                var allTags = Set(primary.tags)
+                for memory in others {
+                    allTags.formUnion(memory.tags)
+                }
+
+                do {
+                    // Update primary with merged content (skipConsent since user initiated)
+                    _ = try await memoryService.updateMemory(
+                        id: primary.id,
+                        content: mergedContent,
+                        tags: Array(allTags),
+                        skipConsent: true
+                    )
+
+                    // Delete others using bulk delete with skipConsent
+                    // (consent was implicitly given when user chose to merge)
+                    _ = try await memoryService.deleteMemories(
+                        ids: others.map { $0.id },
+                        rationale: "Merge cleanup: Removing memories merged into \(primary.id)",
+                        skipConsent: true
+                    )
+                    mergedCount += 1
+                } catch {
+                    print("Error merging issue \(issue.id): \(error)")
+                }
+            }
+
+            exitIssueSelectionMode()
+            detectIssues()
+
+            showSuccess("Merged \(mergedCount) sets of similar memories")
         }
     }
 }

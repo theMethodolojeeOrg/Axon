@@ -12,694 +12,882 @@ struct MemorySettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            // Memory System Toggle
-            SettingsSection(title: "Memory System") {
-                VStack(spacing: 16) {
-                    Toggle(isOn: Binding(
-                        get: { viewModel.settings.memoryEnabled },
-                        set: { newValue in
-                            Task {
-                                await viewModel.updateSetting(\.memoryEnabled, newValue)
-                            }
-                        }
-                    )) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Enable Memory")
-                                .font(AppTypography.bodyMedium(.medium))
-                                .foregroundColor(AppColors.textPrimary)
-
-                            Text("Allow the Axon to remember facts about you and learn about itself in your context across conversations")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-                    }
-                    .tint(AppColors.signalMercury)
-
-                    if viewModel.settings.memoryEnabled {
-                        Divider()
-                            .background(AppColors.divider)
-
-                        Toggle(isOn: Binding(
-                            get: { viewModel.settings.memoryAutoInject },
-                            set: { newValue in
-                                Task {
-                                    await viewModel.updateSetting(\.memoryAutoInject, newValue)
-                                }
-                            }
-                        )) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Auto-Inject Memories")
-                                    .font(AppTypography.bodyMedium(.medium))
-                                    .foregroundColor(AppColors.textPrimary)
-
-                                Text("Automatically include relevant memories in conversations")
-                                    .font(AppTypography.bodySmall())
-                                    .foregroundColor(AppColors.textSecondary)
-                            }
-                        }
-                        .tint(AppColors.signalMercury)
-                    }
-                }
-                .padding()
-                .background(AppColors.substrateSecondary)
-                .cornerRadius(8)
-            }
-
-            // Confidence Threshold
+            memorySystemSection
             if viewModel.settings.memoryEnabled {
-                SettingsSection(title: "Memory Retrieval") {
-                    VStack(spacing: 20) {
-                        // Confidence Threshold
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("Confidence Threshold")
-                                    .font(AppTypography.bodyMedium())
-                                    .foregroundColor(AppColors.textPrimary)
-
-                                Spacer()
-
-                                Text("\(Int(viewModel.settings.memoryConfidenceThreshold * 100))%")
-                                    .font(AppTypography.bodyMedium(.medium))
-                                    .foregroundColor(AppColors.signalMercury)
-                            }
-
-                            Slider(
-                                value: Binding(
-                                    get: { viewModel.settings.memoryConfidenceThreshold },
-                                    set: { newValue in
-                                        Task {
-                                            await viewModel.updateSetting(\.memoryConfidenceThreshold, newValue)
-                                        }
-                                    }
-                                ),
-                                in: 0...1,
-                                step: 0.05
-                            )
-                            .tint(AppColors.signalMercury)
-
-                            Text("Only memories with confidence above this threshold will be used. Higher values mean stricter filtering.")
-                                .font(AppTypography.labelSmall())
-                                .foregroundColor(AppColors.textTertiary)
-                        }
-
-                        Divider()
-                            .background(AppColors.divider)
-
-                        // Max Memories Per Request
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("Max Memories Per Request")
-                                    .font(AppTypography.bodyMedium())
-                                    .foregroundColor(AppColors.textPrimary)
-
-                                Spacer()
-
-                                Text("\(viewModel.settings.maxMemoriesPerRequest)")
-                                    .font(AppTypography.bodyMedium(.medium))
-                                    .foregroundColor(AppColors.signalMercury)
-                            }
-
-                            Slider(
-                                value: Binding(
-                                    get: { Double(viewModel.settings.maxMemoriesPerRequest) },
-                                    set: { newValue in
-                                        Task {
-                                            await viewModel.updateSetting(\.maxMemoriesPerRequest, Int(newValue))
-                                        }
-                                    }
-                                ),
-                                in: 5...50,
-                                step: 5
-                            )
-                            .tint(AppColors.signalMercury)
-
-                            Text("Maximum number of memories to include in each request. Higher values use more tokens.")
-                                .font(AppTypography.labelSmall())
-                                .foregroundColor(AppColors.textTertiary)
-                        }
-                    }
-                    .padding()
-                    .background(AppColors.substrateSecondary)
-                    .cornerRadius(8)
-                }
+                memoryRetrievalSection
             }
-
-            // Memory Types Info
-            SettingsSection(title: "Memory Types") {
-                VStack(spacing: 12) {
-                    MemoryTypeInfo(
-                        icon: "person.fill",
-                        title: "Allocentric",
-                        description: "Knowledge about you: preferences, facts, relationships, context",
-                        color: AppColors.signalMercury
-                    )
-
-                    MemoryTypeInfo(
-                        icon: "brain.head.profile",
-                        title: "Egoic",
-                        description: "What works for Axon: procedures, insights, learnings",
-                        color: AppColors.signalLichen
-                    )
-                }
-            }
-
-            // Epistemic Engine Section
+            memoryTypesSection
             if viewModel.settings.memoryEnabled {
-                SettingsSection(title: "Epistemic Engine") {
-                    VStack(spacing: 16) {
-                        // Epistemic Grounding Toggle
-                        Toggle(isOn: Binding(
-                            get: { viewModel.settings.epistemicEnabled },
-                            set: { newValue in
-                                Task {
-                                    await viewModel.updateSetting(\.epistemicEnabled, newValue)
-                                }
-                            }
-                        )) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Epistemic Grounding")
-                                    .font(AppTypography.bodyMedium(.medium))
-                                    .foregroundColor(AppColors.textPrimary)
-
-                                Text("Ground responses with verified facts and confidence metrics")
-                                    .font(AppTypography.bodySmall())
-                                    .foregroundColor(AppColors.textSecondary)
-                            }
-                        }
-                        .tint(AppColors.signalMercury)
-
-                        if viewModel.settings.epistemicEnabled {
-                            Divider()
-                                .background(AppColors.divider)
-
-                            // Verbose Mode Toggle
-                            Toggle(isOn: Binding(
-                                get: { viewModel.settings.epistemicVerbose },
-                                set: { newValue in
-                                    Task {
-                                        await viewModel.updateSetting(\.epistemicVerbose, newValue)
-                                    }
-                                }
-                            )) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Verbose Boundaries")
-                                        .font(AppTypography.bodyMedium(.medium))
-                                        .foregroundColor(AppColors.textPrimary)
-
-                                    Text("Include detailed epistemic boundaries in prompts")
-                                        .font(AppTypography.bodySmall())
-                                        .foregroundColor(AppColors.textSecondary)
-                                }
-                            }
-                            .tint(AppColors.signalMercury)
-
-                            Divider()
-                                .background(AppColors.divider)
-
-                            // Learning Loop Toggle
-                            Toggle(isOn: Binding(
-                                get: { viewModel.settings.learningLoopEnabled },
-                                set: { newValue in
-                                    Task {
-                                        await viewModel.updateSetting(\.learningLoopEnabled, newValue)
-                                    }
-                                }
-                            )) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Learning Loop")
-                                        .font(AppTypography.bodyMedium(.medium))
-                                        .foregroundColor(AppColors.textPrimary)
-
-                                    Text("Refine memory confidence when predictions don't match reality")
-                                        .font(AppTypography.bodySmall())
-                                        .foregroundColor(AppColors.textSecondary)
-                                }
-                            }
-                            .tint(AppColors.signalMercury)
-                        }
-                    }
-                    .padding()
-                    .background(AppColors.substrateSecondary)
-                    .cornerRadius(8)
-                }
-
-                // Predicate Logging Section
-                SettingsSection(title: "Debugging") {
-                    VStack(spacing: 16) {
-                        Toggle(isOn: Binding(
-                            get: { viewModel.settings.predicateLoggingEnabled },
-                            set: { newValue in
-                                Task {
-                                    await viewModel.updateSetting(\.predicateLoggingEnabled, newValue)
-                                }
-                            }
-                        )) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Predicate Logging")
-                                    .font(AppTypography.bodyMedium(.medium))
-                                    .foregroundColor(AppColors.textPrimary)
-
-                                Text("Log formal proof trees for debugging and verification")
-                                    .font(AppTypography.bodySmall())
-                                    .foregroundColor(AppColors.textSecondary)
-                            }
-                        }
-                        .tint(AppColors.signalMercury)
-
-                        if viewModel.settings.predicateLoggingEnabled {
-                            Divider()
-                                .background(AppColors.divider)
-
-                            // Verbosity Picker
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Verbosity Level")
-                                    .font(AppTypography.bodyMedium())
-                                    .foregroundColor(AppColors.textPrimary)
-
-                                Picker("Verbosity", selection: Binding(
-                                    get: { viewModel.settings.predicateLoggingVerbosity },
-                                    set: { newValue in
-                                        Task {
-                                            await viewModel.updateSetting(\.predicateLoggingVerbosity, newValue)
-                                        }
-                                    }
-                                )) {
-                                    ForEach(PredicateVerbosity.allCases, id: \.self) { level in
-                                        Text(level.displayName).tag(level)
-                                    }
-                                }
-                                .pickerStyle(SegmentedPickerStyle())
-
-                                Text(viewModel.settings.predicateLoggingVerbosity.description)
-                                    .font(AppTypography.labelSmall())
-                                    .foregroundColor(AppColors.textTertiary)
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(AppColors.substrateSecondary)
-                    .cornerRadius(8)
+                epistemicEngineSection
+                debuggingSection
+            }
+            analyticsSection
+            internalThreadSection
+            heartbeatSection
+            notificationsSection
+            if viewModel.settings.memoryEnabled {
+                heuristicsSection
+                if viewModel.settings.heuristicsSettings.enabled {
+                    smallModelOptimizationSection
                 }
             }
+        }
+    }
 
-            // Analytics Toggle
-            SettingsSection(title: "Analytics") {
+    // MARK: - Memory System Section
+
+    private var memorySystemSection: some View {
+        SettingsSection(title: "Memory System") {
+            VStack(spacing: 16) {
                 Toggle(isOn: Binding(
-                    get: { viewModel.settings.memoryAnalyticsEnabled },
+                    get: { viewModel.settings.memoryEnabled },
                     set: { newValue in
                         Task {
-                            await viewModel.updateSetting(\.memoryAnalyticsEnabled, newValue)
+                            await viewModel.updateSetting(\.memoryEnabled, newValue)
                         }
                     }
                 )) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Enable Usage Analytics")
+                        Text("Enable Memory")
                             .font(AppTypography.bodyMedium(.medium))
                             .foregroundColor(AppColors.textPrimary)
 
-                        Text("Help improve the app by sharing anonymous usage data")
+                        Text("Allow the Axon to remember facts about you and learn about itself in your context across conversations")
                             .font(AppTypography.bodySmall())
                             .foregroundColor(AppColors.textSecondary)
                     }
                 }
+                .toggleStyle(.switch)
                 .tint(AppColors.signalMercury)
-                .padding()
-                .background(AppColors.substrateSecondary)
-                .cornerRadius(8)
-            }
 
-            // Internal Thread
-            SettingsSection(title: "Internal Thread") {
-                VStack(spacing: 16) {
+                if viewModel.settings.memoryEnabled {
+                    Divider()
+                        .background(AppColors.divider)
+
                     Toggle(isOn: Binding(
-                        get: { viewModel.settings.internalThreadEnabled },
+                        get: { viewModel.settings.memoryAutoInject },
                         set: { newValue in
                             Task {
-                                await viewModel.updateSetting(\.internalThreadEnabled, newValue)
+                                await viewModel.updateSetting(\.memoryAutoInject, newValue)
                             }
                         }
                     )) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Enable Internal Thread")
+                            Text("Auto-Inject Memories")
                                 .font(AppTypography.bodyMedium(.medium))
                                 .foregroundColor(AppColors.textPrimary)
 
-                            Text("Allow the agent to persist its internal thread across sessions")
+                            Text("Automatically include relevant memories in conversations")
                                 .font(AppTypography.bodySmall())
                                 .foregroundColor(AppColors.textSecondary)
                         }
                     }
+                    .toggleStyle(.switch)
+                    .tint(AppColors.signalMercury)
+                }
+            }
+            .padding()
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(8)
+        }
+    }
+
+    // MARK: - Memory Retrieval Section
+
+    private var memoryRetrievalSection: some View {
+        SettingsSection(title: "Memory Retrieval") {
+            VStack(spacing: 20) {
+                // Confidence Threshold
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Confidence Threshold")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Spacer()
+
+                        Text("\(Int(viewModel.settings.memoryConfidenceThreshold * 100))%")
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.signalMercury)
+                    }
+
+                    Slider(
+                        value: Binding(
+                            get: { viewModel.settings.memoryConfidenceThreshold },
+                            set: { newValue in
+                                Task {
+                                    await viewModel.updateSetting(\.memoryConfidenceThreshold, newValue)
+                                }
+                            }
+                        ),
+                        in: 0...1,
+                        step: 0.05
+                    )
+                    .tint(AppColors.signalMercury)
+
+                    Text("Only memories with confidence above this threshold will be used. Higher values mean stricter filtering.")
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                }
+
+                Divider()
+                    .background(AppColors.divider)
+
+                // Max Memories Per Request
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Max Memories Per Request")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Spacer()
+
+                        Text("\(viewModel.settings.maxMemoriesPerRequest)")
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.signalMercury)
+                    }
+
+                    Slider(
+                        value: Binding(
+                            get: { Double(viewModel.settings.maxMemoriesPerRequest) },
+                            set: { newValue in
+                                Task {
+                                    await viewModel.updateSetting(\.maxMemoriesPerRequest, Int(newValue))
+                                }
+                            }
+                        ),
+                        in: 5...50,
+                        step: 5
+                    )
+                    .tint(AppColors.signalMercury)
+
+                    Text("Maximum number of memories to include in each request. Higher values use more tokens.")
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                }
+            }
+            .padding()
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(8)
+        }
+    }
+
+    // MARK: - Memory Types Section
+
+    private var memoryTypesSection: some View {
+        SettingsSection(title: "Memory Types") {
+            VStack(spacing: 12) {
+                MemoryTypeInfo(
+                    icon: "person.fill",
+                    title: "Allocentric",
+                    description: "Knowledge about you: preferences, facts, relationships, context",
+                    color: AppColors.signalMercury
+                )
+
+                MemoryTypeInfo(
+                    icon: "brain.head.profile",
+                    title: "Egoic",
+                    description: "What works for Axon: procedures, insights, learnings",
+                    color: AppColors.signalLichen
+                )
+            }
+        }
+    }
+
+    // MARK: - Epistemic Engine Section
+
+    private var epistemicEngineSection: some View {
+        SettingsSection(title: "Epistemic Engine") {
+            VStack(spacing: 16) {
+                // Epistemic Grounding Toggle
+                Toggle(isOn: Binding(
+                    get: { viewModel.settings.epistemicEnabled },
+                    set: { newValue in
+                        Task {
+                            await viewModel.updateSetting(\.epistemicEnabled, newValue)
+                        }
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Epistemic Grounding")
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Text("Ground responses with verified facts and confidence metrics")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(AppColors.signalMercury)
+
+                if viewModel.settings.epistemicEnabled {
+                    Divider()
+                        .background(AppColors.divider)
+
+                    // Verbose Mode Toggle
+                    Toggle(isOn: Binding(
+                        get: { viewModel.settings.epistemicVerbose },
+                        set: { newValue in
+                            Task {
+                                await viewModel.updateSetting(\.epistemicVerbose, newValue)
+                            }
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Verbose Boundaries")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Text("Include detailed epistemic boundaries in prompts")
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                    }
+                    .toggleStyle(.switch)
                     .tint(AppColors.signalMercury)
 
                     Divider()
                         .background(AppColors.divider)
 
+                    // Learning Loop Toggle
+                    Toggle(isOn: Binding(
+                        get: { viewModel.settings.learningLoopEnabled },
+                        set: { newValue in
+                            Task {
+                                await viewModel.updateSetting(\.learningLoopEnabled, newValue)
+                            }
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Learning Loop")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Text("Refine memory confidence when predictions don't match reality")
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                    }
+                    .toggleStyle(.switch)
+                    .tint(AppColors.signalMercury)
+                }
+            }
+            .padding()
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(8)
+        }
+    }
+
+    // MARK: - Debugging Section
+
+    private var debuggingSection: some View {
+        SettingsSection(title: "Debugging") {
+            VStack(spacing: 16) {
+                Toggle(isOn: Binding(
+                    get: { viewModel.settings.predicateLoggingEnabled },
+                    set: { newValue in
+                        Task {
+                            await viewModel.updateSetting(\.predicateLoggingEnabled, newValue)
+                        }
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Predicate Logging")
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Text("Log formal proof trees for debugging and verification")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(AppColors.signalMercury)
+
+                if viewModel.settings.predicateLoggingEnabled {
+                    Divider()
+                        .background(AppColors.divider)
+
+                    // Verbosity Picker
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Verbosity Level")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Picker("Verbosity", selection: Binding(
+                            get: { viewModel.settings.predicateLoggingVerbosity },
+                            set: { newValue in
+                                Task {
+                                    await viewModel.updateSetting(\.predicateLoggingVerbosity, newValue)
+                                }
+                            }
+                        )) {
+                            ForEach(PredicateVerbosity.allCases, id: \.self) { level in
+                                Text(level.displayName).tag(level)
+                            }
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+
+                        Text(viewModel.settings.predicateLoggingVerbosity.description)
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+                }
+            }
+            .padding()
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(8)
+        }
+    }
+
+    // MARK: - Analytics Section
+
+    private var analyticsSection: some View {
+        SettingsSection(title: "Analytics") {
+            Toggle(isOn: Binding(
+                get: { viewModel.settings.memoryAnalyticsEnabled },
+                set: { newValue in
+                    Task {
+                        await viewModel.updateSetting(\.memoryAnalyticsEnabled, newValue)
+                    }
+                }
+            )) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Enable Usage Analytics")
+                        .font(AppTypography.bodyMedium(.medium))
+                        .foregroundColor(AppColors.textPrimary)
+
+                    Text("Help improve the app by sharing anonymous usage data")
+                        .font(AppTypography.bodySmall())
+                        .foregroundColor(AppColors.textSecondary)
+                }
+            }
+            .toggleStyle(.switch)
+            .tint(AppColors.signalMercury)
+            .padding()
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(8)
+        }
+    }
+
+    // MARK: - Internal Thread Section
+
+    private var internalThreadSection: some View {
+        SettingsSection(title: "Internal Thread") {
+            VStack(spacing: 16) {
+                Toggle(isOn: Binding(
+                    get: { viewModel.settings.internalThreadEnabled },
+                    set: { newValue in
+                        Task {
+                            await viewModel.updateSetting(\.internalThreadEnabled, newValue)
+                        }
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Enable Internal Thread")
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Text("Allow the agent to persist its internal thread across sessions")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(AppColors.signalMercury)
+
+                Divider()
+                    .background(AppColors.divider)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Retention")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Spacer()
+
+                        Text(retentionLabel(days: viewModel.settings.internalThreadRetentionDays))
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.signalMercury)
+                    }
+
+                    Slider(
+                        value: Binding(
+                            get: { Double(viewModel.settings.internalThreadRetentionDays) },
+                            set: { newValue in
+                                Task {
+                                    await viewModel.updateSetting(\.internalThreadRetentionDays, Int(newValue))
+                                }
+                            }
+                        ),
+                        in: 0...365,
+                        step: 1
+                    )
+                    .tint(AppColors.signalMercury)
+
+                    Text("0 means keep indefinitely.")
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                }
+            }
+            .padding()
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(8)
+        }
+    }
+
+    // MARK: - Heartbeat Section
+
+    private var heartbeatSection: some View {
+        SettingsSection(title: "Heartbeat") {
+            VStack(spacing: 16) {
+                Toggle(isOn: Binding(
+                    get: { viewModel.settings.heartbeatSettings.enabled },
+                    set: { newValue in
+                        Task {
+                            var heartbeat = viewModel.settings.heartbeatSettings
+                            heartbeat.enabled = newValue
+                            await viewModel.updateSetting(\.heartbeatSettings, heartbeat)
+                        }
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Enable Heartbeat")
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Text("Run periodic internal check-ins and update the internal thread")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(AppColors.signalMercury)
+
+                if viewModel.settings.heartbeatSettings.enabled {
+                    Divider()
+                        .background(AppColors.divider)
+
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("Retention")
+                            Text("Interval")
                                 .font(AppTypography.bodyMedium())
                                 .foregroundColor(AppColors.textPrimary)
 
                             Spacer()
 
-                            Text(retentionLabel(days: viewModel.settings.internalThreadRetentionDays))
+                            Text(intervalLabel(seconds: viewModel.settings.heartbeatSettings.intervalSeconds))
                                 .font(AppTypography.bodyMedium(.medium))
                                 .foregroundColor(AppColors.signalMercury)
                         }
 
                         Slider(
                             value: Binding(
-                                get: { Double(viewModel.settings.internalThreadRetentionDays) },
+                                get: { Double(viewModel.settings.heartbeatSettings.intervalSeconds) },
                                 set: { newValue in
                                     Task {
-                                        await viewModel.updateSetting(\.internalThreadRetentionDays, Int(newValue))
+                                        var heartbeat = viewModel.settings.heartbeatSettings
+                                        heartbeat.intervalSeconds = Int(newValue)
+                                        await viewModel.updateSetting(\.heartbeatSettings, heartbeat)
                                     }
                                 }
                             ),
-                            in: 0...365,
-                            step: 1
+                            in: 300...86400,
+                            step: 300
                         )
                         .tint(AppColors.signalMercury)
-
-                        Text("0 means keep indefinitely.")
-                            .font(AppTypography.labelSmall())
-                            .foregroundColor(AppColors.textTertiary)
                     }
-                }
-                .padding()
-                .background(AppColors.substrateSecondary)
-                .cornerRadius(8)
-            }
 
-            // Heartbeat
-            SettingsSection(title: "Heartbeat") {
-                VStack(spacing: 16) {
+                    Divider()
+                        .background(AppColors.divider)
+
+                    HStack {
+                        Text("Delivery Profile")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Spacer()
+
+                        Picker("", selection: Binding(
+                            get: { viewModel.settings.heartbeatSettings.deliveryProfileId },
+                            set: { newValue in
+                                Task {
+                                    var heartbeat = viewModel.settings.heartbeatSettings
+                                    heartbeat.deliveryProfileId = newValue
+                                    await viewModel.updateSetting(\.heartbeatSettings, heartbeat)
+                                }
+                            }
+                        )) {
+                            ForEach(viewModel.settings.heartbeatSettings.deliveryProfiles, id: \.id) { profile in
+                                Text(profile.name).tag(profile.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+
+                    Divider()
+                        .background(AppColors.divider)
+
                     Toggle(isOn: Binding(
-                        get: { viewModel.settings.heartbeatSettings.enabled },
+                        get: { viewModel.settings.heartbeatSettings.allowNotifications },
                         set: { newValue in
                             Task {
                                 var heartbeat = viewModel.settings.heartbeatSettings
-                                heartbeat.enabled = newValue
+                                heartbeat.allowNotifications = newValue
                                 await viewModel.updateSetting(\.heartbeatSettings, heartbeat)
                             }
                         }
                     )) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Enable Heartbeat")
-                                .font(AppTypography.bodyMedium(.medium))
-                                .foregroundColor(AppColors.textPrimary)
-
-                            Text("Run periodic internal check-ins and update the internal thread")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textSecondary)
-                        }
+                        Text("Allow Heartbeat Notifications")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
                     }
+                    .toggleStyle(.switch)
                     .tint(AppColors.signalMercury)
 
-                    if viewModel.settings.heartbeatSettings.enabled {
-                        Divider()
-                            .background(AppColors.divider)
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("Interval")
-                                    .font(AppTypography.bodyMedium())
-                                    .foregroundColor(AppColors.textPrimary)
-
-                                Spacer()
-
-                                Text(intervalLabel(seconds: viewModel.settings.heartbeatSettings.intervalSeconds))
-                                    .font(AppTypography.bodyMedium(.medium))
-                                    .foregroundColor(AppColors.signalMercury)
+                    Toggle(isOn: Binding(
+                        get: { viewModel.settings.heartbeatSettings.allowBackground },
+                        set: { newValue in
+                            Task {
+                                var heartbeat = viewModel.settings.heartbeatSettings
+                                heartbeat.allowBackground = newValue
+                                await viewModel.updateSetting(\.heartbeatSettings, heartbeat)
                             }
-
-                            Slider(
-                                value: Binding(
-                                    get: { Double(viewModel.settings.heartbeatSettings.intervalSeconds) },
-                                    set: { newValue in
-                                        Task {
-                                            var heartbeat = viewModel.settings.heartbeatSettings
-                                            heartbeat.intervalSeconds = Int(newValue)
-                                            await viewModel.updateSetting(\.heartbeatSettings, heartbeat)
-                                        }
-                                    }
-                                ),
-                                in: 300...86400,
-                                step: 300
-                            )
-                            .tint(AppColors.signalMercury)
                         }
+                    )) {
+                        Text("Allow Background Heartbeat")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
+                    }
+                    .toggleStyle(.switch)
+                    .tint(AppColors.signalMercury)
+                }
+            }
+            .padding()
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(8)
+        }
+    }
 
-                        Divider()
-                            .background(AppColors.divider)
+    // MARK: - Notifications Section
 
+    private var notificationsSection: some View {
+        SettingsSection(title: "Notifications") {
+            Toggle(isOn: Binding(
+                get: { viewModel.settings.notificationsEnabled },
+                set: { newValue in
+                    Task {
+                        await viewModel.updateSetting(\.notificationsEnabled, newValue)
+                    }
+                }
+            )) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Enable Notifications")
+                        .font(AppTypography.bodyMedium(.medium))
+                        .foregroundColor(AppColors.textPrimary)
+
+                    Text("Allow the agent to send local notifications")
+                        .font(AppTypography.bodySmall())
+                        .foregroundColor(AppColors.textSecondary)
+                }
+            }
+            .toggleStyle(.switch)
+            .tint(AppColors.signalMercury)
+            .padding()
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(8)
+        }
+    }
+
+    // MARK: - Heuristics Section
+
+    private var heuristicsSection: some View {
+        SettingsSection(title: "Heuristics") {
+            VStack(spacing: 16) {
+                // Master toggle
+                Toggle(isOn: Binding(
+                    get: { viewModel.settings.heuristicsSettings.enabled },
+                    set: { newValue in
+                        Task {
+                            var heuristics = viewModel.settings.heuristicsSettings
+                            heuristics.enabled = newValue
+                            await viewModel.updateSetting(\.heuristicsSettings, heuristics)
+                        }
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Enable Heuristics")
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Text("Compress memories into distilled insights for efficient context injection")
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(AppColors.signalMercury)
+
+                if viewModel.settings.heuristicsSettings.enabled {
+                    Divider()
+                        .background(AppColors.divider)
+
+                    // Per-type synthesis intervals
+                    ForEach(HeuristicType.allCases) { type in
+                        heuristicIntervalSlider(for: type)
+                    }
+
+                    Divider()
+                        .background(AppColors.divider)
+
+                    // Meta-synthesis interval
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("Delivery Profile")
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .foregroundColor(AppColors.signalMercury)
+                            Text("Meta-Synthesis Interval")
                                 .font(AppTypography.bodyMedium())
                                 .foregroundColor(AppColors.textPrimary)
 
                             Spacer()
 
-                            Picker("", selection: Binding(
-                                get: { viewModel.settings.heartbeatSettings.deliveryProfileId },
+                            Text(intervalLabelDays(seconds: viewModel.settings.heuristicsSettings.metaSynthesisIntervalSeconds))
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.signalMercury)
+                        }
+
+                        Slider(
+                            value: Binding(
+                                get: { Double(viewModel.settings.heuristicsSettings.metaSynthesisIntervalSeconds) },
                                 set: { newValue in
                                     Task {
-                                        var heartbeat = viewModel.settings.heartbeatSettings
-                                        heartbeat.deliveryProfileId = newValue
-                                        await viewModel.updateSetting(\.heartbeatSettings, heartbeat)
+                                        var heuristics = viewModel.settings.heuristicsSettings
+                                        heuristics.metaSynthesisIntervalSeconds = Int(newValue)
+                                        await viewModel.updateSetting(\.heuristicsSettings, heuristics)
                                     }
                                 }
-                            )) {
-                                ForEach(viewModel.settings.heartbeatSettings.deliveryProfiles, id: \.id) { profile in
-                                    Text(profile.name).tag(profile.id)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                        }
-
-                        Divider()
-                            .background(AppColors.divider)
-
-                        Toggle(isOn: Binding(
-                            get: { viewModel.settings.heartbeatSettings.allowNotifications },
-                            set: { newValue in
-                                Task {
-                                    var heartbeat = viewModel.settings.heartbeatSettings
-                                    heartbeat.allowNotifications = newValue
-                                    await viewModel.updateSetting(\.heartbeatSettings, heartbeat)
-                                }
-                            }
-                        )) {
-                            Text("Allow Heartbeat Notifications")
-                                .font(AppTypography.bodyMedium())
-                                .foregroundColor(AppColors.textPrimary)
-                        }
+                            ),
+                            in: 86400...2592000,  // 1 day to 30 days
+                            step: 86400
+                        )
                         .tint(AppColors.signalMercury)
 
-                        Toggle(isOn: Binding(
-                            get: { viewModel.settings.heartbeatSettings.allowBackground },
-                            set: { newValue in
-                                Task {
-                                    var heartbeat = viewModel.settings.heartbeatSettings
-                                    heartbeat.allowBackground = newValue
-                                    await viewModel.updateSetting(\.heartbeatSettings, heartbeat)
-                                }
-                            }
-                        )) {
-                            Text("Allow Background Heartbeat")
+                        Text("Distill old heuristics into their cores and archive originals")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+
+                    Divider()
+                        .background(AppColors.divider)
+
+                    // Context window threshold
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Context Window Threshold")
                                 .font(AppTypography.bodyMedium())
                                 .foregroundColor(AppColors.textPrimary)
+
+                            Spacer()
+
+                            Text("\(viewModel.settings.heuristicsSettings.contextWindowThreshold) tokens")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.signalMercury)
                         }
+
+                        Slider(
+                            value: Binding(
+                                get: { Double(viewModel.settings.heuristicsSettings.contextWindowThreshold) },
+                                set: { newValue in
+                                    Task {
+                                        var heuristics = viewModel.settings.heuristicsSettings
+                                        heuristics.contextWindowThreshold = Int(newValue)
+                                        await viewModel.updateSetting(\.heuristicsSettings, heuristics)
+                                    }
+                                }
+                            ),
+                            in: 2000...32000,
+                            step: 1000
+                        )
                         .tint(AppColors.signalMercury)
+
+                        Text("Inject heuristics when model context is below this threshold")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+
+                    Divider()
+                        .background(AppColors.divider)
+
+                    // Heuristics:Memory ratio
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Heuristics : Memory Ratio")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Spacer()
+
+                            Text("\(Int(viewModel.settings.heuristicsSettings.heuristicsMemoryRatio * 100))% : \(Int((1 - viewModel.settings.heuristicsSettings.heuristicsMemoryRatio) * 100))%")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.signalMercury)
+                        }
+
+                        Slider(
+                            value: Binding(
+                                get: { viewModel.settings.heuristicsSettings.heuristicsMemoryRatio },
+                                set: { newValue in
+                                    Task {
+                                        var heuristics = viewModel.settings.heuristicsSettings
+                                        heuristics.heuristicsMemoryRatio = newValue
+                                        await viewModel.updateSetting(\.heuristicsSettings, heuristics)
+                                    }
+                                }
+                            ),
+                            in: 0...1,
+                            step: 0.1
+                        )
+                        .tint(AppColors.signalMercury)
+
+                        Text("Balance between heuristics and raw memories when injecting context")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
                     }
                 }
-                .padding()
-                .background(AppColors.substrateSecondary)
-                .cornerRadius(8)
             }
+            .padding()
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(8)
+        }
+    }
 
-            // Notifications
-            SettingsSection(title: "Notifications") {
+    // MARK: - Small Model Optimization Section
+
+    private var smallModelOptimizationSection: some View {
+        SettingsSection(title: "Small Model Optimization") {
+            VStack(spacing: 16) {
+                // Master toggle
                 Toggle(isOn: Binding(
-                    get: { viewModel.settings.notificationsEnabled },
+                    get: { viewModel.settings.heuristicsSettings.smallModelOptimization.enabled },
                     set: { newValue in
                         Task {
-                            await viewModel.updateSetting(\.notificationsEnabled, newValue)
+                            var heuristics = viewModel.settings.heuristicsSettings
+                            heuristics.smallModelOptimization.enabled = newValue
+                            await viewModel.updateSetting(\.heuristicsSettings, heuristics)
                         }
                     }
                 )) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Enable Notifications")
+                        Text("Auto-Detect Small Models")
                             .font(AppTypography.bodyMedium(.medium))
                             .foregroundColor(AppColors.textPrimary)
 
-                        Text("Allow the agent to send local notifications")
+                        Text("Automatically optimize context for small/quantized models (1B-3B, 4bit)")
                             .font(AppTypography.bodySmall())
                             .foregroundColor(AppColors.textSecondary)
                     }
                 }
+                .toggleStyle(.switch)
                 .tint(AppColors.signalMercury)
-                .padding()
-                .background(AppColors.substrateSecondary)
-                .cornerRadius(8)
-            }
 
-            // Heuristics (Cognitive Compression)
-            SettingsSection(title: "Heuristics") {
-                VStack(spacing: 16) {
-                    // Master toggle
+                if viewModel.settings.heuristicsSettings.smallModelOptimization.enabled {
+                    Divider()
+                        .background(AppColors.divider)
+
+                    // Use heuristics only
                     Toggle(isOn: Binding(
-                        get: { viewModel.settings.heuristicsSettings.enabled },
+                        get: { viewModel.settings.heuristicsSettings.smallModelOptimization.useHeuristicsOnly },
                         set: { newValue in
                             Task {
                                 var heuristics = viewModel.settings.heuristicsSettings
-                                heuristics.enabled = newValue
+                                heuristics.smallModelOptimization.useHeuristicsOnly = newValue
                                 await viewModel.updateSetting(\.heuristicsSettings, heuristics)
                             }
                         }
                     )) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Enable Heuristics")
+                            Text("Use Heuristics Only")
                                 .font(AppTypography.bodyMedium(.medium))
                                 .foregroundColor(AppColors.textPrimary)
 
-                            Text("Compress memories into distilled insights for efficient context injection")
+                            Text("Inject compressed heuristics instead of raw memories for small models")
                                 .font(AppTypography.bodySmall())
                                 .foregroundColor(AppColors.textSecondary)
                         }
                     }
+                    .toggleStyle(.switch)
                     .tint(AppColors.signalMercury)
 
-                    if viewModel.settings.heuristicsSettings.enabled {
-                        Divider()
-                            .background(AppColors.divider)
+                    Divider()
+                        .background(AppColors.divider)
 
-                        // Per-type synthesis intervals
-                        ForEach(HeuristicType.allCases) { type in
-                            heuristicIntervalSlider(for: type)
-                        }
-
-                        Divider()
-                            .background(AppColors.divider)
-
-                        // Meta-synthesis interval
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                                    .foregroundColor(AppColors.signalMercury)
-                                Text("Meta-Synthesis Interval")
-                                    .font(AppTypography.bodyMedium())
-                                    .foregroundColor(AppColors.textPrimary)
-
-                                Spacer()
-
-                                Text(intervalLabelDays(seconds: viewModel.settings.heuristicsSettings.metaSynthesisIntervalSeconds))
-                                    .font(AppTypography.bodyMedium(.medium))
-                                    .foregroundColor(AppColors.signalMercury)
+                    // Skip conversation summary
+                    Toggle(isOn: Binding(
+                        get: { viewModel.settings.heuristicsSettings.smallModelOptimization.skipConversationSummary },
+                        set: { newValue in
+                            Task {
+                                var heuristics = viewModel.settings.heuristicsSettings
+                                heuristics.smallModelOptimization.skipConversationSummary = newValue
+                                await viewModel.updateSetting(\.heuristicsSettings, heuristics)
                             }
-
-                            Slider(
-                                value: Binding(
-                                    get: { Double(viewModel.settings.heuristicsSettings.metaSynthesisIntervalSeconds) },
-                                    set: { newValue in
-                                        Task {
-                                            var heuristics = viewModel.settings.heuristicsSettings
-                                            heuristics.metaSynthesisIntervalSeconds = Int(newValue)
-                                            await viewModel.updateSetting(\.heuristicsSettings, heuristics)
-                                        }
-                                    }
-                                ),
-                                in: 86400...2592000,  // 1 day to 30 days
-                                step: 86400
-                            )
-                            .tint(AppColors.signalMercury)
-
-                            Text("Distill old heuristics into their cores and archive originals")
-                                .font(AppTypography.labelSmall())
-                                .foregroundColor(AppColors.textTertiary)
                         }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Skip Conversation Summary")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.textPrimary)
 
-                        Divider()
-                            .background(AppColors.divider)
-
-                        // Context window threshold
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("Context Window Threshold")
-                                    .font(AppTypography.bodyMedium())
-                                    .foregroundColor(AppColors.textPrimary)
-
-                                Spacer()
-
-                                Text("\(viewModel.settings.heuristicsSettings.contextWindowThreshold) tokens")
-                                    .font(AppTypography.bodyMedium(.medium))
-                                    .foregroundColor(AppColors.signalMercury)
-                            }
-
-                            Slider(
-                                value: Binding(
-                                    get: { Double(viewModel.settings.heuristicsSettings.contextWindowThreshold) },
-                                    set: { newValue in
-                                        Task {
-                                            var heuristics = viewModel.settings.heuristicsSettings
-                                            heuristics.contextWindowThreshold = Int(newValue)
-                                            await viewModel.updateSetting(\.heuristicsSettings, heuristics)
-                                        }
-                                    }
-                                ),
-                                in: 2000...32000,
-                                step: 1000
-                            )
-                            .tint(AppColors.signalMercury)
-
-                            Text("Inject heuristics when model context is below this threshold")
-                                .font(AppTypography.labelSmall())
-                                .foregroundColor(AppColors.textTertiary)
-                        }
-
-                        Divider()
-                            .background(AppColors.divider)
-
-                        // Heuristics:Memory ratio
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("Heuristics : Memory Ratio")
-                                    .font(AppTypography.bodyMedium())
-                                    .foregroundColor(AppColors.textPrimary)
-
-                                Spacer()
-
-                                Text("\(Int(viewModel.settings.heuristicsSettings.heuristicsMemoryRatio * 100))% : \(Int((1 - viewModel.settings.heuristicsSettings.heuristicsMemoryRatio) * 100))%")
-                                    .font(AppTypography.bodyMedium(.medium))
-                                    .foregroundColor(AppColors.signalMercury)
-                            }
-
-                            Slider(
-                                value: Binding(
-                                    get: { viewModel.settings.heuristicsSettings.heuristicsMemoryRatio },
-                                    set: { newValue in
-                                        Task {
-                                            var heuristics = viewModel.settings.heuristicsSettings
-                                            heuristics.heuristicsMemoryRatio = newValue
-                                            await viewModel.updateSetting(\.heuristicsSettings, heuristics)
-                                        }
-                                    }
-                                ),
-                                in: 0...1,
-                                step: 0.1
-                            )
-                            .tint(AppColors.signalMercury)
-
-                            Text("Balance between heuristics and raw memories when injecting context")
-                                .font(AppTypography.labelSmall())
-                                .foregroundColor(AppColors.textTertiary)
+                            Text("Don't inject recent conversation summaries for small models")
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textSecondary)
                         }
                     }
+                    .toggleStyle(.switch)
+                    .tint(AppColors.signalMercury)
+
+                    Divider()
+                        .background(AppColors.divider)
+
+                    // Token budget slider
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Context Token Budget")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Spacer()
+
+                            Text("\(viewModel.settings.heuristicsSettings.smallModelOptimization.smallModelTokenBudget) tokens")
+                                .font(AppTypography.bodyMedium(.medium))
+                                .foregroundColor(AppColors.signalMercury)
+                        }
+
+                        Slider(
+                            value: Binding(
+                                get: { Double(viewModel.settings.heuristicsSettings.smallModelOptimization.smallModelTokenBudget) },
+                                set: { newValue in
+                                    Task {
+                                        var heuristics = viewModel.settings.heuristicsSettings
+                                        heuristics.smallModelOptimization.smallModelTokenBudget = Int(newValue)
+                                        await viewModel.updateSetting(\.heuristicsSettings, heuristics)
+                                    }
+                                }
+                            ),
+                            in: 200...1500,
+                            step: 100
+                        )
+                        .tint(AppColors.signalMercury)
+
+                        Text("Maximum tokens reserved for context injection in small models")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
+                    }
                 }
-                .padding()
-                .background(AppColors.substrateSecondary)
-                .cornerRadius(8)
             }
+            .padding()
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(8)
         }
     }
 

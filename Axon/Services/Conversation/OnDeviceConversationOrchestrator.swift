@@ -61,6 +61,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     private let salienceService = SalienceService.shared
     private let learningLoopService = LearningLoopService.shared
     private let agentStateService = AgentStateService.shared
+    private let heuristicsService = HeuristicsService.shared
     // Lazy to avoid circular dependency: HeartbeatService creates OnDeviceConversationOrchestrator
     private lazy var heartbeatService = HeartbeatService.shared
 
@@ -134,7 +135,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             userQuery: content,
             correlationId: correlationId,
             userName: userName,
-            contextWindowLimit: config.contextWindowLimit
+            contextWindowLimit: config.contextWindowLimit,
+            modelId: config.model
         )
         var systemPrompt = epistemicResult.systemPrompt
         let usedMemories = epistemicResult.usedMemories
@@ -406,7 +408,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             userQuery: content,
             correlationId: correlationId,
             userName: userName,
-            contextWindowLimit: config.contextWindowLimit
+            contextWindowLimit: config.contextWindowLimit,
+            modelId: config.model
         )
         var systemPrompt = epistemicResult.systemPrompt
         let usedMemories = epistemicResult.usedMemories
@@ -1250,7 +1253,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         userQuery: String,
         correlationId: String,
         userName: String? = nil,
-        contextWindowLimit: Int = 128_000
+        contextWindowLimit: Int = 128_000,
+        modelId: String? = nil
     ) async -> EpistemicPromptResult {
         // Track debug info
         let basePromptTokens = TokenEstimator.estimate(base)
@@ -1260,6 +1264,17 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var factsTokens = 0
         var summaryTokens = 0
         var temporalTokens = 0
+
+        // Check if this is a small model that needs optimized context
+        let heuristicsSettings = await MainActor.run {
+            SettingsViewModel.shared.settings.heuristicsSettings
+        }
+        let smallModelOpt = heuristicsSettings.smallModelOptimization
+        let isSmallModel = modelId.map { smallModelOpt.isSmallModel($0) } ?? false
+
+        if isSmallModel {
+            print("[Epistemic] Small model detected (\(modelId ?? "unknown")) - using optimized context injection")
+        }
 
         // Get system messages
         let systemMessages = messages
@@ -1285,10 +1300,44 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         promptParts.append(base)
         promptParts.append(contentsOf: systemMessages)
 
-        // Inject salient memories if available
+        // --- Context Injection: Heuristics vs Memories ---
         var usedMemories: [Memory] = []
-        var memoryInjectionBlock = ""
-        if !memories.isEmpty {
+
+        if isSmallModel && smallModelOpt.useHeuristicsOnly && heuristicsSettings.enabled {
+            // Small model optimization: use compressed heuristics instead of raw memories
+            let heuristics = await MainActor.run { heuristicsService.heuristicsForInjection(limit: 6) }
+
+            if !heuristics.isEmpty {
+                let heuristicsBlock = await MainActor.run {
+                    heuristicsService.buildInjectionContext(heuristics: heuristics)
+                }
+                promptParts.append(heuristicsBlock)
+                memoriesCount = heuristics.count
+                memoriesTokens = TokenEstimator.estimate(heuristicsBlock)
+                print("[Epistemic] Small model: injected \(heuristics.count) heuristics instead of raw memories")
+            } else if !memories.isEmpty {
+                // Fallback to minimal memories if no heuristics available
+                let tokenBudget = smallModelOpt.smallModelTokenBudget
+                let settings = MemoryInjectionSettings.minimal
+                let injection = await salienceService.injectSalient(
+                    conversation: messages,
+                    memories: memories,
+                    availableTokens: tokenBudget,
+                    correlationId: correlationId,
+                    settings: settings,
+                    userName: userName
+                )
+
+                if !injection.isEmpty {
+                    promptParts.append(injection.injectionBlock)
+                    usedMemories = injection.selectedMemories.map { $0.memory }
+                    memoriesCount = usedMemories.count
+                    memoriesTokens = TokenEstimator.estimate(injection.injectionBlock)
+                    print("[Epistemic] Small model fallback: injected \(memoriesCount) memories (no heuristics available)")
+                }
+            }
+        } else if !memories.isEmpty {
+            // Standard memory injection for larger models
             let injection = await salienceService.injectSalient(
                 conversation: messages,
                 memories: memories,
@@ -1298,11 +1347,10 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             )
 
             if !injection.isEmpty {
-                memoryInjectionBlock = injection.injectionBlock
-                promptParts.append(memoryInjectionBlock)
+                promptParts.append(injection.injectionBlock)
                 usedMemories = injection.selectedMemories.map { $0.memory }
                 memoriesCount = usedMemories.count
-                memoriesTokens = TokenEstimator.estimate(memoryInjectionBlock)
+                memoriesTokens = TokenEstimator.estimate(injection.injectionBlock)
             }
         }
 
@@ -1310,14 +1358,16 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         // When the user interrupts Axon's "thinking time", bridge from its internal thread
         await injectInternalThreadContext(into: &promptParts)
 
-        // --- Additional Context Injection ---
+        // --- Additional Context Injection (skip for small models if configured) ---
 
         // Get recent conversation summary for reuse
         let recentSummary = await getRecentConversationSummary()
         let currentConversationId = messages.first?.conversationId
 
-        // Inject recent conversation summary for continuity
-        if let summary = recentSummary,
+        // Inject recent conversation summary for continuity (skip for small models if configured)
+        let skipSummary = isSmallModel && smallModelOpt.skipConversationSummary
+        if !skipSummary,
+           let summary = recentSummary,
            summary.conversationId != currentConversationId {
             // Only inject if this is a different conversation than the summarized one
             let summaryBlock = summary.formattedForInjection()
@@ -1326,24 +1376,27 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             print("[Epistemic] Injected recent conversation summary from '\(summary.title)'")
         }
 
-        // Check for conversation history search auto-injection
-        let searchService = await getConversationSearchService()
-        let topicTags = recentSummary?.topicTags ?? []
+        // Check for conversation history search auto-injection (skip for small models if configured)
+        let skipSearch = isSmallModel && smallModelOpt.skipConversationSearch
+        if !skipSearch {
+            let searchService = await getConversationSearchService()
+            let topicTags = recentSummary?.topicTags ?? []
 
-        if searchService.shouldAutoInject(query: userQuery, conversationTags: topicTags) {
-            let searchResults = await searchService.searchConversations(query: userQuery, limit: 3)
+            if searchService.shouldAutoInject(query: userQuery, conversationTags: topicTags) {
+                let searchResults = await searchService.searchConversations(query: userQuery, limit: 3)
 
-            if !searchResults.isEmpty {
-                var contextBlock = "\n## Related Things We've Discussed\n"
+                if !searchResults.isEmpty {
+                    var contextBlock = "\n## Related Things We've Discussed\n"
 
-                for result in searchResults {
-                    contextBlock += result.formattedForInjection()
+                    for result in searchResults {
+                        contextBlock += result.formattedForInjection()
+                    }
+
+                    promptParts.append(contextBlock)
+                    factsCount = searchResults.count
+                    factsTokens = TokenEstimator.estimate(contextBlock)
+                    print("[Epistemic] Injected \(searchResults.count) relevant conversation results for query")
                 }
-
-                promptParts.append(contextBlock)
-                factsCount = searchResults.count
-                factsTokens = TokenEstimator.estimate(contextBlock)
-                print("[Epistemic] Injected \(searchResults.count) relevant conversation results for query")
             }
         }
 

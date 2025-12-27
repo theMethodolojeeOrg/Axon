@@ -485,6 +485,98 @@ class MemoryService: ObservableObject {
         }
     }
 
+    // MARK: - Bulk Delete Memories
+
+    /// Delete multiple memories with a single consent request
+    /// This is more efficient for bulk operations like resolving duplicates
+    func deleteMemories(ids: [String], rationale: String, skipConsent: Bool = false) async throws -> Int {
+        guard !ids.isEmpty else { return 0 }
+
+        // Request consent once for all deletions
+        if !skipConsent && requiresAIConsent(for: .delete) {
+            let memoryPreviews = ids.compactMap { id in
+                memories.first(where: { $0.id == id })?.content.prefix(50)
+            }.prefix(5).map { String($0) + "..." }
+
+            let bulkRationale = """
+                \(rationale)
+
+                Deleting \(ids.count) memories:
+                \(memoryPreviews.joined(separator: "\n- "))
+                \(ids.count > 5 ? "... and \(ids.count - 5) more" : "")
+                """
+
+            let memoryChanges = MemoryChanges(additions: nil, modifications: nil, deletions: ids)
+            let proposal = CovenantProposal.create(
+                type: .modifyMemories,
+                changes: .memory(memoryChanges),
+                proposedBy: .user,
+                rationale: bulkRationale
+            )
+
+            pendingConsentRequest = MemoryConsentRequest(
+                operation: .delete,
+                memoryId: nil,
+                content: nil,
+                rationale: bulkRationale,
+                proposal: proposal
+            )
+            consentRequired = true
+
+            let attestation = try await aiConsentService.generateAttestation(
+                for: proposal,
+                memories: memories
+            )
+
+            pendingConsentRequest = nil
+            consentRequired = false
+
+            if attestation.didDecline {
+                throw SovereigntyError.aiDeclined(attestation.reasoning)
+            }
+
+            print("[MemoryService] AI consented to bulk deletion of \(ids.count) memories: \(attestation.shortSignature)")
+        }
+
+        // Remove from in-memory array first (optimistic update)
+        memories.removeAll { ids.contains($0.id) }
+
+        var successCount = 0
+
+        if apiClient.isBackendConfigured {
+            // Cloud mode: Soft-delete then try server
+            for id in ids {
+                do {
+                    try await syncManager.deleteMemoryFromCoreData(id: id)
+
+                    struct DeleteResponse: Decodable { let success: Bool }
+                    let _: DeleteResponse = try await apiClient.request(
+                        endpoint: "/apiDeleteMemory/\(id)",
+                        method: .delete
+                    )
+
+                    try await syncManager.hardDeleteMemoryFromCoreData(id: id)
+                    successCount += 1
+                } catch {
+                    print("[MemoryService] Failed to delete memory \(id): \(error.localizedDescription)")
+                }
+            }
+        } else {
+            // Local-first mode: Hard delete immediately
+            for id in ids {
+                do {
+                    try await syncManager.hardDeleteMemoryFromCoreData(id: id)
+                    successCount += 1
+                } catch {
+                    print("[MemoryService] Failed to delete memory \(id): \(error.localizedDescription)")
+                }
+            }
+        }
+
+        print("[MemoryService] Bulk deleted \(successCount)/\(ids.count) memories")
+        return successCount
+    }
+
     // MARK: - Search Memories
 
     func searchMemories(

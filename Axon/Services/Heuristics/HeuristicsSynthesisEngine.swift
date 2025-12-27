@@ -16,7 +16,7 @@ import FoundationModels
 /// Structured output for narrative heuristics
 @Generable
 struct NarrativeHeuristic {
-    @Guide(description: "A 1-2 sentence insight about the core themes and patterns emerging from the user's focus areas. Written in second person (\"You...\").")
+    @Guide(description: "A 1-2 sentence insight about the core themes and patterns emerging from the user's focus areas. Written in first person (\"I...\", \"My...\").")
     var insight: String
 
     @Guide(description: "Confidence score from 0.0 to 1.0 based on pattern clarity.")
@@ -26,7 +26,7 @@ struct NarrativeHeuristic {
 /// Structured output for embodiment heuristics
 @Generable
 struct EmbodimentHeuristic {
-    @Guide(description: "A 1-2 sentence actionable insight or suggestion based on the patterns. Written in second person (\"Consider...\", \"You might...\").")
+    @Guide(description: "A 1-2 sentence actionable insight or suggestion based on the patterns. Written in first person (\"I could...\", \"I might...\").")
     var insight: String
 
     @Guide(description: "Confidence score from 0.0 to 1.0 based on actionability clarity.")
@@ -36,7 +36,7 @@ struct EmbodimentHeuristic {
 /// Structured output for emotion heuristics
 @Generable
 struct EmotionHeuristic {
-    @Guide(description: "A 1-2 sentence observation about the emotional resonance or feeling states around these patterns. Written in second person.")
+    @Guide(description: "A 1-2 sentence observation about the emotional resonance or feeling states around these patterns. Written in first person (\"I feel...\", \"I sense...\").")
     var insight: String
 
     @Guide(description: "Confidence score from 0.0 to 1.0 based on emotional pattern clarity.")
@@ -202,7 +202,7 @@ actor HeuristicsSynthesisEngine {
 
                 \(content.prefix(2000))
 
-                Provide a concise, powerful insight that captures the essential pattern across all these observations. Write in second person ("You...").
+                Provide a concise, powerful insight that captures the essential pattern across all these observations. Write in first person ("I...", "My...").
                 """
 
                 let session = LanguageModelSession()
@@ -450,7 +450,7 @@ actor HeuristicsSynthesisEngine {
 
         \(dimensionInstruction)
 
-        Write a 1-2 sentence insight in second person ("You...", "Your...", "Consider..."). Be specific to the content, not generic.
+        Write a 1-2 sentence insight in first person ("I...", "My...", "I could..."). Be specific to the content, not generic.
         """
     }
 
@@ -530,32 +530,32 @@ actor HeuristicsSynthesisEngine {
 
         switch (type, dimension) {
         case (.frequency, .narrative):
-            return "Your recurring focus on '\(tags)' suggests a deep engagement with these themes. \(memorySnippets)..."
+            return "My recurring focus on '\(tags)' suggests a deep engagement with these themes. \(memorySnippets)..."
         case (.frequency, .embodiment):
-            return "Consider how '\(tags)' manifests in your daily practice. The patterns point to actionable insights."
+            return "I could explore how '\(tags)' manifests in my daily practice. The patterns point to actionable insights."
         case (.frequency, .emotion):
-            return "There's a sense of commitment and purpose around '\(tags)'. These themes resonate with your core interests."
+            return "I feel a sense of commitment and purpose around '\(tags)'. These themes resonate with my core interests."
 
         case (.recency, .narrative):
-            return "This week you've been exploring '\(tags)' heavily, suggesting active focus in these areas."
+            return "This week I've been exploring '\(tags)' heavily, suggesting active focus in these areas."
         case (.recency, .embodiment):
-            return "Recent work on '\(tags)' points to immediate priorities. Consider what next steps would be most impactful."
+            return "My recent work on '\(tags)' points to immediate priorities. I could consider what next steps would be most impactful."
         case (.recency, .emotion):
-            return "There's energy and momentum around '\(tags)'. These current interests feel alive and dynamic."
+            return "I sense energy and momentum around '\(tags)'. These current interests feel alive and dynamic."
 
         case (.curiosity, .narrative):
-            return "Among recent tags, '\(tags)' seem to pull at you with particular intrigue."
+            return "Among recent tags, '\(tags)' seem to pull at me with particular intrigue."
         case (.curiosity, .embodiment):
-            return "Your curiosity about '\(tags)' suggests exploring deeper. What questions are emerging?"
+            return "My curiosity about '\(tags)' suggests exploring deeper. What questions are emerging?"
         case (.curiosity, .emotion):
-            return "There's a sense of wonder and discovery around '\(tags)'. Follow this thread."
+            return "I feel a sense of wonder and discovery around '\(tags)'. I want to follow this thread."
 
         case (.interest, .narrative):
-            return "Your sustained engagement with '\(tags)' shows deep, long-term interest that transcends trends."
+            return "My sustained engagement with '\(tags)' shows deep, long-term interest that transcends trends."
         case (.interest, .embodiment):
-            return "The persistence of '\(tags)' in your thinking suggests building on these foundations."
+            return "The persistence of '\(tags)' in my thinking suggests building on these foundations."
         case (.interest, .emotion):
-            return "'\(tags)' represents a stable center of gravity in your intellectual life. It matters to you."
+            return "'\(tags)' represents a stable center of gravity in my intellectual life. It matters to me."
         }
     }
 }

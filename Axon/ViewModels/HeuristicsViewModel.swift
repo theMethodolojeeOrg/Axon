@@ -16,6 +16,7 @@ class HeuristicsViewModel: ObservableObject {
     // MARK: - Dependencies
 
     private let heuristicsService = HeuristicsService.shared
+    private let synthesisEngine = HeuristicsSynthesisEngine()
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Filter State
@@ -252,13 +253,19 @@ class HeuristicsViewModel: ObservableObject {
         isSynthesizing = true
         defer { isSynthesizing = false }
 
-        // TODO: Call HeuristicsSynthesisEngine when implemented
-        // For now, just record that we attempted synthesis
-        heuristicsService.recordSynthesis(type: type)
-        successMessage = "Synthesis for \(type.displayName) will be available soon"
+        do {
+            let newHeuristics = try await synthesisEngine.synthesize(type: type)
+            heuristicsService.addHeuristics(newHeuristics)
+            heuristicsService.recordSynthesis(type: type)
+            successMessage = "Synthesized \(newHeuristics.count) \(type.displayName) heuristics"
+        } catch {
+            self.error = error.localizedDescription
+            print("[HeuristicsViewModel] Synthesis failed for \(type.rawValue): \(error)")
+        }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             self.successMessage = nil
+            self.error = nil
         }
     }
 
@@ -266,14 +273,21 @@ class HeuristicsViewModel: ObservableObject {
         isSynthesizing = true
         defer { isSynthesizing = false }
 
-        // TODO: Call HeuristicsSynthesisEngine for all types
-        for type in HeuristicType.allCases {
-            heuristicsService.recordSynthesis(type: type)
+        do {
+            let allHeuristics = try await synthesisEngine.synthesizeAll()
+            heuristicsService.addHeuristics(allHeuristics)
+            for type in HeuristicType.allCases {
+                heuristicsService.recordSynthesis(type: type)
+            }
+            successMessage = "Synthesized \(allHeuristics.count) heuristics across all types"
+        } catch {
+            self.error = error.localizedDescription
+            print("[HeuristicsViewModel] Full synthesis failed: \(error)")
         }
-        successMessage = "Full synthesis will be available soon"
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             self.successMessage = nil
+            self.error = nil
         }
     }
 
@@ -281,12 +295,28 @@ class HeuristicsViewModel: ObservableObject {
         isSynthesizing = true
         defer { isSynthesizing = false }
 
-        // TODO: Call HeuristicsSynthesisEngine for meta-synthesis
-        heuristicsService.recordMetaSynthesis()
-        successMessage = "Meta-synthesis will be available soon"
+        let archivedHeuristics = heuristicsService.archivedHeuristics
+        guard !archivedHeuristics.isEmpty else {
+            successMessage = "No archived heuristics to distill"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                self.successMessage = nil
+            }
+            return
+        }
+
+        do {
+            let distilled = try await synthesisEngine.distillHeuristics(archivedHeuristics)
+            heuristicsService.addHeuristics(distilled)
+            heuristicsService.recordMetaSynthesis()
+            successMessage = "Distilled \(archivedHeuristics.count) heuristics into \(distilled.count) core insights"
+        } catch {
+            self.error = error.localizedDescription
+            print("[HeuristicsViewModel] Meta-synthesis failed: \(error)")
+        }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             self.successMessage = nil
+            self.error = nil
         }
     }
 

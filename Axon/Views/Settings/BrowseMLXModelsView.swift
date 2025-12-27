@@ -363,7 +363,7 @@ struct MLXModelDetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    // Header
+                    // Header - always show immediately using modelInfo
                     headerSection
 
                     Divider()
@@ -371,21 +371,43 @@ struct MLXModelDetailSheet: View {
 
                     // Info section
                     if isLoadingDetails {
-                        HStack {
-                            Spacer()
+                        VStack(spacing: 12) {
                             ProgressView()
-                            Spacer()
+                            Text("Loading model details...")
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textSecondary)
                         }
-                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
                     } else if let details = detailedInfo {
                         detailsSection(details)
+                    } else if let error = loadError {
+                        VStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 32))
+                                .foregroundColor(AppColors.accentError)
+                            Text("Failed to load details")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textPrimary)
+                            Text(error)
+                                .font(AppTypography.bodySmall())
+                                .foregroundColor(AppColors.textSecondary)
+                                .multilineTextAlignment(.center)
+                            Button("Retry") {
+                                Task { await loadDetails() }
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
                     }
 
-                    // Actions
+                    // Actions - always show
                     actionsSection
                 }
                 .padding()
             }
+            .frame(minWidth: 400, minHeight: 500)
             .background(AppColors.substratePrimary)
             .navigationTitle("Model Details")
             #if os(iOS)

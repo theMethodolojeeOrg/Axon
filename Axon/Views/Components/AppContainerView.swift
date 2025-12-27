@@ -454,6 +454,7 @@ struct ChatContainerView: View {
     @State private var liveToolCalls: [String: [LiveToolCall]] = [:]
     @State private var contextDebugInfos: [String: ContextDebugInfo] = [:]  // Debug info per message
     @State private var useRealStreaming: Bool = true  // Toggle for streaming vs pseudo-streaming
+    @State private var isFirstMessageSending: Bool = false  // Prevents message reload race condition during first message
 
     // VS Code bridge connection banner
     #if os(macOS)
@@ -609,6 +610,11 @@ struct ChatContainerView: View {
 
                 // Load draft for this conversation
                 loadDraft(for: conversation.id)
+
+                // Skip loading if we're in the middle of sending the first message
+                // The streaming code handles adding messages to the array, and loading
+                // would wipe them out since the new conversation has no saved messages yet
+                guard !isFirstMessageSending else { return }
 
                 // Create a cancellable task for message loading
                 messageLoadTask = Task {
@@ -1077,6 +1083,11 @@ struct ChatContainerView: View {
                 if let existing = conversation {
                     // Check if this is an ephemeral conversation that needs to be persisted
                     if conversationService.isEphemeral(existing.id) {
+                        // Set flag to prevent .task from reloading messages during first send
+                        // This prevents a race condition where the conversation ID change triggers
+                        // a message reload that wipes out the messages we're about to add
+                        await MainActor.run { isFirstMessageSending = true }
+
                         // Persist the ephemeral conversation now that user is sending first message
                         let title = content.isEmpty ? "New Chat" : String(content.prefix(50))
                         conv = try conversationService.persistEphemeralConversation(existing.id, title: title)
@@ -1158,6 +1169,7 @@ struct ChatContainerView: View {
                     cleanupStreamingState()
                     // Ensure UI state ends cleanly even on cancellation
                     isLoading = false
+                    isFirstMessageSending = false
                 }
             } catch {
                 print("[ChatContainer] Error sending message: \(error.localizedDescription)")
@@ -1165,6 +1177,7 @@ struct ChatContainerView: View {
                     cleanupStreamingState()
                     // Ensure UI state ends cleanly even on error
                     isLoading = false
+                    isFirstMessageSending = false
                 }
 
                 // If we errored after creating a conversation, surface an error bubble so the user
@@ -1691,6 +1704,8 @@ struct ChatContainerView: View {
                     modelName: config.model,
                     providerName: config.providerName
                 )
+                // Clear first-message flag on error path
+                isFirstMessageSending = false
             }
             return
         }
@@ -1708,6 +1723,8 @@ struct ChatContainerView: View {
                 modelName: config.model,
                 providerName: config.providerName
             )
+            // Clear first-message flag after streaming completes
+            isFirstMessageSending = false
         }
     }
 

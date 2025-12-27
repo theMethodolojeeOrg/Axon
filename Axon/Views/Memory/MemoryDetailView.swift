@@ -400,6 +400,7 @@ struct MemoryDetailView: View {
             }
         }
         #if os(macOS)
+        .navigationViewStyle(.stack)
         .frame(minWidth: 480, idealWidth: 520, minHeight: 500, idealHeight: 600)
         #endif
     }
