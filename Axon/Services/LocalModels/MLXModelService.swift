@@ -545,29 +545,173 @@ final class MLXModelService: ObservableObject {
 
     // MARK: - Text Generation
 
+    // MARK: - Generation Config Loading
+
+    /// Cached generation configs per model
+    private var generationConfigs: [String: GenerationConfig] = [:]
+
+    /// Generation config loaded from model's generation_config.json
+    struct GenerationConfig: Codable {
+        var temperature: Double?
+        var topP: Double?
+        var topK: Int?
+        var repetitionPenalty: Double?
+        var maxNewTokens: Int?
+        var doSample: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case temperature
+            case topP = "top_p"
+            case topK = "top_k"
+            case repetitionPenalty = "repetition_penalty"
+            case maxNewTokens = "max_new_tokens"
+            case doSample = "do_sample"
+        }
+    }
+
+    /// Load generation config from model directory
+    func loadGenerationConfig(for modelId: String) -> GenerationConfig? {
+        // Check cache first
+        if let cached = generationConfigs[modelId] {
+            return cached
+        }
+
+        guard let modelPath = getModelPath(modelId: modelId) else {
+            return nil
+        }
+
+        let configPath = modelPath.appendingPathComponent("generation_config.json")
+        guard FileManager.default.fileExists(atPath: configPath.path) else {
+            print("[MLXModelService] No generation_config.json found for \(modelId)")
+            return nil
+        }
+
+        do {
+            let data = try Data(contentsOf: configPath)
+            let config = try JSONDecoder().decode(GenerationConfig.self, from: data)
+            generationConfigs[modelId] = config
+            print("[MLXModelService] Loaded generation config for \(modelId): temp=\(config.temperature ?? -1), rep_penalty=\(config.repetitionPenalty ?? -1)")
+            return config
+        } catch {
+            print("[MLXModelService] Failed to load generation_config.json: \(error)")
+            return nil
+        }
+    }
+
+    /// Get effective generation parameters for a model, applying overrides in order:
+    /// 1. Model's generation_config.json (lowest priority)
+    /// 2. User's per-model override (if enabled)
+    /// 3. Global settings (if enabled)
+    /// 4. Function parameters (highest priority, if explicitly provided)
+    func getEffectiveParameters(
+        modelId: String,
+        settings: AppSettings,
+        maxTokens: Int? = nil,
+        temperature: Double? = nil,
+        topP: Double? = nil,
+        repetitionPenalty: Double? = nil,
+        repetitionContextSize: Int? = nil
+    ) -> (maxTokens: Int, temperature: Double, topP: Double, repetitionPenalty: Double, repetitionContextSize: Int) {
+        // Start with defaults
+        var effectiveMaxTokens = 2048
+        var effectiveTemperature = 0.7
+        var effectiveTopP = 0.8
+        var effectiveRepPenalty = 1.2
+        var effectiveRepContext = 64
+
+        // 1. Apply model's generation_config.json
+        if let modelConfig = loadGenerationConfig(for: modelId) {
+            if let temp = modelConfig.temperature { effectiveTemperature = temp }
+            if let topP = modelConfig.topP { effectiveTopP = topP }
+            if let repPenalty = modelConfig.repetitionPenalty { effectiveRepPenalty = repPenalty }
+            if let maxNew = modelConfig.maxNewTokens { effectiveMaxTokens = maxNew }
+        }
+
+        // 2. Apply per-model override (if enabled)
+        if let override = settings.modelOverrides[modelId], override.enabled {
+            if let temp = override.temperature { effectiveTemperature = temp }
+            if let topP = override.topP { effectiveTopP = topP }
+            if let repPenalty = override.repetitionPenalty { effectiveRepPenalty = repPenalty }
+            if let repContext = override.repetitionContextSize { effectiveRepContext = repContext }
+            if let maxTokens = override.maxResponseTokens { effectiveMaxTokens = maxTokens }
+        }
+
+        // 3. Apply global settings (if enabled and no per-model override)
+        let globalSettings = settings.modelGenerationSettings
+        let hasModelOverride = settings.modelOverrides[modelId]?.enabled == true
+
+        if !hasModelOverride {
+            if globalSettings.temperatureEnabled { effectiveTemperature = globalSettings.temperature }
+            if globalSettings.topPEnabled { effectiveTopP = globalSettings.topP }
+            if globalSettings.repetitionPenaltyEnabled {
+                effectiveRepPenalty = globalSettings.repetitionPenalty
+                effectiveRepContext = globalSettings.repetitionContextSize
+            }
+            if globalSettings.maxResponseTokensEnabled { effectiveMaxTokens = globalSettings.maxResponseTokens }
+        }
+
+        // 4. Apply explicit function parameters (highest priority)
+        if let maxTokens = maxTokens { effectiveMaxTokens = maxTokens }
+        if let temperature = temperature { effectiveTemperature = temperature }
+        if let topP = topP { effectiveTopP = topP }
+        if let repetitionPenalty = repetitionPenalty { effectiveRepPenalty = repetitionPenalty }
+        if let repetitionContextSize = repetitionContextSize { effectiveRepContext = repetitionContextSize }
+
+        return (effectiveMaxTokens, effectiveTemperature, effectiveTopP, effectiveRepPenalty, effectiveRepContext)
+    }
+
+    // MARK: - Text Generation
+
     /// Generate a response using the loaded model
     /// - Parameters:
     ///   - systemPrompt: Optional system prompt
     ///   - messages: Conversation messages
-    ///   - maxTokens: Maximum tokens to generate
-    ///   - temperature: Sampling temperature (0.0-1.0)
-    ///   - topP: Nucleus sampling threshold (0.0-1.0)
-    ///   - repetitionPenalty: Penalty for repeated tokens (1.0 = no penalty, higher = stronger penalty)
-    ///   - repetitionContextSize: Number of tokens to look back for repetition detection
+    ///   - maxTokens: Maximum tokens to generate (nil = use effective default)
+    ///   - temperature: Sampling temperature (nil = use effective default)
+    ///   - topP: Nucleus sampling threshold (nil = use effective default)
+    ///   - repetitionPenalty: Penalty for repeated tokens (nil = use effective default)
+    ///   - repetitionContextSize: Number of tokens to look back (nil = use effective default)
+    ///   - settings: App settings for applying overrides (nil = use defaults only)
     func generate(
         systemPrompt: String?,
         messages: [Message],
-        maxTokens: Int = 2048,
-        temperature: Double = 0.7,
-        topP: Double = 0.8,
-        repetitionPenalty: Double = 1.2,
-        repetitionContextSize: Int = 64
+        maxTokens: Int? = nil,
+        temperature: Double? = nil,
+        topP: Double? = nil,
+        repetitionPenalty: Double? = nil,
+        repetitionContextSize: Int? = nil,
+        settings: AppSettings? = nil
     ) async throws -> String {
         #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon) && canImport(MLXVLM)
 
-        guard let container = modelContainer else {
+        guard let container = modelContainer, let modelId = currentModelId else {
             throw MLXModelError.notLoaded
         }
+
+        // Get effective parameters (applies model config, overrides, and global settings)
+        let effectiveParams: (maxTokens: Int, temperature: Double, topP: Double, repetitionPenalty: Double, repetitionContextSize: Int)
+        if let settings = settings {
+            effectiveParams = getEffectiveParameters(
+                modelId: modelId,
+                settings: settings,
+                maxTokens: maxTokens,
+                temperature: temperature,
+                topP: topP,
+                repetitionPenalty: repetitionPenalty,
+                repetitionContextSize: repetitionContextSize
+            )
+        } else {
+            // Use defaults with any explicit overrides
+            effectiveParams = (
+                maxTokens: maxTokens ?? 2048,
+                temperature: temperature ?? 0.7,
+                topP: topP ?? 0.8,
+                repetitionPenalty: repetitionPenalty ?? 1.2,
+                repetitionContextSize: repetitionContextSize ?? 64
+            )
+        }
+
+        print("[MLXModelService] Generating with params: maxTokens=\(effectiveParams.maxTokens), temp=\(effectiveParams.temperature), topP=\(effectiveParams.topP), repPenalty=\(effectiveParams.repetitionPenalty), repContext=\(effectiveParams.repetitionContextSize)")
 
         // Build chat messages for UserInput
         let chatMessages = buildChatMessages(systemPrompt: systemPrompt, messages: messages)
@@ -575,13 +719,13 @@ final class MLXModelService: ObservableObject {
         // Create UserInput with chat messages
         let userInput = UserInput(chat: chatMessages)
 
-        // Create generation parameters with user settings
+        // Create generation parameters with effective settings
         let generateParams = GenerateParameters(
-            maxTokens: maxTokens,
-            temperature: Float(temperature),
-            topP: Float(topP),
-            repetitionPenalty: Float(repetitionPenalty),
-            repetitionContextSize: repetitionContextSize
+            maxTokens: effectiveParams.maxTokens,
+            temperature: Float(effectiveParams.temperature),
+            topP: Float(effectiveParams.topP),
+            repetitionPenalty: Float(effectiveParams.repetitionPenalty),
+            repetitionContextSize: effectiveParams.repetitionContextSize
         )
 
         // Generate response
@@ -611,27 +755,54 @@ final class MLXModelService: ObservableObject {
     /// - Parameters:
     ///   - systemPrompt: Optional system prompt
     ///   - messages: Conversation messages
-    ///   - maxTokens: Maximum tokens to generate
-    ///   - temperature: Sampling temperature (0.0-1.0)
-    ///   - topP: Nucleus sampling threshold (0.0-1.0)
-    ///   - repetitionPenalty: Penalty for repeated tokens (1.0 = no penalty, higher = stronger penalty)
-    ///   - repetitionContextSize: Number of tokens to look back for repetition detection
+    ///   - maxTokens: Maximum tokens to generate (nil = use effective default)
+    ///   - temperature: Sampling temperature (nil = use effective default)
+    ///   - topP: Nucleus sampling threshold (nil = use effective default)
+    ///   - repetitionPenalty: Penalty for repeated tokens (nil = use effective default)
+    ///   - repetitionContextSize: Number of tokens to look back (nil = use effective default)
+    ///   - settings: App settings for applying overrides (nil = use defaults only)
     ///   - onToken: Callback for each generated token
     func generateStreaming(
         systemPrompt: String?,
         messages: [Message],
-        maxTokens: Int = 2048,
-        temperature: Double = 0.7,
-        topP: Double = 0.8,
-        repetitionPenalty: Double = 1.2,
-        repetitionContextSize: Int = 64,
+        maxTokens: Int? = nil,
+        temperature: Double? = nil,
+        topP: Double? = nil,
+        repetitionPenalty: Double? = nil,
+        repetitionContextSize: Int? = nil,
+        settings: AppSettings? = nil,
         onToken: @escaping @Sendable (String) -> Void
     ) async throws {
         #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon) && canImport(MLXVLM)
 
-        guard let container = modelContainer else {
+        guard let container = modelContainer, let modelId = currentModelId else {
             throw MLXModelError.notLoaded
         }
+
+        // Get effective parameters (applies model config, overrides, and global settings)
+        let effectiveParams: (maxTokens: Int, temperature: Double, topP: Double, repetitionPenalty: Double, repetitionContextSize: Int)
+        if let settings = settings {
+            effectiveParams = getEffectiveParameters(
+                modelId: modelId,
+                settings: settings,
+                maxTokens: maxTokens,
+                temperature: temperature,
+                topP: topP,
+                repetitionPenalty: repetitionPenalty,
+                repetitionContextSize: repetitionContextSize
+            )
+        } else {
+            // Use defaults with any explicit overrides
+            effectiveParams = (
+                maxTokens: maxTokens ?? 2048,
+                temperature: temperature ?? 0.7,
+                topP: topP ?? 0.8,
+                repetitionPenalty: repetitionPenalty ?? 1.2,
+                repetitionContextSize: repetitionContextSize ?? 64
+            )
+        }
+
+        print("[MLXModelService] Streaming with params: maxTokens=\(effectiveParams.maxTokens), temp=\(effectiveParams.temperature), topP=\(effectiveParams.topP), repPenalty=\(effectiveParams.repetitionPenalty), repContext=\(effectiveParams.repetitionContextSize)")
 
         // Build chat messages for UserInput
         let chatMessages = buildChatMessages(systemPrompt: systemPrompt, messages: messages)
@@ -639,13 +810,13 @@ final class MLXModelService: ObservableObject {
         // Create UserInput with chat messages
         let userInput = UserInput(chat: chatMessages)
 
-        // Create generation parameters with user settings
+        // Create generation parameters with effective settings
         let generateParams = GenerateParameters(
-            maxTokens: maxTokens,
-            temperature: Float(temperature),
-            topP: Float(topP),
-            repetitionPenalty: Float(repetitionPenalty),
-            repetitionContextSize: repetitionContextSize
+            maxTokens: effectiveParams.maxTokens,
+            temperature: Float(effectiveParams.temperature),
+            topP: Float(effectiveParams.topP),
+            repetitionPenalty: Float(effectiveParams.repetitionPenalty),
+            repetitionContextSize: effectiveParams.repetitionContextSize
         )
 
         // Use the AsyncStream-based generate API for streaming
