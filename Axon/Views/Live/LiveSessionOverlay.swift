@@ -2,6 +2,8 @@ import SwiftUI
 
 struct LiveSessionOverlay: View {
     @StateObject private var liveService = LiveSessionService.shared
+    @StateObject private var threadService = LiveSessionThreadService.shared
+    @State private var showSaveConfirmation = false
 
     var body: some View {
         ZStack {
@@ -14,6 +16,36 @@ struct LiveSessionOverlay: View {
             #endif
 
             VStack(spacing: 24) {
+                // Top bar with recording indicator
+                HStack {
+                    // Recording indicator
+                    if threadService.isRecording {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 8, height: 8)
+                            Text("REC")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.red)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.red.opacity(0.2))
+                        .cornerRadius(8)
+                    }
+
+                    Spacer()
+
+                    // Turn count
+                    if threadService.turns.count > 0 {
+                        Text("\(threadService.turns.count) turns")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+
                 Spacer()
 
                 // Execution Mode Badge
@@ -74,7 +106,12 @@ struct LiveSessionOverlay: View {
 
                 Spacer()
 
-                // Controls
+                // Playback controls (shown after session ends with recording)
+                if liveService.status == .disconnected && liveService.currentRecording != nil {
+                    playbackControls
+                }
+
+                // Main Controls
                 HStack(spacing: 40) {
                     // Mic Toggle
                     Button(action: { liveService.toggleMic() }) {
@@ -95,11 +132,104 @@ struct LiveSessionOverlay: View {
                             .background(Circle().fill(AppColors.accentError))
                     }
                     .buttonStyle(.plain)
+
+                    // Save to Thread (shown when recording available)
+                    if liveService.currentRecording != nil {
+                        Button(action: { showSaveConfirmation = true }) {
+                            Image(systemName: "square.and.arrow.down.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.white)
+                                .frame(width: 60, height: 60)
+                                .background(Circle().fill(Color.blue.opacity(0.8)))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(.bottom, 40)
             }
         }
         .transition(.opacity)
+        .alert("Save to Conversation?", isPresented: $showSaveConfirmation) {
+            Button("Save") {
+                saveAsConversation()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Save this Live session as a chat conversation? You'll be able to view it in your conversation history.")
+        }
+    }
+
+    // MARK: - Playback Controls
+
+    private var playbackControls: some View {
+        VStack(spacing: 12) {
+            // Progress bar
+            if threadService.isPlaying {
+                ProgressView(value: threadService.playbackProgress)
+                    .progressViewStyle(.linear)
+                    .tint(.white)
+                    .padding(.horizontal, 40)
+            }
+
+            HStack(spacing: 24) {
+                // Play/Pause button
+                Button(action: {
+                    if threadService.isPlaying {
+                        liveService.toggleRecordingPlayback()
+                    } else {
+                        liveService.playLastRecording()
+                    }
+                }) {
+                    Image(systemName: threadService.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(Color.white.opacity(0.2)))
+                }
+                .buttonStyle(.plain)
+
+                // Stop button
+                if threadService.isPlaying {
+                    Button(action: { liveService.stopRecordingPlayback() }) {
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Circle().fill(Color.white.opacity(0.2)))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // Current turn info during playback
+            if threadService.isPlaying && threadService.currentPlaybackTurnIndex < threadService.turns.count {
+                let turn = threadService.turns[threadService.currentPlaybackTurnIndex]
+                HStack(spacing: 8) {
+                    Image(systemName: turn.role == .user ? "person.fill" : "brain.head.profile")
+                        .font(.system(size: 12))
+                    Text(turn.transcript.prefix(50) + (turn.transcript.count > 50 ? "..." : ""))
+                        .font(.caption)
+                        .lineLimit(1)
+                }
+                .foregroundColor(.white.opacity(0.7))
+                .padding(.horizontal, 20)
+            }
+        }
+        .padding(.bottom, 20)
+    }
+
+    // MARK: - Save Action
+
+    private func saveAsConversation() {
+        Task {
+            do {
+                if let conversation = try await liveService.saveRecordingAsConversation() {
+                    debugLog(.liveSession, "Saved Live session as conversation: \(conversation.id)")
+                }
+            } catch {
+                debugLog(.liveSession, "Failed to save conversation: \(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: - Execution Mode Badge

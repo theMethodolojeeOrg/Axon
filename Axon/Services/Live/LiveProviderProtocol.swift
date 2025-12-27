@@ -47,6 +47,9 @@ protocol LiveProviderDelegate: AnyObject {
 
     /// Model requested a tool call
     func onToolCall(name: String, args: [String: Any], id: String)
+
+    /// Assistant turn completed (finished speaking/generating)
+    func onAssistantTurnComplete()
 }
 
 // MARK: - Session Configuration

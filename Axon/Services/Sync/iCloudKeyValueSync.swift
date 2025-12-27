@@ -257,12 +257,16 @@ struct SyncableSettings: Codable {
     // Model Generation Settings (temperature, top-p, top-k)
     var modelGenerationSettings: ModelGenerationSettings
 
-    // Heartbeat Settings (user preferences, excluding device-specific)
+    // Per-Model Overrides (tuning parameters per model)
+    var modelOverrides: [String: ModelOverride]
+
+    // Heartbeat Settings (user preferences)
     var heartbeatEnabled: Bool
     var heartbeatIntervalSeconds: Int
     var heartbeatDeliveryProfileId: String
     var heartbeatMaxTokensBudget: Int
     var heartbeatMaxToolCalls: Int
+    var heartbeatAllowBackground: Bool
     var heartbeatAllowNotifications: Bool
     var heartbeatLiveActivityEnabled: Bool
     var heartbeatDeliveryProfiles: [HeartbeatDeliveryProfile]
@@ -360,12 +364,16 @@ struct SyncableSettings: Codable {
         // Model Generation Settings
         self.modelGenerationSettings = settings.modelGenerationSettings
 
+        // Per-Model Overrides
+        self.modelOverrides = settings.modelOverrides
+
         // Heartbeat Settings (user preferences)
         self.heartbeatEnabled = settings.heartbeatSettings.enabled
         self.heartbeatIntervalSeconds = settings.heartbeatSettings.intervalSeconds
         self.heartbeatDeliveryProfileId = settings.heartbeatSettings.deliveryProfileId
         self.heartbeatMaxTokensBudget = settings.heartbeatSettings.maxTokensBudget
         self.heartbeatMaxToolCalls = settings.heartbeatSettings.maxToolCalls
+        self.heartbeatAllowBackground = settings.heartbeatSettings.allowBackground
         self.heartbeatAllowNotifications = settings.heartbeatSettings.allowNotifications
         self.heartbeatLiveActivityEnabled = settings.heartbeatSettings.liveActivityEnabled
         self.heartbeatDeliveryProfiles = settings.heartbeatSettings.deliveryProfiles
@@ -490,16 +498,20 @@ struct SyncableSettings: Codable {
         // Model Generation Settings
         settings.modelGenerationSettings = modelGenerationSettings
 
-        // Heartbeat Settings (user preferences, preserve device-specific)
+        // Per-Model Overrides
+        settings.modelOverrides = modelOverrides
+
+        // Heartbeat Settings (user preferences)
         settings.heartbeatSettings.enabled = heartbeatEnabled
         settings.heartbeatSettings.intervalSeconds = heartbeatIntervalSeconds
         settings.heartbeatSettings.deliveryProfileId = heartbeatDeliveryProfileId
         settings.heartbeatSettings.maxTokensBudget = heartbeatMaxTokensBudget
         settings.heartbeatSettings.maxToolCalls = heartbeatMaxToolCalls
+        settings.heartbeatSettings.allowBackground = heartbeatAllowBackground
         settings.heartbeatSettings.allowNotifications = heartbeatAllowNotifications
         settings.heartbeatSettings.liveActivityEnabled = heartbeatLiveActivityEnabled
         settings.heartbeatSettings.deliveryProfiles = heartbeatDeliveryProfiles
-        // Note: allowBackground and quietHours are device-specific, not synced
+        // Note: quietHours is device-specific, not synced
 
         // Heuristics Settings
         settings.heuristicsSettings = heuristicsSettings

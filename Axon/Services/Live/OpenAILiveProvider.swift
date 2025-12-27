@@ -210,6 +210,13 @@ class OpenAILiveProvider: LiveProviderProtocol {
                     debugLog(.liveSession, "[OpenAILive] Function call arguments complete")
                     break
 
+                case "response.done":
+                    // Assistant turn completed
+                    debugLog(.liveSession, "[OpenAILive] Response completed - assistant turn done")
+                    DispatchQueue.main.async {
+                        self.delegate?.onAssistantTurnComplete()
+                    }
+
                 default:
                     debugLog(.liveSession, "[OpenAILive] Unhandled message type: \(type)")
                     break

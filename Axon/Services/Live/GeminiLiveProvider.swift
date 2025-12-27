@@ -196,6 +196,14 @@ class GeminiLiveProvider: LiveProviderProtocol {
                             }
                         }
                     }
+
+                    // Check for turn completion - Gemini signals this when assistant finishes
+                    if let turnComplete = serverContent["turnComplete"] as? Bool, turnComplete {
+                        debugLog(.liveSession, "[GeminiLive] Turn complete signal received")
+                        DispatchQueue.main.async {
+                            self.delegate?.onAssistantTurnComplete()
+                        }
+                    }
                 }
 
                 if json["setupComplete"] != nil {

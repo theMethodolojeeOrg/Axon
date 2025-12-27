@@ -44,6 +44,10 @@ struct ModelTuningView: View {
                 context: context,
                 viewModel: viewModel
             )
+            #if os(iOS)
+            // Encourage a usable default size on iPhone/iPad.
+            .presentationDetents([.medium, .large])
+            #endif
         }
     }
 
@@ -392,7 +396,10 @@ private struct ModelOverrideSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        ZStack {
+            AppColors.substratePrimary
+                .ignoresSafeArea()
+
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     // Header
@@ -411,25 +418,28 @@ private struct ModelOverrideSheet: View {
                 }
                 .padding()
             }
-            .background(AppColors.substratePrimary)
-            .navigationTitle("Model Override")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+        }
+        .navigationTitle("Model Override")
+        #if !os(macOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") {
+                    dismiss()
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        saveOverride()
-                        dismiss()
-                    }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") {
+                    saveOverride()
+                    dismiss()
                 }
             }
         }
+        #if os(macOS)
+        // Prevent overly compact sheets on macOS.
+        .frame(minWidth: 500, idealWidth: 620, minHeight: 520, idealHeight: 700)
+        #endif
     }
 
     // MARK: - Model Header

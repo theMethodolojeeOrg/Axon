@@ -45,13 +45,18 @@ struct ProvidersSettingsView: View {
     }
 
     private var modelTuningSubtitle: String {
+        let overrideCount = viewModel.settings.modelOverrides.values.filter { $0.enabled }.count
+        if overrideCount > 0 {
+            return "\(overrideCount) model\(overrideCount == 1 ? "" : "s") with custom overrides"
+        }
+        
         let settings = viewModel.settings.modelGenerationSettings
         var active: [String] = []
         if settings.temperatureEnabled { active.append("temp \(String(format: "%.1f", settings.temperature))") }
         if settings.topPEnabled { active.append("top-p") }
         if settings.topKEnabled { active.append("top-k") }
         if settings.systemPromptSuffixEnabled { active.append("custom prompt") }
-        return active.isEmpty ? "Default parameters" : active.joined(separator: ", ")
+        return active.isEmpty ? "Per-model generation parameters" : "Global: " + active.joined(separator: ", ")
     }
 
     var body: some View {
@@ -116,10 +121,10 @@ struct ProvidersSettingsView: View {
             }
             .buttonStyle(.plain)
 
-            // Model Tuning
+            // Model Tuning (Per-Model Overrides)
             NavigationLink {
                 SettingsSubviewContainer {
-                    ModelConfigurationView(viewModel: viewModel)
+                    ModelTuningView(viewModel: viewModel)
                 }
             } label: {
                 SettingsCategoryRow(

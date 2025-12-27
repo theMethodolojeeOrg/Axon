@@ -27,6 +27,15 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
     /// Whether the noise gate is currently open (audio is passing through)
     @Published var isNoiseGateOpen: Bool = false
 
+    /// Whether recording is enabled for this session
+    @Published var isRecordingEnabled: Bool = true
+
+    /// Current session recording (if any)
+    @Published var currentRecording: LiveSessionRecording?
+
+    /// Whether the assistant is currently speaking (for echo suppression)
+    @Published private(set) var isAssistantSpeaking: Bool = false
+
     // MARK: - Private State
 
     private var provider: LiveProviderProtocol?
@@ -39,6 +48,24 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
 
     /// Whether noise gate is enabled for this session
     private var noiseGateEnabled: Bool = true
+
+    /// Track previous gate state to detect transitions
+    private var wasNoiseGateOpen: Bool = false
+
+    /// Timer for detecting when assistant stops speaking
+    private var assistantSpeakingTimer: Timer?
+
+    /// How long to wait after last audio before considering assistant done speaking (ms)
+    private let assistantSpeakingTimeoutMs: Double = 300
+
+    /// Thread service for conversation capture
+    private let threadService = LiveSessionThreadService.shared
+
+    /// Current provider info for recording
+    private var currentProviderName: String = ""
+    private var currentModelId: String = ""
+    private var currentVoice: String = ""
+    private var currentConversationId: String?
 
     /// Output audio format for playback (24kHz mono Int16 - Gemini/OpenAI standard)
     private let outputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 24000, channels: 1, interleaved: false)!
@@ -73,6 +100,22 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
         noiseGate.reset()
         isNoiseGateOpen = false
         debugLog(.liveSession, "Noise gate configured: enabled=\(noiseGateEnabled), threshold=\(liveSettings.noiseGateThreshold)")
+
+        // Store provider info for recording
+        currentProviderName = providerType.rawValue
+        currentModelId = config.modelId
+        currentVoice = config.voice
+
+        // Start recording if enabled
+        if isRecordingEnabled {
+            threadService.startSession(
+                conversationId: currentConversationId,
+                provider: currentProviderName,
+                modelId: currentModelId,
+                voice: currentVoice
+            )
+            debugLog(.liveSession, "Started session recording")
+        }
 
         // Detect capabilities for this provider/model combination
         let capabilities = factory.detectCapabilities(for: providerType, modelId: config.modelId)
@@ -143,6 +186,20 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
         debugLog(.liveSession, "stopSession called")
         provider?.disconnect()
         stopAudioEngine()
+
+        // Clean up echo suppression timer
+        assistantSpeakingTimer?.invalidate()
+        assistantSpeakingTimer = nil
+        isAssistantSpeaking = false
+
+        // End recording and save
+        Task {
+            if let recording = await threadService.endSession() {
+                currentRecording = recording
+                debugLog(.liveSession, "Session recording saved with \(recording.turns.count) turns")
+            }
+        }
+
         status = .disconnected
         provider = nil
         activeExecutionMode = nil
@@ -216,13 +273,29 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
                 self.inputLevel = level
             }
 
+            // ECHO SUPPRESSION: Don't send audio while assistant is speaking
+            // This prevents the microphone from picking up speaker output and
+            // sending it back to the model, which causes stuttering/interruptions
+            if self.isAssistantSpeaking {
+                return
+            }
+
             // Apply noise gate if enabled
             if self.noiseGateEnabled {
                 let shouldPass = self.noiseGate.shouldPass(buffer: buffer)
                 let gateOpen = self.noiseGate.state == .open || self.noiseGate.state == .hold
 
-                // Update gate state on main thread
+                // Update gate state on main thread and detect transitions
                 DispatchQueue.main.async {
+                    // Detect rising edge: gate just opened (user started speaking)
+                    if gateOpen && !self.wasNoiseGateOpen {
+                        // User started speaking - finalize any pending assistant turn
+                        if self.isRecordingEnabled {
+                            self.threadService.onUserStartedSpeaking()
+                        }
+                    }
+                    self.wasNoiseGateOpen = gateOpen
+
                     if self.isNoiseGateOpen != gateOpen {
                         self.isNoiseGateOpen = gateOpen
                     }
@@ -231,10 +304,20 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
                 // Only send audio if gate is open
                 if shouldPass {
                     self.provider?.sendAudio(buffer: buffer)
+
+                    // Record user audio when transmitting
+                    if self.isRecordingEnabled {
+                        self.threadService.recordUserAudio(buffer: buffer)
+                    }
                 }
             } else {
                 // No noise gate - send all audio
                 self.provider?.sendAudio(buffer: buffer)
+
+                // Record user audio
+                if self.isRecordingEnabled {
+                    self.threadService.recordUserAudio(buffer: buffer)
+                }
             }
         }
 
@@ -287,15 +370,64 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
     func onAudioData(_ data: Data) {
         debugLog(.liveSession, "Received audio data: \(data.count) bytes")
         playAudio(data: data)
+
+        // Mark assistant as speaking (for echo suppression)
+        if !isAssistantSpeaking {
+            isAssistantSpeaking = true
+            debugLog(.liveSession, "Assistant started speaking - suppressing mic input")
+        }
+
+        // Reset the speaking timeout timer
+        assistantSpeakingTimer?.invalidate()
+        assistantSpeakingTimer = Timer.scheduledTimer(withTimeInterval: assistantSpeakingTimeoutMs / 1000.0, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                self?.isAssistantSpeaking = false
+                debugLog(.liveSession, "Assistant stopped speaking - mic input enabled")
+            }
+        }
+
+        // Record assistant audio
+        if isRecordingEnabled {
+            threadService.recordAssistantAudio(data: data)
+        }
+    }
+
+    /// Called when assistant finishes speaking (audio playback queue empty or turn complete)
+    func onAssistantTurnComplete() {
+        debugLog(.liveSession, "Assistant turn complete")
+
+        // Clear speaking state immediately on explicit turn complete
+        assistantSpeakingTimer?.invalidate()
+        assistantSpeakingTimer = nil
+        isAssistantSpeaking = false
+
+        if isRecordingEnabled {
+            threadService.onAssistantAudioComplete()
+        }
     }
 
     func onTextDelta(_ text: String) {
         debugLog(.liveSession, "Text delta: \(text)")
         latestTranscript += text
+
+        // Record assistant transcript (streaming)
+        if isRecordingEnabled {
+            threadService.addAssistantTranscript(text, isFinal: false)
+        }
     }
 
     func onTranscript(_ text: String, role: String) {
         debugLog(.liveSession, "Transcript (\(role)): \(text)")
+
+        // Record transcripts
+        if isRecordingEnabled {
+            if role == "user" {
+                threadService.addUserTranscript(text)
+                threadService.finalizeUserTurn()
+            } else if role == "assistant" {
+                threadService.addAssistantTranscript(text, isFinal: true)
+            }
+        }
     }
 
     func onStatusChange(_ status: LiveSessionStatus) {
@@ -311,7 +443,44 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
     func onToolCall(name: String, args: [String : Any], id: String) {
         debugLog(.liveSession, "Tool call received: \(name), id: \(id)")
     }
-    
+
+    // MARK: - Recording Playback
+
+    /// Play back the last recorded session
+    func playLastRecording() {
+        guard let recording = currentRecording else {
+            debugLog(.liveSession, "No recording to play")
+            return
+        }
+        threadService.playRecording(recording)
+    }
+
+    /// Stop playback
+    func stopRecordingPlayback() {
+        threadService.stopPlayback()
+    }
+
+    /// Toggle playback pause/resume
+    func toggleRecordingPlayback() {
+        threadService.togglePlayback()
+    }
+
+    /// Whether recording playback is active
+    var isPlayingRecording: Bool {
+        threadService.isPlaying
+    }
+
+    /// Playback progress (0.0 to 1.0)
+    var recordingPlaybackProgress: Double {
+        threadService.playbackProgress
+    }
+
+    /// Convert the last recording to a chat conversation
+    func saveRecordingAsConversation() async throws -> Conversation? {
+        guard let recording = currentRecording else { return nil }
+        return try await threadService.convertToConversation(recording)
+    }
+
     // MARK: - Audio Playback
 
     private func playAudio(data: Data) {

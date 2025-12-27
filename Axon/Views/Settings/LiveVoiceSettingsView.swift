@@ -3,15 +3,24 @@ import SwiftUI
 struct LiveVoiceSettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
 
+    // Local draft so we can persist changes through SettingsViewModel.updateSetting(...)
+    @State private var draft: LiveSettings
+    @State private var isHydratingDraft = true
+
+    init(viewModel: SettingsViewModel) {
+        self.viewModel = viewModel
+        _draft = State(initialValue: viewModel.settings.liveSettings)
+    }
+
     var body: some View {
         Form {
             // MARK: - Mode Selection
             Section {
-                Toggle("Use On-Device Models", isOn: $viewModel.settings.liveSettings.useOnDeviceModels)
+                Toggle("Use On-Device Models", isOn: $draft.useOnDeviceModels)
             } header: {
                 Text("Mode")
             } footer: {
-                if viewModel.settings.liveSettings.useOnDeviceModels {
+                if draft.useOnDeviceModels {
                     Text("Live mode runs entirely on-device using MLX models. No internet required.")
                 } else {
                     Text("Use cloud providers for real-time voice conversations.")
@@ -19,9 +28,9 @@ struct LiveVoiceSettingsView: View {
             }
 
             // MARK: - Provider Selection (Cloud Mode)
-            if !viewModel.settings.liveSettings.useOnDeviceModels {
+            if !draft.useOnDeviceModels {
                 Section(header: Text("Default Provider")) {
-                    Picker("Provider", selection: $viewModel.settings.liveSettings.defaultProvider) {
+                    Picker("Provider", selection: $draft.defaultProvider) {
                         Text("Gemini Live").tag(AIProvider.gemini)
                         Text("OpenAI Realtime").tag(AIProvider.openai)
                         Text("Anthropic").tag(AIProvider.anthropic)
@@ -34,7 +43,7 @@ struct LiveVoiceSettingsView: View {
                     HStack {
                         Text("Mode")
                         Spacer()
-                        executionModeBadge(for: viewModel.settings.liveSettings.defaultProvider)
+                        executionModeBadge(for: draft.defaultProvider)
                     }
                 }
 
@@ -42,7 +51,7 @@ struct LiveVoiceSettingsView: View {
                     HStack {
                         Text("Model ID")
                         Spacer()
-                        TextField("Model ID", text: $viewModel.settings.liveSettings.defaultModelId)
+                        TextField("Model ID", text: $draft.defaultModelId)
                             .multilineTextAlignment(.trailing)
                             .frame(maxWidth: 200)
                     }
@@ -50,9 +59,9 @@ struct LiveVoiceSettingsView: View {
 
                 Section(header: Text("Voices")) {
                     // Show voice picker based on provider
-                    switch viewModel.settings.liveSettings.defaultProvider {
+                    switch draft.defaultProvider {
                     case .openai:
-                        Picker("Voice", selection: $viewModel.settings.liveSettings.openAIVoice) {
+                        Picker("Voice", selection: $draft.openAIVoice) {
                             Text("Alloy").tag("alloy")
                             Text("Ash").tag("ash")
                             Text("Ballad").tag("ballad")
@@ -64,7 +73,7 @@ struct LiveVoiceSettingsView: View {
                             Text("Verse").tag("verse")
                         }
                     case .gemini:
-                        Picker("Voice", selection: $viewModel.settings.liveSettings.geminiVoice) {
+                        Picker("Voice", selection: $draft.geminiVoice) {
                             Text("Aoede").tag("Aoede")
                             Text("Callirrhoe").tag("Callirrhoe")
                             Text("Charon").tag("Charon")
@@ -84,7 +93,7 @@ struct LiveVoiceSettingsView: View {
             }
 
             // MARK: - On-Device Settings
-            if viewModel.settings.liveSettings.useOnDeviceModels {
+            if draft.useOnDeviceModels {
                 Section {
                     Picker("MLX Model", selection: mlxModelBinding) {
                         Text("Default (Gemma3)").tag("")
@@ -101,9 +110,9 @@ struct LiveVoiceSettingsView: View {
 
             // MARK: - Voice Activity Detection
             Section {
-                Toggle("Local Voice Detection", isOn: $viewModel.settings.liveSettings.useLocalVAD)
+                Toggle("Local Voice Detection", isOn: $draft.useLocalVAD)
 
-                if viewModel.settings.liveSettings.useLocalVAD {
+                if draft.useLocalVAD {
                     VStack(alignment: .leading) {
                         HStack {
                             Text("Sensitivity")
@@ -112,7 +121,7 @@ struct LiveVoiceSettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                         Slider(
-                            value: $viewModel.settings.liveSettings.vadSensitivity,
+                            value: $draft.vadSensitivity,
                             in: 0...1,
                             step: 0.1
                         )
@@ -126,9 +135,9 @@ struct LiveVoiceSettingsView: View {
 
             // MARK: - Noise Gate
             Section {
-                Toggle("Noise Gate", isOn: $viewModel.settings.liveSettings.noiseGateEnabled)
+                Toggle("Noise Gate", isOn: $draft.noiseGateEnabled)
 
-                if viewModel.settings.liveSettings.noiseGateEnabled {
+                if draft.noiseGateEnabled {
                     VStack(alignment: .leading) {
                         HStack {
                             Text("Threshold")
@@ -137,7 +146,7 @@ struct LiveVoiceSettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                         Slider(
-                            value: $viewModel.settings.liveSettings.noiseGateThreshold,
+                            value: $draft.noiseGateThreshold,
                             in: 0.005...0.1,
                             step: 0.005
                         )
@@ -147,7 +156,7 @@ struct LiveVoiceSettingsView: View {
                         HStack {
                             Text("Hold Time")
                             Spacer()
-                            Text("\(viewModel.settings.liveSettings.noiseGateHoldMs) ms")
+                            Text("\(draft.noiseGateHoldMs) ms")
                                 .foregroundColor(.secondary)
                         }
                         Slider(
@@ -165,7 +174,7 @@ struct LiveVoiceSettingsView: View {
 
             // MARK: - Speech Recognition
             Section {
-                Toggle("On-Device Speech Recognition", isOn: $viewModel.settings.liveSettings.useOnDeviceSTT)
+                Toggle("On-Device Speech Recognition", isOn: $draft.useOnDeviceSTT)
             } header: {
                 Text("Speech Recognition")
             } footer: {
@@ -174,14 +183,14 @@ struct LiveVoiceSettingsView: View {
 
             // MARK: - TTS Fallback
             Section {
-                Picker("TTS Engine", selection: $viewModel.settings.liveSettings.fallbackTTSEngine) {
+                Picker("TTS Engine", selection: $draft.fallbackTTSEngine) {
                     ForEach(TTSEngine.allCases, id: \.self) { engine in
                         Text(engine.displayName).tag(engine)
                     }
                 }
 
-                if viewModel.settings.liveSettings.fallbackTTSEngine == .kokoro {
-                    Picker("Voice", selection: $viewModel.settings.liveSettings.defaultKokoroVoice) {
+                if draft.fallbackTTSEngine == .kokoro {
+                    Picker("Voice", selection: $draft.defaultKokoroVoice) {
                         ForEach(popularKokoroVoices, id: \.self) { voice in
                             Text(voice.displayName).tag(voice)
                         }
@@ -195,13 +204,13 @@ struct LiveVoiceSettingsView: View {
 
             // MARK: - Performance
             Section {
-                Picker("Latency Mode", selection: $viewModel.settings.liveSettings.latencyMode) {
+                Picker("Latency Mode", selection: $draft.latencyMode) {
                     ForEach(LatencyMode.allCases, id: \.self) { mode in
                         Text(mode.displayName).tag(mode)
                     }
                 }
 
-                Toggle("Prefer Native Real-time", isOn: $viewModel.settings.liveSettings.preferRealtime)
+                Toggle("Prefer Native Real-time", isOn: $draft.preferRealtime)
             } header: {
                 Text("Performance")
             } footer: {
@@ -209,6 +218,18 @@ struct LiveVoiceSettingsView: View {
             }
         }
         .navigationTitle("Live Voice")
+        // Keep draft in sync with viewModel (e.g., iCloud sync updates settings)
+        .onAppear {
+            // Avoid treating initial hydration as a user edit
+            isHydratingDraft = true
+            draft = viewModel.settings.liveSettings
+            DispatchQueue.main.async { isHydratingDraft = false }
+        }
+        // Persist edits (debounced)
+        .onChange(of: draft) { _, newValue in
+            guard !isHydratingDraft else { return }
+            persistDebounced(newValue)
+        }
         #if os(macOS)
         .formStyle(.grouped)
         #else
@@ -219,7 +240,7 @@ struct LiveVoiceSettingsView: View {
     // MARK: - Helpers
 
     private var sensitivityLabel: String {
-        let value = viewModel.settings.liveSettings.vadSensitivity
+        let value = draft.vadSensitivity
         if value < 0.3 {
             return "Very Sensitive"
         } else if value < 0.5 {
@@ -232,7 +253,7 @@ struct LiveVoiceSettingsView: View {
     }
 
     private var noiseGateThresholdLabel: String {
-        let value = viewModel.settings.liveSettings.noiseGateThreshold
+        let value = draft.noiseGateThreshold
         if value < 0.015 {
             return "Very Low"
         } else if value < 0.03 {
@@ -248,15 +269,31 @@ struct LiveVoiceSettingsView: View {
 
     private var noiseGateHoldBinding: Binding<Double> {
         Binding(
-            get: { Double(viewModel.settings.liveSettings.noiseGateHoldMs) },
-            set: { viewModel.settings.liveSettings.noiseGateHoldMs = Int($0) }
+            get: { Double(draft.noiseGateHoldMs) },
+            set: { draft.noiseGateHoldMs = Int($0) }
         )
     }
+
+    // MARK: - Persistence
+
+    /// Simple debounce so slider drags don’t spam disk/iCloud writes.
+    private func persistDebounced(_ newValue: LiveSettings) {
+        let token = UUID()
+        pendingPersistToken = token
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000) // 350ms
+            guard pendingPersistToken == token else { return }
+            await viewModel.updateSetting(\.liveSettings, newValue)
+        }
+    }
+
+    @State private var pendingPersistToken: UUID?
 
     private func executionModeBadge(for provider: AIProvider) -> some View {
         let mode = LiveProviderFactory.shared.detectCapabilities(
             for: provider,
-            modelId: viewModel.settings.liveSettings.defaultModelId
+            modelId: draft.defaultModelId
         ).executionMode
 
         return Text(mode.displayName)
@@ -281,8 +318,8 @@ struct LiveVoiceSettingsView: View {
 
     private var mlxModelBinding: Binding<String> {
         Binding(
-            get: { viewModel.settings.liveSettings.preferredMLXModel ?? "" },
-            set: { viewModel.settings.liveSettings.preferredMLXModel = $0.isEmpty ? nil : $0 }
+            get: { draft.preferredMLXModel ?? "" },
+            set: { draft.preferredMLXModel = $0.isEmpty ? nil : $0 }
         )
     }
 
