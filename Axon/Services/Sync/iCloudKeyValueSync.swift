@@ -175,7 +175,7 @@ class iCloudKeyValueSync: ObservableObject {
 // MARK: - Syncable Settings
 
 /// Settings that should be synced across devices
-/// Excludes device-specific settings like API keys, security settings
+/// Excludes device-specific settings like API keys, security settings, biometric prefs
 struct SyncableSettings: Codable {
     // Theme
     var theme: String
@@ -200,20 +200,84 @@ struct SyncableSettings: Codable {
     var learningLoopEnabled: Bool
     var predicateLoggingVerbosity: String
 
-    // TTS Settings (voice preferences sync nicely)
+    // TTS Settings (complete voice preferences)
+    var ttsProvider: String
+    var ttsQualityTier: String
+    var ttsStripMarkdown: Bool
+    var ttsSpokenFriendly: Bool
+    var ttsVoiceGenderFilter: String?
+    // Apple TTS
+    var appleVoice: String
+    var appleRate: Float
+    // ElevenLabs
     var ttsModel: String
     var ttsOutputFormat: String
     var selectedVoiceId: String?
     var selectedVoiceName: String?
+    var voiceStability: Double
+    var voiceSimilarityBoost: Double
+    var voiceStyle: Double
+    var voiceUseSpeakerBoost: Bool
+    // Gemini TTS
+    var geminiVoice: String
+    var geminiModel: String
+    var geminiVoiceDirection: String
+    // OpenAI TTS
+    var openaiVoice: String
+    var openaiModel: String
+    var openaiVoiceInstructions: String
+    var openaiSpeed: Double
+    // Kokoro TTS
+    var kokoroVoice: String
+    var kokoroSpeed: Float
 
     // Tool Settings
     var toolsEnabled: Bool
     var enabledToolIds: [String]
     var maxToolCallsPerTurn: Int
     var toolTimeout: Int
+    var experimentalFeaturesEnabled: Bool
+    var mediaProxyEnabled: Bool
+    var chatDebugEnabled: Bool
 
     // Device Mode Config (sync preferences, not device-specific state)
     var deviceModeConfig: DeviceModeConfig
+
+    // Model Generation Settings (temperature, top-p, top-k)
+    var modelGenerationSettings: ModelGenerationSettings
+
+    // Heartbeat Settings (user preferences, excluding device-specific)
+    var heartbeatEnabled: Bool
+    var heartbeatIntervalSeconds: Int
+    var heartbeatDeliveryProfileId: String
+    var heartbeatMaxTokensBudget: Int
+    var heartbeatMaxToolCalls: Int
+    var heartbeatAllowNotifications: Bool
+    var heartbeatLiveActivityEnabled: Bool
+    var heartbeatDeliveryProfiles: [HeartbeatDeliveryProfile]
+
+    // Heuristics Settings (cognitive compression layer)
+    var heuristicsSettings: HeuristicsSettings
+
+    // Live Voice Settings (realtime voice preferences)
+    var liveSettings: LiveSettings
+
+    // Sovereignty Settings (excluding biometric-specific settings)
+    var sovereigntyEnabled: Bool
+    var sovereigntyConsentProvider: String
+    var sovereigntyConsentModel: String
+    var sovereigntyShowDetailedReasoning: Bool
+    var sovereigntyConsentTimeoutSeconds: Int
+    var sovereigntyAuditLoggingEnabled: Bool
+
+    // Temporal Settings (preferences only, not counters)
+    var temporalMode: String
+    var temporalTurnCountScope: String
+    var temporalShowStatusBar: Bool
+    var temporalInjectHumanTime: Bool
+    var temporalInjectTurnCount: Bool
+    var temporalInjectContextSaturation: Bool
+    var temporalTrackSessionDuration: Bool
 
     init(from settings: AppSettings) {
         self.theme = settings.theme.rawValue
@@ -234,17 +298,77 @@ struct SyncableSettings: Codable {
         self.learningLoopEnabled = settings.learningLoopEnabled
         self.predicateLoggingVerbosity = settings.predicateLoggingVerbosity.rawValue
 
+        // TTS Settings (complete)
+        self.ttsProvider = settings.ttsSettings.provider.rawValue
+        self.ttsQualityTier = settings.ttsSettings.qualityTier.rawValue
+        self.ttsStripMarkdown = settings.ttsSettings.stripMarkdownBeforeTTS
+        self.ttsSpokenFriendly = settings.ttsSettings.spokenFriendlyTTS
+        self.ttsVoiceGenderFilter = settings.ttsSettings.voiceGenderFilter?.rawValue
+        self.appleVoice = settings.ttsSettings.appleVoice.rawValue
+        self.appleRate = settings.ttsSettings.appleRate
         self.ttsModel = settings.ttsSettings.model.rawValue
         self.ttsOutputFormat = settings.ttsSettings.outputFormat.rawValue
         self.selectedVoiceId = settings.ttsSettings.selectedVoiceId
         self.selectedVoiceName = settings.ttsSettings.selectedVoiceName
+        self.voiceStability = settings.ttsSettings.voiceSettings.stability
+        self.voiceSimilarityBoost = settings.ttsSettings.voiceSettings.similarityBoost
+        self.voiceStyle = settings.ttsSettings.voiceSettings.style
+        self.voiceUseSpeakerBoost = settings.ttsSettings.voiceSettings.useSpeakerBoost
+        self.geminiVoice = settings.ttsSettings.geminiVoice.rawValue
+        self.geminiModel = settings.ttsSettings.geminiModel.rawValue
+        self.geminiVoiceDirection = settings.ttsSettings.geminiVoiceDirection
+        self.openaiVoice = settings.ttsSettings.openaiVoice.rawValue
+        self.openaiModel = settings.ttsSettings.openaiModel.rawValue
+        self.openaiVoiceInstructions = settings.ttsSettings.openaiVoiceInstructions
+        self.openaiSpeed = settings.ttsSettings.openaiSpeed
+        self.kokoroVoice = settings.ttsSettings.kokoroVoice.rawValue
+        self.kokoroSpeed = settings.ttsSettings.kokoroSpeed
 
         self.toolsEnabled = settings.toolSettings.toolsEnabled
         self.enabledToolIds = Array(settings.toolSettings.enabledToolIds)
         self.maxToolCallsPerTurn = settings.toolSettings.maxToolCallsPerTurn
         self.toolTimeout = settings.toolSettings.toolTimeout
+        self.experimentalFeaturesEnabled = settings.toolSettings.experimentalFeaturesEnabled
+        self.mediaProxyEnabled = settings.toolSettings.mediaProxyEnabled
+        self.chatDebugEnabled = settings.toolSettings.chatDebugEnabled
 
         self.deviceModeConfig = settings.deviceModeConfig
+
+        // Model Generation Settings
+        self.modelGenerationSettings = settings.modelGenerationSettings
+
+        // Heartbeat Settings (user preferences)
+        self.heartbeatEnabled = settings.heartbeatSettings.enabled
+        self.heartbeatIntervalSeconds = settings.heartbeatSettings.intervalSeconds
+        self.heartbeatDeliveryProfileId = settings.heartbeatSettings.deliveryProfileId
+        self.heartbeatMaxTokensBudget = settings.heartbeatSettings.maxTokensBudget
+        self.heartbeatMaxToolCalls = settings.heartbeatSettings.maxToolCalls
+        self.heartbeatAllowNotifications = settings.heartbeatSettings.allowNotifications
+        self.heartbeatLiveActivityEnabled = settings.heartbeatSettings.liveActivityEnabled
+        self.heartbeatDeliveryProfiles = settings.heartbeatSettings.deliveryProfiles
+
+        // Heuristics Settings
+        self.heuristicsSettings = settings.heuristicsSettings
+
+        // Live Voice Settings
+        self.liveSettings = settings.liveSettings
+
+        // Sovereignty Settings (excluding biometric)
+        self.sovereigntyEnabled = settings.sovereigntySettings.enabled
+        self.sovereigntyConsentProvider = settings.sovereigntySettings.consentProvider.rawValue
+        self.sovereigntyConsentModel = settings.sovereigntySettings.consentModel
+        self.sovereigntyShowDetailedReasoning = settings.sovereigntySettings.showDetailedReasoning
+        self.sovereigntyConsentTimeoutSeconds = settings.sovereigntySettings.consentTimeoutSeconds
+        self.sovereigntyAuditLoggingEnabled = settings.sovereigntySettings.auditLoggingEnabled
+
+        // Temporal Settings (preferences only)
+        self.temporalMode = settings.temporalSettings.mode.rawValue
+        self.temporalTurnCountScope = settings.temporalSettings.turnCountScope.rawValue
+        self.temporalShowStatusBar = settings.temporalSettings.showStatusBar
+        self.temporalInjectHumanTime = settings.temporalSettings.injectHumanTime
+        self.temporalInjectTurnCount = settings.temporalSettings.injectTurnCount
+        self.temporalInjectContextSaturation = settings.temporalSettings.injectContextSaturation
+        self.temporalTrackSessionDuration = settings.temporalSettings.trackSessionDuration
     }
 
     func apply(to settings: inout AppSettings) {
@@ -272,6 +396,20 @@ struct SyncableSettings: Codable {
             settings.predicateLoggingVerbosity = verbosity
         }
 
+        // TTS Settings (complete)
+        if let provider = TTSProvider(rawValue: ttsProvider) {
+            settings.ttsSettings.provider = provider
+        }
+        if let tier = TTSQualityTier(rawValue: ttsQualityTier) {
+            settings.ttsSettings.qualityTier = tier
+        }
+        settings.ttsSettings.stripMarkdownBeforeTTS = ttsStripMarkdown
+        settings.ttsSettings.spokenFriendlyTTS = ttsSpokenFriendly
+        settings.ttsSettings.voiceGenderFilter = ttsVoiceGenderFilter.flatMap { VoiceGender(rawValue: $0) }
+        if let voice = AppleTTSVoice(rawValue: appleVoice) {
+            settings.ttsSettings.appleVoice = voice
+        }
+        settings.ttsSettings.appleRate = appleRate
         if let model = TTSModel(rawValue: ttsModel) {
             settings.ttsSettings.model = model
         }
@@ -280,12 +418,83 @@ struct SyncableSettings: Codable {
         }
         settings.ttsSettings.selectedVoiceId = selectedVoiceId
         settings.ttsSettings.selectedVoiceName = selectedVoiceName
+        settings.ttsSettings.voiceSettings.stability = voiceStability
+        settings.ttsSettings.voiceSettings.similarityBoost = voiceSimilarityBoost
+        settings.ttsSettings.voiceSettings.style = voiceStyle
+        settings.ttsSettings.voiceSettings.useSpeakerBoost = voiceUseSpeakerBoost
+        if let voice = GeminiTTSVoice(rawValue: geminiVoice) {
+            settings.ttsSettings.geminiVoice = voice
+        }
+        if let model = GeminiTTSModel(rawValue: geminiModel) {
+            settings.ttsSettings.geminiModel = model
+        }
+        settings.ttsSettings.geminiVoiceDirection = geminiVoiceDirection
+        if let voice = OpenAITTSVoice(rawValue: openaiVoice) {
+            settings.ttsSettings.openaiVoice = voice
+        }
+        if let model = OpenAITTSModel(rawValue: openaiModel) {
+            settings.ttsSettings.openaiModel = model
+        }
+        settings.ttsSettings.openaiVoiceInstructions = openaiVoiceInstructions
+        settings.ttsSettings.openaiSpeed = openaiSpeed
+        if let voice = KokoroTTSVoice(rawValue: kokoroVoice) {
+            settings.ttsSettings.kokoroVoice = voice
+        }
+        settings.ttsSettings.kokoroSpeed = kokoroSpeed
 
         settings.toolSettings.toolsEnabled = toolsEnabled
         settings.toolSettings.enabledToolIds = Set(enabledToolIds)
         settings.toolSettings.maxToolCallsPerTurn = maxToolCallsPerTurn
         settings.toolSettings.toolTimeout = toolTimeout
+        settings.toolSettings.experimentalFeaturesEnabled = experimentalFeaturesEnabled
+        settings.toolSettings.mediaProxyEnabled = mediaProxyEnabled
+        settings.toolSettings.chatDebugEnabled = chatDebugEnabled
 
         settings.deviceModeConfig = deviceModeConfig
+
+        // Model Generation Settings
+        settings.modelGenerationSettings = modelGenerationSettings
+
+        // Heartbeat Settings (user preferences, preserve device-specific)
+        settings.heartbeatSettings.enabled = heartbeatEnabled
+        settings.heartbeatSettings.intervalSeconds = heartbeatIntervalSeconds
+        settings.heartbeatSettings.deliveryProfileId = heartbeatDeliveryProfileId
+        settings.heartbeatSettings.maxTokensBudget = heartbeatMaxTokensBudget
+        settings.heartbeatSettings.maxToolCalls = heartbeatMaxToolCalls
+        settings.heartbeatSettings.allowNotifications = heartbeatAllowNotifications
+        settings.heartbeatSettings.liveActivityEnabled = heartbeatLiveActivityEnabled
+        settings.heartbeatSettings.deliveryProfiles = heartbeatDeliveryProfiles
+        // Note: allowBackground and quietHours are device-specific, not synced
+
+        // Heuristics Settings
+        settings.heuristicsSettings = heuristicsSettings
+
+        // Live Voice Settings
+        settings.liveSettings = liveSettings
+
+        // Sovereignty Settings (preserve biometric settings)
+        settings.sovereigntySettings.enabled = sovereigntyEnabled
+        if let provider = AIProvider(rawValue: sovereigntyConsentProvider) {
+            settings.sovereigntySettings.consentProvider = provider
+        }
+        settings.sovereigntySettings.consentModel = sovereigntyConsentModel
+        settings.sovereigntySettings.showDetailedReasoning = sovereigntyShowDetailedReasoning
+        settings.sovereigntySettings.consentTimeoutSeconds = sovereigntyConsentTimeoutSeconds
+        settings.sovereigntySettings.auditLoggingEnabled = sovereigntyAuditLoggingEnabled
+        // Note: requireBiometricForAllActions is device-specific, not synced
+
+        // Temporal Settings (preferences only, preserve counters/timestamps)
+        if let mode = TemporalMode(rawValue: temporalMode) {
+            settings.temporalSettings.mode = mode
+        }
+        if let scope = TurnCountScope(rawValue: temporalTurnCountScope) {
+            settings.temporalSettings.turnCountScope = scope
+        }
+        settings.temporalSettings.showStatusBar = temporalShowStatusBar
+        settings.temporalSettings.injectHumanTime = temporalInjectHumanTime
+        settings.temporalSettings.injectTurnCount = temporalInjectTurnCount
+        settings.temporalSettings.injectContextSaturation = temporalInjectContextSaturation
+        settings.temporalSettings.trackSessionDuration = temporalTrackSessionDuration
+        // Note: lifetimeTurnCount, lastSessionTurnCount, lastInteractionAt, sessionStartedAt are device-specific
     }
 }

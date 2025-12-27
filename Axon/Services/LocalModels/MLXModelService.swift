@@ -546,12 +546,16 @@ final class MLXModelService: ObservableObject {
     ///   - systemPrompt: Optional system prompt
     ///   - messages: Conversation messages
     ///   - maxTokens: Maximum tokens to generate
+    ///   - temperature: Sampling temperature (0.0-1.0)
+    ///   - topP: Nucleus sampling threshold (0.0-1.0)
     ///   - repetitionPenalty: Penalty for repeated tokens (1.0 = no penalty, higher = stronger penalty)
     ///   - repetitionContextSize: Number of tokens to look back for repetition detection
     func generate(
         systemPrompt: String?,
         messages: [Message],
         maxTokens: Int = 2048,
+        temperature: Double = 0.7,
+        topP: Double = 0.8,
         repetitionPenalty: Double = 1.2,
         repetitionContextSize: Int = 64
     ) async throws -> String {
@@ -567,11 +571,11 @@ final class MLXModelService: ObservableObject {
         // Create UserInput with chat messages
         let userInput = UserInput(chat: chatMessages)
 
-        // Create generation parameters with repetition penalty to prevent runaway loops
+        // Create generation parameters with user settings
         let generateParams = GenerateParameters(
             maxTokens: maxTokens,
-            temperature: 0.7,
-            topP: 0.9,
+            temperature: Float(temperature),
+            topP: Float(topP),
             repetitionPenalty: Float(repetitionPenalty),
             repetitionContextSize: repetitionContextSize
         )
@@ -604,6 +608,8 @@ final class MLXModelService: ObservableObject {
     ///   - systemPrompt: Optional system prompt
     ///   - messages: Conversation messages
     ///   - maxTokens: Maximum tokens to generate
+    ///   - temperature: Sampling temperature (0.0-1.0)
+    ///   - topP: Nucleus sampling threshold (0.0-1.0)
     ///   - repetitionPenalty: Penalty for repeated tokens (1.0 = no penalty, higher = stronger penalty)
     ///   - repetitionContextSize: Number of tokens to look back for repetition detection
     ///   - onToken: Callback for each generated token
@@ -611,6 +617,8 @@ final class MLXModelService: ObservableObject {
         systemPrompt: String?,
         messages: [Message],
         maxTokens: Int = 2048,
+        temperature: Double = 0.7,
+        topP: Double = 0.8,
         repetitionPenalty: Double = 1.2,
         repetitionContextSize: Int = 64,
         onToken: @escaping @Sendable (String) -> Void
@@ -627,11 +635,11 @@ final class MLXModelService: ObservableObject {
         // Create UserInput with chat messages
         let userInput = UserInput(chat: chatMessages)
 
-        // Create generation parameters with repetition penalty to prevent runaway loops
+        // Create generation parameters with user settings
         let generateParams = GenerateParameters(
             maxTokens: maxTokens,
-            temperature: 0.7,
-            topP: 0.9,
+            temperature: Float(temperature),
+            topP: Float(topP),
             repetitionPenalty: Float(repetitionPenalty),
             repetitionContextSize: repetitionContextSize
         )

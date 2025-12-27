@@ -30,6 +30,10 @@ struct ModelGenerationSettings: Codable, Equatable, Sendable {
     // Repetition Context Size: How many tokens to look back for repetition detection
     var repetitionContextSize: Int = 64
 
+    // Max Response Tokens (Local MLX models only): Limits response length
+    var maxResponseTokens: Int = 2048
+    var maxResponseTokensEnabled: Bool = false
+
     // Custom system prompt suffix appended after epistemic prompt
     var systemPromptSuffix: String = ""
     var systemPromptSuffixEnabled: Bool = false

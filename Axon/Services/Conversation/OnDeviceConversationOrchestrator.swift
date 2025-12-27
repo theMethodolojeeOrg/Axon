@@ -2585,18 +2585,24 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             // Load the specific model (will download if not cached)
             try await MLXModelService.shared.loadModel(modelId: modelId)
 
-            // Get repetition penalty settings from user preferences
+            // Get generation settings from user preferences
             let genSettings = await MainActor.run {
                 SettingsViewModel.shared.settings.modelGenerationSettings
             }
 
+            // Apply user settings with sensible defaults for Qwen3
+            let temperature = genSettings.temperatureEnabled ? genSettings.temperature : 0.7
+            let topP = genSettings.topPEnabled ? genSettings.topP : 0.8
             let repetitionPenalty = genSettings.repetitionPenaltyEnabled ? genSettings.repetitionPenalty : 1.0
             let repetitionContextSize = genSettings.repetitionPenaltyEnabled ? genSettings.repetitionContextSize : 64
+            let maxTokens = genSettings.maxResponseTokensEnabled ? genSettings.maxResponseTokens : 2048
 
             let response = try await MLXModelService.shared.generate(
                 systemPrompt: system,
                 messages: messages,
-                maxTokens: 2048,
+                maxTokens: maxTokens,
+                temperature: temperature,
+                topP: topP,
                 repetitionPenalty: repetitionPenalty,
                 repetitionContextSize: repetitionContextSize
             )
