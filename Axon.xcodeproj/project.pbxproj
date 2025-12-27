@@ -11,6 +11,7 @@
 		E217D4332EEA4BF700D3DAB2 /* CryptoKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4322EEA4BF700D3DAB2 /* CryptoKit.framework */; };
 		E217D4352EEA4BFF00D3DAB2 /* CryptoTokenKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4342EEA4BFF00D3DAB2 /* CryptoTokenKit.framework */; };
 		E217D7B62EEDDD5C00D3DAB2 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D7B52EEDDD5C00D3DAB2 /* CoreLocation.framework */; };
+		E22011022EFF709D00DC50DC /* MLXUtilsLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = E22011012EFF709D00DC50DC /* MLXUtilsLibrary */; };
 		E22498CA2ED5D1880053D459 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = E22498C92ED5D1880053D459 /* MarkdownUI */; };
 		E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9A2EB23493009B116D /* FirebaseAuth */; };
 		E23FFF9D2EB23493009B116D /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9C2EB23493009B116D /* FirebaseCore */; };
@@ -39,7 +40,6 @@
 		E2E5FDAF2EFF5A6800E4835C /* MLXEmbedders in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDAE2EFF5A6800E4835C /* MLXEmbedders */; };
 		E2E5FDB12EFF5A6800E4835C /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDB02EFF5A6800E4835C /* MLXLLM */; };
 		E2E5FDB32EFF5A6800E4835C /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDB22EFF5A6800E4835C /* MLXLMCommon */; };
-		E2E5FDB52EFF5A6800E4835C /* MLXMNIST in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDB42EFF5A6800E4835C /* MLXMNIST */; };
 		E2E5FDB72EFF5A6800E4835C /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDB62EFF5A6800E4835C /* MLXVLM */; };
 /* End PBXBuildFile section */
 
@@ -191,10 +191,10 @@
 				E2E5FDB12EFF5A6800E4835C /* MLXLLM in Frameworks */,
 				E254EDDA2EB222B3000CDD9D /* FirebaseAILogic in Frameworks */,
 				E217D4312EEA494A00D3DAB2 /* CloudKit.framework in Frameworks */,
+				E22011022EFF709D00DC50DC /* MLXUtilsLibrary in Frameworks */,
 				E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */,
 				E27FB5F12ECD5E2F003C52BF /* SodiumFoundationCompat in Frameworks */,
 				E22498CA2ED5D1880053D459 /* MarkdownUI in Frameworks */,
-				E2E5FDB52EFF5A6800E4835C /* MLXMNIST in Frameworks */,
 				E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */,
 				E23FFFA32EB23493009B116D /* FirebaseMessaging in Frameworks */,
 				E217D4352EEA4BFF00D3DAB2 /* CryptoTokenKit.framework in Frameworks */,
@@ -332,8 +332,8 @@
 				E2E5FDAE2EFF5A6800E4835C /* MLXEmbedders */,
 				E2E5FDB02EFF5A6800E4835C /* MLXLLM */,
 				E2E5FDB22EFF5A6800E4835C /* MLXLMCommon */,
-				E2E5FDB42EFF5A6800E4835C /* MLXMNIST */,
 				E2E5FDB62EFF5A6800E4835C /* MLXVLM */,
+				E22011012EFF709D00DC50DC /* MLXUtilsLibrary */,
 			);
 			productName = Axon;
 			productReference = E254ED962EB21B76000CDD9D /* Axon.app */;
@@ -446,6 +446,7 @@
 				E21FCC002EFA24B1009EF882 /* XCRemoteSwiftPackageReference "kokoro-ios" */,
 				E2E5FD862EFF4F8F00E4835C /* XCRemoteSwiftPackageReference "swift-huggingface" */,
 				E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
+				E22011002EFF709D00DC50DC /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E254ED972EB21B76000CDD9D /* Products */;
@@ -1000,6 +1001,14 @@
 				minimumVersion = 1.0.10;
 			};
 		};
+		E22011002EFF709D00DC50DC /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mlalma/MLXUtilsLibrary";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.0.6;
+			};
+		};
 		E22498C82ED5D1880053D459 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui.git";
@@ -1051,6 +1060,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		E22011012EFF709D00DC50DC /* MLXUtilsLibrary */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E22011002EFF709D00DC50DC /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */;
+			productName = MLXUtilsLibrary;
+		};
 		E22498C92ED5D1880053D459 /* MarkdownUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E22498C82ED5D1880053D459 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
@@ -1165,11 +1179,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
 			productName = MLXLMCommon;
-		};
-		E2E5FDB42EFF5A6800E4835C /* MLXMNIST */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXMNIST;
 		};
 		E2E5FDB62EFF5A6800E4835C /* MLXVLM */ = {
 			isa = XCSwiftPackageProductDependency;
