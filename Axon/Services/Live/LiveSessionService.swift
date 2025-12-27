@@ -11,7 +11,11 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
 
     // MARK: - Published State
 
-    @Published var status: LiveSessionStatus = .idle
+    @Published var status: LiveSessionStatus = .idle {
+        didSet {
+            print("[LiveSession] Status changed: \(oldValue) → \(status)")
+        }
+    }
     @Published var isMicEnabled: Bool = true
     @Published var inputLevel: Float = 0.0
     @Published var outputLevel: Float = 0.0
@@ -108,8 +112,14 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
             // status update handled by delegate
         } catch {
             liveLog.error("Connection failed: \(error.localizedDescription)")
+            print("[LiveSession] ❌ Connection failed: \(error)")
             status = .error(error.localizedDescription)
-            stopSession()
+            // Don't call stopSession() here - it sets status to .disconnected which hides the overlay
+            // Instead, just clean up the provider
+            provider?.disconnect()
+            provider = nil
+            activeExecutionMode = nil
+            currentCapabilities = nil
         }
     }
     
@@ -140,14 +150,17 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
 
     private func startAudioEngine() async throws {
         liveLog.info("Initializing AVAudioEngine...")
+        print("[LiveSession] 🎤 Starting audio engine...")
 
         // Request microphone permission first
         liveLog.info("Requesting microphone permission...")
         let permissionGranted = await requestMicrophonePermission()
         guard permissionGranted else {
             liveLog.error("Microphone permission denied by user")
+            print("[LiveSession] ❌ Microphone permission denied")
             throw NSError(domain: "LiveSession", code: -1, userInfo: [NSLocalizedDescriptionKey: "Microphone permission denied. Please enable in Settings."])
         }
+        print("[LiveSession] ✅ Microphone permission granted")
         liveLog.info("Microphone permission granted")
 
         audioEngine = AVAudioEngine()

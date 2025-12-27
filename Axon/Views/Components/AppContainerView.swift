@@ -46,6 +46,12 @@ struct AppContainerView: View {
             if liveService.status != .idle && liveService.status != .disconnected {
                 LiveSessionOverlay()
                     .zIndex(200) // Ensure visibility
+                    .onAppear {
+                        print("[LiveOverlay] Overlay appeared, status: \(liveService.status)")
+                    }
+                    .onDisappear {
+                        print("[LiveOverlay] Overlay disappeared, status: \(liveService.status)")
+                    }
             }
 
             // Launch Screen Overlay
@@ -152,6 +158,13 @@ struct AppContainerView: View {
                         ToolbarItem {
                             ToolsStatusMenu(style: .pill)
                                 .fixedSize()
+                        }
+
+                        ToolbarItem {
+                            Button(action: startLiveSession) {
+                                Label("Live", systemImage: "waveform.circle")
+                            }
+                            .help("Start Live voice session")
                         }
                     }
 
@@ -375,8 +388,13 @@ struct AppContainerView: View {
 
 
     private func startLiveSession() {
-        guard let conversation = selectedConversation else { return }
-        
+        guard let conversation = selectedConversation else {
+            print("[LiveSession] ⚠️ startLiveSession called but no selectedConversation")
+            return
+        }
+
+        print("[LiveSession] 🎬 startLiveSession called for conversation: \(conversation.id), isEphemeral: \(conversationService.isEphemeral(conversation.id))")
+
         let settings = settingsViewModel.settings.liveSettings
         var provider: AIProvider = settings.defaultProvider
         var modelId = settings.defaultModelId
@@ -405,7 +423,9 @@ struct AppContainerView: View {
              systemInstruction: "You are a helpful assistant.",
              tools: nil
         )
-        
+
+        print("[LiveSession] 🚀 Starting Live session with provider: \(provider), model: \(modelId), voice: \(voice)")
+
         Task {
             await liveService.startSession(config: config, providerType: provider)
         }

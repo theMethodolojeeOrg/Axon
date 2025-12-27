@@ -93,7 +93,7 @@
                 },
                 {
                     "param": "timeout",
-                    "widget": "number",
+                    "widget": "stepper",
                     "label": "Timeout (ms)"
                 }
             ],
@@ -101,7 +101,7 @@
             "submitLabel": "Run Command"
         },
         "resultDisplay": {
-            "style": "terminal",
+            "style": "card",
             "sections": [
                 {
                     "type": "header",

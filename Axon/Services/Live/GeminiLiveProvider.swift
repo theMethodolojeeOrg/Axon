@@ -22,42 +22,51 @@ class GeminiLiveProvider: LiveProviderProtocol {
     
     func connect(config: LiveSessionConfig) async throws {
         geminiLog.info("connect called with model: \(config.modelId)")
+        print("[GeminiLive] 🔌 connect() called with model: \(config.modelId)")
         self.currentConfig = config
 
         // Construct URL
         let baseUrl = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent"
-        guard let url = URL(string: "\(baseUrl)?key=\(config.apiKey)") else {
+        guard let url = URL(string: "\(baseUrl)?key=\(config.apiKey.prefix(8))...") else {
             geminiLog.error("Invalid URL construction")
+            print("[GeminiLive] ❌ Invalid URL")
             throw LiveSessionError.invalidURL
         }
 
         geminiLog.info("Creating WebSocket connection...")
-        let request = URLRequest(url: url)
+        print("[GeminiLive] 🌐 Creating WebSocket...")
+        let request = URLRequest(url: URL(string: "\(baseUrl)?key=\(config.apiKey)")!)
         let session = URLSession(configuration: .default)
         webSocketTask = session.webSocketTask(with: request)
 
         isConnected = true
+        print("[GeminiLive] 📡 Calling delegate?.onStatusChange(.connecting)")
         delegate?.onStatusChange(.connecting)
 
         webSocketTask?.resume()
         geminiLog.info("WebSocket resumed, starting listener...")
+        print("[GeminiLive] ▶️ WebSocket resumed")
 
         // Start receiving messages
         listen()
 
         // Send Setup Message
         geminiLog.info("Sending setup message...")
+        print("[GeminiLive] 📤 Sending setup message...")
         try await sendSetupMessage(config: config)
 
         geminiLog.info("Connection established successfully")
+        print("[GeminiLive] ✅ Calling delegate?.onStatusChange(.connected)")
         delegate?.onStatusChange(.connected)
     }
 
     func disconnect() {
         geminiLog.info("disconnect called")
+        print("[GeminiLive] 🔴 disconnect() called")
         isConnected = false
         webSocketTask?.cancel(with: .normalClosure, reason: nil)
         webSocketTask = nil
+        print("[GeminiLive] 📡 Calling delegate?.onStatusChange(.disconnected)")
         delegate?.onStatusChange(.disconnected)
         geminiLog.info("Disconnected")
     }
@@ -118,11 +127,15 @@ class GeminiLiveProvider: LiveProviderProtocol {
         }
 
         task.receive { [weak self] result in
-            guard let self = self, self.isConnected else { return }
+            guard let self = self, self.isConnected else {
+                print("[GeminiLive] ⚠️ receive callback but not connected or self is nil")
+                return
+            }
 
             switch result {
             case .failure(let error):
                 geminiLog.error("WebSocket receive error: \(error.localizedDescription)")
+                print("[GeminiLive] ❌ WebSocket receive error: \(error)")
                 self.delegate?.onError(error)
                 self.disconnect()
             case .success(let message):

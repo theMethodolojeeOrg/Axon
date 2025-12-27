@@ -84,7 +84,7 @@
             "submitLabel": "List Directory"
         },
         "resultDisplay": {
-            "style": "list",
+            "style": "card",
             "sections": [
                 {
                     "type": "header",

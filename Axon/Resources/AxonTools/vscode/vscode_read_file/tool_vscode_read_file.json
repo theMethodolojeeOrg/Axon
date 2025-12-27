@@ -84,9 +84,9 @@
                     "widget": "picker",
                     "label": "Encoding",
                     "options": [
-                        "utf-8",
-                        "utf-16",
-                        "ascii"
+                        {"value": "utf-8", "label": "UTF-8"},
+                        {"value": "utf-16", "label": "UTF-16"},
+                        {"value": "ascii", "label": "ASCII"}
                     ]
                 }
             ],
@@ -94,7 +94,7 @@
             "submitLabel": "Read File"
         },
         "resultDisplay": {
-            "style": "code",
+            "style": "card",
             "sections": [
                 {
                     "type": "header",

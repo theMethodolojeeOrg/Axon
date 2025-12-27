@@ -84,7 +84,7 @@
                 },
                 {
                     "param": "content",
-                    "widget": "text_area",
+                    "widget": "textarea",
                     "label": "Content",
                     "placeholder": "File content..."
                 },
