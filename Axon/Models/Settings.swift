@@ -99,6 +99,10 @@ struct AppSettings: Codable, Equatable, Sendable {
     // Custom Providers
     var customProviders: [CustomProviderConfig] = []
 
+    // User-added MLX Models (from Hugging Face browser)
+    var userMLXModels: [UserMLXModel] = []
+    var selectedMLXModelId: String? = nil  // repoId of selected model (nil = use default bundled)
+
     // Local API Server
     var serverEnabled: Bool = false
     var serverPort: Int = 8080
@@ -1020,7 +1024,19 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                 )
             ]
         case .localMLX:
+            // Built-in models from LocalMLXModel enum
+            // User-added models are appended dynamically via SettingsViewModel
             return [
+                // Default bundled model (first in list)
+                AIModel(
+                    id: "mlx-community/Qwen3-VL-2B-Instruct-4bit",
+                    name: "Qwen3 VL 2B",
+                    provider: .localMLX,
+                    contextWindow: 8_192,
+                    modalities: ["text", "vision"],
+                    description: "Vision-language model. Bundled in app - ready instantly. Private, offline, free."
+                ),
+                // Downloadable models
                 AIModel(
                     id: "mlx-community/SmolLM2-1.7B-Instruct-4bit",
                     name: "SmolLM2 1.7B",
@@ -1131,6 +1147,47 @@ struct AIModel: Identifiable, Hashable, Codable, Sendable {
     let contextWindow: Int
     let modalities: [String]
     let description: String
+}
+
+// MARK: - User MLX Model (from Hugging Face)
+
+/// User-added MLX model downloaded from Hugging Face
+struct UserMLXModel: Codable, Identifiable, Equatable, Sendable {
+    let id: UUID
+    let repoId: String              // e.g., "mlx-community/Qwen3-VL-2B-Instruct-4bit"
+    let displayName: String         // e.g., "Qwen3 VL 2B"
+    var downloadStatus: DownloadStatus
+    var sizeBytes: Int64?
+    var contextWindow: Int          // from model config or default
+    var modalities: [String]        // ["text"], ["text", "vision"], etc.
+    var addedAt: Date
+
+    enum DownloadStatus: String, Codable, Sendable {
+        case notDownloaded
+        case downloading
+        case downloaded
+        case failed
+    }
+
+    /// Convert to AIModel for unified provider/model selection
+    func toAIModel() -> AIModel {
+        AIModel(
+            id: repoId,
+            name: displayName,
+            provider: .localMLX,
+            contextWindow: contextWindow,
+            modalities: modalities,
+            description: "User-added model from Hugging Face. \(formatSize(sizeBytes))"
+        )
+    }
+
+    private func formatSize(_ bytes: Int64?) -> String {
+        guard let bytes = bytes else { return "" }
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useGB, .useMB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
 }
 
 // MARK: - Unified Provider & Model (for UI)

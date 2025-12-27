@@ -388,7 +388,9 @@ struct MLXModelDetailSheet: View {
             }
             .background(AppColors.substratePrimary)
             .navigationTitle("Model Details")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
@@ -480,10 +482,7 @@ struct MLXModelDetailSheet: View {
                 }
 
                 if isDownloaded, let actualSize = browserService.getModelSize(modelInfo.id) {
-                    let formatter = ByteCountFormatter()
-                    formatter.allowedUnits = [.useGB, .useMB]
-                    formatter.countStyle = .file
-                    infoRow(label: "On Disk", value: formatter.string(fromByteCount: actualSize))
+                    infoRow(label: "On Disk", value: formatBytes(actualSize))
                 }
             }
             .padding()
@@ -515,6 +514,13 @@ struct MLXModelDetailSheet: View {
                 .font(AppTypography.bodySmall(.medium))
                 .foregroundColor(AppColors.textPrimary)
         }
+    }
+
+    private func formatBytes(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useGB, .useMB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
     }
 
     private var actionsSection: some View {

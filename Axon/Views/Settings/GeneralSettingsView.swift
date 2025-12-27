@@ -150,8 +150,81 @@ struct GeneralSettingsView: View {
                 if let provider = currentProvider {
                     // Check if this is the MLX provider
                     if provider.id == "builtin_localMLX" {
-                        // Show comprehensive MLX management UI
-                        MLXModelManagementView()
+                        // MLX uses a unified picker + manage link pattern
+                        let mlxModels = viewModel.allMLXModels()
+                        let selectedId = viewModel.selectedMLXModelId()
+                        let selectedModel = mlxModels.first { $0.id == selectedId }
+
+                        VStack(spacing: 12) {
+                            // Model picker dropdown
+                            StyledMenuPicker(
+                                icon: selectedModel?.modalities.contains("vision") == true ? "eye.circle" : "cpu",
+                                title: selectedModel?.name ?? LocalMLXModel.defaultModel.displayName,
+                                selection: Binding(
+                                    get: { selectedId },
+                                    set: { newModelId in
+                                        Task {
+                                            await viewModel.selectMLXModel(repoId: newModelId)
+                                        }
+                                    }
+                                )
+                            ) {
+                                #if os(macOS)
+                                ForEach(mlxModels) { model in
+                                    MenuButtonItem(
+                                        id: model.id,
+                                        label: model.name,
+                                        isSelected: selectedId == model.id
+                                    ) {
+                                        Task { await viewModel.selectMLXModel(repoId: model.id) }
+                                    }
+                                }
+                                #else
+                                ForEach(mlxModels) { model in
+                                    Text(model.name).tag(model.id)
+                                }
+                                #endif
+                            }
+
+                            // Selected model info card
+                            if let model = selectedModel {
+                                MLXSelectedModelCard(model: model)
+                            }
+
+                            // Manage Models link
+                            NavigationLink {
+                                SettingsSubviewContainer {
+                                    ScrollView {
+                                        MLXModelManagementView(viewModel: viewModel)
+                                            .padding()
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "slider.horizontal.3")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(AppColors.signalMercury)
+
+                                    Text("Manage Models")
+                                        .font(AppTypography.bodyMedium())
+                                        .foregroundColor(AppColors.textPrimary)
+
+                                    Spacer()
+
+                                    Text("\(viewModel.settings.userMLXModels.count + LocalMLXModel.allCases.count) available")
+                                        .font(AppTypography.labelSmall())
+                                        .foregroundColor(AppColors.textTertiary)
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(AppColors.textTertiary)
+                                }
+                                .padding()
+                                .background(AppColors.substrateSecondary)
+                                .cornerRadius(8)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     } else {
                         // Show standard model picker for other providers
                         let availableModels = provider.availableModels(customProviderIndex: providerIndex + 1)
@@ -806,6 +879,82 @@ struct SettingsOptionRow: View {
 }
 
 // SettingsToggleRow moved to SharedUIElements.swift
+
+// MARK: - MLX Selected Model Card
+
+struct MLXSelectedModelCard: View {
+    let model: AIModel
+
+    private var isBundled: Bool {
+        model.id == LocalMLXModel.defaultModel.rawValue
+    }
+
+    private var isVision: Bool {
+        model.modalities.contains("vision")
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: isVision ? "eye.circle.fill" : "cpu")
+                .font(.system(size: 24))
+                .foregroundColor(AppColors.signalMercury)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(model.name)
+                        .font(AppTypography.bodyMedium(.medium))
+                        .foregroundColor(AppColors.textPrimary)
+
+                    if isBundled {
+                        Text("Bundled")
+                            .font(AppTypography.labelSmall())
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(AppColors.signalMercury.opacity(0.2))
+                            .foregroundColor(AppColors.signalMercury)
+                            .cornerRadius(4)
+                    }
+
+                    if isVision {
+                        Text("Vision")
+                            .font(AppTypography.labelSmall())
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(AppColors.signalLichen.opacity(0.2))
+                            .foregroundColor(AppColors.signalLichen)
+                            .cornerRadius(4)
+                    }
+                }
+
+                Text(model.description)
+                    .font(AppTypography.bodySmall())
+                    .foregroundColor(AppColors.textSecondary)
+                    .lineLimit(2)
+
+                HStack(spacing: 12) {
+                    Label("\(model.contextWindow / 1000)K context", systemImage: "brain.head.profile")
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+
+                    Label("Private & Free", systemImage: "lock.shield")
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                }
+            }
+
+            Spacer()
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(AppColors.substrateSecondary)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                )
+        )
+    }
+}
 
 // MARK: - Temporal Mode Button
 

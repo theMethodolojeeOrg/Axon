@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import Combine
 import HuggingFace
 
 // MARK: - Model Info Types

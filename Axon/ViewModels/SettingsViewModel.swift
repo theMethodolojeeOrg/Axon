@@ -540,4 +540,101 @@ class SettingsViewModel: ObservableObject {
             self.successMessage = nil
         }
     }
+
+    // MARK: - User MLX Models
+
+    /// Add a user-downloaded MLX model to settings
+    func addUserMLXModel(_ model: UserMLXModel) async {
+        // Check if already exists
+        guard !settings.userMLXModels.contains(where: { $0.repoId == model.repoId }) else {
+            // Update existing
+            if let index = settings.userMLXModels.firstIndex(where: { $0.repoId == model.repoId }) {
+                settings.userMLXModels[index] = model
+            }
+            do {
+                try storageService.saveSettings(settings)
+                syncToiCloudIfEnabled()
+                SettingsSyncCoordinator.shared.markDirty()
+            } catch {
+                self.error = "Failed to update model: \(error.localizedDescription)"
+            }
+            return
+        }
+
+        settings.userMLXModels.append(model)
+        settings.lastUpdated = Date()
+
+        do {
+            try storageService.saveSettings(settings)
+            syncToiCloudIfEnabled()
+            SettingsSyncCoordinator.shared.markDirty()
+            showSuccessMessage("Model \(model.displayName) added")
+        } catch {
+            self.error = "Failed to save model: \(error.localizedDescription)"
+        }
+    }
+
+    /// Remove a user-downloaded MLX model from settings
+    func removeUserMLXModel(repoId: String) async {
+        settings.userMLXModels.removeAll { $0.repoId == repoId }
+
+        // If this was the selected model, clear selection
+        if settings.selectedMLXModelId == repoId {
+            settings.selectedMLXModelId = nil
+        }
+
+        settings.lastUpdated = Date()
+
+        do {
+            try storageService.saveSettings(settings)
+            syncToiCloudIfEnabled()
+            SettingsSyncCoordinator.shared.markDirty()
+            showSuccessMessage("Model removed")
+        } catch {
+            self.error = "Failed to remove model: \(error.localizedDescription)"
+        }
+    }
+
+    /// Update download status for a user MLX model
+    func updateUserMLXModelStatus(repoId: String, status: UserMLXModel.DownloadStatus, sizeBytes: Int64? = nil) async {
+        guard let index = settings.userMLXModels.firstIndex(where: { $0.repoId == repoId }) else { return }
+
+        settings.userMLXModels[index].downloadStatus = status
+        if let size = sizeBytes {
+            settings.userMLXModels[index].sizeBytes = size
+        }
+
+        do {
+            try storageService.saveSettings(settings)
+        } catch {
+            self.error = "Failed to update model status: \(error.localizedDescription)"
+        }
+    }
+
+    /// Select an MLX model for use
+    func selectMLXModel(repoId: String) async {
+        await updateSetting(\.selectedMLXModelId, repoId)
+        showSuccessMessage("Model selected")
+    }
+
+    /// Get all available MLX models (built-in + user-added)
+    func allMLXModels() -> [AIModel] {
+        // Built-in models
+        var models = AIProvider.localMLX.availableModels
+
+        // Add user models that are downloaded
+        for userModel in settings.userMLXModels where userModel.downloadStatus == .downloaded {
+            // Don't duplicate if already in built-in list
+            if !models.contains(where: { $0.id == userModel.repoId }) {
+                models.append(userModel.toAIModel())
+            }
+        }
+
+        return models
+    }
+
+    /// Get the currently selected MLX model ID (defaults to bundled model)
+    func selectedMLXModelId() -> String {
+        settings.selectedMLXModelId ?? LocalMLXModel.defaultModel.rawValue
+    }
 }

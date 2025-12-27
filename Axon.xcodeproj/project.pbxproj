@@ -37,6 +37,11 @@
 		E2E5FD812EFF401E00E4835C /* KokoroSwift in Embed Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FD7F2EFF401E00E4835C /* KokoroSwift */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		E2E5FD852EFF41DF00E4835C /* MLXUtilsLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FD842EFF41DF00E4835C /* MLXUtilsLibrary */; };
 		E2E5FD882EFF4F8F00E4835C /* HuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FD872EFF4F8F00E4835C /* HuggingFace */; };
+		E2E5FDAF2EFF5A6800E4835C /* MLXEmbedders in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDAE2EFF5A6800E4835C /* MLXEmbedders */; };
+		E2E5FDB12EFF5A6800E4835C /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDB02EFF5A6800E4835C /* MLXLLM */; };
+		E2E5FDB32EFF5A6800E4835C /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDB22EFF5A6800E4835C /* MLXLMCommon */; };
+		E2E5FDB52EFF5A6800E4835C /* MLXMNIST in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDB42EFF5A6800E4835C /* MLXMNIST */; };
+		E2E5FDB72EFF5A6800E4835C /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDB62EFF5A6800E4835C /* MLXVLM */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -154,6 +159,7 @@
 			explicitFolders = (
 				Resources/AxonTools,
 				Resources/KokoroTTS,
+				Resources/MLXModels,
 			);
 			path = Axon;
 			sourceTree = "<group>";
@@ -183,11 +189,13 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E2E5FDB12EFF5A6800E4835C /* MLXLLM in Frameworks */,
 				E254EDDA2EB222B3000CDD9D /* FirebaseAILogic in Frameworks */,
 				E217D4312EEA494A00D3DAB2 /* CloudKit.framework in Frameworks */,
 				E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */,
 				E27FB5F12ECD5E2F003C52BF /* SodiumFoundationCompat in Frameworks */,
 				E22498CA2ED5D1880053D459 /* MarkdownUI in Frameworks */,
+				E2E5FDB52EFF5A6800E4835C /* MLXMNIST in Frameworks */,
 				E2E5FD852EFF41DF00E4835C /* MLXUtilsLibrary in Frameworks */,
 				E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */,
 				E23FFFA32EB23493009B116D /* FirebaseMessaging in Frameworks */,
@@ -197,17 +205,20 @@
 				E26F33402EEE017C000E55BD /* AppKit.framework in Frameworks */,
 				E27FB5EF2ECD5E2F003C52BF /* Sodium in Frameworks */,
 				E27FB5ED2ECD5E2F003C52BF /* Clibsodium in Frameworks */,
+				E2E5FDB32EFF5A6800E4835C /* MLXLMCommon in Frameworks */,
 				E23FFFA12EB23493009B116D /* FirebaseFunctions in Frameworks */,
 				E217D7B62EEDDD5C00D3DAB2 /* CoreLocation.framework in Frameworks */,
 				E254EDD82EB222B3000CDD9D /* FirebaseAI in Frameworks */,
 				E217D4332EEA4BF700D3DAB2 /* CryptoKit.framework in Frameworks */,
 				E23FFF9D2EB23493009B116D /* FirebaseCore in Frameworks */,
 				E273631A2EBD237F0031CFF7 /* FlyingFox in Frameworks */,
+				E2E5FDAF2EFF5A6800E4835C /* MLXEmbedders in Frameworks */,
 				E23FFF9F2EB23493009B116D /* FirebaseFirestore in Frameworks */,
 				E23FFFA52EB23493009B116D /* FirebaseStorage in Frameworks */,
 				E254EDDC2EB222B3000CDD9D /* FirebaseAnalytics in Frameworks */,
 				E2E5FD802EFF401E00E4835C /* KokoroSwift in Frameworks */,
 				E27FB5F32ECD5E2F003C52BF /* SodiumNIOCompat in Frameworks */,
+				E2E5FDB72EFF5A6800E4835C /* MLXVLM in Frameworks */,
 				E254EDDE2EB222B3000CDD9D /* FirebaseAnalyticsCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -321,6 +332,11 @@
 				E2E5FD7F2EFF401E00E4835C /* KokoroSwift */,
 				E2E5FD842EFF41DF00E4835C /* MLXUtilsLibrary */,
 				E2E5FD872EFF4F8F00E4835C /* HuggingFace */,
+				E2E5FDAE2EFF5A6800E4835C /* MLXEmbedders */,
+				E2E5FDB02EFF5A6800E4835C /* MLXLLM */,
+				E2E5FDB22EFF5A6800E4835C /* MLXLMCommon */,
+				E2E5FDB42EFF5A6800E4835C /* MLXMNIST */,
+				E2E5FDB62EFF5A6800E4835C /* MLXVLM */,
 			);
 			productName = Axon;
 			productReference = E254ED962EB21B76000CDD9D /* Axon.app */;
@@ -433,6 +449,7 @@
 				E21FCC002EFA24B1009EF882 /* XCRemoteSwiftPackageReference "kokoro-ios" */,
 				E2E5FD832EFF41DF00E4835C /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */,
 				E2E5FD862EFF4F8F00E4835C /* XCRemoteSwiftPackageReference "swift-huggingface" */,
+				E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E254ED972EB21B76000CDD9D /* Products */;
@@ -1035,6 +1052,14 @@
 				minimumVersion = 0.5.0;
 			};
 		};
+		E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-examples";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.29.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1142,6 +1167,31 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E2E5FD862EFF4F8F00E4835C /* XCRemoteSwiftPackageReference "swift-huggingface" */;
 			productName = HuggingFace;
+		};
+		E2E5FDAE2EFF5A6800E4835C /* MLXEmbedders */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXEmbedders;
+		};
+		E2E5FDB02EFF5A6800E4835C /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLLM;
+		};
+		E2E5FDB22EFF5A6800E4835C /* MLXLMCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLMCommon;
+		};
+		E2E5FDB42EFF5A6800E4835C /* MLXMNIST */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXMNIST;
+		};
+		E2E5FDB62EFF5A6800E4835C /* MLXVLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXVLM;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
