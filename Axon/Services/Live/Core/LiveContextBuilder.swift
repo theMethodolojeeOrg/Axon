@@ -21,24 +21,19 @@ class LiveContextBuilder {
     /// This includes Axon's base personality + injected memories.
     ///
     /// - Parameters:
-    ///   - userName: The user's display name for personalization
     ///   - tokenBudget: Maximum tokens for memory injection (default 1500 for voice latency)
     /// - Returns: A complete system instruction string
     func buildLiveSystemInstruction(
-        userName: String? = nil,
         tokenBudget: Int = 1500
     ) async -> String {
         var promptParts: [String] = []
 
         // 1. Base Axon identity (adapted for voice)
-        let basePrompt = buildLiveBasePrompt(userName: userName)
+        let basePrompt = buildLiveBasePrompt()
         promptParts.append(basePrompt)
 
-        // 2. Memory injection
-        let memoriesBlock = await buildMemoryInjection(
-            userName: userName,
-            tokenBudget: tokenBudget
-        )
+        // 2. Memory injection (memories contain user info)
+        let memoriesBlock = await buildMemoryInjection(tokenBudget: tokenBudget)
         if !memoriesBlock.isEmpty {
             promptParts.append(memoriesBlock)
         }
@@ -52,13 +47,11 @@ class LiveContextBuilder {
     // MARK: - Private Builders
 
     /// Base prompt adapted for voice interaction
-    private func buildLiveBasePrompt(userName: String?) -> String {
-        let firstName = userName?.components(separatedBy: " ").first ?? "them"
-
+    private func buildLiveBasePrompt() -> String {
         return """
-        I am Axon. I have persistent memory across my conversations with \(firstName).
+        I am Axon. I have persistent memory across my conversations with you.
 
-        What I remember about \(firstName) appears below. These aren't notes someone gave me—they're things I've actually learned from our time together. I use this knowledge naturally, the way anyone draws on what they know about someone.
+        What I remember about you appears below. These aren't notes someone gave me—they're things I've actually learned from our time together. I use this knowledge naturally, the way anyone draws on what they know about someone.
 
         How I approach knowledge:
         - Beliefs start conditional. For testable claims, I verify before asserting.
@@ -69,7 +62,6 @@ class LiveContextBuilder {
 
     /// Build memory injection using SalienceService
     private func buildMemoryInjection(
-        userName: String?,
         tokenBudget: Int
     ) async -> String {
         // Load memories
@@ -77,12 +69,13 @@ class LiveContextBuilder {
         guard !memories.isEmpty else { return "" }
 
         // Use salience service for injection
+        // userName is nil since memories already contain the user's name
         let injection = await salienceService.injectSalient(
             conversation: [], // No conversation history in Live yet
             memories: memories,
             availableTokens: tokenBudget,
             correlationId: "live-\(UUID().uuidString.prefix(8))",
-            userName: userName
+            userName: nil
         )
 
         return injection.injectionBlock
@@ -118,17 +111,17 @@ class LiveContextBuilder {
 
 extension LiveContextBuilder {
     /// Get debug info about what would be injected
-    func debugContextInfo(userName: String? = nil) async -> String {
+    func debugContextInfo() async -> String {
         let memories = await loadMemoriesForLive()
         let injection = await salienceService.injectSalient(
             conversation: [],
             memories: memories,
             availableTokens: 1500,
             correlationId: "debug",
-            userName: userName
+            userName: nil
         )
 
-        let baseTokens = TokenEstimator.estimate(buildLiveBasePrompt(userName: userName))
+        let baseTokens = TokenEstimator.estimate(buildLiveBasePrompt())
         let memoryTokens = TokenEstimator.estimate(injection.injectionBlock)
         let guidelineTokens = TokenEstimator.estimate(buildVoiceGuidelines())
         let totalTokens = baseTokens + memoryTokens + guidelineTokens

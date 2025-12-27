@@ -423,14 +423,12 @@ struct AppContainerView: View {
 
         Task {
             // Build full Axon context with personality and memories
-            let userName = await getUserDisplayName()
             let systemInstruction = await LiveContextBuilder.shared.buildLiveSystemInstruction(
-                userName: userName,
                 tokenBudget: 1500 // Keep concise for voice latency
             )
 
             // Debug: log what we're injecting
-            let debugInfo = await LiveContextBuilder.shared.debugContextInfo(userName: userName)
+            let debugInfo = await LiveContextBuilder.shared.debugContextInfo()
             debugLog(.liveSession, debugInfo)
 
             let config = LiveSessionConfig(
@@ -442,16 +440,6 @@ struct AppContainerView: View {
             )
 
             await liveService.startSession(config: config, providerType: provider)
-        }
-    }
-
-    /// Get user's display name for personalization
-    private func getUserDisplayName() async -> String? {
-        return await withCheckedContinuation { continuation in
-            Task { @MainActor in
-                let name = SettingsViewModel.shared.settings.userDisplayName
-                continuation.resume(returning: name.isEmpty ? nil : name)
-            }
         }
     }
 }

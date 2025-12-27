@@ -24,12 +24,21 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
     /// Current provider capabilities
     @Published var currentCapabilities: LiveProviderCapabilities?
 
+    /// Whether the noise gate is currently open (audio is passing through)
+    @Published var isNoiseGateOpen: Bool = false
+
     // MARK: - Private State
 
     private var provider: LiveProviderProtocol?
     private var audioEngine: AVAudioEngine?
     private var inputNode: AVAudioInputNode?
     private var playerNode: AVAudioPlayerNode?
+
+    /// Noise gate for filtering background noise
+    private let noiseGate = NoiseGate()
+
+    /// Whether noise gate is enabled for this session
+    private var noiseGateEnabled: Bool = true
 
     /// Output audio format for playback (24kHz mono Int16 - Gemini/OpenAI standard)
     private let outputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 24000, channels: 1, interleaved: false)!
@@ -56,6 +65,14 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
         status = .connecting
         latestTranscript = ""  // Reset transcript
         debugLog(.liveSession, "Status changed to connecting")
+
+        // Configure noise gate from settings
+        let liveSettings = SettingsViewModel.shared.settings.liveSettings
+        noiseGateEnabled = liveSettings.noiseGateEnabled
+        noiseGate.configure(from: liveSettings)
+        noiseGate.reset()
+        isNoiseGateOpen = false
+        debugLog(.liveSession, "Noise gate configured: enabled=\(noiseGateEnabled), threshold=\(liveSettings.noiseGateThreshold)")
 
         // Detect capabilities for this provider/model combination
         let capabilities = factory.detectCapabilities(for: providerType, modelId: config.modelId)
@@ -193,14 +210,32 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
         input.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, time in
             guard let self = self, self.isMicEnabled else { return }
 
-            // Calculate level
+            // Calculate level for visualization
             let level = self.calculateRMS(buffer: buffer)
             DispatchQueue.main.async {
                 self.inputLevel = level
             }
 
-            // Send to provider
-            self.provider?.sendAudio(buffer: buffer)
+            // Apply noise gate if enabled
+            if self.noiseGateEnabled {
+                let shouldPass = self.noiseGate.shouldPass(buffer: buffer)
+                let gateOpen = self.noiseGate.state == .open || self.noiseGate.state == .hold
+
+                // Update gate state on main thread
+                DispatchQueue.main.async {
+                    if self.isNoiseGateOpen != gateOpen {
+                        self.isNoiseGateOpen = gateOpen
+                    }
+                }
+
+                // Only send audio if gate is open
+                if shouldPass {
+                    self.provider?.sendAudio(buffer: buffer)
+                }
+            } else {
+                // No noise gate - send all audio
+                self.provider?.sendAudio(buffer: buffer)
+            }
         }
 
         debugLog(.liveSession, "Starting audio engine...")

@@ -2994,6 +2994,24 @@ struct LiveSettings: Codable, Equatable, Sendable {
     /// VAD sensitivity (0.0 = very sensitive, 1.0 = less sensitive)
     var vadSensitivity: Float = 0.5
 
+    // MARK: - Noise Gate Settings
+
+    /// Enable noise gate to filter out background noise
+    var noiseGateEnabled: Bool = true
+
+    /// Noise gate threshold (0.0 = very sensitive, 1.0 = aggressive filtering)
+    /// This is the RMS level below which audio is silenced
+    var noiseGateThreshold: Float = 0.02
+
+    /// Attack time - how quickly the gate opens when speech is detected (ms)
+    var noiseGateAttackMs: Int = 10
+
+    /// Hold time - how long to keep gate open after speech stops (ms)
+    var noiseGateHoldMs: Int = 200
+
+    /// Release time - how quickly the gate closes after hold time (ms)
+    var noiseGateReleaseMs: Int = 50
+
     // MARK: - STT Settings
 
     /// Use on-device speech-to-text

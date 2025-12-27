@@ -124,6 +124,45 @@ struct LiveVoiceSettingsView: View {
                 Text("Local VAD detects when you start and stop speaking. Higher sensitivity picks up quieter speech.")
             }
 
+            // MARK: - Noise Gate
+            Section {
+                Toggle("Noise Gate", isOn: $viewModel.settings.liveSettings.noiseGateEnabled)
+
+                if viewModel.settings.liveSettings.noiseGateEnabled {
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Text("Threshold")
+                            Spacer()
+                            Text(noiseGateThresholdLabel)
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(
+                            value: $viewModel.settings.liveSettings.noiseGateThreshold,
+                            in: 0.005...0.1,
+                            step: 0.005
+                        )
+                    }
+
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Text("Hold Time")
+                            Spacer()
+                            Text("\(viewModel.settings.liveSettings.noiseGateHoldMs) ms")
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(
+                            value: noiseGateHoldBinding,
+                            in: 50...500,
+                            step: 50
+                        )
+                    }
+                }
+            } header: {
+                Text("Noise Gate")
+            } footer: {
+                Text("Filters out background noise. Higher threshold blocks more ambient sounds but may cut off quiet speech.")
+            }
+
             // MARK: - Speech Recognition
             Section {
                 Toggle("On-Device Speech Recognition", isOn: $viewModel.settings.liveSettings.useOnDeviceSTT)
@@ -190,6 +229,28 @@ struct LiveVoiceSettingsView: View {
         } else {
             return "Less Sensitive"
         }
+    }
+
+    private var noiseGateThresholdLabel: String {
+        let value = viewModel.settings.liveSettings.noiseGateThreshold
+        if value < 0.015 {
+            return "Very Low"
+        } else if value < 0.03 {
+            return "Low"
+        } else if value < 0.05 {
+            return "Medium"
+        } else if value < 0.07 {
+            return "High"
+        } else {
+            return "Very High"
+        }
+    }
+
+    private var noiseGateHoldBinding: Binding<Double> {
+        Binding(
+            get: { Double(viewModel.settings.liveSettings.noiseGateHoldMs) },
+            set: { viewModel.settings.liveSettings.noiseGateHoldMs = Int($0) }
+        )
     }
 
     private func executionModeBadge(for provider: AIProvider) -> some View {

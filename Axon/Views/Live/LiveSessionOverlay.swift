@@ -28,11 +28,12 @@ struct LiveSessionOverlay: View {
 
                 // Simple Visualizer
                 HStack(spacing: 8) {
-                    // Input Level (Mic)
+                    // Input Level (Mic) - color indicates noise gate state
                     Capsule()
-                        .fill(Color.green)
+                        .fill(liveService.isNoiseGateOpen ? Color.green : Color.gray.opacity(0.5))
                         .frame(width: 8, height: 20 + CGFloat(liveService.inputLevel * 200))
                         .animation(.spring(response: 0.1), value: liveService.inputLevel)
+                        .animation(.easeInOut(duration: 0.1), value: liveService.isNoiseGateOpen)
 
                     // Output Level (Speaker)
                     Capsule()
@@ -41,6 +42,18 @@ struct LiveSessionOverlay: View {
                         .animation(.spring(response: 0.1), value: liveService.outputLevel)
                 }
                 .frame(height: 100)
+
+                // Noise Gate Indicator
+                if liveService.isNoiseGateOpen {
+                    Text("Transmitting")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .background(Color.green.opacity(0.2))
+                        .cornerRadius(8)
+                        .transition(.opacity)
+                }
 
                 // Transcript / Feedback
                 if !liveService.latestTranscript.isEmpty {
