@@ -345,29 +345,61 @@ struct ChatInfoSettingsView: View {
                         .foregroundColor(AppColors.textSecondary)
 
                     Menu {
-                        Button("Default (\(settingsViewModel.settings.liveSettings.defaultProvider == .openai ? "OpenAI" : "Gemini"))") {
+                        Button("Default (\(liveProviderDisplayName(settingsViewModel.settings.liveSettings.defaultProvider)))") {
                             selectedLiveProvider = nil
                             selectedLiveModel = nil
                             selectedLiveVoice = nil
                             saveConversationOverrides()
                         }
                         Divider()
-                        Button("Gemini Live") {
-                            selectedLiveProvider = "gemini"
-                            saveConversationOverrides()
+
+                        // Native real-time providers (WebSocket)
+                        Section("Native Real-time") {
+                            Button("Gemini Live") {
+                                selectedLiveProvider = "gemini"
+                                saveConversationOverrides()
+                            }
+                            Button("OpenAI Realtime") {
+                                selectedLiveProvider = "openai"
+                                saveConversationOverrides()
+                            }
                         }
-                        Button("OpenAI Realtime") {
-                            selectedLiveProvider = "openai"
-                            saveConversationOverrides()
+
+                        // HTTP streaming providers (STT + API + TTS)
+                        Section("HTTP Streaming") {
+                            Button("Anthropic (Claude)") {
+                                selectedLiveProvider = "anthropic"
+                                saveConversationOverrides()
+                            }
+                            Button("xAI (Grok)") {
+                                selectedLiveProvider = "xai"
+                                saveConversationOverrides()
+                            }
+                            Button("Perplexity") {
+                                selectedLiveProvider = "perplexity"
+                                saveConversationOverrides()
+                            }
+                            Button("DeepSeek") {
+                                selectedLiveProvider = "deepseek"
+                                saveConversationOverrides()
+                            }
+                        }
+
+                        // On-device
+                        Section("On-Device") {
+                            Button("MLX (Offline)") {
+                                selectedLiveProvider = "mlx"
+                                saveConversationOverrides()
+                            }
                         }
                     } label: {
                         HStack {
-                            Text(selectedLiveProvider == "openai" ? "OpenAI Realtime" :
-                                 selectedLiveProvider == "gemini" ? "Gemini Live" :
-                                 "Default (\(settingsViewModel.settings.liveSettings.defaultProvider == .openai ? "OpenAI" : "Gemini"))")
+                            Text(selectedLiveProviderLabel)
                                 .font(AppTypography.bodySmall())
                                 .foregroundColor(AppColors.textPrimary)
                             Spacer()
+                            // Execution mode badge
+                            liveExecutionModeBadge
                             Image(systemName: "chevron.up.chevron.down")
                                 .font(.system(size: 12))
                                 .foregroundColor(AppColors.textTertiary)
@@ -379,55 +411,70 @@ struct ChatInfoSettingsView: View {
                     .buttonStyle(.plain)
                 }
 
-                // Voice Selection
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Voice")
-                        .font(AppTypography.labelSmall())
-                        .foregroundColor(AppColors.textSecondary)
+                // Voice Selection (only for native real-time providers)
+                if selectedLiveProvider == nil || selectedLiveProvider == "openai" || selectedLiveProvider == "gemini" {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Voice")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textSecondary)
 
-                    Menu {
-                        Button("Default") {
-                            selectedLiveVoice = nil
-                            saveConversationOverrides()
+                        Menu {
+                            Button("Default") {
+                                selectedLiveVoice = nil
+                                saveConversationOverrides()
+                            }
+                            Divider()
+                            if (selectedLiveProvider == "openai") || (selectedLiveProvider == nil && settingsViewModel.settings.liveSettings.defaultProvider == .openai) {
+                                Button("Alloy") { selectedLiveVoice = "alloy"; saveConversationOverrides() }
+                                Button("Ash") { selectedLiveVoice = "ash"; saveConversationOverrides() }
+                                Button("Ballad") { selectedLiveVoice = "ballad"; saveConversationOverrides() }
+                                Button("Coral") { selectedLiveVoice = "coral"; saveConversationOverrides() }
+                                Button("Echo") { selectedLiveVoice = "echo"; saveConversationOverrides() }
+                                Button("Marin") { selectedLiveVoice = "marin"; saveConversationOverrides() }
+                                Button("Sage") { selectedLiveVoice = "sage"; saveConversationOverrides() }
+                                Button("Shimmer") { selectedLiveVoice = "shimmer"; saveConversationOverrides() }
+                                Button("Verse") { selectedLiveVoice = "verse"; saveConversationOverrides() }
+                            } else {
+                                // Gemini voices
+                                Button("Aoede") { selectedLiveVoice = "Aoede"; saveConversationOverrides() }
+                                Button("Callirrhoe") { selectedLiveVoice = "Callirrhoe"; saveConversationOverrides() }
+                                Button("Charon") { selectedLiveVoice = "Charon"; saveConversationOverrides() }
+                                Button("Fenrir") { selectedLiveVoice = "Fenrir"; saveConversationOverrides() }
+                                Button("Kore") { selectedLiveVoice = "Kore"; saveConversationOverrides() }
+                                Button("Leda") { selectedLiveVoice = "Leda"; saveConversationOverrides() }
+                                Button("Orus") { selectedLiveVoice = "Orus"; saveConversationOverrides() }
+                                Button("Puck") { selectedLiveVoice = "Puck"; saveConversationOverrides() }
+                                Button("Zephyr") { selectedLiveVoice = "Zephyr"; saveConversationOverrides() }
+                            }
+                        } label: {
+                            HStack {
+                                Text(selectedLiveVoice ?? "Default")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textPrimary)
+                                Spacer()
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppColors.textTertiary)
+                            }
+                            .padding(12)
+                            .background(AppColors.substrateSecondary)
+                            .cornerRadius(8)
                         }
-                        Divider()
-                        if (selectedLiveProvider == "openai") || (selectedLiveProvider == nil && settingsViewModel.settings.liveSettings.defaultProvider == .openai) {
-                            Button("Alloy") { selectedLiveVoice = "alloy"; saveConversationOverrides() }
-                            Button("Ash") { selectedLiveVoice = "ash"; saveConversationOverrides() }
-                            Button("Ballad") { selectedLiveVoice = "ballad"; saveConversationOverrides() }
-                            Button("Coral") { selectedLiveVoice = "coral"; saveConversationOverrides() }
-                            Button("Echo") { selectedLiveVoice = "echo"; saveConversationOverrides() }
-                            Button("Sage") { selectedLiveVoice = "sage"; saveConversationOverrides() }
-                            Button("Shimmer") { selectedLiveVoice = "shimmer"; saveConversationOverrides() }
-                            Button("Verse") { selectedLiveVoice = "verse"; saveConversationOverrides() }
-                            Button("Marin") { selectedLiveVoice = "marin"; saveConversationOverrides() }
-                        } else {
-                            // Gemini voices
-                            Button("Kore") { selectedLiveVoice = "Kore"; saveConversationOverrides() }
-                            Button("Leda") { selectedLiveVoice = "Leda"; saveConversationOverrides() }
-                            Button("Puck") { selectedLiveVoice = "Puck"; saveConversationOverrides() }
-                            Button("Charon") { selectedLiveVoice = "Charon"; saveConversationOverrides() }
-                            Button("Fenrir") { selectedLiveVoice = "Fenrir"; saveConversationOverrides() }
-                            Button("Orus") { selectedLiveVoice = "Orus"; saveConversationOverrides() }
-                            Button("Aoede") { selectedLiveVoice = "Aoede"; saveConversationOverrides() }
-                            Button("Callirrhoe") { selectedLiveVoice = "Callirrhoe"; saveConversationOverrides() }
-                            Button("Zenir") { selectedLiveVoice = "Zenir"; saveConversationOverrides() }
-                        }
-                    } label: {
-                        HStack {
-                            Text(selectedLiveVoice ?? "Default")
-                                .font(AppTypography.bodySmall())
-                                .foregroundColor(AppColors.textPrimary)
-                            Spacer()
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 12))
-                                .foregroundColor(AppColors.textTertiary)
-                        }
-                        .padding(12)
-                        .background(AppColors.substrateSecondary)
-                        .cornerRadius(8)
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                } else {
+                    // HTTP streaming or MLX providers use Kokoro TTS
+                    HStack(spacing: 8) {
+                        Image(systemName: "waveform")
+                            .font(.system(size: 14))
+                            .foregroundColor(AppColors.textTertiary)
+                        Text("Uses Kokoro TTS for voice output")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+                    .padding(12)
+                    .background(AppColors.substrateSecondary)
+                    .cornerRadius(8)
                 }
             }
         }
@@ -528,6 +575,48 @@ struct ChatInfoSettingsView: View {
         // MARK: - Tools Section
         ChatInfoSection(title: "Tools") {
             VStack(spacing: 16) {
+                // Execution Mode Toggle
+                HStack(spacing: 12) {
+                    Image(systemName: settingsViewModel.settings.toolSettings.executionMode.icon)
+                        .font(.system(size: 16))
+                        .foregroundColor(AppColors.signalMercury)
+                        .frame(width: 24)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Execution Mode")
+                            .font(AppTypography.bodySmall(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Text(settingsViewModel.settings.toolSettings.executionMode.description)
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+
+                    Spacer()
+
+                    // Segmented picker
+                    Picker("", selection: Binding(
+                        get: { settingsViewModel.settings.toolSettings.executionMode },
+                        set: { newMode in
+                            Task {
+                                var updated = settingsViewModel.settings.toolSettings
+                                updated.executionMode = newMode
+                                await settingsViewModel.updateSetting(\.toolSettings, updated)
+                            }
+                        }
+                    )) {
+                        ForEach(ToolExecutionMode.allCases) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 160)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
+
                 // Gemini Tools
                 ChatInfoToolCategorySection(
                     title: "Google (Gemini)",
@@ -868,6 +957,80 @@ struct ChatInfoSettingsView: View {
         }
     }
     #endif
+
+    // MARK: - Live Provider Helpers
+
+    private func liveProviderDisplayName(_ provider: AIProvider) -> String {
+        switch provider {
+        case .gemini: return "Gemini"
+        case .openai: return "OpenAI"
+        case .anthropic: return "Anthropic"
+        case .xai: return "xAI"
+        case .perplexity: return "Perplexity"
+        case .deepseek: return "DeepSeek"
+        case .localMLX: return "MLX"
+        default: return provider.displayName
+        }
+    }
+
+    private var selectedLiveProviderLabel: String {
+        guard let provider = selectedLiveProvider else {
+            return "Default (\(liveProviderDisplayName(settingsViewModel.settings.liveSettings.defaultProvider)))"
+        }
+        switch provider {
+        case "openai": return "OpenAI Realtime"
+        case "gemini": return "Gemini Live"
+        case "anthropic": return "Anthropic (Claude)"
+        case "xai": return "xAI (Grok)"
+        case "perplexity": return "Perplexity"
+        case "deepseek": return "DeepSeek"
+        case "mlx": return "MLX (Offline)"
+        default: return provider.capitalized
+        }
+    }
+
+    private var liveExecutionModeBadge: some View {
+        let mode = effectiveLiveExecutionMode
+        return Text(mode.displayName)
+            .font(.system(size: 10, weight: .medium))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(liveExecutionModeColor(mode).opacity(0.2))
+            .foregroundColor(liveExecutionModeColor(mode))
+            .cornerRadius(4)
+    }
+
+    private var effectiveLiveExecutionMode: ExecutionMode {
+        guard let provider = selectedLiveProvider else {
+            // Use default provider's mode
+            return LiveProviderFactory.shared.detectCapabilities(
+                for: settingsViewModel.settings.liveSettings.defaultProvider,
+                modelId: settingsViewModel.settings.liveSettings.defaultModelId
+            ).executionMode
+        }
+
+        switch provider {
+        case "openai", "gemini":
+            return .cloudWebSocket
+        case "anthropic", "xai", "perplexity", "deepseek":
+            return .cloudHTTPStreaming
+        case "mlx":
+            return .onDeviceMLX
+        default:
+            return .cloudHTTPStreaming
+        }
+    }
+
+    private func liveExecutionModeColor(_ mode: ExecutionMode) -> Color {
+        switch mode {
+        case .cloudWebSocket:
+            return AppColors.signalLichen
+        case .cloudHTTPStreaming:
+            return AppColors.signalMercury
+        case .onDeviceMLX:
+            return .purple
+        }
+    }
 
     // MARK: - Helpers
 

@@ -850,9 +850,10 @@ struct ToolRequestCodeBlockView: View {
     var isFromHistory: Bool = false
 
     /// Controls whether tool requests auto-execute when they appear
-    /// When true, tools execute automatically as soon as the view renders
-    /// When false, user must click "Apply" to execute
-    static var autoExecuteEnabled: Bool = true
+    /// Reads from global tool settings - .immediate = auto-execute, .deferred = manual apply
+    private var autoExecuteEnabled: Bool {
+        SettingsViewModel.shared.settings.toolSettings.executionMode == .immediate
+    }
 
     @State private var executionState: ToolExecutionState = .notExecuted
     @State private var executionResult: String?
@@ -1099,8 +1100,8 @@ struct ToolRequestCodeBlockView: View {
             // Don't auto-execute - just show it as not executed (user can manually run if needed)
             // This prevents the "all tools re-execute on app rebuild" bug
             print("[ToolRequestCodeBlockView] Skipping auto-execute for history tool: \(parsedRequest?.tool ?? "unknown")")
-        } else if Self.autoExecuteEnabled && executionState == .notExecuted {
-            // Newly streamed tool request - auto-execute on appear
+        } else if autoExecuteEnabled && executionState == .notExecuted {
+            // Newly streamed tool request - auto-execute on appear (immediate mode)
             // This is the key to decoupling display from execution
             // The tool request is in the markdown, the UI renders it, and we execute when ready
             executeToolRequest()

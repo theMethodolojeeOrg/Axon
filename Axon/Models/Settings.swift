@@ -1858,6 +1858,40 @@ struct VoiceSettings: Codable, Equatable {
     var useSpeakerBoost: Bool = false
 }
 
+// MARK: - Tool Execution Mode
+
+/// Controls when tool requests are executed during a conversation
+enum ToolExecutionMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// Tools execute automatically as soon as they're streamed from the assistant
+    case immediate
+
+    /// Tools show "Apply" button; results are sent with the user's next message
+    case deferred
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .immediate: return "Immediate"
+        case .deferred: return "Deferred"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .immediate: return "Execute tools automatically as they stream"
+        case .deferred: return "Review and apply tools manually"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .immediate: return "bolt.fill"
+        case .deferred: return "hand.tap.fill"
+        }
+    }
+}
+
 // MARK: - Tool Settings
 
 /// Settings for AI tool use (web search, code execution, etc.)
@@ -1885,6 +1919,9 @@ struct ToolSettings: Codable, Equatable, Sendable {
     /// Enable chat debug mode (developer feature)
     /// Shows detailed context breakdown, token counts, and injection details in chat
     var chatDebugEnabled: Bool = false
+
+    /// Tool execution mode: immediate (auto-execute) or deferred (manual apply)
+    var executionMode: ToolExecutionMode = .immediate
 
     /// Helper to check if a specific tool is enabled
     func isToolEnabled(_ tool: ToolId) -> Bool {

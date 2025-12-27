@@ -419,13 +419,13 @@ struct AssistantMessageView: View {
                     toolCalls: toolCalls
                 )
             } else {
-                // Standard markdown rendering (non-streaming / loaded from history)
-                // Pass persisted liveToolCalls to prevent re-execution of already-completed tools
-                // isFromHistory: true prevents auto-execution of tool requests on app restart
+                // Standard markdown rendering
+                // When streaming: isFromHistory=false allows tools to auto-execute (if enabled)
+                // When not streaming: isFromHistory=true prevents re-execution on app restart
                 AssistantMarkdownView(
                     content: textToRender,
                     executedToolCalls: message.liveToolCalls,
-                    isFromHistory: true
+                    isFromHistory: !isStreaming
                 )
                 .codeArtifactHost()
             }

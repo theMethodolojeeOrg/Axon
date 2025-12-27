@@ -40,6 +40,21 @@ final class ToolRoutingService: ObservableObject {
         logger.debug("ToolRoutingService initialized")
     }
 
+    // MARK: - Tool Availability
+
+    /// Check if any tools are available for use (V1 or V2)
+    /// - Parameter enabledV1Tools: Set of enabled V1 tool IDs
+    /// - Returns: True if tools are available and should trigger tool proxy mode
+    func hasAnyToolsAvailable(enabledV1Tools: Set<String>) -> Bool {
+        if toolsToggle.isV2Active {
+            // V2 mode: check if any V2 tools are enabled
+            return !pluginLoader.enabledTools.isEmpty
+        } else {
+            // V1 mode: check if any V1 tools are enabled
+            return !enabledV1Tools.isEmpty
+        }
+    }
+
     // MARK: - System Prompt Generation
 
     /// Generate tool system prompt based on active tool system

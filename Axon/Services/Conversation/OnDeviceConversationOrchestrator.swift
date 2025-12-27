@@ -141,12 +141,14 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var systemPrompt = epistemicResult.systemPrompt
         let usedMemories = epistemicResult.usedMemories
 
-        // Use tool proxy for all providers with tools enabled
+        // Use tool proxy for all providers with tools enabled (V1 or V2)
         // Uses minimal discovery-based prompt to reduce context bloat - AI discovers tools via list_tools/get_tool_details
         // All providers (including Gemini) use the same unified tool proxy architecture
-        let useToolProxy = hasGeminiTools
+        let enabledToolIds = Set(enabledTools)
+        let useToolProxy = await MainActor.run {
+            ToolRoutingService.shared.hasAnyToolsAvailable(enabledV1Tools: enabledToolIds)
+        }
         if useToolProxy {
-            let enabledToolIds = Set(requestedGeminiTools)
             let maxToolCalls = await MainActor.run {
                 SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
             }
@@ -156,7 +158,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 maxToolCalls: maxToolCalls
             )
             systemPrompt = (systemPrompt ?? "") + toolPrompt
-            print("[OnDeviceOrchestrator] Tool proxy mode (discovery-based): injected tool prompt for \(enabledToolIds.count) tools (max \(maxToolCalls) calls)")
+            print("[OnDeviceOrchestrator] Tool proxy mode (discovery-based): injected tool prompt (max \(maxToolCalls) calls)")
         }
 
         // MARK: - Media Proxy for Video/Audio Understanding
@@ -417,11 +419,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         // Track tool prompt tokens for debug
         var toolPromptTokens = 0
 
-        // Use tool proxy for all providers with tools enabled
+        // Use tool proxy for all providers with tools enabled (V1 or V2)
         // Uses minimal discovery-based prompt to reduce context bloat
-        let useToolProxy = hasGeminiTools
+        let enabledToolIds = Set(enabledTools)
+        let useToolProxy = await MainActor.run {
+            ToolRoutingService.shared.hasAnyToolsAvailable(enabledV1Tools: enabledToolIds)
+        }
         if useToolProxy {
-            let enabledToolIds = Set(requestedGeminiTools)
             let maxToolCalls = await MainActor.run {
                 SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
             }

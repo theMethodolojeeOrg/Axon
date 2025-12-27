@@ -104,8 +104,154 @@ struct AutomationSettingsView: View {
                 )
             }
             .buttonStyle(.plain)
+
+            // Tool Execution Configuration (applies to V1 and V2)
+            ToolExecutionConfigSection(viewModel: viewModel)
         }
         .navigationTitle("Automation")
+    }
+}
+
+// MARK: - Tool Execution Configuration Section
+
+/// Configuration settings that apply globally to all tool execution (V1 and V2)
+private struct ToolExecutionConfigSection: View {
+    @ObservedObject var viewModel: SettingsViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Section header
+            Text("Tool Execution")
+                .font(AppTypography.labelSmall())
+                .foregroundColor(AppColors.textTertiary)
+                .textCase(.uppercase)
+                .padding(.horizontal, 4)
+
+            VStack(spacing: 20) {
+                // Execution Mode Toggle
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Execution Mode")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Spacer()
+
+                        // Segmented picker for immediate/deferred
+                        Picker("", selection: Binding(
+                            get: { viewModel.settings.toolSettings.executionMode },
+                            set: { newMode in
+                                Task {
+                                    var updated = viewModel.settings.toolSettings
+                                    updated.executionMode = newMode
+                                    await viewModel.updateSetting(\.toolSettings, updated)
+                                }
+                            }
+                        )) {
+                            ForEach(ToolExecutionMode.allCases) { mode in
+                                Label(mode.displayName, systemImage: mode.icon)
+                                    .tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 200)
+                    }
+
+                    Text(viewModel.settings.toolSettings.executionMode.description)
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                }
+
+                Divider()
+                    .background(AppColors.divider)
+
+                // Max Tool Calls Per Turn
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Max Tool Calls Per Turn")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Spacer()
+
+                        Text("\(viewModel.settings.toolSettings.maxToolCallsPerTurn)")
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.signalMercury)
+                    }
+
+                    Slider(
+                        value: Binding(
+                            get: { Double(viewModel.settings.toolSettings.maxToolCallsPerTurn) },
+                            set: { newValue in
+                                Task {
+                                    var updated = viewModel.settings.toolSettings
+                                    updated.maxToolCallsPerTurn = Int(newValue)
+                                    await viewModel.updateSetting(\.toolSettings, updated)
+                                }
+                            }
+                        ),
+                        in: 1...10,
+                        step: 1
+                    )
+                    .tint(AppColors.signalMercury)
+
+                    Text("Maximum number of tool calls per response")
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                }
+
+                Divider()
+                    .background(AppColors.divider)
+
+                // Tool Timeout
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Tool Timeout")
+                            .font(AppTypography.bodyMedium())
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Spacer()
+
+                        Text("\(viewModel.settings.toolSettings.toolTimeout)s")
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.signalMercury)
+                    }
+
+                    Slider(
+                        value: Binding(
+                            get: { Double(viewModel.settings.toolSettings.toolTimeout) },
+                            set: { newValue in
+                                Task {
+                                    var updated = viewModel.settings.toolSettings
+                                    updated.toolTimeout = Int(newValue)
+                                    await viewModel.updateSetting(\.toolSettings, updated)
+                                }
+                            }
+                        ),
+                        in: 10...120,
+                        step: 10
+                    )
+                    .tint(AppColors.signalMercury)
+
+                    Text("How long to wait for tool execution before timing out")
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                }
+            }
+            .padding()
+            .background(AppColors.substrateSecondary)
+            .cornerRadius(12)
+
+            // Info text
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 12))
+                Text("These settings apply to all tool systems (V1 and V2)")
+                    .font(AppTypography.labelSmall())
+            }
+            .foregroundColor(AppColors.textTertiary)
+            .padding(.horizontal, 4)
+        }
     }
 }
 
