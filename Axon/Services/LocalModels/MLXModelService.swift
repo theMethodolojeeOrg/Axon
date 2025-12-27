@@ -13,10 +13,11 @@ import UIKit
 #endif
 
 // MLX packages for on-device inference
-#if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
+#if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon) && canImport(MLXVLM)
 import MLX
 import MLXLLM
 import MLXLMCommon
+import MLXVLM
 import Tokenizers
 private let mlxPackagesAvailable = true
 #else
@@ -116,6 +117,11 @@ enum LocalMLXModel: String, CaseIterable {
         }
     }
 
+    /// Whether this is a vision-language model (requires VLMModelFactory)
+    var isVisionModel: Bool {
+        modalities.contains("vision")
+    }
+
     /// Convert to AIModel for unified selection
     func toAIModel() -> AIModel {
         AIModel(
@@ -175,7 +181,7 @@ struct BundledMLXModels {
 final class MLXModelService: ObservableObject {
     static let shared = MLXModelService()
 
-    #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
+    #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon) && canImport(MLXVLM)
     /// Cached model container to avoid reloading
     private var modelContainer: ModelContainer?
     private var currentModelId: String?
@@ -231,14 +237,14 @@ final class MLXModelService: ObservableObject {
 
     /// Clear the KV cache to free memory
     func clearCache() {
-        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
+        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon) && canImport(MLXVLM)
         // Model container manages its own cache - unload to free memory
         #endif
     }
 
     /// Unload the model completely to free memory
     func unloadModel() {
-        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
+        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon) && canImport(MLXVLM)
         modelContainer = nil
         currentModelId = nil
         #endif
@@ -248,7 +254,7 @@ final class MLXModelService: ObservableObject {
 
     /// Check if model is currently loaded
     var isModelLoaded: Bool {
-        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
+        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon) && canImport(MLXVLM)
         return modelContainer != nil
         #else
         return false
@@ -423,7 +429,7 @@ final class MLXModelService: ObservableObject {
     /// Load a model from local path or HuggingFace
     /// - Parameter modelId: HuggingFace model ID (e.g., "mlx-community/SmolLM2-1.7B-Instruct-4bit")
     func loadModel(modelId: String = LocalMLXModel.defaultModel.rawValue) async throws {
-        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
+        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon) && canImport(MLXVLM)
 
         #if targetEnvironment(simulator)
         throw MLXModelError.simulatorNotSupported
@@ -460,13 +466,31 @@ final class MLXModelService: ObservableObject {
                 config = ModelConfiguration(id: modelId)
             }
 
-            // Load the model using LLMModelFactory
+            // Determine if this is a vision model
+            let isVisionModel = Self.isVisionModel(modelId: modelId)
+
+            // Load the model using appropriate factory
             loadingStatus = "Initializing model..."
-            let container = try await LLMModelFactory.shared.loadContainer(configuration: config) { progress in
-                Task { @MainActor in
-                    self.downloadProgress = progress.fractionCompleted
-                    if progress.fractionCompleted < 1.0 {
-                        self.loadingStatus = String(format: "Downloading... %.0f%%", progress.fractionCompleted * 100)
+            let container: ModelContainer
+
+            if isVisionModel {
+                print("[MLXModelService] Using VLMModelFactory for vision model")
+                container = try await VLMModelFactory.shared.loadContainer(configuration: config) { progress in
+                    Task { @MainActor in
+                        self.downloadProgress = progress.fractionCompleted
+                        if progress.fractionCompleted < 1.0 {
+                            self.loadingStatus = String(format: "Downloading... %.0f%%", progress.fractionCompleted * 100)
+                        }
+                    }
+                }
+            } else {
+                print("[MLXModelService] Using LLMModelFactory for text model")
+                container = try await LLMModelFactory.shared.loadContainer(configuration: config) { progress in
+                    Task { @MainActor in
+                        self.downloadProgress = progress.fractionCompleted
+                        if progress.fractionCompleted < 1.0 {
+                            self.loadingStatus = String(format: "Downloading... %.0f%%", progress.fractionCompleted * 100)
+                        }
                     }
                 }
             }
@@ -495,6 +519,26 @@ final class MLXModelService: ObservableObject {
         #endif
     }
 
+    /// Determine if a model ID is a vision-language model
+    private static func isVisionModel(modelId: String) -> Bool {
+        // Check known VLM patterns
+        let vlmPatterns = ["VL", "vl", "vision", "Vision", "paligemma", "Paligemma", "idefics", "smolvlm"]
+        let modelName = modelId.lowercased()
+
+        for pattern in vlmPatterns {
+            if modelName.contains(pattern.lowercased()) {
+                return true
+            }
+        }
+
+        // Also check LocalMLXModel enum if it matches
+        if let localModel = LocalMLXModel(rawValue: modelId) {
+            return localModel.isVisionModel
+        }
+
+        return false
+    }
+
     // MARK: - Text Generation
 
     /// Generate a response using the loaded model
@@ -503,7 +547,7 @@ final class MLXModelService: ObservableObject {
         messages: [Message],
         maxTokens: Int = 2048
     ) async throws -> String {
-        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
+        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon) && canImport(MLXVLM)
 
         guard let container = modelContainer else {
             throw MLXModelError.notLoaded
@@ -552,7 +596,7 @@ final class MLXModelService: ObservableObject {
         maxTokens: Int = 2048,
         onToken: @escaping @Sendable (String) -> Void
     ) async throws {
-        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
+        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon) && canImport(MLXVLM)
 
         guard let container = modelContainer else {
             throw MLXModelError.notLoaded
@@ -604,7 +648,7 @@ final class MLXModelService: ObservableObject {
 
     // MARK: - Message Formatting
 
-    #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
+    #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon) && canImport(MLXVLM)
     /// Convert app messages to Chat.Message for MLX UserInput
     private func buildChatMessages(systemPrompt: String?, messages: [Message]) -> [Chat.Message] {
         var chatMessages: [Chat.Message] = []
