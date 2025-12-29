@@ -126,6 +126,15 @@ final class HeartbeatService: ObservableObject {
             return .skipped("Quiet hours active.")
         }
 
+        // Route based on execution mode
+        switch heartbeat.executionMode {
+        case .soloThread:
+            return await runSoloThreadMode(reason: reason, settings: settings)
+        case .internalThread:
+            // Continue with internal thread (silent) mode below
+            break
+        }
+
         // Signal Live Activity that we're running
         await liveActivityService.markHeartbeatRunning()
 
@@ -194,6 +203,66 @@ final class HeartbeatService: ObservableObject {
             }
             return .failed(error.localizedDescription)
         }
+    }
+    
+    // MARK: - Solo Thread Mode
+    
+    /// Run heartbeat in solo thread mode - creates a visible conversation with tool access
+    private func runSoloThreadMode(reason: String, settings: AppSettings) async -> HeartbeatRunResult {
+        let soloService = SoloThreadService.shared
+        
+        // Check if a solo session is already active
+        if soloService.activeSoloThreadId != nil {
+            return .skipped("Solo session already active.")
+        }
+        
+        // Build initial prompt from context modules
+        let modules = await buildContextModules(settings: settings)
+        let prompt = buildSoloPrompt(modules: modules, reason: reason)
+        
+        do {
+            // Start solo session
+            let conversation = try await soloService.startSoloSession(
+                initialPrompt: prompt,
+                turnsAllocated: settings.heartbeatSettings.soloTurnsPerSession,
+                agendaItemId: nil, // TODO: Pick from agenda
+                heartbeatId: UUID().uuidString
+            )
+            
+            lastHeartbeatAt = Date()
+            lastHeartbeatSummary = "Solo session started: \(conversation.id)"
+            
+            // Return success for solo mode (no InternalThreadEntry, uses conversation instead)
+            return .soloStarted(conversationId: conversation.id)
+        } catch {
+            return .failed("Solo session failed: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Build the initial prompt for a solo session
+    private func buildSoloPrompt(modules: [HeartbeatModuleOutput], reason: String) -> String {
+        let moduleLines = modules.map { "- \($0.title): \($0.content)" }.joined(separator: "\n")
+        
+        return """
+        SOLO SESSION STARTED
+        
+        Context:
+        \(moduleLines)
+        
+        Trigger: \(reason)
+        
+        Instructions:
+        You are now in a solo work session. This is a visible conversation where you can:
+        - Use tools to accomplish useful work
+        - Access memories, internal thread, and other resources
+        - Work autonomously on tasks that benefit the user
+        
+        You have been allocated turns to work. At the turn boundary, you'll be presented
+        with a SOLO SESSION CHECKPOINT where you'll use the solo_turn_action tool to
+        decide whether to extend, conclude, pause, or notify.
+        
+        Start by identifying what would be most valuable to work on right now.
+        """
     }
 
     private func isNotificationPreApproved() -> Bool {
@@ -399,6 +468,10 @@ struct HeartbeatRunResult {
 
     static func success(entry: InternalThreadEntry, notified: Bool, moodIcon: HeartbeatMoodIcon? = nil, moodReason: String? = nil) -> HeartbeatRunResult {
         HeartbeatRunResult(status: .success, entry: entry, notified: notified, message: "Heartbeat completed.", moodIcon: moodIcon, moodReason: moodReason)
+    }
+    
+    static func soloStarted(conversationId: String) -> HeartbeatRunResult {
+        HeartbeatRunResult(status: .success, entry: nil, notified: false, message: "Solo session started: \(conversationId)", moodIcon: nil, moodReason: nil)
     }
 
     static func skipped(_ message: String) -> HeartbeatRunResult {
