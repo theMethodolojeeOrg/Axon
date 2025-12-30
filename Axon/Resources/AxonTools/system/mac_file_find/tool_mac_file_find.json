@@ -6,7 +6,7 @@
     "description": "Find files by name pattern in a directory.",
     "category": "system",
     "icon": {
-      "sfSymbol": "folder.badge.magnifyingglass"
+      "sfSymbol": "rectangle.and.text.magnifyingglass"
     },
     "requiresApproval": false,
     "tags": [

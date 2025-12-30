@@ -18,6 +18,7 @@ struct SettingsTabView: View {
 
     enum SettingsTab: String, CaseIterable, Identifiable {
         case general = "General"
+        case account = "Account"
         case providers = "Providers"
         case automation = "Automation"
         case memory = "Memory"
@@ -30,6 +31,7 @@ struct SettingsTabView: View {
         var icon: String {
             switch self {
             case .general: return "gearshape.fill"
+            case .account: return "person.crop.circle.fill"
             case .providers: return "key.fill"
             case .automation: return "wrench.and.screwdriver.fill"
             case .memory: return "AxonLogoTemplate"
@@ -71,6 +73,8 @@ struct SettingsTabView: View {
                         switch selectedTab {
                         case .general:
                             GeneralSettingsView(viewModel: viewModel)
+                        case .account:
+                            AccountSettingsView(viewModel: viewModel)
                         case .providers:
                             ProvidersSettingsView(viewModel: viewModel)
                         case .automation:

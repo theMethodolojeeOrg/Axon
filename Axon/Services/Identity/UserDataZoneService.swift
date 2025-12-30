@@ -26,7 +26,7 @@ public class UserDataZoneService: ObservableObject {
     @Published public var error: String?
     
     private init() {
-        self.container = CKContainer(identifier: "iCloud.com.axon")
+        self.container = CKContainer(identifier: "iCloud.NeurXAxon")
         self.privateDatabase = container.privateCloudDatabase
         self.publicDatabase = container.publicCloudDatabase
     }
@@ -98,7 +98,10 @@ public class UserDataZoneService: ObservableObject {
     
     /// Publish the share URL to the public CloudKit database for discovery.
     private func publishToRegistry(bioID: String, displayName: String, shareURL: URL) async throws {
-        let registryID = CKRecord.ID(recordName: "\(displayName).\(bioID)")
+        let recordName = "\(displayName).\(bioID)"
+        logger.info("Attempting to publish to public registry: \(recordName)")
+        
+        let registryID = CKRecord.ID(recordName: recordName)
         let registryRecord = CKRecord(recordType: "AIPRegistry", recordID: registryID)
         
         registryRecord["bioID"] = bioID
@@ -106,8 +109,24 @@ public class UserDataZoneService: ObservableObject {
         registryRecord["shareURL"] = shareURL.absoluteString
         registryRecord["updatedAt"] = Date()
         
-        try await publicDatabase.save(registryRecord)
-        logger.info("Published to public registry: \(displayName).\(bioID)")
+        do {
+            let savedRecord = try await publicDatabase.save(registryRecord)
+            logger.info("✅ Successfully published to public registry: \(savedRecord.recordID.recordName)")
+        } catch let ckError as CKError {
+            logger.error("❌ CloudKit error saving to public registry: code=\(ckError.code.rawValue) \(ckError.localizedDescription)")
+            if let serverRecord = ckError.serverRecord {
+                logger.error("   Server record: \(serverRecord.recordID.recordName)")
+            }
+            if let partialErrors = ckError.partialErrorsByItemID {
+                for (key, error) in partialErrors {
+                    logger.error("   Partial error for \(key): \(error.localizedDescription)")
+                }
+            }
+            throw ckError
+        } catch {
+            logger.error("❌ Unexpected error saving to public registry: \(error.localizedDescription)")
+            throw error
+        }
     }
     
     /// Look up a share URL from the public registry.
@@ -151,6 +170,17 @@ public class UserDataZoneService: ObservableObject {
         
         self.isZoneReady = true
         logger.info("Successfully accepted share")
+    }
+    
+    // MARK: - Reset (Testing)
+    
+    /// Resets the zone status for testing. Does not delete CloudKit records.
+    @MainActor
+    public func resetZoneStatus() {
+        logger.info("Resetting zone status for testing")
+        self.isZoneReady = false
+        self.currentShareURL = nil
+        self.error = nil
     }
 }
 

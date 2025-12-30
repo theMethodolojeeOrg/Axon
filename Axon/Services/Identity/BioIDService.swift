@@ -42,6 +42,7 @@ public class BioIDService: ObservableObject {
     /// If one exists in the Keychain, it is loaded.
     /// If not, a new Secure Enclave key is generated and stored.
     /// - Returns: The 4-character BioID string (e.g., "a7f3")
+    /// - Throws: BioIDError if biometrics are unavailable or SE key generation fails
     @MainActor
     public func ensureIdentity() async throws -> String {
         if let existing = currentBioID {
@@ -56,26 +57,117 @@ public class BioIDService: ObservableObject {
             return bioID
         }
         
-        // 2. Create new key if none exists
-        logger.info("No existing identity found. specific key generation...")
-        let accessControl = SecAccessControlCreateWithFlags(
+        // 2. Check if Secure Enclave is available (REQUIRED)
+        guard SecureEnclave.isAvailable else {
+            logger.error("Secure Enclave not available on this device")
+            throw BioIDError.secureEnclaveNotAvailable
+        }
+        
+        // 3. Check if biometrics are available (REQUIRED)
+        guard isBiometricsAvailable else {
+            logger.error("Biometrics not available - enrollment required")
+            throw BioIDError.biometricsNotAvailable
+        }
+        
+        // 4. Create access control for biometric-protected key
+        var cfError: Unmanaged<CFError>?
+        guard let accessControl = SecAccessControlCreateWithFlags(
             nil,
             kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-            [.privateKeyUsage, .biometryCurrentSet], // Requires biometrics to use the key
-            nil
-        )!
+            [.privateKeyUsage, .biometryCurrentSet],
+            &cfError
+        ) else {
+            let errorDesc = cfError?.takeRetainedValue().localizedDescription ?? "unknown"
+            logger.error("Failed to create access control: \(errorDesc)")
+            throw BioIDError.accessControlCreationFailed(errorDesc)
+        }
         
-        // Generate key in Secure Enclave
-        let privateKey = try SecureEnclave.P256.Signing.PrivateKey(accessControl: accessControl)
+        // 5. Generate key in Secure Enclave
+        do {
+            let privateKey = try SecureEnclave.P256.Signing.PrivateKey(accessControl: accessControl)
+            
+            // Store reference in Keychain
+            try storeKey(privateKey)
+            
+            // 6. Derive BioID
+            let bioID = deriveBioID(from: privateKey.publicKey)
+            self.currentBioID = bioID
+            logger.info("Generated new BioID (Secure Enclave): \(bioID)")
+            return bioID
+        } catch let seError as NSError {
+            logger.error("Secure Enclave key generation failed: domain=\(seError.domain) code=\(seError.code) \(seError.localizedDescription)")
+            throw BioIDError.secureEnclaveKeyGenerationFailed(seError.localizedDescription)
+        }
+    }
+    
+    /// Resets the BioID identity by deleting the key from keychain and clearing state.
+    /// Used for development/testing purposes.
+    @MainActor
+    public func resetIdentity() throws {
+        logger.info("Resetting BioID identity...")
         
-        // Store reference in Keychain
-        try storeKey(privateKey)
+        // Delete the SE key from keychain
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: keyTag,
+            kSecAttrService as String: "com.axon.bioid.secureenclave"
+        ]
+        let status = SecItemDelete(deleteQuery as CFDictionary)
         
-        // 3. Derive BioID
-        let bioID = deriveBioID(from: privateKey.publicKey)
+        if status != errSecSuccess && status != errSecItemNotFound {
+            logger.error("Failed to delete key from keychain: \(status)")
+            throw BioIDError.keychainError(status)
+        }
+        
+        // Also delete any software fallback key
+        let softwareQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: keyTag + ".software"
+        ]
+        SecItemDelete(softwareQuery as CFDictionary)
+        
+        // Clear current state
+        self.currentBioID = nil
+        logger.info("BioID identity reset complete")
+    }
+    
+    /// Software fallback for devices without Secure Enclave (e.g., Simulator)
+    @MainActor
+    private func ensureIdentitySoftwareFallback() async throws -> String {
+        logger.info("Using software key fallback")
+        
+        // Generate a regular P256 key (not SE-protected)
+        let privateKey = P256.Signing.PrivateKey()
+        
+        // Store in Keychain
+        let keyData = privateKey.rawRepresentation
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: keyTag + ".software",
+            kSecValueData as String: keyData,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        ]
+        
+        // Delete existing and add new
+        SecItemDelete(query as CFDictionary)
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw BioIDError.keychainError(status)
+        }
+        
+        // Derive BioID from public key
+        let bioID = deriveBioIDFromSoftwareKey(privateKey.publicKey)
         self.currentBioID = bioID
-        logger.info("Generated new BioID: \(bioID)")
+        logger.info("Generated new BioID (software fallback): \(bioID)")
         return bioID
+    }
+    
+    private func deriveBioIDFromSoftwareKey(_ publicKey: P256.Signing.PublicKey) -> String {
+        let data = publicKey.x963Representation
+        let digest = SHA256.hash(data: data)
+        let prefix = digest.prefix(2)
+        let hex = prefix.map { String(format: "%02x", $0) }.joined()
+        return hex
     }
     
     /// Signs the given data using the Secure Enclave private key.
@@ -87,25 +179,6 @@ public class BioIDService: ObservableObject {
         
         // This call will trigger the biometric prompt (FaceID/TouchID)
         return try privateKey.signature(for: data)
-    }
-    
-    /// Resets the identity, deleting the key from the Keychain.
-    /// WARNING: This is destructive and will result in data loss if not handled carefully.
-    public func resetIdentity() throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationTag as String: keyTag.data(using: .utf8)!
-        ]
-        
-        let status = SecItemDelete(query as CFDictionary)
-        if status != errSecSuccess && status != errSecItemNotFound {
-            throw BioIDError.keychainError(status)
-        }
-        
-        DispatchQueue.main.async {
-            self.currentBioID = nil
-        }
-        logger.warning("BioID identity has been reset.")
     }
     
     // MARK: - Internal Helpers
@@ -131,71 +204,82 @@ public class BioIDService: ObservableObject {
     }
     
     private func storeKey(_ key: SecureEnclave.P256.Signing.PrivateKey) throws {
-        // SecureEnclave keys are not exportable relative to data, but we store the reference
-        // Actually, SecureEnclave.P256.Signing.PrivateKey automatically uses the Keychain when initialized with access control?
-        // Wait, the standard init(accessControl:) creates it, but we need to ensure it's queryable.
-        // We typically add it to the keychain explicitly if we want to retrieve it by tag.
+        // Secure Enclave keys store a reference to the key, not the key itself
+        // We use dataRepresentation which contains the key reference data
+        let keyData = key.dataRepresentation
         
         let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationTag as String: keyTag.data(using: .utf8)!,
-            kSecValueRef as String: key.dataRepresentation // For SE keys, this holds the reference
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: keyTag,
+            kSecAttrService as String: "com.axon.bioid.secureenclave",
+            kSecValueData as String: keyData,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         ]
         
         // Delete any existing item first
-        SecItemDelete(query as CFDictionary)
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: keyTag,
+            kSecAttrService as String: "com.axon.bioid.secureenclave"
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
         
         let status = SecItemAdd(query as CFDictionary, nil)
         if status != errSecSuccess {
+            logger.error("Failed to store key: \(status)")
             throw BioIDError.keychainError(status)
         }
+        logger.info("Stored SE key reference in keychain")
     }
     
     private func retrieveKey() throws -> SecureEnclave.P256.Signing.PrivateKey {
         let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationTag as String: keyTag.data(using: .utf8)!,
-            kSecReturnRef as String: true
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: keyTag,
+            kSecAttrService as String: "com.axon.bioid.secureenclave",
+            kSecReturnData as String: true
         ]
         
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         
-        guard status == errSecSuccess else {
+        guard status == errSecSuccess, let data = item as? Data else {
+            logger.info("No existing key found in keychain: \(status)")
             throw BioIDError.keyNotFound
         }
         
-        // Reconstitute the key from the reference
-        // Note: For Secure Enclave keys, we initialize from the Data representation (reference)
-        // Check if we can cast directly to SecKey and init?
-        // CryptoKit provides init(dataRepresentation:) for retrieving.
-        
-        // Wait, SecItemCopyMatching with kSecReturnRef returns a SecKey.
-        // SecureEnclave.P256.Signing.PrivateKey can be initialized from a data representation of the key reference.
-        // Correct approach for CryptoKit + Keychain integration:
-        
-        let dataQuery: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationTag as String: keyTag.data(using: .utf8)!,
-            kSecReturnData as String: true
-        ]
-        
-        var dataItem: CFTypeRef?
-        let dataStatus = SecItemCopyMatching(dataQuery as CFDictionary, &dataItem)
-        
-        guard dataStatus == errSecSuccess, let data = dataItem as? Data else {
-            throw BioIDError.keyNotFound
-        }
-        
+        // Reconstruct the SE key from the data representation
         return try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: data)
     }
 }
 
-public enum BioIDError: Error {
+public enum BioIDError: Error, LocalizedError {
     case biometricsNotAvailable
+    case secureEnclaveNotAvailable
+    case accessControlCreationFailed(String)
+    case secureEnclaveKeyGenerationFailed(String)
     case keyNotFound
     case keychainError(OSStatus)
     case unknown
+    
+    public var errorDescription: String? {
+        switch self {
+        case .biometricsNotAvailable:
+            return "Face ID or Touch ID is not enrolled. Please enable biometrics in Settings to create your AIP identity."
+        case .secureEnclaveNotAvailable:
+            return "This device does not support Secure Enclave. AIP identity requires a device with hardware security."
+        case .accessControlCreationFailed(let detail):
+            return "Failed to create secure access control: \(detail)"
+        case .secureEnclaveKeyGenerationFailed(let detail):
+            return "Failed to generate secure key: \(detail)"
+        case .keyNotFound:
+            return "Identity key not found in keychain."
+        case .keychainError(let status):
+            return "Keychain error: \(status)"
+        case .unknown:
+            return "An unknown error occurred."
+        }
+    }
 }
 
 extension BioIDService {

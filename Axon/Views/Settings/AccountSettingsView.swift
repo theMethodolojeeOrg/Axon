@@ -18,6 +18,7 @@ struct AccountSettingsView: View {
     @State private var showingSignOutConfirmation = false
     @State private var showingDeleteAccountConfirmation = false
     @State private var isSettingUpAIP = false
+    @State private var aipDisplayName: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -148,34 +149,67 @@ struct AccountSettingsView: View {
                     } else {
                         // Setup BioID
                         VStack(spacing: 12) {
-                            Text("Set up your sovereign AI identity")
-                                .font(AppTypography.bodyMedium())
-                                .foregroundColor(AppColors.textSecondary)
-                                .multilineTextAlignment(.center)
-                            
-                            Button(action: {
-                                Task {
-                                    await setupAIPIdentity()
+                            // Check biometrics availability
+                            if !bioIDService.isBiometricsAvailable {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(AppColors.accentWarning)
+                                    Text("Face ID or Touch ID is required")
+                                        .font(AppTypography.bodySmall(.medium))
+                                        .foregroundColor(AppColors.accentWarning)
                                 }
-                            }) {
-                                HStack {
-                                    Image(systemName: "faceid")
-                                        .font(.system(size: 18))
-                                    Text("Enroll with Biometrics")
-                                        .font(AppTypography.bodyMedium(.medium))
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 12)
-                                .background(AppColors.signalMercury)
+                                .padding()
+                                .background(AppColors.accentWarning.opacity(0.15))
                                 .cornerRadius(8)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            .disabled(isSettingUpAIP)
-                            
-                            if isSettingUpAIP {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle())
+                                
+                                Text("Enable biometrics in Settings → Face ID & Passcode")
+                                    .font(AppTypography.labelSmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                                    .multilineTextAlignment(.center)
+                            } else {
+                                Text("Set up your sovereign AI identity")
+                                    .font(AppTypography.bodyMedium())
+                                    .foregroundColor(AppColors.textSecondary)
+                                    .multilineTextAlignment(.center)
+                                
+                                // Display name input if no auth display name
+                                if authService.displayName == nil {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Choose a display name")
+                                            .font(AppTypography.labelSmall())
+                                            .foregroundColor(AppColors.textTertiary)
+                                        
+                                        TextField("e.g., tom", text: $aipDisplayName)
+                                            .textFieldStyle(.roundedBorder)
+                                            .disableAutocorrection(true)
+                                    }
+                                    .padding(.horizontal)
+                                }
+                                
+                                Button(action: {
+                                    Task {
+                                        await setupAIPIdentity()
+                                    }
+                                }) {
+                                    HStack {
+                                        Image(systemName: "faceid")
+                                            .font(.system(size: 18))
+                                        Text("Enroll with Biometrics")
+                                            .font(AppTypography.bodyMedium(.medium))
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 12)
+                                    .background(AppColors.signalMercury)
+                                    .cornerRadius(8)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .disabled(isSettingUpAIP || (authService.displayName == nil && aipDisplayName.trimmingCharacters(in: .whitespaces).isEmpty))
+                                
+                                if isSettingUpAIP {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle())
+                                }
                             }
                         }
                         .padding(.vertical, 8)
@@ -359,15 +393,20 @@ struct AccountSettingsView: View {
         isSettingUpAIP = true
         defer { isSettingUpAIP = false }
         
+        // 1. Get display name first (before any other operations)
+        let displayName: String
+        if let authName = authService.displayName, !authName.isEmpty {
+            displayName = authName
+        } else if !aipDisplayName.trimmingCharacters(in: .whitespaces).isEmpty {
+            displayName = aipDisplayName.trimmingCharacters(in: .whitespaces)
+        } else {
+            viewModel.error = "Please enter a display name before setting up AIP identity"
+            return
+        }
+        
         do {
-            // 1. Generate or retrieve BioID
+            // 2. Generate or retrieve BioID
             let bioID = try await bioIDService.ensureIdentity()
-            
-            // 2. Get display name for the AIP address
-            guard let displayName = authService.displayName else {
-                viewModel.error = "Please set a display name before setting up AIP identity"
-                return
-            }
             
             // 3. Bootstrap the shared CloudKit zone
             let shareURL = try await userDataZoneService.bootstrapSharedZone(
