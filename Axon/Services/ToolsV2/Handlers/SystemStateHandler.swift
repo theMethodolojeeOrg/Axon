@@ -8,53 +8,66 @@
 import Foundation
 import os.log
 
+// MARK: - Lightweight Codable for Reading Overrides
+
+/// Minimal struct for decoding per-conversation overrides
+/// Mirrors relevant fields from ConversationOverrides in ChatInfoSettingsView
+private struct ConversationOverridesForQuery: Codable {
+    var builtInProvider: String?
+    var customProviderId: UUID?
+    var builtInModel: String?
+    var customModelId: UUID?
+    var providerDisplayName: String?
+    var modelDisplayName: String?
+}
+
 /// Handler for system state tools
 ///
 /// Registered handlers:
 /// - `system_state` → query_system_state, change_system_state
 @MainActor
 final class SystemStateHandler: ToolHandlerV2 {
-    
+
     let handlerId = "system_state"
-    
+
     private let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "com.axon",
         category: "SystemStateHandler"
     )
-    
+
     private let settingsViewModel = SettingsViewModel.shared
-    
+
     // MARK: - ToolHandlerV2
-    
+
     func executeV2(
         inputs: [String: Any],
         manifest: ToolManifest,
         context: ToolContextV2
     ) async throws -> ToolResultV2 {
         let toolId = manifest.tool.id
-        
+
         switch toolId {
         case "query_system_state":
-            return executeQuerySystemState(inputs: inputs)
+            return executeQuerySystemState(inputs: inputs, context: context)
         case "change_system_state":
             return try await executeChangeSystemState(inputs: inputs)
         default:
             throw ToolExecutionErrorV2.executionFailed("Unknown system state tool: \(toolId)")
         }
     }
-    
+
     // MARK: - query_system_state
-    
-    private func executeQuerySystemState(inputs: [String: Any]) -> ToolResultV2 {
+
+    private func executeQuerySystemState(inputs: [String: Any], context: ToolContextV2) -> ToolResultV2 {
         let scope = (inputs["query"] as? String)?.lowercased() ?? "current"
-        
-        logger.info("Querying system state: \(scope)")
-        
+
+        logger.info("Querying system state: \(scope), conversationId: \(context.conversationId ?? "none")")
+
         let settings = settingsViewModel.settings
-        
+
         switch scope {
         case "current":
-            return queryCurrentState(settings)
+            return queryCurrentState(settings, context: context)
         case "providers":
             return queryProviders(settings)
         case "tools":
@@ -62,26 +75,87 @@ final class SystemStateHandler: ToolHandlerV2 {
         case "permissions":
             return queryPermissions()
         case "all":
-            return queryAllState(settings)
+            return queryAllState(settings, context: context)
         default:
-            return queryCurrentState(settings)
+            return queryCurrentState(settings, context: context)
         }
     }
-    
-    private func queryCurrentState(_ settings: AppSettings) -> ToolResultV2 {
+
+    // MARK: - Per-Conversation Override Resolution
+
+    /// Resolves the effective provider and model for the current context
+    /// Checks per-conversation overrides first, then falls back to global settings
+    private func resolveEffectiveProviderAndModel(
+        globalSettings: AppSettings,
+        context: ToolContextV2
+    ) -> (providerName: String, modelName: String, isOverridden: Bool) {
+        // Check for per-conversation overrides
+        if let conversationId = context.conversationId {
+            let key = "conversation_overrides_\(conversationId)"
+            if let data = UserDefaults.standard.data(forKey: key),
+               let overrides = try? JSONDecoder().decode(ConversationOverridesForQuery.self, from: data) {
+
+                // Determine provider display name
+                var providerName: String?
+                if let displayName = overrides.providerDisplayName {
+                    providerName = displayName
+                } else if let builtInProvider = overrides.builtInProvider,
+                          let provider = AIProvider(rawValue: builtInProvider) {
+                    providerName = provider.displayName
+                } else if let customProviderId = overrides.customProviderId {
+                    // Custom provider - try to get from settings
+                    if let customProvider = globalSettings.customProviders.first(where: { $0.id == customProviderId }) {
+                        providerName = customProvider.providerName
+                    }
+                }
+
+                // Determine model display name
+                var modelName: String?
+                if let displayName = overrides.modelDisplayName {
+                    modelName = displayName
+                } else if let builtInModel = overrides.builtInModel {
+                    modelName = builtInModel
+                }
+
+                // If we found overrides, use them
+                if let provider = providerName, let model = modelName {
+                    logger.info("Using per-conversation override: \(provider) / \(model)")
+                    return (provider, model, true)
+                } else if let provider = providerName {
+                    // Have provider override but no model - use provider with default model
+                    logger.info("Using per-conversation provider override: \(provider)")
+                    return (provider, overrides.builtInModel ?? globalSettings.defaultModel, true)
+                }
+            }
+        }
+
+        // Fall back to global settings
+        return (globalSettings.defaultProvider.displayName, globalSettings.defaultModel, false)
+    }
+
+    private func queryCurrentState(_ settings: AppSettings, context: ToolContextV2) -> ToolResultV2 {
+        let (providerName, modelName, isOverridden) = resolveEffectiveProviderAndModel(
+            globalSettings: settings,
+            context: context
+        )
+
         var output = "# Current System State\n\n"
-        output += "**Provider:** \(settings.defaultProvider.displayName)\n"
-        output += "**Model:** \(settings.defaultModel)\n"
+        output += "**Provider:** \(providerName)\n"
+        output += "**Model:** \(modelName)\n"
+        if isOverridden {
+            output += "**Note:** Using per-conversation override\n"
+        }
         output += "**Orchestration:** \(settings.useOnDeviceOrchestration ? "Enabled" : "Disabled")\n"
         output += "**Internal Thread:** \(settings.internalThreadEnabled ? "Enabled" : "Disabled")\n"
         output += "**Heartbeat:** \(settings.heartbeatSettings.enabled ? "Enabled" : "Disabled")\n"
-        
+
         return ToolResultV2.success(
             toolId: "query_system_state",
             output: output,
             structured: [
-                "provider": settings.defaultProvider.rawValue,
-                "model": settings.defaultModel
+                "provider": providerName,
+                "model": modelName,
+                "isOverridden": isOverridden
             ]
         )
     }
@@ -130,15 +204,23 @@ final class SystemStateHandler: ToolHandlerV2 {
         )
     }
     
-    private func queryAllState(_ settings: AppSettings) -> ToolResultV2 {
+    private func queryAllState(_ settings: AppSettings, context: ToolContextV2) -> ToolResultV2 {
+        let (providerName, modelName, isOverridden) = resolveEffectiveProviderAndModel(
+            globalSettings: settings,
+            context: context
+        )
+
         var output = "# Full System State\n\n"
-        
+
         // Current config
         output += "## Configuration\n"
-        output += "- Provider: \(settings.defaultProvider.displayName)\n"
-        output += "- Model: \(settings.defaultModel)\n"
+        output += "- Provider: \(providerName)\n"
+        output += "- Model: \(modelName)\n"
+        if isOverridden {
+            output += "- Note: Using per-conversation override\n"
+        }
         output += "- Orchestration: \(settings.useOnDeviceOrchestration)\n\n"
-        
+
         // Tools
         let tools = ToolPluginLoader.shared.loadedTools
         output += "## Tools\n"

@@ -151,7 +151,7 @@ class StreamingResponseHandler {
                     continuation.yield(.textDelta(text))
 
                 case .messageDelta(let stopReason, let usage):
-                    if let _ = stopReason {
+                    if stopReason != nil {
                         var tokens: TokenUsage? = nil
                         if let u = usage {
                             tokens = TokenUsage(
@@ -170,6 +170,7 @@ class StreamingResponseHandler {
                             modelName: config.model,
                             providerName: "Anthropic"
                         )))
+                        return  // Exit the function after completion
                     }
 
                 case .error(let type, let message):
@@ -260,7 +261,7 @@ class StreamingResponseHandler {
                         accumulatedContent += content
                         continuation.yield(.textDelta(content))
                     }
-                    if let _ = finishReason {
+                    if finishReason != nil {
                         continuation.yield(.completion(StreamingCompletion(
                             fullContent: accumulatedContent,
                             reasoning: nil,
@@ -271,9 +272,10 @@ class StreamingResponseHandler {
                             modelName: config.model,
                             providerName: "OpenAI"
                         )))
+                        return  // Exit the function after completion
                     }
                 case .done:
-                    break
+                    return  // Exit the function when [DONE] signal received
                 }
             }
         }
@@ -363,6 +365,7 @@ class StreamingResponseHandler {
                             modelName: config.model,
                             providerName: "Gemini"
                         )))
+                        return  // Exit the function after completion
 
                     default:
                         break
@@ -438,6 +441,7 @@ class StreamingResponseHandler {
                         modelName: config.model,
                         providerName: "DeepSeek"
                     )))
+                    return  // Exit the function when [DONE] signal received
                 }
             }
         }

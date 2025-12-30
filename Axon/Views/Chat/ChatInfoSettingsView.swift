@@ -1207,9 +1207,15 @@ struct ChatInfoSettingsView: View {
             hasCustomToolOverrides = true
             localEnabledTools = toolOverrides
         } else {
-            // Fall back to global defaults
+            // Fall back to global defaults based on active tool system
             hasCustomToolOverrides = false
-            localEnabledTools = settingsViewModel.settings.toolSettings.enabledToolIds
+            if ToolsV2Toggle.shared.isV2Active {
+                // V2: Read from ToolPluginLoader
+                localEnabledTools = ToolPluginLoader.shared.enabledToolIds
+            } else {
+                // V1: Read from AppSettings
+                localEnabledTools = settingsViewModel.settings.toolSettings.enabledToolIds
+            }
         }
     }
 

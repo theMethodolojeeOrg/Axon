@@ -295,6 +295,11 @@ struct SyncableSettings: Codable {
     var temporalInjectContextSaturation: Bool
     var temporalTrackSessionDuration: Bool
 
+    // Custom Providers (OpenAI-compatible endpoints)
+    var customProviders: [CustomProviderConfig]
+    var selectedCustomProviderId: String?
+    var selectedCustomModelId: String?
+
     init(from settings: AppSettings) {
         self.theme = settings.theme.rawValue
 
@@ -401,6 +406,11 @@ struct SyncableSettings: Codable {
         self.temporalInjectTurnCount = settings.temporalSettings.injectTurnCount
         self.temporalInjectContextSaturation = settings.temporalSettings.injectContextSaturation
         self.temporalTrackSessionDuration = settings.temporalSettings.trackSessionDuration
+
+        // Custom Providers
+        self.customProviders = settings.customProviders
+        self.selectedCustomProviderId = settings.selectedCustomProviderId?.uuidString
+        self.selectedCustomModelId = settings.selectedCustomModelId?.uuidString
     }
 
     func apply(to settings: inout AppSettings) {
@@ -544,5 +554,23 @@ struct SyncableSettings: Codable {
         settings.temporalSettings.injectContextSaturation = temporalInjectContextSaturation
         settings.temporalSettings.trackSessionDuration = temporalTrackSessionDuration
         // Note: lifetimeTurnCount, lastSessionTurnCount, lastInteractionAt, sessionStartedAt are device-specific
+
+        // Custom Providers (merge by ID to preserve any local-only providers)
+        for cloudProvider in customProviders {
+            if let existingIndex = settings.customProviders.firstIndex(where: { $0.id == cloudProvider.id }) {
+                // Update existing provider
+                settings.customProviders[existingIndex] = cloudProvider
+            } else {
+                // Add new provider from cloud
+                settings.customProviders.append(cloudProvider)
+            }
+        }
+        if let idString = selectedCustomProviderId, let id = UUID(uuidString: idString) {
+            settings.selectedCustomProviderId = id
+        }
+        if let idString = selectedCustomModelId, let id = UUID(uuidString: idString) {
+            settings.selectedCustomModelId = id
+        }
+        // Note: API keys for custom providers are device-specific (stored in SecureVault)
     }
 }

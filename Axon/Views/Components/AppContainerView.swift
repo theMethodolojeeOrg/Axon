@@ -1521,17 +1521,20 @@ struct ChatContainerView: View {
         let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
         let apiKeysStorage = APIKeysStorage.shared
 
-        // Get provider and model info
-        let providerString = settings.defaultProvider.rawValue
-        let modelId = settings.defaultModel
-        let providerDisplayName = settings.defaultProvider.displayName
+        // Get provider and model info - use ConversationModelResolver to respect conversation overrides
+        let resolved = ConversationModelResolver.resolve(conversationId: conversationId, settings: settings)
+        let providerString = resolved.normalizedProvider  // This handles xai -> grok mapping
+        let modelId = resolved.modelId
+        let providerDisplayName = resolved.providerName
 
         // Pre-flight check: Verify built-in providers (Apple Intelligence, MLX) are available
         // This prevents the "generating forever" issue when the provider can't actually respond
-        if !settings.defaultProvider.isAvailable {
-            let reason = settings.defaultProvider.unavailableReason ?? "Provider is not available on this device"
+        // Only check for built-in providers that have availability requirements
+        let resolvedBuiltInProvider = AIProvider(rawValue: resolved.provider)
+        if let builtInProvider = resolvedBuiltInProvider, !builtInProvider.isAvailable {
+            let reason = builtInProvider.unavailableReason ?? "Provider is not available on this device"
             let guidance: String
-            switch settings.defaultProvider {
+            switch builtInProvider {
             case .appleFoundation:
                 guidance = """
                 **Apple Intelligence is not available.**
@@ -1599,15 +1602,30 @@ struct ChatContainerView: View {
         let minimaxKey = try? apiKeysStorage.getAPIKey(for: .minimax)
         let mistralKey = try? apiKeysStorage.getAPIKey(for: .mistral)
 
-        // Get custom provider config if needed
+        // Get custom provider config if needed - check conversation overrides first
         var customBaseUrl: String? = nil
         var customApiKey: String? = nil
-        if providerString == "openai-compatible",
-           let providerId = settings.selectedCustomProviderId,
-           let customProvider = settings.customProviders.first(where: { $0.id == providerId }) {
-            customBaseUrl = customProvider.apiEndpoint
-            if let apiKey = try? apiKeysStorage.getCustomProviderAPIKey(providerId: providerId), !apiKey.isEmpty {
-                customApiKey = apiKey
+        if providerString == "openai-compatible" {
+            // Get custom provider ID from conversation overrides or global settings
+            let overridesKey = "conversation_overrides_\(conversationId)"
+            var customProviderId: UUID? = nil
+
+            // Check conversation overrides first
+            if let data = UserDefaults.standard.data(forKey: overridesKey),
+               let overrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data) {
+                customProviderId = overrides.customProviderId
+            } else {
+                // Fall back to global settings
+                customProviderId = settings.selectedCustomProviderId
+            }
+
+            // Get custom provider config and API key
+            if let providerId = customProviderId,
+               let customProvider = settings.customProviders.first(where: { $0.id == providerId }) {
+                customBaseUrl = customProvider.apiEndpoint
+                if let apiKey = try? apiKeysStorage.getCustomProviderAPIKey(providerId: providerId), !apiKey.isEmpty {
+                    customApiKey = apiKey
+                }
             }
         }
 
