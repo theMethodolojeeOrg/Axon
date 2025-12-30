@@ -408,9 +408,15 @@ final class SoloThreadService: ObservableObject {
     
     /// Send notification if trigger is enabled
     private func sendNotificationIfEnabled(_ trigger: SoloNotificationTrigger, threadId: String, context: [String: String] = [:]) async {
-        // TODO: Check SoloWorkAgreement for enabled triggers
-        // For now, just log
-        logger.info("Would send notification: \(trigger.rawValue) for thread \(threadId)")
+        do {
+            try await NotificationService.shared.sendSoloTriggerNotification(
+                trigger: trigger,
+                threadId: threadId,
+                context: context
+            )
+        } catch {
+            logger.warning("Failed to send solo notification: \(error.localizedDescription)")
+        }
     }
 }
 

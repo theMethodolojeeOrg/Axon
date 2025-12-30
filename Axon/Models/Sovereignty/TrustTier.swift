@@ -143,13 +143,18 @@ enum ActionCategory: String, Codable, CaseIterable, Equatable {
     case temporalSync = "temporal_sync"         // Enable time + turn awareness
     case temporalDrift = "temporal_drift"       // Disable temporal tracking
     case temporalModeChange = "temporal_mode_change"  // Change temporal awareness mode
+    
+    // Solo Thread Execution (autonomous work sessions)
+    case soloExecution = "solo_execution"       // Execute a solo thread session
+    case soloExtend = "solo_extend"             // Request more turns in solo session
 
     /// Whether this action affects the world (requires user biometrics)
     var affectsWorld: Bool {
         switch self {
         case .fileRead, .fileWrite, .fileDelete,
              .networkRequest, .toolInvocation, .shellCommand, .memoryRecall,
-             .agentStateRead, .userNotify:
+             .agentStateRead, .userNotify,
+             .soloExecution, .soloExtend:  // Solo threads consume API tokens
             return true
         default:
             return false
@@ -206,6 +211,8 @@ enum ActionCategory: String, Codable, CaseIterable, Equatable {
         case .temporalSync: return "Enable Temporal Sync"
         case .temporalDrift: return "Enable Temporal Drift"
         case .temporalModeChange: return "Change Temporal Mode"
+        case .soloExecution: return "Solo Thread Execution"
+        case .soloExtend: return "Extend Solo Session"
         }
     }
 
@@ -235,6 +242,8 @@ enum ActionCategory: String, Codable, CaseIterable, Equatable {
         case .temporalSync: return "clock.badge.checkmark"
         case .temporalDrift: return "infinity"
         case .temporalModeChange: return "clock.arrow.2.circlepath"
+        case .soloExecution: return "bolt.circle.fill"
+        case .soloExtend: return "arrow.clockwise.circle"
         }
     }
 }

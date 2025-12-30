@@ -42,6 +42,9 @@ struct Covenant: Codable, Identifiable, Equatable {
 
     // Status
     let status: CovenantStatus
+    
+    // Solo work agreement (optional, must be negotiated separately)
+    let soloWorkAgreement: SoloWorkAgreement?
 
     // MARK: - Convenience
 
@@ -150,7 +153,8 @@ extension Covenant {
                 )
             ],
             pendingProposals: nil,
-            status: .active
+            status: .active,
+            soloWorkAgreement: nil
         )
     }
 
@@ -177,7 +181,8 @@ extension Covenant {
             settingsStateHash: settingsStateHash,
             negotiationHistory: newHistory,
             pendingProposals: nil,
-            status: .active
+            status: .active,
+            soloWorkAgreement: soloWorkAgreement
         )
     }
 
@@ -196,7 +201,8 @@ extension Covenant {
             settingsStateHash: settingsStateHash,
             negotiationHistory: negotiationHistory,
             pendingProposals: nil,
-            status: .superseded
+            status: .superseded,
+            soloWorkAgreement: soloWorkAgreement
         )
     }
 }

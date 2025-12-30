@@ -512,6 +512,11 @@ struct ChatContainerView: View {
 
             VStack(spacing: 0) {
                 if let conversation = conversation {
+                    // Solo thread status bar (if applicable)
+                    if conversation.isSoloThread {
+                        SoloThreadStatusBar(conversation: conversation)
+                    }
+                    
                     // Existing conversation
                     existingChatView(conversation: conversation)
                 } else {
@@ -519,16 +524,32 @@ struct ChatContainerView: View {
                     welcomeView
                 }
 
-                // Input bar (always visible)
-                MessageInputBar(
-                    text: $messageText,
-                    attachments: $selectedAttachments,
-                    isLoading: isLoading,
-                    onSend: sendMessage,
-                    onStop: stopGeneration,
-                    focus: $isInputFocused,
-                    conversationId: conversation?.id
-                )
+                // Input bar or Solo Thread Toolbar
+                if let conversation = conversation,
+                   conversation.isSoloThread,
+                   conversation.isSoloActive {
+                    // Show solo thread toolbar for active solo sessions
+                    SoloThreadToolbar(
+                        conversation: conversation,
+                        onPause: {
+                            SoloThreadService.shared.pauseSession()
+                        },
+                        onTakeOver: {
+                            SoloThreadService.shared.userTakeOver(threadId: conversation.id)
+                        }
+                    )
+                } else {
+                    // Normal input bar
+                    MessageInputBar(
+                        text: $messageText,
+                        attachments: $selectedAttachments,
+                        isLoading: isLoading,
+                        onSend: sendMessage,
+                        onStop: stopGeneration,
+                        focus: $isInputFocused,
+                        conversationId: conversation?.id
+                    )
+                }
             }
             .overlay(alignment: .top) {
                 if conversation != nil && conversationService.isLoading {

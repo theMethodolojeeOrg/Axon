@@ -610,6 +610,10 @@ struct DynamicToolsDraftPreviewSheet: View {
                 }
             }
         }
+        #if os(macOS)
+        // Prevent overly compact sheets on macOS.
+        .frame(minWidth: 500, idealWidth: 600, minHeight: 450, idealHeight: 600)
+        #endif
     }
 }
 
@@ -736,6 +740,10 @@ struct DynamicToolDetailSheet: View {
                 }
             }
         }
+        #if os(macOS)
+        // Prevent overly compact sheets on macOS.
+        .frame(minWidth: 500, idealWidth: 600, minHeight: 550, idealHeight: 700)
+        #endif
     }
 }
 
@@ -783,6 +791,10 @@ struct DynamicToolEditorSheet: View {
                 }
             }
         }
+        #if os(macOS)
+        // Prevent overly compact sheets on macOS.
+        .frame(minWidth: 450, idealWidth: 500, minHeight: 350, idealHeight: 400)
+        #endif
     }
 }
 

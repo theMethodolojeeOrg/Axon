@@ -407,8 +407,11 @@ struct MLXModelDetailSheet: View {
                 }
                 .padding()
             }
-            .frame(minWidth: 400, minHeight: 500)
             .background(AppColors.substratePrimary)
+            #if os(macOS)
+            // Prevent overly compact sheets on macOS.
+            .frame(minWidth: 500, idealWidth: 600, minHeight: 550, idealHeight: 700)
+            #endif
             .navigationTitle("Model Details")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

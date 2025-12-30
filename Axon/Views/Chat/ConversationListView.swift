@@ -137,6 +137,13 @@ struct ConversationRow: View {
         GlassCard(padding: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
+                    // Solo thread indicator
+                    if conversation.isSoloThread {
+                        Image(systemName: conversation.isSoloActive ? "bolt.circle.fill" : "bolt.circle")
+                            .foregroundColor(conversation.isSoloActive ? AppColors.signalLichen : AppColors.textSecondary)
+                            .font(.system(size: 14))
+                    }
+                    
                     Text(conversation.title)
                         .font(AppTypography.titleMedium())
                         .foregroundColor(AppColors.textPrimary)

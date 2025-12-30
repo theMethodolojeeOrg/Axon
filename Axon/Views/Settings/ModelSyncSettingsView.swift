@@ -532,6 +532,10 @@ struct DraftPreviewSheet: View {
                 }
             }
         }
+        #if os(macOS)
+        // Prevent overly compact sheets on macOS.
+        .frame(minWidth: 500, idealWidth: 600, minHeight: 450, idealHeight: 600)
+        #endif
     }
 }
 

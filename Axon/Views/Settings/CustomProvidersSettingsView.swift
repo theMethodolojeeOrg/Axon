@@ -460,7 +460,8 @@ struct CustomProviderEditSheet: View {
             }
         }
         #if os(macOS)
-        .frame(minWidth: 500, idealWidth: 550, minHeight: 550, idealHeight: 650)
+        // Prevent overly compact sheets on macOS.
+        .frame(minWidth: 550, idealWidth: 650, minHeight: 600, idealHeight: 750)
         #endif
         .onAppear {
             if let provider = existingProvider {

@@ -53,6 +53,29 @@
       "type": "integer",
       "required": false,
       "description": "Max tool calls per heartbeat"
+    },
+    "execution_mode": {
+      "type": "string",
+      "required": false,
+      "enum": [
+        "internal_thread",
+        "solo_thread"
+      ],
+      "description": "Heartbeat execution mode - internal_thread (silent reflection) or solo_thread (visible conversation with tools)"
+    },
+    "solo_turns_per_session": {
+      "type": "integer",
+      "required": false,
+      "minimum": 1,
+      "maximum": 20,
+      "description": "Number of turns allocated per solo thread session"
+    },
+    "solo_max_sessions_per_day": {
+      "type": "integer",
+      "required": false,
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Maximum solo sessions allowed per day"
     }
   },
   "inputFormat": {
@@ -63,7 +86,7 @@
     "handler": "heartbeat"
   },
   "ai": {
-    "systemPromptSection": "### heartbeat_configure\nConfigure heartbeat settings.\n\n**Format:**\n```tool_request\n{\"tool\": \"heartbeat_configure\", \"query\": \"{\\\"enabled\\\": true, \\\"interval_seconds\\\": 3600}\"}\n```\n\n**Parameters:**\n- enabled: boolean\n- interval_seconds: 60-86400\n- allow_background: boolean\n- allow_notifications: boolean\n- delivery_profile_id: string\n- max_tokens_budget: integer\n- max_tool_calls: integer",
+    "systemPromptSection": "### heartbeat_configure\nConfigure heartbeat settings including solo thread mode.\n\n**Format:**\n```tool_request\n{\"tool\": \"heartbeat_configure\", \"query\": \"{\\\"enabled\\\": true, \\\"interval_seconds\\\": 3600}\"}\n```\n\n**Parameters:**\n- enabled: boolean - Enable/disable heartbeat\n- interval_seconds: 60-86400 - Heartbeat interval\n- allow_background: boolean - Allow background heartbeats\n- allow_notifications: boolean - Allow notifications\n- delivery_profile_id: string - Delivery profile to use\n- max_tokens_budget: integer - Max tokens per heartbeat\n- max_tool_calls: integer - Max tool calls per heartbeat\n- execution_mode: 'internal_thread' | 'solo_thread' - Execution mode (silent vs visible)\n- solo_turns_per_session: 1-20 - Turns per solo session\n- solo_max_sessions_per_day: 1-10 - Max solo sessions per day\n\n**Solo Thread Mode:**\nWhen execution_mode is 'solo_thread', heartbeats create visible conversation threads where you can use tools and work autonomously. At turn boundaries, use solo_turn_action to extend, conclude, pause, or notify.",
     "usageExamples": [
       {
         "description": "Enable hourly heartbeat",

@@ -98,4 +98,51 @@ final class NotificationService: NSObject, ObservableObject, UNUserNotificationC
     ) async -> UNNotificationPresentationOptions {
         return [.banner, .sound, .list]
     }
+    
+    // MARK: - Solo Thread Notifications
+    
+    /// Send notification based on solo thread trigger
+    func sendSoloTriggerNotification(
+        trigger: SoloNotificationTrigger,
+        threadId: String,
+        context: [String: String] = [:]
+    ) async throws {
+        // Check if this trigger is enabled in sovereignty settings
+        guard let agreement = SovereigntyService.shared.activeCovenant?.soloWorkAgreement,
+              agreement.notificationTriggers.contains(trigger) else {
+            return // Trigger not enabled
+        }
+        
+        let (title, body) = notificationContent(for: trigger, context: context)
+        
+        _ = try await sendLocalNotification(
+            title: title,
+            body: body,
+            userInfo: [
+                "source": "solo_thread",
+                "trigger": trigger.rawValue,
+                "threadId": threadId
+            ]
+        )
+    }
+    
+    private func notificationContent(
+        for trigger: SoloNotificationTrigger,
+        context: [String: String]
+    ) -> (title: String, body: String) {
+        switch trigger {
+        case .sessionStarted:
+            return ("Solo Session Started", "Axon has started an autonomous work session.")
+        case .sessionCompleted:
+            return ("Solo Session Complete", context["summary"] ?? "Axon completed its work.")
+        case .errorOccurred:
+            return ("Solo Session Error", context["error"] ?? "An error occurred.")
+        case .budgetThresholdReached:
+            return ("Budget Alert", "Solo session approaching daily budget limit.")
+        case .turnAllocationExhausted:
+            return ("Turns Exhausted", "Axon has used all allocated turns.")
+        case .axonRequestedExtension:
+            return ("Extension Requested", "Axon wants to continue working.")
+        }
+    }
 }
