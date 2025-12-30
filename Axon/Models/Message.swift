@@ -372,3 +372,85 @@ private struct ContentPart: Codable {
     struct AudioUrl: Codable { let url: String }
     struct VideoUrl: Codable { let url: String }
 }
+
+// MARK: - AttachmentType UI Helpers
+
+extension MessageAttachment.AttachmentType {
+    /// SF Symbol name for this attachment type.
+    var iconName: String {
+        switch self {
+        case .image: return "photo.fill"
+        case .document: return "doc.fill"
+        case .video: return "video.fill"
+        case .audio: return "waveform"
+        }
+    }
+}
+
+// MARK: - URL Attachment Helpers
+
+extension URL {
+    /// Returns the MIME type based on file extension.
+    var mimeType: String {
+        let ext = pathExtension.lowercased()
+        switch ext {
+        // Documents
+        case "pdf": return "application/pdf"
+        case "txt", "text": return "text/plain"
+        case "json": return "application/json"
+        case "xml": return "application/xml"
+        case "doc", "docx": return "application/msword"
+        case "xls", "xlsx": return "application/vnd.ms-excel"
+        case "ppt", "pptx": return "application/vnd.ms-powerpoint"
+
+        // Images
+        case "jpg", "jpeg": return "image/jpeg"
+        case "png": return "image/png"
+        case "gif": return "image/gif"
+        case "webp": return "image/webp"
+
+        // Video formats
+        case "mp4", "m4v": return "video/mp4"
+        case "mpeg", "mpg": return "video/mpeg"
+        case "mov": return "video/mov"
+        case "avi": return "video/avi"
+        case "flv": return "video/x-flv"
+        case "webm": return "video/webm"
+        case "wmv": return "video/wmv"
+        case "3gp", "3gpp": return "video/3gpp"
+
+        // Audio formats
+        case "wav": return "audio/wav"
+        case "mp3": return "audio/mp3"
+        case "aiff", "aif": return "audio/aiff"
+        case "aac", "m4a": return "audio/aac"
+        case "ogg": return "audio/ogg"
+        case "flac": return "audio/flac"
+
+        default: return "application/octet-stream"
+        }
+    }
+
+    /// Infers the attachment type based on file extension.
+    var attachmentType: MessageAttachment.AttachmentType {
+        let ext = pathExtension.lowercased()
+
+        // Video extensions
+        if ["mp4", "m4v", "mpeg", "mpg", "mov", "avi", "flv", "webm", "wmv", "3gp", "3gpp"].contains(ext) {
+            return .video
+        }
+
+        // Audio extensions
+        if ["wav", "mp3", "aiff", "aif", "aac", "m4a", "ogg", "flac"].contains(ext) {
+            return .audio
+        }
+
+        // Image extensions
+        if ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif"].contains(ext) {
+            return .image
+        }
+
+        // Default to document
+        return .document
+    }
+}

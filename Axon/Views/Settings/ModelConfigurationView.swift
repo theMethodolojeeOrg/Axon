@@ -34,7 +34,7 @@ struct ModelConfigurationView: View {
                             .font(.system(.body, design: .monospaced))
                             .scrollContentBackground(.hidden)
                             .padding(8)
-                            .background(Color(.textBackgroundColor).opacity(0.5))
+                            .background(AppColors.substrateTertiary.opacity(0.5))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                 }

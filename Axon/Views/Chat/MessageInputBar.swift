@@ -16,6 +16,20 @@ import UIKit
 import AppKit
 #endif
 
+// MARK: - AttachmentType Color Extension
+
+extension MessageAttachment.AttachmentType {
+    /// Color for displaying attachment type icons.
+    var iconColor: Color {
+        switch self {
+        case .image: return AppColors.textPrimary
+        case .document: return AppColors.textPrimary
+        case .video: return Color.red
+        case .audio: return Color.purple
+        }
+    }
+}
+
 // MARK: - Custom Text Editor with Enter/Shift+Enter handling
 
 #if canImport(AppKit)
@@ -277,6 +291,9 @@ struct MessageInputBar: View {
     let onStop: (() -> Void)?
     let focus: FocusState<Bool>.Binding?
 
+    // ViewModel handles attachment capability and slash command state
+    @StateObject private var viewModel: MessageInputViewModel
+
     private let inputMaxHeight: CGFloat = 120
     @State private var inputHeight: CGFloat = 20
 
@@ -288,30 +305,11 @@ struct MessageInputBar: View {
     @State private var showAnyFileImporter = false
     @State private var showAttachmentOptions = false  // iOS action sheet
 
-    // Slash Command Menu
-    @State private var slashMenuState: SlashMenuState = .hidden
-    @State private var commandSuggestions: [SlashCommandSuggestion] = []
-    @State private var toolSuggestions: [ToolSuggestion] = []
-
-    // Tool Invocation Sheet (for /use command)
-    @State private var showToolInvocationSheet = false
-    @State private var selectedToolForInvocation: ToolSuggestion?
-
     // Flag to prevent onChange from overriding manual state updates
     @State private var skipNextTextChange = false
 
     // VS Code Bridge
     @ObservedObject private var bridgeServer = BridgeServer.shared
-
-    private let conversationId: String?
-
-    private struct AttachmentCapability {
-        let images: Bool
-        let documents: Bool
-        let video: Bool
-        let audio: Bool
-        let description: String
-    }
 
     init(
         text: Binding<String>,
@@ -328,262 +326,43 @@ struct MessageInputBar: View {
         self.onSend = onSend
         self.onStop = onStop
         self.focus = focus
-        self.conversationId = conversationId
+        self._viewModel = StateObject(wrappedValue: MessageInputViewModel(conversationId: conversationId))
     }
+
+    // MARK: - Computed Properties (delegated to ViewModel)
 
     private var attachmentCapability: AttachmentCapability {
-        let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
-
-        // Resolve the effective provider+model used for this conversation.
-        // This keeps the attachment UI aligned with the actual send path.
-        let resolved: ConversationModelResolver.ResolvedProviderModel
-        if let conversationId {
-            resolved = ConversationModelResolver.resolve(conversationId: conversationId, settings: settings)
-            debugLog(.providerResolution, "Resolved provider for conversation \(conversationId): \(resolved.normalizedProvider) / \(resolved.modelId)")
-        } else {
-            resolved = ConversationModelResolver.resolveGlobal(settings: settings)
-            debugLog(.providerResolution, "Resolved global provider: \(resolved.normalizedProvider) / \(resolved.modelId)")
-        }
-
-        // Check if Gemini tools are enabled - if so, we can proxy media through Gemini
-        let geminiToolsEnabled = settings.toolSettings.enabledTools.contains {
-            [.googleSearch, .codeExecution, .urlContext, .googleMaps, .fileSearch].contains($0)
-        }
-        let mediaProxyEnabled = settings.toolSettings.experimentalFeaturesEnabled && settings.toolSettings.mediaProxyEnabled
-        let geminiKey = try? APIKeysStorage.shared.getAPIKey(for: .gemini)
-        let canProxyMedia = geminiToolsEnabled && mediaProxyEnabled && geminiKey != nil && !geminiKey!.isEmpty
-
-        switch resolved.normalizedProvider {
-        case "anthropic":
-            // Claude supports images + PDFs natively.
-            // Audio/video require the Gemini proxy.
-            let supportsVideoAudio = canProxyMedia
-            return AttachmentCapability(
-                images: true,
-                documents: true,
-                video: supportsVideoAudio,
-                audio: supportsVideoAudio,
-                description: supportsVideoAudio
-                    ? "Claude supports images and PDFs natively, and video/audio via Gemini proxy."
-                    : "Claude supports images and PDFs."
-            )
-
-        case "gemini":
-            // Gemini supports images, documents, video, and audio.
-            debugLog(.attachments, "Gemini provider detected - all attachment types enabled (images, documents, video, audio)")
-            return AttachmentCapability(
-                images: true,
-                documents: true,
-                video: true,
-                audio: true,
-                description: "Gemini supports images, documents, video, and audio."
-            )
-
-        case "openai":
-            // OpenAI: treat audio as supported for GPT-4o-family models.
-            // Video/PDF are still proxied.
-            let model = resolved.modelId.lowercased()
-            let supportsAudioNatively = model.contains("4o") || model.contains("audio") || model.contains("realtime")
-            let supportsVideo = canProxyMedia
-
-            return AttachmentCapability(
-                images: true,
-                documents: canProxyMedia,
-                video: supportsVideo,
-                audio: supportsAudioNatively,
-                description: supportsVideo
-                    ? "GPT supports images natively; audio depends on model; video/docs via Gemini proxy."
-                    : "GPT supports images natively; audio depends on model."
-            )
-
-        case "grok":
-            // Grok is images-only unless proxied.
-            let supportsAll = canProxyMedia
-            return AttachmentCapability(
-                images: true,
-                documents: supportsAll,
-                video: supportsAll,
-                audio: supportsAll,
-                description: supportsAll
-                    ? "Grok supports images natively, and other media via Gemini proxy."
-                    : "Grok supports images only."
-            )
-
-        case "openai-compatible":
-            // Provider-declared: use the selected custom provider/model from settings/overrides.
-            // If your provider doesn't declare capabilities yet, we fall back to conservative defaults.
-            if let (caps, description) = declaredCustomProviderCapability(settings: settings, conversationId: conversationId) {
-                let withProxySuffix = canProxyMedia
-                    ? description + " (Plus video/audio/docs via Gemini proxy when enabled.)"
-                    : description
-
-                return AttachmentCapability(
-                    images: caps.images,
-                    documents: caps.documents || canProxyMedia,
-                    video: caps.video || canProxyMedia,
-                    audio: caps.audio || canProxyMedia,
-                    description: withProxySuffix
-                )
-            }
-
-            // Fallback if not declared: images only (or proxy for the rest)
-            return AttachmentCapability(
-                images: true,
-                documents: canProxyMedia,
-                video: canProxyMedia,
-                audio: canProxyMedia,
-                description: canProxyMedia
-                    ? "Images supported; other formats via Gemini proxy."
-                    : "Images supported; other formats depend on the provider."
-            )
-
-        default:
-            // Conservative default.
-            return AttachmentCapability(
-                images: true,
-                documents: canProxyMedia,
-                video: canProxyMedia,
-                audio: canProxyMedia,
-                description: "Images supported."
-            )
-        }
+        viewModel.resolveAttachmentCapability()
     }
 
-    /// Provider-declared capability lookup for custom providers.
-    ///
-    /// NOTE: If your `CustomProviderModel`/`CustomProvider` types later grow explicit capability fields,
-    /// this should be updated to read those instead of using the heuristics below.
-    private func declaredCustomProviderCapability(
-        settings: AppSettings,
-        conversationId: String?
-    ) -> (caps: AttachmentCapability, description: String)? {
-        // Identify custom provider + model using the same override precedence used by ConversationService.
-        var providerId: UUID? = nil
-        var modelId: UUID? = nil
-
-        if let conversationId {
-            let overridesKey = "conversation_overrides_\(conversationId)"
-            if let data = UserDefaults.standard.data(forKey: overridesKey),
-               let overrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data) {
-                providerId = overrides.customProviderId
-                modelId = overrides.customModelId
-            }
-        }
-
-        if providerId == nil { providerId = settings.selectedCustomProviderId }
-        if modelId == nil { modelId = settings.selectedCustomModelId }
-
-        guard let providerId,
-              let provider = settings.customProviders.first(where: { $0.id == providerId }) else {
-            return nil
-        }
-
-        // Heuristic: without explicit capability metadata, infer from model code/name.
-        // This is a best-effort until the provider schema declares capabilities.
-        var modelCode: String? = nil
-        if let modelId,
-           let model = provider.models.first(where: { $0.id == modelId }) {
-            modelCode = model.modelCode
-        }
-
-        let signature = (modelCode ?? "").lowercased()
-
-        // Vision/Multimodal hints
-        let supportsVision = signature.contains("vision") || signature.contains("image") || signature.contains("vl") || signature.contains("v-") || signature.hasSuffix("-v")
-
-        // Audio hints
-        let supportsAudio = signature.contains("audio") || signature.contains("speech") || signature.contains("tts") || signature.contains("realtime")
-
-        // Video hints (rare in openai-compatible providers)
-        let supportsVideo = signature.contains("video")
-
-        // Documents (PDF) hints
-        let supportsDocs = signature.contains("pdf") || signature.contains("doc")
-
-        // Default to images (most compatible OpenAI-like providers support vision if they are multimodal).
-        let images = supportsVision || true
-
-        let descParts: [String] = [
-            "Custom provider: \(provider.providerName)",
-            modelCode != nil ? "model: \(modelCode!)" : nil
-        ].compactMap { $0 }
-
-        return (
-            AttachmentCapability(
-                images: images,
-                documents: supportsDocs,
-                video: supportsVideo,
-                audio: supportsAudio,
-                description: ""
-            ),
-            descParts.joined(separator: ", ")
-        )
-    }
-    
     private var canSend: Bool {
-        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty
+        viewModel.canSend(text: text, attachments: attachments)
     }
-    
+
+    private var isSlashCommand: Bool {
+        viewModel.isSlashCommand(text)
+    }
+
+    // MARK: - Actions
+
     private func handleSend() {
         guard canSend && !isLoading else { return }
         onSend()
     }
-    
+
     private func handleStop() {
         guard isLoading else { return }
         onStop?()
     }
 
-    // MARK: - Slash Command Menu
-
-    private func updateSlashMenuState(for input: String) {
-        withAnimation(.easeOut(duration: 0.15)) {
-            slashMenuState = SlashCommandParser.shared.getMenuState(for: input)
-
-            switch slashMenuState {
-            case .hidden:
-                commandSuggestions = []
-                toolSuggestions = []
-            case .showingCommands:
-                commandSuggestions = SlashCommandParser.shared.getCommandSuggestions(for: input)
-                toolSuggestions = []
-            case .showingTools(let filter):
-                commandSuggestions = []
-                toolSuggestions = SlashCommandParser.shared.getToolSuggestions(filter: filter)
-            case .showingUseTools(let filter):
-                commandSuggestions = []
-                // Use filtered list for /use (excludes AI-only tools, adds user actions)
-                toolSuggestions = SlashCommandParser.shared.getUserInvokableTools(filter: filter)
-            }
-        }
-    }
+    // MARK: - Slash Command Menu (delegated to ViewModel)
 
     private func handleCommandSelection(_ suggestion: SlashCommandSuggestion) {
-        if suggestion.hasSubmenu {
-            // For commands with submenus (like /tool, /use), insert the command with a space
-            // and immediately show the tool list
-            // Set flag to prevent onChange from overriding our state
-            skipNextTextChange = true
-            text = "/\(suggestion.command) "
-            // Immediately update state to show tool suggestions
-            withAnimation(.easeOut(duration: 0.15)) {
-                if suggestion.command == "use" {
-                    slashMenuState = .showingUseTools(filter: "")
-                    commandSuggestions = []
-                    // Use filtered list for /use (excludes AI-only tools, adds user actions)
-                    toolSuggestions = SlashCommandParser.shared.getUserInvokableTools(filter: "")
-                } else {
-                    slashMenuState = .showingTools(filter: "")
-                    commandSuggestions = []
-                    toolSuggestions = SlashCommandParser.shared.getToolSuggestions(filter: "")
-                }
-            }
-        } else {
-            // For direct commands, insert and send immediately
-            skipNextTextChange = true
-            text = "/\(suggestion.command)"
-            dismissSlashMenu()
-            // Auto-send after a brief delay
+        let result = viewModel.handleCommandSelection(suggestion)
+        skipNextTextChange = result.skipNextChange
+        text = result.newText
+
+        if result.shouldSend {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 self.handleSend()
             }
@@ -591,122 +370,36 @@ struct MessageInputBar: View {
     }
 
     private func handleToolSelection(_ tool: ToolSuggestion) {
-        // Insert the full /tool command with the selected tool ID and auto-send
-        text = "/tool \(tool.toolId)"
-        dismissSlashMenu()
-        // Auto-send the command after a brief delay to ensure UI updates
+        text = viewModel.handleToolSelection(tool)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             self.handleSend()
         }
     }
 
     private func handleUseToolSelection(_ tool: ToolSuggestion) {
-        // Clear text and show the tool invocation sheet
         text = ""
-        dismissSlashMenu()
-        selectedToolForInvocation = tool
-        showToolInvocationSheet = true
+        viewModel.handleUseToolSelection(tool)
     }
 
-    private func dismissSlashMenu() {
-        withAnimation(.easeOut(duration: 0.15)) {
-            slashMenuState = .hidden
-            commandSuggestions = []
-            toolSuggestions = []
-        }
-    }
+    // MARK: - Body
 
     var body: some View {
         ZStack(alignment: .bottom) {
             // Slash Command Menu (appears above input)
-            if slashMenuState != .hidden {
-                VStack {
-                    Spacer()
-                    SlashCommandMenu(
-                        menuState: slashMenuState,
-                        commandSuggestions: commandSuggestions,
-                        toolSuggestions: toolSuggestions,
-                        onSelectCommand: handleCommandSelection,
-                        onSelectTool: handleToolSelection,
-                        onSelectUseTool: handleUseToolSelection,
-                        onDismiss: dismissSlashMenu
-                    )
-                    .padding(.horizontal)
-                    .padding(.bottom, 70) // Position above input bar
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                .zIndex(1)
-            }
+            slashCommandMenuOverlay
 
             // Main content
-            VStack(spacing: 0) {
-                // Attachments Preview
-                if !attachments.isEmpty {
-                    attachmentsPreview
-                }
-
-                // Main input bar
-                HStack(alignment: .center, spacing: 8) {
-                    let capability = attachmentCapability
-
-                    // VS Code Bridge Toggle (macOS only)
-                    #if os(macOS)
-                    bridgeButton
-                    #endif
-
-                    // Attachment Button
-                    if capability.images || capability.documents || capability.video || capability.audio {
-                        attachmentMenu(capability: capability)
-                    }
-
-                    // Text input area
-                    textInputArea
-
-                    // Send button
-                    sendButton
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(
-                    RoundedRectangle(cornerRadius: 22)
-                        .fill(AppColors.substrateSecondary.opacity(0.85))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 22)
-                                .stroke(AppColors.glassBorder, lineWidth: 0.5)
-                        )
-                )
-                .background(.ultraThinMaterial.opacity(0.4))
-                .clipShape(RoundedRectangle(cornerRadius: 22))
-                .padding(.horizontal)
-                .padding(.bottom, 8)
-            }
+            mainInputContent
         }
         .onChange(of: text) { _, newText in
-            // Skip if we manually set the state (e.g., after tapping a command)
             if skipNextTextChange {
                 skipNextTextChange = false
                 return
             }
-            updateSlashMenuState(for: newText)
+            viewModel.updateSlashMenuState(for: newText)
         }
         .onChange(of: selectedItem) { _, newItem in
             handlePhotoSelection(newItem)
-        }
-        // State change observers for debugging
-        .onChange(of: showFileImporter) { _, newValue in
-            debugLog(.attachments, "showFileImporter changed to \(newValue)")
-        }
-        .onChange(of: showVideoImporter) { _, newValue in
-            debugLog(.attachments, "showVideoImporter changed to \(newValue)")
-        }
-        .onChange(of: showAudioImporter) { _, newValue in
-            debugLog(.attachments, "showAudioImporter changed to \(newValue)")
-        }
-        .onChange(of: showPhotoPicker) { _, newValue in
-            debugLog(.attachments, "showPhotoPicker changed to \(newValue)")
-        }
-        .onChange(of: showAttachmentOptions) { _, newValue in
-            debugLog(.attachments, "showAttachmentOptions (action sheet) changed to \(newValue)")
         }
         .fileImporter(
             isPresented: $showFileImporter,
@@ -732,7 +425,6 @@ struct MessageInputBar: View {
             debugLog(.attachments, "fileImporter (audio) callback triggered")
             handleFileImport(result, type: .audio)
         }
-        // Mac: Any file picker
         .fileImporter(
             isPresented: $showAnyFileImporter,
             allowedContentTypes: [.item],
@@ -741,17 +433,15 @@ struct MessageInputBar: View {
             debugLog(.attachments, "fileImporter (any file) callback triggered")
             handleAnyFileImport(result)
         }
-        // Tool Invocation Sheet (for /use command)
-        .sheet(isPresented: $showToolInvocationSheet) {
-            if let tool = selectedToolForInvocation {
+        .sheet(isPresented: $viewModel.showToolInvocationSheet) {
+            if let tool = viewModel.selectedToolForInvocation {
                 ToolInvocationSheet(
                     tool: tool,
                     onDismiss: {
-                        showToolInvocationSheet = false
-                        selectedToolForInvocation = nil
+                        viewModel.showToolInvocationSheet = false
+                        viewModel.selectedToolForInvocation = nil
                     },
                     onResult: { result, success in
-                        // Insert the result into the text field for the user to send to AI
                         if success {
                             text = "Tool result from \(tool.displayName):\n\n\(result)"
                         }
@@ -759,52 +449,123 @@ struct MessageInputBar: View {
                 )
             }
         }
-        // Photos picker attached at top level to avoid UIContextMenuInteraction warning
-        // when dismissing Menu while presenting picker
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
-        // iOS: Use confirmationDialog (action sheet) instead of Menu to avoid UIContextMenu timing issues
         #if os(iOS)
         .confirmationDialog(
             "Add Attachment",
             isPresented: $showAttachmentOptions,
             titleVisibility: .visible
         ) {
-            let capability = attachmentCapability
-            debugLog(.attachments, "confirmationDialog opened - capabilities: images=\(capability.images), docs=\(capability.documents), video=\(capability.video), audio=\(capability.audio)")
-
-            if capability.images {
-                Button("Photo Library") {
-                    debugLog(.attachments, "User tapped Photo Library")
-                    showPhotoPicker = true
-                }
-            }
-            if capability.video {
-                Button("Video") {
-                    debugLog(.attachments, "User tapped Video - setting showVideoImporter=true")
-                    showVideoImporter = true
-                }
-            }
-            if capability.audio {
-                Button("Audio") {
-                    debugLog(.attachments, "User tapped Audio - setting showAudioImporter=true")
-                    showAudioImporter = true
-                }
-            }
-            if capability.documents {
-                Button("Document") {
-                    debugLog(.attachments, "User tapped Document - setting showFileImporter=true")
-                    showFileImporter = true
-                }
-            }
-            Button("Cancel", role: .cancel) {
-                debugLog(.attachments, "User cancelled attachment selection")
-            }
+            attachmentDialogButtons
         } message: {
             Text(attachmentCapability.description)
         }
         #endif
     }
-    
+
+    // MARK: - Body Subviews
+
+    @ViewBuilder
+    private var slashCommandMenuOverlay: some View {
+        if viewModel.slashMenuState != .hidden {
+            VStack {
+                Spacer()
+                SlashCommandMenu(
+                    menuState: viewModel.slashMenuState,
+                    commandSuggestions: viewModel.commandSuggestions,
+                    toolSuggestions: viewModel.toolSuggestions,
+                    onSelectCommand: handleCommandSelection,
+                    onSelectTool: handleToolSelection,
+                    onSelectUseTool: handleUseToolSelection,
+                    onDismiss: { viewModel.dismissSlashMenu() }
+                )
+                .padding(.horizontal)
+                .padding(.bottom, 70)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            .zIndex(1)
+        }
+    }
+
+    @ViewBuilder
+    private var mainInputContent: some View {
+        VStack(spacing: 0) {
+            if !attachments.isEmpty {
+                attachmentsPreview
+            }
+
+            // Main input bar
+            HStack(alignment: .center, spacing: 8) {
+                let capability = attachmentCapability
+
+                // VS Code Bridge Toggle (macOS only)
+                #if os(macOS)
+                bridgeButton
+                #endif
+
+                // Attachment Button
+                if capability.supportsAnyAttachment {
+                    attachmentMenu(capability: capability)
+                }
+
+                // Text input area
+                textInputArea
+
+                // Send button
+                sendButton
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(AppColors.substrateSecondary.opacity(0.85))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22)
+                            .stroke(AppColors.glassBorder, lineWidth: 0.5)
+                    )
+            )
+            .background(.ultraThinMaterial.opacity(0.4))
+            .clipShape(RoundedRectangle(cornerRadius: 22))
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+        }
+    }
+
+    #if os(iOS)
+    @ViewBuilder
+    private var attachmentDialogButtons: some View {
+        let capability = attachmentCapability
+
+        if capability.images {
+            Button("Photo Library") {
+                debugLog(.attachments, "User tapped Photo Library")
+                showPhotoPicker = true
+            }
+        }
+        if capability.video {
+            Button("Video") {
+                debugLog(.attachments, "User tapped Video")
+                showVideoImporter = true
+            }
+        }
+        if capability.audio {
+            Button("Audio") {
+                debugLog(.attachments, "User tapped Audio")
+                showAudioImporter = true
+            }
+        }
+        if capability.documents {
+            Button("Document") {
+                debugLog(.attachments, "User tapped Document")
+                showFileImporter = true
+            }
+        }
+        Button("Cancel", role: .cancel) {
+            debugLog(.attachments, "User cancelled attachment selection")
+        }
+    }
+    #endif
+
     // MARK: - Subviews
     
     @ViewBuilder
@@ -847,9 +608,9 @@ struct MessageInputBar: View {
                 #endif
             } else {
                 VStack(spacing: 4) {
-                    Image(systemName: attachmentIcon(for: attachment.wrappedValue.type))
+                    Image(systemName: attachment.wrappedValue.type.iconName)
                         .font(.system(size: 20))
-                        .foregroundColor(attachmentIconColor(for: attachment.wrappedValue.type))
+                        .foregroundColor(attachment.wrappedValue.type.iconColor)
                     Text(attachment.wrappedValue.name ?? (attachment.wrappedValue.type == .image ? "Image" : "File"))
                         .font(.system(size: 9))
                         .lineLimit(1)
@@ -939,11 +700,6 @@ struct MessageInputBar: View {
         }
         .menuStyle(.borderlessButton)
         #endif
-    }
-
-    /// Whether the current input is a slash command
-    private var isSlashCommand: Bool {
-        text.trimmingCharacters(in: .whitespaces).hasPrefix("/")
     }
 
     @ViewBuilder
@@ -1123,8 +879,7 @@ struct MessageInputBar: View {
             do {
                 let data = try Data(contentsOf: url)
                 let base64 = data.base64EncodedString()
-                let mimeType = getMimeType(for: url)
-                
+
                 // Check file size for video
                 if type == .video {
                     let fileSizeMB = Double(data.count) / (1024 * 1024)
@@ -1132,12 +887,12 @@ struct MessageInputBar: View {
                         print("[MessageInputBar] Warning: Video file is \(String(format: "%.1f", fileSizeMB))MB. Files >20MB should use File API upload.")
                     }
                 }
-                
+
                 let attachment = MessageAttachment(
                     type: type,
                     base64: base64,
                     name: url.lastPathComponent,
-                    mimeType: mimeType
+                    mimeType: url.mimeType
                 )
                 withAnimation(.easeOut(duration: 0.2)) {
                     attachments.append(attachment)
@@ -1170,141 +925,22 @@ struct MessageInputBar: View {
             do {
                 let data = try Data(contentsOf: url)
                 let base64 = data.base64EncodedString()
-                let mimeType = getMimeType(for: url)
-                let type = attachmentType(for: url)
-                
+
                 let attachment = MessageAttachment(
-                    type: type,
+                    type: url.attachmentType,
                     base64: base64,
                     name: url.lastPathComponent,
-                    mimeType: mimeType
+                    mimeType: url.mimeType
                 )
                 withAnimation(.easeOut(duration: 0.2)) {
                     attachments.append(attachment)
                 }
-                debugLog(.attachments, "Successfully added file: \(url.lastPathComponent) (\(data.count) bytes, type: \(String(describing: type)))")
+                debugLog(.attachments, "Successfully added file: \(url.lastPathComponent) (\(data.count) bytes, type: \(url.attachmentType))")
             } catch {
                 debugLog(.attachments, "Failed to read file data: \(error.localizedDescription)")
             }
         case .failure(let error):
             debugLog(.attachments, "Any file import FAILED: \(error.localizedDescription)")
         }
-    }
-
-    private func getMimeType(for url: URL) -> String {
-        let pathExtension = url.pathExtension.lowercased()
-        switch pathExtension {
-        // Documents
-        case "pdf":
-            return "application/pdf"
-        case "txt", "text":
-            return "text/plain"
-        case "json":
-            return "application/json"
-        case "xml":
-            return "application/xml"
-        case "doc", "docx":
-            return "application/msword"
-        case "xls", "xlsx":
-            return "application/vnd.ms-excel"
-        case "ppt", "pptx":
-            return "application/vnd.ms-powerpoint"
-
-        // Images
-        case "jpg", "jpeg":
-            return "image/jpeg"
-        case "png":
-            return "image/png"
-        case "gif":
-            return "image/gif"
-        case "webp":
-            return "image/webp"
-
-        // Video formats
-        case "mp4", "m4v":
-            return "video/mp4"
-        case "mpeg", "mpg":
-            return "video/mpeg"
-        case "mov":
-            return "video/mov"
-        case "avi":
-            return "video/avi"
-        case "flv":
-            return "video/x-flv"
-        case "webm":
-            return "video/webm"
-        case "wmv":
-            return "video/wmv"
-        case "3gp", "3gpp":
-            return "video/3gpp"
-
-        // Audio formats
-        case "wav":
-            return "audio/wav"
-        case "mp3":
-            return "audio/mp3"
-        case "aiff", "aif":
-            return "audio/aiff"
-        case "aac", "m4a":
-            return "audio/aac"
-        case "ogg":
-            return "audio/ogg"
-        case "flac":
-            return "audio/flac"
-
-        default:
-            return "application/octet-stream"
-        }
-    }
-
-    private func attachmentIcon(for type: MessageAttachment.AttachmentType) -> String {
-        switch type {
-        case .image:
-            return "photo.fill"
-        case .document:
-            return "doc.fill"
-        case .video:
-            return "video.fill"
-        case .audio:
-            return "waveform"
-        }
-    }
-
-    private func attachmentIconColor(for type: MessageAttachment.AttachmentType) -> Color {
-        switch type {
-        case .image:
-            return AppColors.textPrimary
-        case .document:
-            return AppColors.textPrimary
-        case .video:
-            return Color.red
-        case .audio:
-            return Color.purple
-        }
-    }
-
-    private func attachmentType(for url: URL) -> MessageAttachment.AttachmentType {
-        let ext = url.pathExtension.lowercased()
-
-        // Video extensions
-        let videoExtensions = ["mp4", "m4v", "mpeg", "mpg", "mov", "avi", "flv", "webm", "wmv", "3gp", "3gpp"]
-        if videoExtensions.contains(ext) {
-            return .video
-        }
-
-        // Audio extensions
-        let audioExtensions = ["wav", "mp3", "aiff", "aif", "aac", "m4a", "ogg", "flac"]
-        if audioExtensions.contains(ext) {
-            return .audio
-        }
-
-        // Image extensions
-        let imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif"]
-        if imageExtensions.contains(ext) {
-            return .image
-        }
-
-        // Default to document
-        return .document
     }
 }
