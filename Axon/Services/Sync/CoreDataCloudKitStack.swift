@@ -15,9 +15,6 @@ import CloudKit
 
 enum CoreDataCloudKitStack {
 
-    /// Observes CloudKit sync events and logs them for diagnostics
-    private static var syncEventObserver: NSObjectProtocol?
-
     /// The CloudKit container identifier - must match entitlements
     private static let cloudKitContainerIdentifier = "iCloud.NeurXAxon"
 
@@ -84,9 +81,12 @@ enum CoreDataCloudKitStack {
 
     // MARK: - CloudKit Diagnostics
 
+    /// Holds observers to prevent deallocation
+    private static var eventObservers: [NSObjectProtocol] = []
+
     private static func setupCloudKitEventMonitoring(for container: NSPersistentCloudKitContainer) {
         // Listen for remote change notifications
-        syncEventObserver = NotificationCenter.default.addObserver(
+        let remoteChangeObserver = NotificationCenter.default.addObserver(
             forName: .NSPersistentStoreRemoteChange,
             object: container.persistentStoreCoordinator,
             queue: .main
@@ -99,8 +99,44 @@ enum CoreDataCloudKitStack {
                 print("[CloudKit] 🔄 History token updated: \(type(of: historyToken))")
             }
         }
+        eventObservers.append(remoteChangeObserver)
 
-        print("[CloudKit] 👀 Event monitoring enabled")
+        // Listen for CloudKit events (import/export activity) - iOS 14+ / macOS 11+
+        let eventObserver = NotificationCenter.default.addObserver(
+            forName: NSPersistentCloudKitContainer.eventChangedNotification,
+            object: container,
+            queue: .main
+        ) { notification in
+            guard let event = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey] as? NSPersistentCloudKitContainer.Event else {
+                return
+            }
+
+            let typeStr: String
+            switch event.type {
+            case .setup: typeStr = "Setup"
+            case .import: typeStr = "Import"
+            case .export: typeStr = "Export"
+            @unknown default: typeStr = "Unknown(\(event.type.rawValue))"
+            }
+
+            if event.endDate != nil {
+                // Event finished
+                if let error = event.error {
+                    print("[CloudKit] ❌ \(typeStr) FAILED: \(error.localizedDescription)")
+                    if let ckError = error as? CKError {
+                        diagnoseCloudKitError(ckError)
+                    }
+                } else {
+                    print("[CloudKit] ✅ \(typeStr) completed successfully")
+                }
+            } else {
+                // Event started
+                print("[CloudKit] 🚀 \(typeStr) started...")
+            }
+        }
+        eventObservers.append(eventObserver)
+
+        print("[CloudKit] 👀 Event monitoring enabled (remote changes + CloudKit events)")
     }
 
     private static func checkCloudKitAccountStatus() {
