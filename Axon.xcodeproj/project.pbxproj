@@ -11,7 +11,6 @@
 		E217D4332EEA4BF700D3DAB2 /* CryptoKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4322EEA4BF700D3DAB2 /* CryptoKit.framework */; };
 		E217D4352EEA4BFF00D3DAB2 /* CryptoTokenKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4342EEA4BFF00D3DAB2 /* CryptoTokenKit.framework */; };
 		E217D7B62EEDDD5C00D3DAB2 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D7B52EEDDD5C00D3DAB2 /* CoreLocation.framework */; };
-		E22011022EFF709D00DC50DC /* MLXUtilsLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = E22011012EFF709D00DC50DC /* MLXUtilsLibrary */; };
 		E22498CA2ED5D1880053D459 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = E22498C92ED5D1880053D459 /* MarkdownUI */; };
 		E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9A2EB23493009B116D /* FirebaseAuth */; };
 		E23FFF9D2EB23493009B116D /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9C2EB23493009B116D /* FirebaseCore */; };
@@ -19,6 +18,16 @@
 		E23FFFA12EB23493009B116D /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFFA02EB23493009B116D /* FirebaseFunctions */; };
 		E23FFFA32EB23493009B116D /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFFA22EB23493009B116D /* FirebaseMessaging */; };
 		E23FFFA52EB23493009B116D /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFFA42EB23493009B116D /* FirebaseStorage */; };
+		E2403AFD2F03725C00CC9418 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = E2403AFC2F03725C00CC9418 /* MLX */; };
+		E2403AFF2F03725C00CC9418 /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = E2403AFE2F03725C00CC9418 /* MLXFFT */; settings = {ATTRIBUTES = (Weak, ); }; };
+		E2403B012F03725C00CC9418 /* MLXFast in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B002F03725C00CC9418 /* MLXFast */; settings = {ATTRIBUTES = (Weak, ); }; };
+		E2403B032F03725C00CC9418 /* MLXLinalg in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B022F03725C00CC9418 /* MLXLinalg */; settings = {ATTRIBUTES = (Weak, ); }; };
+		E2403B052F03725C00CC9418 /* MLXNN in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B042F03725C00CC9418 /* MLXNN */; settings = {ATTRIBUTES = (Weak, ); }; };
+		E2403B0A2F0372D100CC9418 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B092F0372D100CC9418 /* MLXLLM */; };
+		E2403B0C2F0372D100CC9418 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B0B2F0372D100CC9418 /* MLXLMCommon */; };
+		E2403B102F0372D100CC9418 /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B0F2F0372D100CC9418 /* MLXVLM */; };
+		E2403B132F03739200CC9418 /* MLXUtilsLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B122F03739200CC9418 /* MLXUtilsLibrary */; };
+		E2403B1C2F037E0E00CC9418 /* MLXRandom in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B1B2F037E0E00CC9418 /* MLXRandom */; settings = {ATTRIBUTES = (Weak, ); }; };
 		E254EDD82EB222B3000CDD9D /* FirebaseAI in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDD72EB222B3000CDD9D /* FirebaseAI */; };
 		E254EDDA2EB222B3000CDD9D /* FirebaseAILogic in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDD92EB222B3000CDD9D /* FirebaseAILogic */; };
 		E254EDDC2EB222B3000CDD9D /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDDB2EB222B3000CDD9D /* FirebaseAnalytics */; };
@@ -37,10 +46,6 @@
 		E2E057EA2F0357F1009339D8 /* HuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = E2E057E92F0357F1009339D8 /* HuggingFace */; };
 		E2E5FD802EFF401E00E4835C /* KokoroSwift in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FD7F2EFF401E00E4835C /* KokoroSwift */; };
 		E2E5FD812EFF401E00E4835C /* KokoroSwift in Embed Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FD7F2EFF401E00E4835C /* KokoroSwift */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		E2E5FDAF2EFF5A6800E4835C /* MLXEmbedders in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDAE2EFF5A6800E4835C /* MLXEmbedders */; };
-		E2E5FDB12EFF5A6800E4835C /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDB02EFF5A6800E4835C /* MLXLLM */; };
-		E2E5FDB32EFF5A6800E4835C /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDB22EFF5A6800E4835C /* MLXLMCommon */; };
-		E2E5FDB72EFF5A6800E4835C /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FDB62EFF5A6800E4835C /* MLXVLM */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -188,35 +193,40 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E2E5FDB12EFF5A6800E4835C /* MLXLLM in Frameworks */,
 				E254EDDA2EB222B3000CDD9D /* FirebaseAILogic in Frameworks */,
 				E217D4312EEA494A00D3DAB2 /* CloudKit.framework in Frameworks */,
-				E22011022EFF709D00DC50DC /* MLXUtilsLibrary in Frameworks */,
+				E2403B1C2F037E0E00CC9418 /* MLXRandom in Frameworks */,
 				E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */,
+				E2403B0C2F0372D100CC9418 /* MLXLMCommon in Frameworks */,
 				E27FB5F12ECD5E2F003C52BF /* SodiumFoundationCompat in Frameworks */,
 				E22498CA2ED5D1880053D459 /* MarkdownUI in Frameworks */,
 				E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */,
 				E23FFFA32EB23493009B116D /* FirebaseMessaging in Frameworks */,
+				E2403B0A2F0372D100CC9418 /* MLXLLM in Frameworks */,
 				E217D4352EEA4BFF00D3DAB2 /* CryptoTokenKit.framework in Frameworks */,
 				E254EDE02EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport in Frameworks */,
 				E26F33402EEE017C000E55BD /* AppKit.framework in Frameworks */,
+				E2403B102F0372D100CC9418 /* MLXVLM in Frameworks */,
+				E2403B012F03725C00CC9418 /* MLXFast in Frameworks */,
+				E2403AFF2F03725C00CC9418 /* MLXFFT in Frameworks */,
 				E27FB5EF2ECD5E2F003C52BF /* Sodium in Frameworks */,
+				E2403B052F03725C00CC9418 /* MLXNN in Frameworks */,
 				E27FB5ED2ECD5E2F003C52BF /* Clibsodium in Frameworks */,
-				E2E5FDB32EFF5A6800E4835C /* MLXLMCommon in Frameworks */,
 				E23FFFA12EB23493009B116D /* FirebaseFunctions in Frameworks */,
 				E217D7B62EEDDD5C00D3DAB2 /* CoreLocation.framework in Frameworks */,
 				E2E057EA2F0357F1009339D8 /* HuggingFace in Frameworks */,
 				E254EDD82EB222B3000CDD9D /* FirebaseAI in Frameworks */,
 				E217D4332EEA4BF700D3DAB2 /* CryptoKit.framework in Frameworks */,
+				E2403AFD2F03725C00CC9418 /* MLX in Frameworks */,
 				E23FFF9D2EB23493009B116D /* FirebaseCore in Frameworks */,
 				E273631A2EBD237F0031CFF7 /* FlyingFox in Frameworks */,
-				E2E5FDAF2EFF5A6800E4835C /* MLXEmbedders in Frameworks */,
 				E23FFF9F2EB23493009B116D /* FirebaseFirestore in Frameworks */,
 				E23FFFA52EB23493009B116D /* FirebaseStorage in Frameworks */,
+				E2403B032F03725C00CC9418 /* MLXLinalg in Frameworks */,
 				E254EDDC2EB222B3000CDD9D /* FirebaseAnalytics in Frameworks */,
 				E2E5FD802EFF401E00E4835C /* KokoroSwift in Frameworks */,
 				E27FB5F32ECD5E2F003C52BF /* SodiumNIOCompat in Frameworks */,
-				E2E5FDB72EFF5A6800E4835C /* MLXVLM in Frameworks */,
+				E2403B132F03739200CC9418 /* MLXUtilsLibrary in Frameworks */,
 				E254EDDE2EB222B3000CDD9D /* FirebaseAnalyticsCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -328,12 +338,17 @@
 				E27FB5F22ECD5E2F003C52BF /* SodiumNIOCompat */,
 				E22498C92ED5D1880053D459 /* MarkdownUI */,
 				E2E5FD7F2EFF401E00E4835C /* KokoroSwift */,
-				E2E5FDAE2EFF5A6800E4835C /* MLXEmbedders */,
-				E2E5FDB02EFF5A6800E4835C /* MLXLLM */,
-				E2E5FDB22EFF5A6800E4835C /* MLXLMCommon */,
-				E2E5FDB62EFF5A6800E4835C /* MLXVLM */,
-				E22011012EFF709D00DC50DC /* MLXUtilsLibrary */,
 				E2E057E92F0357F1009339D8 /* HuggingFace */,
+				E2403AFC2F03725C00CC9418 /* MLX */,
+				E2403AFE2F03725C00CC9418 /* MLXFFT */,
+				E2403B002F03725C00CC9418 /* MLXFast */,
+				E2403B022F03725C00CC9418 /* MLXLinalg */,
+				E2403B042F03725C00CC9418 /* MLXNN */,
+				E2403B092F0372D100CC9418 /* MLXLLM */,
+				E2403B0B2F0372D100CC9418 /* MLXLMCommon */,
+				E2403B0F2F0372D100CC9418 /* MLXVLM */,
+				E2403B122F03739200CC9418 /* MLXUtilsLibrary */,
+				E2403B1B2F037E0E00CC9418 /* MLXRandom */,
 			);
 			productName = Axon;
 			productReference = E254ED962EB21B76000CDD9D /* Axon.app */;
@@ -411,7 +426,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2610;
-				LastUpgradeCheck = 2600;
+				LastUpgradeCheck = 2610;
 				TargetAttributes = {
 					E254ED952EB21B76000CDD9D = {
 						CreatedOnToolsVersion = 26.0.1;
@@ -444,9 +459,10 @@
 				E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */,
 				E22498C82ED5D1880053D459 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 				E21FCC002EFA24B1009EF882 /* XCRemoteSwiftPackageReference "kokoro-ios" */,
-				E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
-				E22011002EFF709D00DC50DC /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */,
 				E2E057E82F0357F1009339D8 /* XCRemoteSwiftPackageReference "swift-huggingface" */,
+				E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */,
+				E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
+				E2403B112F03739200CC9418 /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E254ED972EB21B76000CDD9D /* Products */;
@@ -577,6 +593,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 546A88TQB5;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -602,6 +619,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -641,6 +659,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 546A88TQB5;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -659,6 +678,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -674,12 +694,13 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 546A88TQB5;
 				ENABLE_APP_SANDBOX = YES;
-				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readonly;
+				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
 				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = YES;
 				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
@@ -690,7 +711,7 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
-				ENABLE_USER_SELECTED_FILES = readonly;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Axon/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Axon;
@@ -720,6 +741,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_PACKAGE_LIBRARY_LINKAGE = static;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -737,12 +759,13 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 546A88TQB5;
 				ENABLE_APP_SANDBOX = YES;
-				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readonly;
+				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
 				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = YES;
 				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
@@ -753,7 +776,7 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
-				ENABLE_USER_SELECTED_FILES = readonly;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Axon/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Axon;
@@ -783,6 +806,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_PACKAGE_LIBRARY_LINKAGE = static;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -795,6 +819,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 546A88TQB5;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
@@ -816,6 +841,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 546A88TQB5;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
@@ -836,6 +862,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 546A88TQB5;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -855,6 +882,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 546A88TQB5;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -1001,20 +1029,36 @@
 				minimumVersion = 1.0.10;
 			};
 		};
-		E22011002EFF709D00DC50DC /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/mlalma/MLXUtilsLibrary";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.6;
-			};
-		};
 		E22498C82ED5D1880053D459 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui.git";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 2.4.1;
+			};
+		};
+		E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.29.1;
+			};
+		};
+		E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-examples";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.29.1;
+			};
+		};
+		E2403B112F03739200CC9418 /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mlalma/MLXUtilsLibrary";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.0.6;
 			};
 		};
 		E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
@@ -1049,22 +1093,9 @@
 				kind = branch;
 			};
 		};
-		E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ml-explore/mlx-swift-examples";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.29.1;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		E22011012EFF709D00DC50DC /* MLXUtilsLibrary */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E22011002EFF709D00DC50DC /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */;
-			productName = MLXUtilsLibrary;
-		};
 		E22498C92ED5D1880053D459 /* MarkdownUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E22498C82ED5D1880053D459 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
@@ -1099,6 +1130,56 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseStorage;
+		};
+		E2403AFC2F03725C00CC9418 /* MLX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLX;
+		};
+		E2403AFE2F03725C00CC9418 /* MLXFFT */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXFFT;
+		};
+		E2403B002F03725C00CC9418 /* MLXFast */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXFast;
+		};
+		E2403B022F03725C00CC9418 /* MLXLinalg */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXLinalg;
+		};
+		E2403B042F03725C00CC9418 /* MLXNN */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXNN;
+		};
+		E2403B092F0372D100CC9418 /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLLM;
+		};
+		E2403B0B2F0372D100CC9418 /* MLXLMCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLMCommon;
+		};
+		E2403B0F2F0372D100CC9418 /* MLXVLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXVLM;
+		};
+		E2403B122F03739200CC9418 /* MLXUtilsLibrary */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403B112F03739200CC9418 /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */;
+			productName = MLXUtilsLibrary;
+		};
+		E2403B1B2F037E0E00CC9418 /* MLXRandom */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXRandom;
 		};
 		E254EDD72EB222B3000CDD9D /* FirebaseAI */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1164,26 +1245,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E21FCC002EFA24B1009EF882 /* XCRemoteSwiftPackageReference "kokoro-ios" */;
 			productName = KokoroSwift;
-		};
-		E2E5FDAE2EFF5A6800E4835C /* MLXEmbedders */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXEmbedders;
-		};
-		E2E5FDB02EFF5A6800E4835C /* MLXLLM */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXLLM;
-		};
-		E2E5FDB22EFF5A6800E4835C /* MLXLMCommon */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXLMCommon;
-		};
-		E2E5FDB62EFF5A6800E4835C /* MLXVLM */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E2E5FDAD2EFF5A6800E4835C /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXVLM;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

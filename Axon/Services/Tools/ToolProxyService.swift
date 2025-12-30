@@ -3286,7 +3286,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 - **Provider:** \(settings.defaultProvider.displayName)
                 - **Model:** \(settings.defaultModel)
                 - **Theme:** \(settings.theme.displayName)
-                - **Device Mode:** \(settings.deviceMode.displayName)
+                - **Device Mode:** \(settings.deviceModeConfig.aiProcessing.displayName)
 
                 ### Memory Settings
                 - **Enabled:** \(settings.memoryEnabled ? "Yes" : "No")
