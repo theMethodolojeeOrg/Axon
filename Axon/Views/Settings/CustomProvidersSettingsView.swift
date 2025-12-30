@@ -361,13 +361,13 @@ struct CustomProviderEditSheet: View {
                             Text("API Endpoint")
                                 .font(AppTypography.bodySmall(.medium))
                                 .foregroundColor(AppColors.textSecondary)
-                            TextField("https://api.example.com", text: $apiEndpoint)
+                            TextField("https://openrouter.ai/api/v1", text: $apiEndpoint)
                                 .textFieldStyle(CustomTextFieldStyle())
                                 #if os(iOS)
                                 .textInputAutocapitalization(.never)
                                 .keyboardType(.URL)
                                 #endif
-                            Text("Must be a valid HTTPS URL")
+                            Text("Paste the full endpoint URL - /chat/completions will be handled automatically")
                                 .font(AppTypography.labelSmall())
                                 .foregroundColor(AppColors.textTertiary)
                         }

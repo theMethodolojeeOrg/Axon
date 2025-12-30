@@ -134,15 +134,35 @@ final class SystemStateHandler: ToolHandlerV2 {
     }
 
     private func queryCurrentState(_ settings: AppSettings, context: ToolContextV2) -> ToolResultV2 {
-        let (providerName, modelName, isOverridden) = resolveEffectiveProviderAndModel(
-            globalSettings: settings,
-            context: context
-        )
+        // Use runtime context if available (actual provider/model serving this response)
+        let providerName: String
+        let modelName: String
+        let isRuntime: Bool
+        let isOverridden: Bool
+        
+        if let runtimeProvider = context.runtimeProvider, let runtimeModel = context.runtimeModel {
+            // Runtime context available - this is the actual provider/model
+            providerName = runtimeProvider
+            modelName = runtimeModel
+            isRuntime = true
+            isOverridden = false
+            logger.info("Using runtime context: provider=\(runtimeProvider), model=\(runtimeModel)")
+        } else {
+            // Fall back to settings-based resolution
+            let resolved = resolveEffectiveProviderAndModel(globalSettings: settings, context: context)
+            providerName = resolved.providerName
+            modelName = resolved.modelName
+            isOverridden = resolved.isOverridden
+            isRuntime = false
+            logger.info("Using settings fallback: provider=\(providerName), model=\(modelName)")
+        }
 
         var output = "# Current System State\n\n"
         output += "**Provider:** \(providerName)\n"
         output += "**Model:** \(modelName)\n"
-        if isOverridden {
+        if isRuntime {
+            output += "**Source:** Runtime (live request context)\n"
+        } else if isOverridden {
             output += "**Note:** Using per-conversation override\n"
         }
         output += "**Orchestration:** \(settings.useOnDeviceOrchestration ? "Enabled" : "Disabled")\n"
@@ -155,7 +175,8 @@ final class SystemStateHandler: ToolHandlerV2 {
             structured: [
                 "provider": providerName,
                 "model": modelName,
-                "isOverridden": isOverridden
+                "isOverridden": isOverridden,
+                "isRuntime": isRuntime
             ]
         )
     }
@@ -205,10 +226,24 @@ final class SystemStateHandler: ToolHandlerV2 {
     }
     
     private func queryAllState(_ settings: AppSettings, context: ToolContextV2) -> ToolResultV2 {
-        let (providerName, modelName, isOverridden) = resolveEffectiveProviderAndModel(
-            globalSettings: settings,
-            context: context
-        )
+        // Use runtime context if available (actual provider/model serving this response)
+        let providerName: String
+        let modelName: String
+        let isRuntime: Bool
+        let isOverridden: Bool
+        
+        if let runtimeProvider = context.runtimeProvider, let runtimeModel = context.runtimeModel {
+            providerName = runtimeProvider
+            modelName = runtimeModel
+            isRuntime = true
+            isOverridden = false
+        } else {
+            let resolved = resolveEffectiveProviderAndModel(globalSettings: settings, context: context)
+            providerName = resolved.providerName
+            modelName = resolved.modelName
+            isOverridden = resolved.isOverridden
+            isRuntime = false
+        }
 
         var output = "# Full System State\n\n"
 
@@ -216,7 +251,9 @@ final class SystemStateHandler: ToolHandlerV2 {
         output += "## Configuration\n"
         output += "- Provider: \(providerName)\n"
         output += "- Model: \(modelName)\n"
-        if isOverridden {
+        if isRuntime {
+            output += "- Source: Runtime (live request context)\n"
+        } else if isOverridden {
             output += "- Note: Using per-conversation override\n"
         }
         output += "- Orchestration: \(settings.useOnDeviceOrchestration)\n\n"

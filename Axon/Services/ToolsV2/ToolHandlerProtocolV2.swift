@@ -79,12 +79,22 @@ struct ToolContextV2: Sendable {
     /// Creation timestamp
     let timestamp: Date
     
+    /// Runtime provider name (actual provider serving current response)
+    /// This is the live value, not from settings - enables accurate self-introspection
+    let runtimeProvider: String?
+    
+    /// Runtime model ID (actual model serving current response)
+    /// This is the live value, not from settings - enables accurate self-introspection
+    let runtimeModel: String?
+    
     init(
         conversationId: String? = nil,
         messageId: String? = nil,
         userId: String? = nil,
         sessionApprovals: [String: Any] = [:],
-        secrets: [String: String] = [:]
+        secrets: [String: String] = [:],
+        runtimeProvider: String? = nil,
+        runtimeModel: String? = nil
     ) {
         self.conversationId = conversationId
         self.messageId = messageId
@@ -92,6 +102,8 @@ struct ToolContextV2: Sendable {
         self.sessionApprovals = sessionApprovals
         self.secrets = secrets
         self.timestamp = Date()
+        self.runtimeProvider = runtimeProvider
+        self.runtimeModel = runtimeModel
     }
     
     /// Empty context for testing

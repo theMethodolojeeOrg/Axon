@@ -1502,6 +1502,10 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             return await executeProposeCovenant(query: query)
 
         case .querySystemState:
+            // Route to V2 SystemStateHandler when V2 is active - includes runtime provider/model context
+            if ToolsV2Toggle.shared.isV2Active {
+                return await executeV2ToolWithContext(toolId: "query_system_state", query: query, context: context)
+            }
             return await executeQuerySystemState(query: query)
 
         case .changeSystemState:
@@ -2431,6 +2435,41 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             let result = try await ToolExecutionRouterV2.shared.executeToolV2(
                 toolId: toolId,
                 rawInput: query
+            )
+
+            return ToolResult(
+                tool: toolId,
+                success: result.success,
+                result: result.output,
+                sources: nil,
+                memoryOperation: nil
+            )
+        } catch {
+            return ToolResult(
+                tool: toolId,
+                success: false,
+                result: "V2 tool execution failed: \(error.localizedDescription)",
+                sources: nil,
+                memoryOperation: nil
+            )
+        }
+    }
+
+    /// Execute a V2 tool with runtime context from conversation
+    /// Passes actual provider/model through to enable accurate self-introspection
+    private func executeV2ToolWithContext(toolId: String, query: String, context: ToolConversationContext?) async -> ToolResult {
+        do {
+            // Create V2 context with runtime info if available
+            let v2Context = ToolContextV2(
+                conversationId: context?.conversationId,
+                runtimeProvider: context?.runtimeProvider,
+                runtimeModel: context?.runtimeModel
+            )
+            
+            let result = try await ToolExecutionRouterV2.shared.executeToolV2(
+                toolId: toolId,
+                rawInput: query,
+                context: v2Context
             )
 
             return ToolResult(
@@ -5035,4 +5074,17 @@ struct ToolResultSource {
 struct ToolConversationContext {
     let conversationId: String
     let messages: [Message]
+    
+    /// Runtime provider name (actual provider serving current response)
+    let runtimeProvider: String?
+    
+    /// Runtime model ID (actual model serving current response)
+    let runtimeModel: String?
+    
+    init(conversationId: String, messages: [Message], runtimeProvider: String? = nil, runtimeModel: String? = nil) {
+        self.conversationId = conversationId
+        self.messages = messages
+        self.runtimeProvider = runtimeProvider
+        self.runtimeModel = runtimeModel
+    }
 }

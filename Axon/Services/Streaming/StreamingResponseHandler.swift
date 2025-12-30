@@ -209,8 +209,51 @@ class StreamingResponseHandler {
         messages: [Message],
         continuation: AsyncThrowingStream<StreamingEvent, Error>.Continuation
     ) async throws {
-        let baseUrl = config.baseUrl ?? "https://api.openai.com/v1"
-        let url = URL(string: "\(baseUrl)/chat/completions")!
+        // Normalize base URL - handle various formats users might enter
+        var baseUrl = (config.baseUrl ?? "https://api.openai.com/v1")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Remove trailing slashes
+        while baseUrl.hasSuffix("/") {
+            baseUrl.removeLast()
+        }
+        
+        // Remove common path suffixes that users might accidentally include
+        // Order matters - check longest paths first
+        let pathsToStrip = [
+            "/chat/completions",  // Full OpenAI-compatible endpoint
+            "/completions",       // Legacy completions endpoint
+        ]
+        
+        for path in pathsToStrip {
+            if baseUrl.lowercased().hasSuffix(path.lowercased()) {
+                baseUrl = String(baseUrl.dropLast(path.count))
+                break
+            }
+        }
+        
+        // Clean up any remaining trailing slashes after stripping paths
+        while baseUrl.hasSuffix("/") {
+            baseUrl.removeLast()
+        }
+        
+        let fullUrlString = "\(baseUrl)/chat/completions"
+        
+        // Debug logging for custom provider issues
+        print("[StreamingHTTP] OpenAI-compatible request:")
+        print("[StreamingHTTP]   Base URL: \(baseUrl)")
+        print("[StreamingHTTP]   Full URL: \(fullUrlString)")
+        print("[StreamingHTTP]   Model: \(config.model)")
+        print("[StreamingHTTP]   API Key present: \(!config.apiKey.isEmpty)")
+        if config.apiKey.isEmpty {
+            print("[StreamingHTTP]   ⚠️ WARNING: API key is empty!")
+        }
+        
+        guard let url = URL(string: fullUrlString) else {
+            print("[StreamingHTTP]   ❌ ERROR: Invalid URL constructed")
+            throw StreamingError.connectionFailed("Invalid URL: \(fullUrlString)")
+        }
+        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
@@ -239,14 +282,48 @@ class StreamingResponseHandler {
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (bytes, response) = try await URLSession.shared.bytes(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw StreamingError.connectionFailed("Invalid response")
+        // Log request body size for debugging large payloads
+        if let bodyData = request.httpBody {
+            print("[StreamingHTTP]   Request body size: \(bodyData.count) bytes")
         }
 
+        let bytes: URLSession.AsyncBytes
+        let response: URLResponse
+        
+        do {
+            (bytes, response) = try await URLSession.shared.bytes(for: request)
+        } catch {
+            // Capture the actual network error
+            let nsError = error as NSError
+            print("[StreamingHTTP] ❌ Network error:")
+            print("[StreamingHTTP]   Domain: \(nsError.domain)")
+            print("[StreamingHTTP]   Code: \(nsError.code)")
+            print("[StreamingHTTP]   Description: \(nsError.localizedDescription)")
+            if let underlyingError = nsError.userInfo[NSUnderlyingErrorKey] as? Error {
+                print("[StreamingHTTP]   Underlying: \(underlyingError)")
+            }
+            throw StreamingError.connectionFailed("Network error: \(nsError.localizedDescription)")
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("[StreamingHTTP] ❌ Invalid response type")
+            throw StreamingError.connectionFailed("Invalid response")
+        }
+        
+        print("[StreamingHTTP]   HTTP Status: \(httpResponse.statusCode)")
+
         guard httpResponse.statusCode == 200 else {
-            throw StreamingError.providerError(httpResponse.statusCode, "OpenAI API error")
+            // Try to read the error response body
+            var errorBody = ""
+            do {
+                for try await line in bytes.lines {
+                    errorBody += line
+                }
+            } catch {
+                // Ignore errors reading the error body
+            }
+            print("[StreamingHTTP] ❌ Provider error (\(httpResponse.statusCode)): \(errorBody)")
+            throw StreamingError.providerError(httpResponse.statusCode, errorBody.isEmpty ? "OpenAI API error" : errorBody)
         }
 
         var accumulatedContent = ""

@@ -4,7 +4,7 @@
         "id": "solo_turn_action",
         "name": "Solo Turn Action",
         "description": "Respond to a turn allocation boundary in a solo session. Use this when presented with a SOLO SESSION CHECKPOINT to decide whether to extend, conclude, pause, or notify.",
-        "category": "solo_thread",
+        "category": "sovereignty",
         "icon": {
             "sfSymbol": "bolt.circle.fill"
         },
