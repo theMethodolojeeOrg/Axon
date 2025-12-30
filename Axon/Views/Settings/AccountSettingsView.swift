@@ -11,10 +11,13 @@ import FirebaseAuth
 struct AccountSettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
     @StateObject private var authService = AuthenticationService.shared
+    @StateObject private var bioIDService = BioIDService.shared
+    @StateObject private var userDataZoneService = UserDataZoneService.shared
 
     @State private var showingPasswordReset = false
     @State private var showingSignOutConfirmation = false
     @State private var showingDeleteAccountConfirmation = false
+    @State private var isSettingUpAIP = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -79,6 +82,103 @@ struct AccountSettingsView: View {
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         }
+                    }
+                }
+                .padding()
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
+            }
+            
+            // AIP Identity Section
+            SettingsSection(title: "AIP Identity") {
+                VStack(spacing: 16) {
+                    if let bioID = bioIDService.currentBioID {
+                        // BioID Display
+                        HStack {
+                            Text("BioID")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textSecondary)
+                            
+                            Spacer()
+                            
+                            Text(bioID)
+                                .font(AppTypography.code())
+                                .foregroundColor(AppColors.signalMercury)
+                        }
+                        
+                        Divider()
+                            .background(AppColors.divider)
+                        
+                        // AIP Address
+                        if let displayName = authService.displayName {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("AIP Address")
+                                    .font(AppTypography.bodyMedium())
+                                    .foregroundColor(AppColors.textSecondary)
+                                
+                                Text("ai://axon/\(displayName.lowercased()).\(bioID)/*")
+                                    .font(AppTypography.code())
+                                    .foregroundColor(AppColors.textPrimary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                        }
+                        
+                        Divider()
+                            .background(AppColors.divider)
+                        
+                        // Zone Status
+                        HStack {
+                            Text("Data Zone")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textSecondary)
+                            
+                            Spacer()
+                            
+                            if userDataZoneService.isZoneReady {
+                                Label("Ready", systemImage: "checkmark.circle.fill")
+                                    .font(AppTypography.bodySmall(.medium))
+                                    .foregroundColor(AppColors.accentSuccess)
+                            } else {
+                                Text("Not Configured")
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.textTertiary)
+                            }
+                        }
+                    } else {
+                        // Setup BioID
+                        VStack(spacing: 12) {
+                            Text("Set up your sovereign AI identity")
+                                .font(AppTypography.bodyMedium())
+                                .foregroundColor(AppColors.textSecondary)
+                                .multilineTextAlignment(.center)
+                            
+                            Button(action: {
+                                Task {
+                                    await setupAIPIdentity()
+                                }
+                            }) {
+                                HStack {
+                                    Image(systemName: "faceid")
+                                        .font(.system(size: 18))
+                                    Text("Enroll with Biometrics")
+                                        .font(AppTypography.bodyMedium(.medium))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                .background(AppColors.signalMercury)
+                                .cornerRadius(8)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .disabled(isSettingUpAIP)
+                            
+                            if isSettingUpAIP {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                            }
+                        }
+                        .padding(.vertical, 8)
                     }
                 }
                 .padding()
@@ -253,6 +353,33 @@ struct AccountSettingsView: View {
         // This should call a backend endpoint to delete all user data
         // and then delete the Firebase Auth account
         viewModel.error = "Account deletion not yet implemented"
+    }
+    
+    private func setupAIPIdentity() async {
+        isSettingUpAIP = true
+        defer { isSettingUpAIP = false }
+        
+        do {
+            // 1. Generate or retrieve BioID
+            let bioID = try await bioIDService.ensureIdentity()
+            
+            // 2. Get display name for the AIP address
+            guard let displayName = authService.displayName else {
+                viewModel.error = "Please set a display name before setting up AIP identity"
+                return
+            }
+            
+            // 3. Bootstrap the shared CloudKit zone
+            let shareURL = try await userDataZoneService.bootstrapSharedZone(
+                bioID: bioID,
+                displayName: displayName.lowercased()
+            )
+            
+            viewModel.showSuccessMessage("AIP identity created: ai://axon/\(displayName.lowercased()).\(bioID)/*")
+            print("[AccountSettings] Share URL: \(shareURL)")
+        } catch {
+            viewModel.error = "Failed to set up AIP identity: \(error.localizedDescription)"
+        }
     }
 }
 
