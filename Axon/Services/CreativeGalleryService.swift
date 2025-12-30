@@ -105,12 +105,33 @@ final class CreativeGalleryService: ObservableObject {
         var updatedItem = item
         updatedItem.isDeleted = true
         updatedItem.deletedAt = Date()
-        
+
         // Update in Core Data cache
         updateCachedItem(updatedItem)
-        
+
         // Remove from in-memory list
         items.removeAll { $0.id == item.id }
+    }
+
+    /// Update the title of an item
+    /// - Parameters:
+    ///   - item: The item to update
+    ///   - newTitle: The new title to set
+    /// - Returns: The updated item
+    @discardableResult
+    func updateItemTitle(_ item: CreativeItem, newTitle: String) -> CreativeItem {
+        var updatedItem = item
+        updatedItem.title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Update in Core Data cache
+        updateCachedItem(updatedItem)
+
+        // Update in-memory list
+        if let index = items.firstIndex(where: { $0.id == item.id }) {
+            items[index] = updatedItem
+        }
+
+        return updatedItem
     }
     
     /// Add a directly created item to the gallery

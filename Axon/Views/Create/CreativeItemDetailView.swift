@@ -13,7 +13,7 @@ import AppKit
 #endif
 
 struct CreativeItemDetailView: View {
-    let item: CreativeItem
+    @State private var item: CreativeItem
 
     @StateObject private var conversationService = ConversationService.shared
     @StateObject private var playbackService = TTSPlaybackService.shared
@@ -22,6 +22,12 @@ struct CreativeItemDetailView: View {
     @State private var showShareSheet = false
     @State private var copied = false
     @State private var playbackError: String?
+    @State private var showEditTitleAlert = false
+    @State private var editedTitle = ""
+
+    init(item: CreativeItem) {
+        self._item = State(initialValue: item)
+    }
     
     var body: some View {
         NavigationStack {
@@ -58,19 +64,26 @@ struct CreativeItemDetailView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Button {
+                            editedTitle = item.displayTitle
+                            showEditTitleAlert = true
+                        } label: {
+                            Label("Edit Title", systemImage: "pencil")
+                        }
+
+                        Button {
                             shareItem()
                         } label: {
                             Label("Share", systemImage: "square.and.arrow.up")
                         }
-                        
+
                         Button {
                             copyToClipboard()
                         } label: {
                             Label(copied ? "Copied!" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
                         }
-                        
+
                         Divider()
-                        
+
                         Button(role: .destructive) {
                             CreativeGalleryService.shared.deleteItem(item)
                             dismiss()
@@ -83,7 +96,21 @@ struct CreativeItemDetailView: View {
                     }
                 }
             }
+            .alert("Edit Title", isPresented: $showEditTitleAlert) {
+                TextField("Title", text: $editedTitle)
+                Button("Cancel", role: .cancel) {}
+                Button("Save") {
+                    saveEditedTitle()
+                }
+            } message: {
+                Text("Enter a new title for this item")
+            }
         }
+    }
+
+    private func saveEditedTitle() {
+        guard !editedTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        item = CreativeGalleryService.shared.updateItemTitle(item, newTitle: editedTitle)
     }
     
     // MARK: - Content View

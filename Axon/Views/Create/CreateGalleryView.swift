@@ -8,6 +8,18 @@
 
 import SwiftUI
 
+enum GalleryViewMode: String, CaseIterable {
+    case grid
+    case list
+
+    var icon: String {
+        switch self {
+        case .grid: return "square.grid.2x2"
+        case .list: return "list.bullet"
+        }
+    }
+}
+
 struct CreateGalleryView: View {
     @StateObject private var galleryService = CreativeGalleryService.shared
     @StateObject private var conversationService = ConversationService.shared
@@ -19,8 +31,12 @@ struct CreateGalleryView: View {
     @State private var showingImageSheet = false
     @State private var showingAudioSheet = false
     @State private var showingVideoSheet = false
+    @State private var showEditTitleAlert = false
+    @State private var editingItem: CreativeItem?
+    @State private var editedTitle = ""
+    @State private var viewMode: GalleryViewMode = .grid
     @StateObject private var videoService = VideoGenerationService.shared
-    
+
     @Environment(\.dismiss) private var dismiss
     
     private var filteredItems: [CreativeItem] {
@@ -57,7 +73,12 @@ struct CreateGalleryView: View {
                 } else if filteredItems.isEmpty && !hasAnyCreateCard {
                     emptyStateView
                 } else {
-                    galleryGrid
+                    switch viewMode {
+                    case .grid:
+                        galleryGrid
+                    case .list:
+                        galleryList
+                    }
                 }
             }
         }
@@ -76,8 +97,29 @@ struct CreateGalleryView: View {
         .sheet(isPresented: $showingVideoSheet) {
             CreateVideoSheet()
         }
+        .alert("Edit Title", isPresented: $showEditTitleAlert) {
+            TextField("Title", text: $editedTitle)
+            Button("Cancel", role: .cancel) {
+                editingItem = nil
+            }
+            Button("Save") {
+                saveEditedTitle()
+            }
+        } message: {
+            Text("Enter a new title for this item")
+        }
     }
-    
+
+    private func saveEditedTitle() {
+        guard let item = editingItem,
+              !editedTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            editingItem = nil
+            return
+        }
+        galleryService.updateItemTitle(item, newTitle: editedTitle)
+        editingItem = nil
+    }
+
     // MARK: - Search Bar
     
     private var searchBar: some View {
@@ -107,6 +149,24 @@ struct CreateGalleryView: View {
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(AppColors.glassBorder, lineWidth: 1)
             )
+
+            // View mode toggle
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    viewMode = viewMode == .grid ? .list : .grid
+                }
+            } label: {
+                Image(systemName: viewMode == .grid ? GalleryViewMode.list.icon : GalleryViewMode.grid.icon)
+                    .font(.system(size: 18))
+                    .foregroundColor(AppColors.textSecondary)
+                    .frame(width: 40, height: 40)
+                    .background(AppColors.substrateSecondary)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(AppColors.glassBorder, lineWidth: 1)
+                    )
+            }
         }
         .padding(.horizontal)
         .padding(.vertical, 12)
@@ -200,13 +260,21 @@ struct CreateGalleryView: View {
                         }
                         .contextMenu {
                             Button {
+                                editingItem = item
+                                editedTitle = item.displayTitle
+                                showEditTitleAlert = true
+                            } label: {
+                                Label("Edit Title", systemImage: "pencil")
+                            }
+
+                            Button {
                                 navigateToChat(item: item)
                             } label: {
                                 Label("Go to Chat", systemImage: "bubble.left.and.bubble.right")
                             }
-                            
+
                             Divider()
-                            
+
                             Button(role: .destructive) {
                                 galleryService.deleteItem(item)
                             } label: {
@@ -218,7 +286,80 @@ struct CreateGalleryView: View {
             .padding()
         }
     }
-    
+
+    // MARK: - Gallery List
+
+    private var galleryList: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                // Create cards for list view
+                if shouldShowImageCreateCard {
+                    CreateActionListRow(
+                        title: "Create an image",
+                        subtitle: "with ChatGPT Image",
+                        icon: "plus.circle.fill",
+                        color: AppColors.signalMercury
+                    ) {
+                        showingImageSheet = true
+                    }
+                }
+
+                if shouldShowAudioCreateCard {
+                    CreateActionListRow(
+                        title: "Create audio",
+                        subtitle: "with Text-to-Speech",
+                        icon: "plus.circle.fill",
+                        color: AppColors.signalMercury
+                    ) {
+                        showingAudioSheet = true
+                    }
+                }
+
+                if shouldShowVideoCreateCard {
+                    CreateActionListRow(
+                        title: "Create a video",
+                        subtitle: "with Veo or Sora",
+                        icon: "plus.circle.fill",
+                        color: AppColors.signalMercury
+                    ) {
+                        showingVideoSheet = true
+                    }
+                }
+
+                ForEach(filteredItems) { item in
+                    GalleryItemRow(item: item)
+                        .onTapGesture {
+                            selectedItem = item
+                        }
+                        .contextMenu {
+                            Button {
+                                editingItem = item
+                                editedTitle = item.displayTitle
+                                showEditTitleAlert = true
+                            } label: {
+                                Label("Edit Title", systemImage: "pencil")
+                            }
+
+                            Button {
+                                navigateToChat(item: item)
+                            } label: {
+                                Label("Go to Chat", systemImage: "bubble.left.and.bubble.right")
+                            }
+
+                            Divider()
+
+                            Button(role: .destructive) {
+                                galleryService.deleteItem(item)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                }
+            }
+            .padding()
+        }
+    }
+
     // Helpers for create card visibility
     private var shouldShowImageCreateCard: Bool {
         creationService.hasOpenAIKey && (selectedFilter == .all || selectedFilter == .type(.photo))
@@ -550,6 +691,202 @@ private struct CreateActionCard: View {
                         .font(.system(size: 24, weight: .medium))
                         .foregroundColor(color)
                 }
+            }
+            .padding(12)
+        }
+        .buttonStyle(.plain)
+        .background(AppColors.substrateTertiary)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(color.opacity(0.3), lineWidth: 2)
+                .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+        )
+    }
+}
+
+// MARK: - Gallery Item Row (List View)
+
+private struct GalleryItemRow: View {
+    let item: CreativeItem
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Thumbnail
+            thumbnailView
+                .frame(width: 60, height: 60)
+                .cornerRadius(8)
+                .clipped()
+
+            // Info
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.displayTitle)
+                    .font(AppTypography.bodyMedium(.medium))
+                    .foregroundColor(AppColors.textPrimary)
+                    .lineLimit(1)
+
+                HStack(spacing: 8) {
+                    Label(item.type.displayName, systemImage: item.type.icon)
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+
+                    Text("•")
+                        .foregroundColor(AppColors.textTertiary)
+
+                    Text(item.createdAt, style: .relative)
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                }
+
+                if let prompt = item.prompt, !prompt.isEmpty {
+                    Text(prompt)
+                        .font(AppTypography.bodySmall())
+                        .foregroundColor(AppColors.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(AppColors.textTertiary)
+        }
+        .padding(12)
+        .background(AppColors.substrateSecondary)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(AppColors.glassBorder, lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private var thumbnailView: some View {
+        switch item.type {
+        case .photo:
+            photoThumbnail
+        case .video:
+            videoThumbnail
+        case .audio:
+            audioThumbnail
+        case .artifact:
+            artifactThumbnail
+        }
+    }
+
+    private var photoThumbnail: some View {
+        Group {
+            if let base64 = item.contentBase64 ?? item.thumbnailBase64,
+               let data = Data(base64Encoded: base64),
+               let image = PlatformImageCodec.image(from: data) {
+                #if canImport(UIKit)
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                #elseif canImport(AppKit)
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFill()
+                #endif
+            } else if let urlString = item.contentURL, let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        iconPlaceholder(icon: "exclamationmark.triangle")
+                    case .empty:
+                        ProgressView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    @unknown default:
+                        iconPlaceholder(icon: "photo")
+                    }
+                }
+            } else {
+                iconPlaceholder(icon: "photo")
+            }
+        }
+    }
+
+    private var videoThumbnail: some View {
+        iconPlaceholder(icon: "video.fill")
+            .overlay(
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(.white.opacity(0.8))
+            )
+    }
+
+    private var audioThumbnail: some View {
+        ZStack {
+            AppColors.signalMercury.opacity(0.1)
+            Image(systemName: "waveform")
+                .font(.system(size: 24))
+                .foregroundColor(AppColors.signalMercury)
+        }
+    }
+
+    private var artifactThumbnail: some View {
+        ZStack {
+            AppColors.substrateTertiary
+            Image(systemName: "doc.text")
+                .font(.system(size: 24))
+                .foregroundColor(AppColors.textTertiary)
+        }
+    }
+
+    private func iconPlaceholder(icon: String) -> some View {
+        ZStack {
+            AppColors.substrateTertiary
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundColor(AppColors.textTertiary)
+        }
+    }
+}
+
+// MARK: - Create Action List Row
+
+private struct CreateActionListRow: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                // Icon
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(color.opacity(0.1))
+                        .frame(width: 60, height: 60)
+
+                    Image(systemName: icon)
+                        .font(.system(size: 24))
+                        .foregroundColor(color)
+                }
+
+                // Info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(AppTypography.bodyMedium(.medium))
+                        .foregroundColor(color)
+
+                    Text(subtitle)
+                        .font(AppTypography.bodySmall())
+                        .foregroundColor(color.opacity(0.8))
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(color.opacity(0.6))
             }
             .padding(12)
         }

@@ -647,39 +647,39 @@ struct MemoryDetailView: View {
                     .padding(.vertical)
                 }
             }
-        }
-        .navigationTitle("Memory Details")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                if isEditing {
-                    Button("Cancel") {
-                        // Reset values
-                        content = memory.content
-                        selectedType = memory.type
-                        confidence = memory.confidence
-                        tags = memory.tags.joined(separator: ", ")
-                        context = memory.context ?? ""
-                        isEditing = false
-                    }
-                    .foregroundColor(AppColors.textSecondary)
-                } else {
-                    Button("Close") {
-                        dismiss()
-                    }
-                    .foregroundColor(AppColors.textSecondary)
-                }
-            }
-            
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(isEditing ? "Save" : "Edit") {
+            .navigationTitle("Memory Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
                     if isEditing {
-                        saveChanges()
+                        Button("Cancel") {
+                            // Reset values
+                            content = memory.content
+                            selectedType = memory.type
+                            confidence = memory.confidence
+                            tags = memory.tags.joined(separator: ", ")
+                            context = memory.context ?? ""
+                            isEditing = false
+                        }
+                        .foregroundColor(AppColors.textSecondary)
                     } else {
-                        isEditing = true
+                        Button("Close") {
+                            dismiss()
+                        }
+                        .foregroundColor(AppColors.textSecondary)
                     }
                 }
-                .foregroundColor(AppColors.signalMercury)
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(isEditing ? "Save" : "Edit") {
+                        if isEditing {
+                            saveChanges()
+                        } else {
+                            isEditing = true
+                        }
+                    }
+                    .foregroundColor(AppColors.signalMercury)
+                }
             }
         }
         .alert("Delete Memory?", isPresented: $showingDeleteConfirmation) {
@@ -771,4 +771,3 @@ struct MemoryDetailView: View {
         }
     }
 }
-

@@ -69,7 +69,7 @@ struct CreativeItem: Identifiable, Codable, Equatable {
     let mimeType: String?
     
     // Metadata
-    let title: String?           // For artifacts: filename or title
+    var title: String?           // For artifacts: filename or title (mutable for user editing)
     let prompt: String?          // Generation prompt if available
     let language: String?        // For code artifacts: programming language
     let fileSize: Int64?         // In bytes, if known

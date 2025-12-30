@@ -213,6 +213,10 @@ struct MemoryContentView: View {
         }
         .sheet(item: $viewModel.selectedMemory) { memory in
             MemoryDetailView(memory: memory)
+                #if os(iOS)
+                .presentationDetents([.large, .medium])
+                .presentationDragIndicator(.visible)
+                #endif
         }
         .sheet(isPresented: $viewModel.showAllTags) {
             AllTagsSheet(

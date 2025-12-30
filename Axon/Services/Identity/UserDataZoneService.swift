@@ -39,11 +39,11 @@ public class UserDataZoneService: ObservableObject {
         logger.info("Bootstrapping shared zone for bioID: \(bioID)")
         
         // 1. Create the zone
-        let zone = CKRecordZone(zoneID: sharedZoneID)
+        let zone = CKRecordZone(zoneID: self.sharedZoneID)
         
         do {
-            let savedZone = try await privateDatabase.save(zone)
-            logger.info("Created zone: \(sharedZoneID.zoneName)")
+            _ = try await privateDatabase.save(zone)
+            logger.info("Created zone: \(self.sharedZoneID.zoneName)")
             debugLog(.aipZone, "✅ Created zone: \(sharedZoneID.zoneName)")
         } catch let error as CKError where error.code == .serverRecordChanged {
             // Zone already exists, that's fine

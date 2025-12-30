@@ -18,7 +18,11 @@ struct CreateAudioSheet: View {
     @State private var selectedGeminiVoice: GeminiTTSService.GeminiVoice = .puck
     @State private var selectedElevenLabsVoiceId: String?
     @State private var selectedElevenLabsVoiceName: String?
-    
+
+    // Voice direction/instructions (Gemini and OpenAI gpt-4o-mini-tts)
+    @State private var voiceDirection: String = ""
+    @State private var selectedOpenAIModel: OpenAITTSModel = .gpt4oMiniTTS
+
     @State private var isGenerating = false
     @State private var errorMessage: String?
     @State private var generatedItem: CreativeItem?
@@ -123,6 +127,11 @@ struct CreateAudioSheet: View {
 
                     // Voice selection
                     voiceSection
+
+                    // Voice direction (for OpenAI and Gemini)
+                    if selectedProvider == .openai || selectedProvider == .gemini {
+                        voiceDirectionSection
+                    }
 
                     // Generate button
                     generateButton
@@ -355,7 +364,75 @@ struct CreateAudioSheet: View {
             }
         }
     }
-    
+
+    // MARK: - Voice Direction Section
+
+    private var voiceDirectionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Model selector for OpenAI (instructions only work with gpt-4o-mini-tts)
+            if selectedProvider == .openai {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Model")
+                        .font(AppTypography.labelMedium())
+                        .foregroundColor(AppColors.textSecondary)
+
+                    Picker("Model", selection: $selectedOpenAIModel) {
+                        ForEach(OpenAITTSModel.allCases, id: \.self) { model in
+                            Text(model.displayName).tag(model)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if !selectedOpenAIModel.supportsInstructions {
+                        HStack(spacing: 6) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 12))
+                            Text("Voice direction requires GPT-4o Mini TTS model")
+                                .font(AppTypography.labelSmall())
+                        }
+                        .foregroundColor(AppColors.textTertiary)
+                    }
+                }
+            }
+
+            // Voice direction input (shown for Gemini, or OpenAI with compatible model)
+            if selectedProvider == .gemini || (selectedProvider == .openai && selectedOpenAIModel.supportsInstructions) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Voice Direction")
+                            .font(AppTypography.labelMedium())
+                            .foregroundColor(AppColors.textSecondary)
+
+                        Spacer()
+
+                        Text("Optional")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+
+                    TextField("e.g., Speak in a cheerful tone, whisper softly, sound excited...", text: $voiceDirection, axis: .vertical)
+                        .font(AppTypography.bodySmall())
+                        .foregroundColor(AppColors.textPrimary)
+                        .lineLimit(2...4)
+                        .padding(12)
+                        .background(AppColors.substrateTertiary)
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(AppColors.glassBorder, lineWidth: 1)
+                        )
+
+                    Text("Control accent, tone, emotion, speed, and speaking style")
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                }
+            }
+        }
+        .padding()
+        .background(AppColors.substrateSecondary)
+        .cornerRadius(12)
+    }
+
     // MARK: - Generate Button
     
     private var generateButton: some View {
@@ -420,14 +497,22 @@ struct CreateAudioSheet: View {
                     // MLX-Audio is for in-chat TTS only, not for gallery audio creation
                     throw DirectMediaError.generationFailed("MLX Neural TTS is available for reading messages aloud. For audio file creation, please use ElevenLabs, OpenAI, or Gemini.")
                 case .openai:
+                    // Pass instructions only if model supports it and direction is provided
+                    let instructions = selectedOpenAIModel.supportsInstructions && !voiceDirection.isEmpty
+                        ? voiceDirection : nil
                     item = try await creationService.generateAudioOpenAI(
                         text: text,
-                        voice: selectedOpenAIVoice
+                        voice: selectedOpenAIVoice,
+                        model: selectedOpenAIModel,
+                        instructions: instructions
                     )
                 case .gemini:
+                    // Pass direction if provided
+                    let direction = !voiceDirection.isEmpty ? voiceDirection : nil
                     item = try await creationService.generateAudioGemini(
                         text: text,
-                        voice: selectedGeminiVoice
+                        voice: selectedGeminiVoice,
+                        direction: direction
                     )
                 case .elevenlabs:
                     guard let voiceId = selectedElevenLabsVoiceId,

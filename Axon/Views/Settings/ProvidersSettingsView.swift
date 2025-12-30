@@ -108,9 +108,8 @@ struct ProvidersSettingsView: View {
 
             // Realtime Voice
             NavigationLink {
-                SettingsSubviewContainer {
-                    LiveVoiceSettingsView(viewModel: viewModel)
-                }
+                LiveVoiceSettingsView(viewModel: viewModel)
+                    .background(AppColors.substratePrimary)
             } label: {
                 SettingsCategoryRow(
                     icon: "waveform.circle.fill",
