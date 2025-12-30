@@ -43,7 +43,8 @@ public class UserDataZoneService: ObservableObject {
         
         do {
             let savedZone = try await privateDatabase.save(zone)
-            logger.info("Created zone: \(savedZone.zoneID.zoneName)")
+            logger.info("Created zone: \(sharedZoneID.zoneName)")
+            debugLog(.aipZone, "✅ Created zone: \(sharedZoneID.zoneName)")
         } catch let error as CKError where error.code == .serverRecordChanged {
             // Zone already exists, that's fine
             logger.info("Zone already exists, continuing...")
@@ -58,6 +59,7 @@ public class UserDataZoneService: ObservableObject {
         
         try await privateDatabase.save(rootRecord)
         logger.info("Created root record")
+        debugLog(.aipZone, "✅ Created root record: AxonRoot_\(bioID)")
         
         // 3. Create a CKShare for the zone
         let share = CKShare(rootRecord: rootRecord)
@@ -87,6 +89,7 @@ public class UserDataZoneService: ObservableObject {
         self.currentShareURL = shareURL
         self.isZoneReady = true
         logger.info("Created share with URL: \(shareURL.absoluteString)")
+        debugLog(.aipZone, "✅ Created share: \(shareURL.absoluteString)")
         
         // 5. Publish to public registry
         try await publishToRegistry(bioID: bioID, displayName: displayName, shareURL: shareURL)
@@ -100,6 +103,7 @@ public class UserDataZoneService: ObservableObject {
     private func publishToRegistry(bioID: String, displayName: String, shareURL: URL) async throws {
         let recordName = "\(displayName).\(bioID)"
         logger.info("Attempting to publish to public registry: \(recordName)")
+        debugLog(.aipRegistry, "⏳ Publishing to registry: \(recordName)")
         
         let registryID = CKRecord.ID(recordName: recordName)
         let registryRecord = CKRecord(recordType: "AIPRegistry", recordID: registryID)
@@ -112,6 +116,7 @@ public class UserDataZoneService: ObservableObject {
         do {
             let savedRecord = try await publicDatabase.save(registryRecord)
             logger.info("✅ Successfully published to public registry: \(savedRecord.recordID.recordName)")
+            debugLog(.aipRegistry, "✅ Published to registry: \(savedRecord.recordID.recordName)")
         } catch let ckError as CKError {
             logger.error("❌ CloudKit error saving to public registry: code=\(ckError.code.rawValue) \(ckError.localizedDescription)")
             if let serverRecord = ckError.serverRecord {
@@ -122,9 +127,11 @@ public class UserDataZoneService: ObservableObject {
                     logger.error("   Partial error for \(key): \(error.localizedDescription)")
                 }
             }
+            debugLog(.aipRegistry, "❌ CloudKit error: code=\(ckError.code.rawValue) \(ckError.localizedDescription)")
             throw ckError
         } catch {
             logger.error("❌ Unexpected error saving to public registry: \(error.localizedDescription)")
+            debugLog(.aipRegistry, "❌ Unexpected error: \(error.localizedDescription)")
             throw error
         }
     }

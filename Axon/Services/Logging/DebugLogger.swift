@@ -54,6 +54,11 @@ enum LogCategory: String, CaseIterable, Identifiable, Codable {
 
     // Developer
     case developerSettings = "DeveloperSettings"
+    
+    // AIP (AI Addressing Protocol)
+    case aipIdentity = "AIPIdentity"
+    case aipZone = "AIPZone"
+    case aipRegistry = "AIPRegistry"
 
     var id: String { rawValue }
 
@@ -83,6 +88,9 @@ enum LogCategory: String, CaseIterable, Identifiable, Codable {
         case .attachments: return "Attachments"
         case .providerResolution: return "Provider Resolution"
         case .developerSettings: return "Developer Settings"
+        case .aipIdentity: return "AIP Identity"
+        case .aipZone: return "AIP Zone"
+        case .aipRegistry: return "AIP Registry"
         }
     }
 
@@ -112,6 +120,9 @@ enum LogCategory: String, CaseIterable, Identifiable, Codable {
         case .attachments: return "paperclip"
         case .providerResolution: return "arrow.triangle.branch"
         case .developerSettings: return "hammer"
+        case .aipIdentity: return "person.badge.key"
+        case .aipZone: return "externaldrive.connected.to.line.below"
+        case .aipRegistry: return "list.bullet.clipboard"
         }
     }
 
@@ -136,6 +147,8 @@ enum LogCategory: String, CaseIterable, Identifiable, Codable {
             return .chat
         case .developerSettings:
             return .developer
+        case .aipIdentity, .aipZone, .aipRegistry:
+            return .aip
         }
     }
 }
@@ -152,6 +165,7 @@ enum LogCategoryGroup: String, CaseIterable, Identifiable {
     case tools = "Tools"
     case chat = "Chat"
     case developer = "Developer"
+    case aip = "AIP"
 
     var id: String { rawValue }
 
@@ -168,6 +182,7 @@ enum LogCategoryGroup: String, CaseIterable, Identifiable {
         case .tools: return "wrench.and.screwdriver.fill"
         case .chat: return "bubble.left.and.bubble.right.fill"
         case .developer: return "hammer.fill"
+        case .aip: return "person.badge.key.fill"
         }
     }
 

@@ -54,18 +54,21 @@ public class BioIDService: ObservableObject {
             let bioID = deriveBioID(from: privateKey.publicKey)
             self.currentBioID = bioID
             logger.info("Loaded existing BioID: \(bioID)")
+            debugLog(.aipIdentity, "✅ Loaded existing BioID: \(bioID)")
             return bioID
         }
         
         // 2. Check if Secure Enclave is available (REQUIRED)
         guard SecureEnclave.isAvailable else {
             logger.error("Secure Enclave not available on this device")
+            debugLog(.aipIdentity, "❌ Secure Enclave not available")
             throw BioIDError.secureEnclaveNotAvailable
         }
         
         // 3. Check if biometrics are available (REQUIRED)
         guard isBiometricsAvailable else {
             logger.error("Biometrics not available - enrollment required")
+            debugLog(.aipIdentity, "❌ Biometrics not enrolled")
             throw BioIDError.biometricsNotAvailable
         }
         
@@ -79,6 +82,7 @@ public class BioIDService: ObservableObject {
         ) else {
             let errorDesc = cfError?.takeRetainedValue().localizedDescription ?? "unknown"
             logger.error("Failed to create access control: \(errorDesc)")
+            debugLog(.aipIdentity, "❌ Access control creation failed: \(errorDesc)")
             throw BioIDError.accessControlCreationFailed(errorDesc)
         }
         
@@ -93,9 +97,11 @@ public class BioIDService: ObservableObject {
             let bioID = deriveBioID(from: privateKey.publicKey)
             self.currentBioID = bioID
             logger.info("Generated new BioID (Secure Enclave): \(bioID)")
+            debugLog(.aipIdentity, "✅ Generated new BioID (Secure Enclave): \(bioID)")
             return bioID
         } catch let seError as NSError {
             logger.error("Secure Enclave key generation failed: domain=\(seError.domain) code=\(seError.code) \(seError.localizedDescription)")
+            debugLog(.aipIdentity, "❌ SE key generation failed: domain=\(seError.domain) code=\(seError.code) \(seError.localizedDescription)")
             throw BioIDError.secureEnclaveKeyGenerationFailed(seError.localizedDescription)
         }
     }
