@@ -498,11 +498,53 @@ Config/Local/
 *.local
 local-*.json
 
+# API Keys and Secrets - More comprehensive
+*api-key*
+*apikey*
+*_secret*
+*-secret*
+*_credential*
+*-credential*
+*_auth*
+*-auth*
+*_token*
+*-token*
+
+# Configuration files with secrets
+**/secrets.yaml
+**/secrets.yml
+**/secrets.json
+**/credentials.yaml
+**/credentials.yml
+**/credentials.json
+**/config/secret*
+**/config/credential*
+
 # Sensitive files
 *.key
 *.pem
 *.p12
 *.pfx
+*.cer
+*.crt
+
+# Xcode scheme secrets
+*.xcscheme/*/EnvironmentVariables.xcscheme
+
+# Secret backups
+*.secret.backup
+*.key.backup
+*.token.backup
+
+# Temporary secret files
+secret*
+credential*
+auth-key*
+api-key*
+
+# Project-specific config
+Axon/Config/*.secret
+Axon/Config/*.local
 
 # Build artifacts
 *.app
