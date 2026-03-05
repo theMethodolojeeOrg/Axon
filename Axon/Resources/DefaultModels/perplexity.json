@@ -1,0 +1,86 @@
+{
+  "id": "perplexity",
+  "displayName": "Perplexity (Sonar)",
+  "models": [
+    {
+      "id": "sonar-reasoning-pro",
+      "displayName": "Sonar Reasoning Pro",
+      "category": "reasoning",
+      "contextWindow": 128000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 2.00,
+        "outputPerMillion": 8.00,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Best for complex queries. Advanced reasoning (CoT) + real-time web search",
+      "sourceUrls": [
+        "https://docs.perplexity.ai/getting-started/pricing"
+      ]
+    },
+    {
+      "id": "sonar-reasoning",
+      "displayName": "Sonar Reasoning",
+      "category": "reasoning",
+      "contextWindow": 128000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 1.00,
+        "outputPerMillion": 5.00,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Lighter reasoning model with web search. Good balance of speed/intelligence",
+      "sourceUrls": [
+        "https://docs.perplexity.ai/getting-started/pricing"
+      ]
+    },
+    {
+      "id": "sonar-pro",
+      "displayName": "Sonar Pro",
+      "category": "frontier",
+      "contextWindow": 200000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 3.00,
+        "outputPerMillion": 15.00,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "High-capacity standard search model (no reasoning tokens)",
+      "sourceUrls": [
+        "https://docs.perplexity.ai/getting-started/pricing"
+      ]
+    },
+    {
+      "id": "sonar",
+      "displayName": "Sonar",
+      "category": "fast",
+      "contextWindow": 128000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 1.00,
+        "outputPerMillion": 1.00,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Cheapest standard search model. Good for simple lookups",
+      "sourceUrls": [
+        "https://docs.perplexity.ai/getting-started/pricing"
+      ]
+    }
+  ]
+}

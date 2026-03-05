@@ -1,0 +1,129 @@
+{
+  "id": "xai",
+  "displayName": "xAI (Grok)",
+  "models": [
+    {
+      "id": "grok-4-fast-reasoning",
+      "displayName": "Grok 4 Fast Reasoning",
+      "category": "reasoning",
+      "contextWindow": 131072,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.20,
+        "outputPerMillion": 0.75,
+        "cachedInputPerMillion": 0.05,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Fast reasoning with chain-of-thought for complex problems",
+      "sourceUrls": [
+        "https://docs.x.ai/docs/models"
+      ]
+    },
+    {
+      "id": "grok-4-fast-non-reasoning",
+      "displayName": "Grok 4 Fast",
+      "category": "fast",
+      "contextWindow": 131072,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.20,
+        "outputPerMillion": 0.50,
+        "cachedInputPerMillion": 0.05,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Fast responses without extended reasoning",
+      "sourceUrls": [
+        "https://docs.x.ai/docs/models"
+      ]
+    },
+    {
+      "id": "grok-code-fast-1",
+      "displayName": "Grok Code Fast",
+      "category": "fast",
+      "contextWindow": 131072,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.20,
+        "outputPerMillion": 1.50,
+        "cachedInputPerMillion": 0.05,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Specialized for code generation and completion",
+      "sourceUrls": [
+        "https://docs.x.ai/docs/models"
+      ]
+    },
+    {
+      "id": "grok-4-0709",
+      "displayName": "Grok 4",
+      "category": "frontier",
+      "contextWindow": 131072,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 3.00,
+        "outputPerMillion": 15.00,
+        "cachedInputPerMillion": 0.75,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Most capable Grok model for complex tasks",
+      "sourceUrls": [
+        "https://docs.x.ai/docs/models"
+      ]
+    },
+    {
+      "id": "grok-3-mini",
+      "displayName": "Grok 3 Mini",
+      "category": "fast",
+      "contextWindow": 131072,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.30,
+        "outputPerMillion": 0.50,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Small and fast for simple tasks",
+      "sourceUrls": [
+        "https://docs.x.ai/docs/models"
+      ]
+    },
+    {
+      "id": "grok-3",
+      "displayName": "Grok 3",
+      "category": "legacy",
+      "contextWindow": 131072,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 3.00,
+        "outputPerMillion": 15.00,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Previous generation flagship Grok model",
+      "sourceUrls": [
+        "https://docs.x.ai/docs/models"
+      ]
+    }
+  ]
+}

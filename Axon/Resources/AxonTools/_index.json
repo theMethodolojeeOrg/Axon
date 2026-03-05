@@ -1,0 +1,488 @@
+{
+  "version": "1.0.0",
+  "name": "Axon Tools",
+  "description": "Master index of all available Axon tools",
+  "generatedAt": "2026-02-14T00:00:00Z",
+  "categories": {
+    "memory": {
+      "name": "Memory",
+      "description": "Long-term memory and conversation management",
+      "icon": {
+        "sfSymbol": "brain"
+      },
+      "tools": [
+        "core/memory/create_memory/tool_create_memory.json",
+        "core/memory/conversation_search/tool_conversation_search.json",
+        "core/memory/reflect_on_conversation/tool_reflect_on_conversation.json"
+      ]
+    },
+    "agent_state": {
+      "name": "Agent State",
+      "description": "Session state management and persistence",
+      "icon": {
+        "sfSymbol": "note.text"
+      },
+      "tools": [
+        "core/agent_state/agent_state_append/tool_agent_state_append.json",
+        "core/agent_state/agent_state_query/tool_agent_state_query.json",
+        "core/agent_state/agent_state_clear/tool_agent_state_clear.json",
+        "core/agent_state/persistence_disable/tool_persistence_disable.json"
+      ]
+    },
+    "heartbeat": {
+      "name": "Heartbeat",
+      "description": "Background task scheduling and autonomous actions",
+      "icon": {
+        "sfSymbol": "heart.fill"
+      },
+      "tools": [
+        "core/heartbeat/heartbeat_configure/tool_heartbeat_configure.json",
+        "core/heartbeat/heartbeat_run_once/tool_heartbeat_run_once.json",
+        "core/heartbeat/heartbeat_set_delivery_profile/tool_heartbeat_set_delivery_profile.json",
+        "core/heartbeat/heartbeat_update_profile/tool_heartbeat_update_profile.json"
+      ]
+    },
+    "discovery": {
+      "name": "Discovery",
+      "description": "Tool and port discovery and invocation",
+      "icon": {
+        "sfSymbol": "magnifyingglass"
+      },
+      "tools": [
+        "core/discovery/list_tools/tool_list_tools.json",
+        "core/discovery/get_tool_details/tool_get_tool_details.json",
+        "core/discovery/discover_ports/tool_discover_ports.json",
+        "core/discovery/invoke_port/tool_invoke_port.json"
+      ]
+    },
+    "notification": {
+      "name": "Notification",
+      "description": "User notification delivery",
+      "icon": {
+        "sfSymbol": "bell"
+      },
+      "tools": [
+        "core/notification/notify_user/tool_notify_user.json"
+      ]
+    },
+    "system_state": {
+      "name": "System State",
+      "description": "Query and modify system configuration",
+      "icon": {
+        "sfSymbol": "gearshape.2"
+      },
+      "tools": [
+        "core/system_state/query_system_state/tool_query_system_state.json",
+        "core/system_state/change_system_state/tool_change_system_state.json"
+      ]
+    },
+    "temporal": {
+      "name": "Temporal",
+      "description": "Time awareness and synchronization",
+      "icon": {
+        "sfSymbol": "clock"
+      },
+      "tools": [
+        "core/temporal/temporal_sync/tool_temporal_sync.json",
+        "core/temporal/temporal_drift/tool_temporal_drift.json",
+        "core/temporal/temporal_status/tool_temporal_status.json"
+      ]
+    },
+    "device_presence": {
+      "name": "Device Presence",
+      "description": "Multi-device presence and state management",
+      "icon": {
+        "sfSymbol": "iphone.and.arrow.forward"
+      },
+      "tools": [
+        "core/device_presence/query_device_presence/tool_query_device_presence.json",
+        "core/device_presence/request_device_switch/tool_request_device_switch.json",
+        "core/device_presence/set_presence_intent/tool_set_presence_intent.json",
+        "core/device_presence/save_state_checkpoint/tool_save_state_checkpoint.json"
+      ]
+    },
+    "sub_agents": {
+      "name": "Sub-Agents",
+      "description": "Spawn and manage autonomous sub-agents",
+      "icon": {
+        "sfSymbol": "person.2"
+      },
+      "tools": [
+        "core/sub_agents/spawn_scout/tool_spawn_scout.json",
+        "core/sub_agents/spawn_mechanic/tool_spawn_mechanic.json",
+        "core/sub_agents/spawn_designer/tool_spawn_designer.json",
+        "core/sub_agents/query_job_status/tool_query_job_status.json",
+        "core/sub_agents/accept_job_result/tool_accept_job_result.json",
+        "core/sub_agents/terminate_job/tool_terminate_job.json"
+      ]
+    },
+    "sovereignty": {
+      "name": "Sovereignty",
+      "description": "Co-sovereignty covenant management",
+      "icon": {
+        "sfSymbol": "checkmark.shield"
+      },
+      "tools": [
+        "core/sovereignty/query_covenant/tool_query_covenant.json",
+        "core/sovereignty/propose_covenant_change/tool_propose_covenant_change.json"
+      ]
+    },
+    "debug": {
+      "name": "Debug",
+      "description": "Debugging and diagnostics tools",
+      "icon": {
+        "sfSymbol": "ladybug"
+      },
+      "tools": [
+        "core/debug/debug_bridge/tool_debug_bridge.json"
+      ]
+    },
+    "collapse_engine": {
+      "name": "Collapse Engine",
+      "description": "Transform analogies into scoped, testable research artifacts",
+      "icon": {
+        "sfSymbol": "square.stack.3d.down.right"
+      },
+      "tools": [
+        "core/collapse_engine/run_collapse_engine/tool_run_collapse_engine.json",
+        "core/collapse_engine/create_collapse_session/tool_create_collapse_session.json",
+        "core/collapse_engine/query_collapse_session/tool_query_collapse_session.json",
+        "core/collapse_engine/list_collapse_sessions/tool_list_collapse_sessions.json",
+        "core/collapse_engine/capture_analog_card/tool_capture_analog_card.json",
+        "core/collapse_engine/extract_constraints/tool_extract_constraints.json",
+        "core/collapse_engine/check_identity_gate/tool_check_identity_gate.json",
+        "core/collapse_engine/record_divergence/tool_record_divergence.json",
+        "core/collapse_engine/compile_divergence_budget/tool_compile_divergence_budget.json",
+        "core/collapse_engine/check_derivation/tool_check_derivation.json",
+        "core/collapse_engine/select_gauge_anchor/tool_select_gauge_anchor.json",
+        "core/collapse_engine/record_gauge_relativity/tool_record_gauge_relativity.json",
+        "core/collapse_engine/generate_collapse_statement/tool_generate_collapse_statement.json",
+        "core/collapse_engine/generate_paper_packet/tool_generate_paper_packet.json",
+        "core/collapse_engine/query_strata_ledger/tool_query_strata_ledger.json"
+      ]
+    },
+    "mac_system": {
+      "name": "Mac System",
+      "description": "macOS system integration tools",
+      "icon": {
+        "sfSymbol": "desktopcomputer"
+      },
+      "tools": [
+        "system/mac_system_info/tool_mac_system_info.json",
+        "system/mac_processes/tool_mac_processes.json",
+        "system/mac_disk_usage/tool_mac_disk_usage.json",
+        "system/mac_clipboard_read/tool_mac_clipboard_read.json",
+        "system/mac_clipboard_write/tool_mac_clipboard_write.json",
+        "system/mac_notification/tool_mac_notification.json",
+        "system/mac_spotlight_search/tool_mac_spotlight_search.json",
+        "system/mac_list_files/tool_mac_list_files.json",
+        "system/mac_file_find/tool_mac_file_find.json",
+        "system/mac_file_read/tool_mac_file_read.json",
+        "system/mac_file_metadata/tool_mac_file_metadata.json",
+        "system/mac_app_list/tool_mac_app_list.json",
+        "system/mac_app_launch/tool_mac_app_launch.json",
+        "system/mac_screenshot/tool_mac_screenshot.json",
+        "system/mac_network_info/tool_mac_network_info.json",
+        "system/mac_ping/tool_mac_ping.json",
+        "system/mac_shell/tool_mac_shell.json"
+      ]
+    },
+    "googlegemini": {
+      "name": "Google Gemini",
+      "description": "Gemini provider-native tools",
+      "icon": {
+        "sfSymbol": "sparkles"
+      },
+      "tools": [
+        "googlegemini/gemini_google_search/tool_gemini_google_search.json",
+        "googlegemini/gemini_code_execution/tool_gemini_code_execution.json",
+        "googlegemini/gemini_url_context/tool_gemini_url_context.json",
+        "googlegemini/gemini_google_maps/tool_gemini_google_maps.json",
+        "googlegemini/gemini_file_search/tool_gemini_file_search.json",
+        "googlegemini/gemini_image_generation/tool_gemini_image_generation.json",
+        "googlegemini/gemini_deep_research/tool_gemini_deep_research.json",
+        "googlegemini/gemini_computer_use/tool_gemini_computer_use.json",
+        "googlegemini/gemini_embeddings/tool_gemini_embeddings.json",
+        "googlegemini/gemini_speech_to_text/tool_gemini_speech_to_text.json",
+        "googlegemini/gemini_text_to_speech/tool_gemini_text_to_speech.json",
+        "googlegemini/gemini_video_understanding/tool_gemini_video_understanding.json",
+        "googlegemini/gemini_audio_understanding/tool_gemini_audio_understanding.json"
+      ]
+    },
+    "openai": {
+      "name": "OpenAI",
+      "description": "OpenAI provider-native tools",
+      "icon": {
+        "sfSymbol": "brain"
+      },
+      "tools": [
+        "openai/openai_deep_research/tool_openai_deep_research.json",
+        "openai/openai_web_search/tool_openai_web_search.json",
+        "openai/openai_image_generation/tool_openai_image_generation.json",
+        "openai/openai_video_generation/tool_openai_video_generation.json",
+        "openai/openai_computer_use/tool_openai_computer_use.json",
+        "openai/openai_embeddings/tool_openai_embeddings.json",
+        "openai/openai_speech_to_text/tool_openai_speech_to_text.json",
+        "openai/openai_text_to_speech/tool_openai_text_to_speech.json"
+      ]
+    },
+    "elevenlabs": {
+      "name": "ElevenLabs",
+      "description": "ElevenLabs provider-native tools",
+      "icon": {
+        "sfSymbol": "waveform"
+      },
+      "tools": [
+        "elevenlabs/elevenlabs_text_to_speech/tool_elevenlabs_text_to_speech.json",
+        "elevenlabs/elevenlabs_speech_to_text/tool_elevenlabs_speech_to_text.json"
+      ]
+    },
+    "xai": {
+      "name": "xAI",
+      "description": "xAI/Grok provider-native tools",
+      "icon": {
+        "sfSymbol": "xmark.circle"
+      },
+      "tools": [
+        "xai/grok_web_search/tool_grok_web_search.json",
+        "xai/grok_code_execution/tool_grok_code_execution.json",
+        "xai/grok_image_generation/tool_grok_image_generation.json",
+        "xai/grok_x_search/tool_grok_x_search.json",
+        "xai/grok_image_understanding/tool_grok_image_understanding.json"
+      ]
+    },
+    "zai": {
+      "name": "zAI",
+      "description": "zAI/GLM provider-native tools",
+      "icon": {
+        "sfSymbol": "z.circle"
+      },
+      "tools": [
+        "zai/glm_web_search/tool_glm_web_search.json",
+        "zai/glm_cogview_4/tool_glm_cogview_4.json",
+        "zai/glm_cogvideo_3/tool_glm_cogvideo_3.json",
+        "zai/glm_speech_to_text/tool_glm_speech_to_text.json"
+      ]
+    }
+  },
+  "stats": {
+    "totalTools": 98,
+    "coreTools": 49,
+    "systemTools": 17,
+    "providerTools": 32,
+    "toolsRequiringApproval": 17
+  },
+  "defaultTrustTiers": {
+    "memory": {
+      "trustTierCategory": "memory_add",
+      "riskLevel": "low",
+      "requiresApproval": false
+    },
+    "agent_state": {
+      "trustTierCategory": "agent_state_write",
+      "riskLevel": "low",
+      "requiresApproval": false
+    },
+    "heartbeat": {
+      "trustTierCategory": "heartbeat_control",
+      "riskLevel": "medium",
+      "requiresApproval": false
+    },
+    "discovery": {
+      "trustTierCategory": "tool_discovery",
+      "riskLevel": "low",
+      "requiresApproval": false
+    },
+    "notification": {
+      "trustTierCategory": "user_notify",
+      "riskLevel": "low",
+      "requiresApproval": false
+    },
+    "temporal": {
+      "trustTierCategory": "temporal_sync",
+      "riskLevel": "low",
+      "requiresApproval": false
+    },
+    "sub_agents": {
+      "trustTierCategory": "sub_agent_spawn",
+      "riskLevel": "medium",
+      "requiresApproval": true
+    },
+    "sovereignty": {
+      "trustTierCategory": "covenant_query",
+      "riskLevel": "low",
+      "requiresApproval": false
+    },
+    "system": {
+      "trustTierCategory": "system_execute",
+      "riskLevel": "high",
+      "requiresApproval": true
+    },
+    "provider": {
+      "trustTierCategory": "network_request",
+      "riskLevel": "medium",
+      "requiresApproval": false
+    },
+    "port": {
+      "trustTierCategory": "port_invocation",
+      "riskLevel": "medium",
+      "requiresApproval": false
+    },
+    "custom": {
+      "trustTierCategory": "custom_tool",
+      "riskLevel": "medium",
+      "requiresApproval": true
+    },
+    "collapse_engine": {
+      "trustTierCategory": "collapse_engine",
+      "riskLevel": "low",
+      "requiresApproval": false
+    }
+  },
+  "handlers": {
+    "memory": [
+      "create_memory",
+      "conversation_search",
+      "reflect_on_conversation"
+    ],
+    "agent_state": [
+      "agent_state_append",
+      "agent_state_query",
+      "agent_state_clear",
+      "persistence_disable"
+    ],
+    "heartbeat": [
+      "heartbeat_configure",
+      "heartbeat_run_once",
+      "heartbeat_set_delivery_profile",
+      "heartbeat_update_profile"
+    ],
+    "discovery": [
+      "list_tools",
+      "get_tool_details",
+      "discover_ports",
+      "invoke_port"
+    ],
+    "notification": [
+      "notify_user"
+    ],
+    "system_state": [
+      "query_system_state",
+      "change_system_state"
+    ],
+    "temporal": [
+      "temporal_sync",
+      "temporal_drift",
+      "temporal_status"
+    ],
+    "device_presence": [
+      "query_device_presence",
+      "request_device_switch",
+      "set_presence_intent",
+      "save_state_checkpoint"
+    ],
+    "sub_agent": [
+      "spawn_scout",
+      "spawn_mechanic",
+      "spawn_designer",
+      "query_job_status",
+      "accept_job_result",
+      "terminate_job"
+    ],
+    "sovereignty": [
+      "query_covenant",
+      "propose_covenant_change"
+    ],
+    "bridge": [
+      "debug_bridge"
+    ],
+    "mac_system": [
+      "mac_system_info",
+      "mac_processes",
+      "mac_disk_usage",
+      "mac_clipboard_read",
+      "mac_clipboard_write",
+      "mac_notification",
+      "mac_spotlight_search",
+      "mac_list_files",
+      "mac_file_find",
+      "mac_file_read",
+      "mac_file_metadata",
+      "mac_app_list",
+      "mac_app_launch",
+      "mac_screenshot",
+      "mac_network_info",
+      "mac_ping",
+      "mac_shell"
+    ],
+    "gemini": [
+      "google_search",
+      "gemini_google_search",
+      "code_execution",
+      "gemini_code_execution",
+      "url_context",
+      "gemini_url_context",
+      "google_maps",
+      "gemini_google_maps",
+      "file_search",
+      "gemini_file_search",
+      "gemini_veo",
+      "gemini_image_generation",
+      "gemini_deep_research",
+      "gemini_computer_use",
+      "gemini_embeddings",
+      "gemini_speech_to_text",
+      "gemini_text_to_speech",
+      "gemini_video_understanding",
+      "gemini_audio_understanding"
+    ],
+    "openai": [
+      "openai_web_search",
+      "openai_image_gen",
+      "openai_image_generation",
+      "openai_deep_research",
+      "openai_video_gen",
+      "openai_video_generation",
+      "openai_computer_use",
+      "openai_embeddings",
+      "openai_speech_to_text",
+      "openai_text_to_speech"
+    ],
+    "elevenlabs": [
+      "elevenlabs_text_to_speech",
+      "elevenlabs_speech_to_text"
+    ],
+    "xai": [
+      "xai_web_search",
+      "grok_web_search",
+      "grok_code_execution",
+      "grok_image_generation",
+      "grok_x_search",
+      "grok_image_understanding"
+    ],
+    "zai": [
+      "zai_web_search",
+      "glm_web_search",
+      "glm_cogview_4",
+      "glm_cogvideo_3",
+      "glm_speech_to_text"
+    ],
+    "collapse_engine": [
+      "run_collapse_engine",
+      "create_collapse_session",
+      "query_collapse_session",
+      "list_collapse_sessions",
+      "capture_analog_card",
+      "extract_constraints",
+      "check_identity_gate",
+      "record_divergence",
+      "compile_divergence_budget",
+      "check_derivation",
+      "select_gauge_anchor",
+      "record_gauge_relativity",
+      "generate_collapse_statement",
+      "generate_paper_packet",
+      "query_strata_ledger"
+    ]
+  }
+}

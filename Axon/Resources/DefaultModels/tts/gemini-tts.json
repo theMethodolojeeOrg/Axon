@@ -1,0 +1,299 @@
+{
+  "id": "gemini",
+  "displayName": "Gemini",
+  "type": "tts",
+  "description": "Google's TTS with expressive voices",
+  "icon": "sparkles",
+  "requiresAPIKey": true,
+  "apiKeyProvider": "gemini",
+  "isOnDevice": false,
+  "voices": [
+    {
+      "id": "Zephyr",
+      "displayName": "Zephyr",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "God of west wind - bright male voice",
+      "toneDescription": "Bright"
+    },
+    {
+      "id": "Puck",
+      "displayName": "Puck",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Mischievous sprite - upbeat male voice",
+      "toneDescription": "Upbeat"
+    },
+    {
+      "id": "Charon",
+      "displayName": "Charon",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Ferryman of Hades - informative male voice",
+      "toneDescription": "Informative"
+    },
+    {
+      "id": "Kore",
+      "displayName": "Kore",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Persephone/maiden - firm female voice",
+      "toneDescription": "Firm"
+    },
+    {
+      "id": "Fenrir",
+      "displayName": "Fenrir",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Norse wolf - excitable male voice",
+      "toneDescription": "Excitable"
+    },
+    {
+      "id": "Leda",
+      "displayName": "Leda",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Queen of Sparta - youthful female voice",
+      "toneDescription": "Youthful"
+    },
+    {
+      "id": "Orus",
+      "displayName": "Orus",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Variant of Horus - firm male voice",
+      "toneDescription": "Firm"
+    },
+    {
+      "id": "Aoede",
+      "displayName": "Aoede",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Muse of song - breezy female voice",
+      "toneDescription": "Breezy"
+    },
+    {
+      "id": "Callirrhoe",
+      "displayName": "Callirrhoe",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Ocean nymph - easy-going female voice",
+      "toneDescription": "Easy-going"
+    },
+    {
+      "id": "Autonoe",
+      "displayName": "Autonoe",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Daughter of Cadmus - bright female voice",
+      "toneDescription": "Bright"
+    },
+    {
+      "id": "Enceladus",
+      "displayName": "Enceladus",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Giant - breathy male voice",
+      "toneDescription": "Breathy"
+    },
+    {
+      "id": "Iapetus",
+      "displayName": "Iapetus",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Titan - clear male voice",
+      "toneDescription": "Clear"
+    },
+    {
+      "id": "Umbriel",
+      "displayName": "Umbriel",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Moon of Uranus - easy-going male voice",
+      "toneDescription": "Easy-going"
+    },
+    {
+      "id": "Algieba",
+      "displayName": "Algieba",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Star name - smooth male voice",
+      "toneDescription": "Smooth"
+    },
+    {
+      "id": "Despina",
+      "displayName": "Despina",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Sea nymph - smooth female voice",
+      "toneDescription": "Smooth"
+    },
+    {
+      "id": "Erinome",
+      "displayName": "Erinome",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "One of the Graces - clear female voice",
+      "toneDescription": "Clear"
+    },
+    {
+      "id": "Algenib",
+      "displayName": "Algenib",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Star name - gravelly male voice",
+      "toneDescription": "Gravelly"
+    },
+    {
+      "id": "Rasalgethi",
+      "displayName": "Rasalgethi",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Head of the kneeler - informative male voice",
+      "toneDescription": "Informative"
+    },
+    {
+      "id": "Laomedeia",
+      "displayName": "Laomedeia",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Sea nymph - upbeat female voice",
+      "toneDescription": "Upbeat"
+    },
+    {
+      "id": "Achernar",
+      "displayName": "Achernar",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Star name - soft male voice",
+      "toneDescription": "Soft"
+    },
+    {
+      "id": "Alnilam",
+      "displayName": "Alnilam",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Star name - firm male voice",
+      "toneDescription": "Firm"
+    },
+    {
+      "id": "Schedar",
+      "displayName": "Schedar",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Star name - even male voice",
+      "toneDescription": "Even"
+    },
+    {
+      "id": "Gacrux",
+      "displayName": "Gacrux",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Star name - mature male voice",
+      "toneDescription": "Mature"
+    },
+    {
+      "id": "Pulcherrima",
+      "displayName": "Pulcherrima",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Latin 'most beautiful' - forward female voice",
+      "toneDescription": "Forward"
+    },
+    {
+      "id": "Achird",
+      "displayName": "Achird",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Star name - friendly male voice",
+      "toneDescription": "Friendly"
+    },
+    {
+      "id": "Zubenelgenubi",
+      "displayName": "Zubenelgenubi",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Star name - casual male voice",
+      "toneDescription": "Casual"
+    },
+    {
+      "id": "Vindemiatrix",
+      "displayName": "Vindemiatrix",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Latin 'grape gatherer' - gentle female voice",
+      "toneDescription": "Gentle"
+    },
+    {
+      "id": "Sadachbia",
+      "displayName": "Sadachbia",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Star name - lively male voice",
+      "toneDescription": "Lively"
+    },
+    {
+      "id": "Sadaltager",
+      "displayName": "Sadaltager",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Star name - knowledgeable male voice",
+      "toneDescription": "Knowledgeable"
+    },
+    {
+      "id": "Sulafat",
+      "displayName": "Sulafat",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Star name - warm male voice",
+      "toneDescription": "Warm"
+    }
+  ],
+  "models": [
+    {
+      "id": "gemini-2.5-flash-preview-tts",
+      "displayName": "Flash (Faster)",
+      "description": "Optimized for speed and cost efficiency",
+      "isDefault": true
+    },
+    {
+      "id": "gemini-2.5-pro-preview-tts",
+      "displayName": "Pro (Higher Quality)",
+      "description": "Best quality, more expressive output",
+      "isDefault": false
+    }
+  ],
+  "settings": {
+    "supportsVoiceDirection": true
+  }
+}

@@ -1,0 +1,127 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "vscode_run_terminal",
+        "name": "VS Code Run Terminal",
+        "description": "Execute a command in the VS Code integrated terminal.",
+        "category": "vscode",
+        "icon": {
+            "sfSymbol": "terminal.fill"
+        },
+        "requiresApproval": true,
+        "tags": [
+            "vscode",
+            "terminal",
+            "shell",
+            "command",
+            "workspace",
+            "bridge"
+        ]
+    },
+    "parameters": {
+        "command": {
+            "type": "string",
+            "required": true,
+            "description": "The command to execute in the terminal"
+        },
+        "cwd": {
+            "type": "string",
+            "required": false,
+            "description": "Working directory for the command (relative to workspace or absolute)"
+        },
+        "timeout": {
+            "type": "integer",
+            "required": false,
+            "description": "Timeout in milliseconds (default: 30000)",
+            "default": 30000
+        }
+    },
+    "inputFormat": {
+        "style": "json"
+    },
+    "execution": {
+        "type": "bridge",
+        "bridgeMethod": "terminal/run",
+        "bridgeTarget": "vscode"
+    },
+    "ai": {
+        "systemPromptSection": "### vscode_run_terminal\nExecute a command in the VS Code integrated terminal.\n\n**Format:**\n```tool_request\n{\"tool\": \"vscode_run_terminal\", \"query\": \"{\\\"command\\\": \\\"npm run build\\\"}\"}\n```\n\n**Parameters:**\n- command: Command to execute (required)\n- cwd: Working directory relative to workspace (optional)\n- timeout: Timeout in ms (default: 30000)\n\n**Returns:** Command output, exit code, and execution time",
+        "usageExamples": [
+            {
+                "description": "Run npm build",
+                "input": "{\"command\": \"npm run build\"}"
+            },
+            {
+                "description": "Run tests",
+                "input": "{\"command\": \"npm test\"}"
+            },
+            {
+                "description": "Git status",
+                "input": "{\"command\": \"git status\"}"
+            },
+            {
+                "description": "List files",
+                "input": "{\"command\": \"ls -la\", \"cwd\": \"src\"}"
+            }
+        ],
+        "whenToUse": [
+            "Running build commands in the VS Code project",
+            "Executing npm/yarn scripts",
+            "Running git commands in the workspace",
+            "Compiling or testing code"
+        ],
+        "whenNotToUse": [
+            "VS Code bridge not connected",
+            "Running commands on Mac directly (use mac_shell)",
+            "Long-running or interactive commands"
+        ]
+    },
+    "ui": {
+        "inputForm": {
+            "fields": [
+                {
+                    "param": "command",
+                    "widget": "text_field",
+                    "label": "Command",
+                    "placeholder": "npm run build"
+                },
+                {
+                    "param": "cwd",
+                    "widget": "text_field",
+                    "label": "Working Directory",
+                    "placeholder": "src (optional)"
+                },
+                {
+                    "param": "timeout",
+                    "widget": "stepper",
+                    "label": "Timeout (ms)"
+                }
+            ],
+            "layout": "vertical",
+            "submitLabel": "Run Command"
+        },
+        "resultDisplay": {
+            "style": "card",
+            "sections": [
+                {
+                    "type": "header",
+                    "title": "Terminal Output",
+                    "icon": "terminal.fill"
+                },
+                {
+                    "type": "code",
+                    "source": "{{output}}",
+                    "language": "shell"
+                }
+            ]
+        }
+    },
+    "sovereignty": {
+        "actionCategory": "shell_execute",
+        "approvalDescription": "Execute terminal command in VS Code",
+        "scopes": [
+            "vscode.terminal.execute"
+        ],
+        "riskLevel": "high"
+    }
+}

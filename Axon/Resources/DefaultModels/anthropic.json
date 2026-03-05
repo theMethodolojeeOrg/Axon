@@ -1,0 +1,132 @@
+{
+  "id": "anthropic",
+  "displayName": "Anthropic (Claude)",
+  "models": [
+    {
+      "id": "claude-opus-4-5-20251022",
+      "displayName": "Claude Opus 4.5",
+      "category": "frontier",
+      "contextWindow": 200000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 15.00,
+        "outputPerMillion": 75.00,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Most capable Claude model for deep reasoning, agents, and long-horizon coding",
+      "sourceUrls": [
+        "https://docs.anthropic.com/en/docs/about-claude/models"
+      ]
+    },
+    {
+      "id": "claude-sonnet-4-5-20250929",
+      "displayName": "Claude Sonnet 4.5",
+      "category": "frontier",
+      "contextWindow": 200000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 3.00,
+        "outputPerMillion": 15.00,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Best coding model. Strongest for complex agents and computer use",
+      "sourceUrls": [
+        "https://docs.anthropic.com/en/docs/about-claude/models"
+      ]
+    },
+    {
+      "id": "claude-haiku-4-5-20251001",
+      "displayName": "Claude Haiku 4.5",
+      "category": "fast",
+      "contextWindow": 200000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 1.00,
+        "outputPerMillion": 5.00,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Fast hybrid reasoning model. Great for coding and quick tasks",
+      "sourceUrls": [
+        "https://docs.anthropic.com/en/docs/about-claude/models"
+      ]
+    },
+    {
+      "id": "claude-opus-4-1-20250805",
+      "displayName": "Claude Opus 4.1",
+      "category": "frontier",
+      "contextWindow": 200000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 15.00,
+        "outputPerMillion": 75.00,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Most powerful for long-running tasks and deep reasoning",
+      "sourceUrls": [
+        "https://docs.anthropic.com/en/docs/about-claude/models"
+      ]
+    },
+    {
+      "id": "claude-sonnet-4-20250514",
+      "displayName": "Claude Sonnet 4",
+      "category": "legacy",
+      "contextWindow": 200000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 3.00,
+        "outputPerMillion": 15.00,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Previous generation Sonnet model",
+      "sourceUrls": [
+        "https://docs.anthropic.com/en/docs/about-claude/models"
+      ]
+    },
+    {
+      "id": "claude-opus-4-20250514",
+      "displayName": "Claude Opus 4",
+      "category": "legacy",
+      "contextWindow": 200000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 15.00,
+        "outputPerMillion": 75.00,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Previous generation Opus model",
+      "sourceUrls": [
+        "https://docs.anthropic.com/en/docs/about-claude/models"
+      ]
+    }
+  ]
+}

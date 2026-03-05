@@ -1,0 +1,111 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "capture_analog_card",
+    "name": "Capture Analog Card",
+    "description": "Capture the initial analogy hypothesis between two systems (Phase 1). Records system descriptions, the hypothesized structural correspondence, and predicted transfers.",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "rectangle.stack.badge.plus"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "analog_card", "hypothesis", "phase1"]
+  },
+
+  "parameters": {
+    "session_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the collapse session"
+    },
+    "system_a": {
+      "type": "object",
+      "required": true,
+      "description": "Source system (known domain)",
+      "properties": {
+        "name": { "type": "string", "required": true },
+        "domain": { "type": "string", "required": true },
+        "description": { "type": "string", "required": true },
+        "key_principles": { "type": "array" }
+      }
+    },
+    "system_b": {
+      "type": "object",
+      "required": true,
+      "description": "Target system (explored domain)",
+      "properties": {
+        "name": { "type": "string", "required": true },
+        "domain": { "type": "string", "required": true },
+        "description": { "type": "string", "required": true },
+        "key_principles": { "type": "array" }
+      }
+    },
+    "hypothesis": {
+      "type": "string",
+      "required": true,
+      "description": "The hypothesized structural correspondence"
+    },
+    "generative_potential": {
+      "type": "string",
+      "required": true,
+      "description": "Why this analogy might be generative - what insights could transfer"
+    },
+    "confidence": {
+      "type": "number",
+      "required": true,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Initial confidence level"
+    },
+    "predicted_transfer": {
+      "type": "string",
+      "required": false,
+      "description": "A concrete implication to be tested"
+    },
+    "scary_mismatch": {
+      "type": "string",
+      "required": false,
+      "description": "What's most likely to break the analogy"
+    },
+    "scope_hint": {
+      "type": "string",
+      "required": false,
+      "description": "Boundaries of where the analogy applies"
+    },
+    "tags": {
+      "type": "array",
+      "required": false,
+      "description": "Tags for categorization"
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "systemPromptSection": "### capture_analog_card\nCapture an initial analogy hypothesis. This is Phase 1 of the Collapse Engine workflow.",
+    "usageExamples": [
+      {
+        "description": "Capture physics-ML analogy",
+        "input": "{\"session_id\": \"sess-123\", \"system_a\": {\"name\": \"Statistical Mechanics\", \"domain\": \"physics\", \"description\": \"Study of large ensembles of particles\", \"key_principles\": [\"Partition function\", \"Free energy minimization\"]}, \"system_b\": {\"name\": \"Neural Network Training\", \"domain\": \"machine_learning\", \"description\": \"Optimization of neural network parameters\"}, \"hypothesis\": \"Loss landscape optimization corresponds to free energy minimization\", \"generative_potential\": \"Temperature scheduling in SGD may benefit from simulated annealing insights\", \"confidence\": 0.7}"
+      }
+    ],
+    "whenToUse": [
+      "Starting to explore an analogy formally",
+      "User has identified two potentially corresponding systems",
+      "Beginning Phase 1 of collapse workflow"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_capture",
+    "scopes": ["collapse_engine.write"],
+    "riskLevel": "low"
+  }
+}

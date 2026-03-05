@@ -1,0 +1,95 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "solo_turn_action",
+        "name": "Solo Turn Action",
+        "description": "Respond to a turn allocation boundary in a solo session. Use this when presented with a SOLO SESSION CHECKPOINT to decide whether to extend, conclude, pause, or notify.",
+        "category": "sovereignty",
+        "icon": {
+            "sfSymbol": "bolt.circle.fill"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "solo",
+            "session",
+            "allocation",
+            "control"
+        ]
+    },
+    "parameters": {
+        "action": {
+            "type": "string",
+            "required": true,
+            "enum": [
+                "extend",
+                "conclude",
+                "pause",
+                "notify"
+            ],
+            "description": "The action to take at the turn boundary. 'extend' requests more turns, 'conclude' marks session complete, 'pause' waits for next heartbeat, 'notify' sends notification and concludes."
+        },
+        "reasoning": {
+            "type": "string",
+            "required": true,
+            "description": "Brief explanation of why this action was chosen. Be specific about what you accomplished and why you're making this choice."
+        },
+        "next_goal": {
+            "type": "string",
+            "required": false,
+            "description": "If extending, briefly describe what you plan to work on next."
+        },
+        "session_summary": {
+            "type": "string",
+            "required": false,
+            "description": "If concluding or notifying, provide a brief summary of what was accomplished during this session."
+        }
+    },
+    "inputFormat": {
+        "style": "json"
+    },
+    "execution": {
+        "type": "internal_handler",
+        "handler": "solo_turn_action"
+    },
+    "ai": {
+        "systemPromptSection": "### solo_turn_action\nRespond to a solo session turn allocation checkpoint.\n\n**When to use:** Only when you see a SOLO SESSION CHECKPOINT message with turn/budget status.\n\n**Format:**\n```tool_request\n{\"tool\": \"solo_turn_action\", \"query\": \"{\\\"action\\\": \\\"extend\\\", \\\"reasoning\\\": \\\"I have more work to do on the agenda item\\\", \\\"next_goal\\\": \\\"Continue organizing memories\\\"}\"}\n```\n\n**Actions:**\n- `extend` - Request more turns (provide next_goal)\n- `conclude` - Mark session complete (provide session_summary)\n- `pause` - Pause until next heartbeat trigger\n- `notify` - Send notification to user and conclude (provide session_summary)\n\n**Examples:**\n- Extend: More work to do, within budget\n- Conclude: Task completed or natural stopping point\n- Pause: Waiting for external input or user action\n- Notify: Something important to tell the user",
+        "usageExamples": [
+            {
+                "description": "Extend session to continue work",
+                "input": "{\"action\": \"extend\", \"reasoning\": \"I've organized recent memories but haven't finished categorizing older ones.\", \"next_goal\": \"Categorize and tag remaining unsorted memories.\"}"
+            },
+            {
+                "description": "Conclude after completing task",
+                "input": "{\"action\": \"conclude\", \"reasoning\": \"Successfully completed the agenda item for memory organization.\", \"session_summary\": \"Organized 47 memories into 5 categories. Created 3 new insight heuristics.\"}"
+            },
+            {
+                "description": "Pause waiting for user input",
+                "input": "{\"action\": \"pause\", \"reasoning\": \"Found several items that need user clarification before I can proceed.\"}"
+            },
+            {
+                "description": "Notify user of important finding",
+                "input": "{\"action\": \"notify\", \"reasoning\": \"Discovered something important during analysis.\", \"session_summary\": \"Found 12 conflicting memories that may indicate outdated information. User review recommended.\"}"
+            }
+        ],
+        "whenToUse": [
+            "Presented with SOLO SESSION CHECKPOINT message",
+            "Need to decide whether to continue or stop working",
+            "Reached a natural stopping point in autonomous work",
+            "Need to communicate status to user"
+        ],
+        "whenNotToUse": [
+            "In normal conversation (not a solo session)",
+            "Before receiving a checkpoint prompt",
+            "During regular heartbeat reflections"
+        ]
+    },
+    "sovereignty": {
+        "actionCategory": "solo_execution",
+        "approvalDescription": "Solo session turn control",
+        "scopes": [
+            "solo.turn_control"
+        ],
+        "riskLevel": "low",
+        "notes": "This tool controls solo session flow. Extending uses additional API tokens within agreed limits."
+    }
+}

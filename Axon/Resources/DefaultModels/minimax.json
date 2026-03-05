@@ -1,0 +1,46 @@
+{
+  "id": "minimax",
+  "displayName": "MiniMax",
+  "models": [
+    {
+      "id": "MiniMax-M2",
+      "displayName": "MiniMax M2",
+      "category": "frontier",
+      "contextWindow": 1000000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.15,
+        "outputPerMillion": 0.60,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Flagship agentic model. 1M context, 92% cheaper than Claude Sonnet",
+      "sourceUrls": [
+        "https://platform.minimax.io/docs/guides/pricing"
+      ]
+    },
+    {
+      "id": "MiniMax-M2-Stable",
+      "displayName": "MiniMax M2 Stable",
+      "category": "frontier",
+      "contextWindow": 1000000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.15,
+        "outputPerMillion": 0.60,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Stable version with higher rate limits",
+      "sourceUrls": [
+        "https://platform.minimax.io/docs/guides/pricing"
+      ]
+    }
+  ]
+}

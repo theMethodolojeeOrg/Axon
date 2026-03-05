@@ -1,0 +1,729 @@
+# Axon iOS Project - Comprehensive .gitignore
+
+# Xcode
+# Build Products
+build/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Xcode User State
+*.xcuserstate
+
+# Xcode Scheme Management
+*.xcscheme
+
+# Xcode Quick Look
+*.xcscmblueprint
+*.xccheckout
+
+# CocoaPods
+# CocoaPods - Just one example line
+Pods/
+# CocoaPods/Specifications/*.json
+# CocoaPods/Specifications/Headers/
+# CocoaPods/Specifications/*.pbxuser
+# CocoaPods/Specifications/*.mode1v3
+# CocoaPods/Specifications/*.perspectivev3
+
+# CocoaPods Build Scripts
+# CocoaPods_Xcode*.xcscheme
+
+# Swift Package Manager
+# Add this line if you want to avoid checking in your Swift Package Manager dependencies.
+# Packages/
+# Package.pins
+# Package.resolved
+# *.xcodeproj
+
+# Package.resolved file has been commented out due to using an aggregate Projects/
+# Package.resolved
+
+# FMI Package Dependencies
+# https://forums.swift.org/t/semver-a-minimum-release-engineering-management-solution-for-swift-projects/36293
+# .swiftpm/build/
+
+# AppCode
+.idea/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# SwiftBuildServer
+.build/
+
+# AppCode
+/AppCodeBuildServer/
+
+# Xcode Gen
+# /Generated/
+
+# Playground
+*.playground/
+
+# iOS
+# iOS / Xcode specific
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# iOS
+# Bundle identifier and provisioning profile
+*.mobileprovision
+
+# Apple Developer Center
+/AppleDeveloperCenter/
+
+# XcodeDumpStrings
+*.strings
+
+# Xcode Moment Kit
+*.momentkit
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+fastlane/readme.md
+
+# Logging
+*.log
+
+# PMEditor Debug Files
+# .DebugSymbols/
+
+# Xcode archive
+*.xcarchive
+
+# Swift Gen
+# Generated/
+# /Resources/
+
+# Symbols
+app-icons/*.png
+
+# Sentry Config File
+.sentryclirc
+
+# CocoaPods
+# Add this line if you want to avoid checking in your CocoaPods dependencies.
+# Pods/
+
+# CocoaPods Templates
+# Source/InitPodTemplates/
+
+# CocoaPods Example
+# CocoaPods-Example/
+
+# Carthage
+# Add this line if you are using Carthage to avoid checking in your Carthage/Build directory.
+# Carthage/Build/
+
+# Carthage Essentials
+# Carthage/Checkouts/
+# Carthage/Build/
+
+# Carthage Setup
+# .carthage_executable
+
+# CocoaPods
+# Pods/
+# CocoaPods-Example/
+
+# Bundler
+.bundle/
+vendor/
+
+# iOS Detox
+# /ios/detox.log
+# /ios/build/
+# /ios/.xcode.env.local
+# /ios/build/
+# /ios/.xcode.env.*.local
+
+# iOS/Electrode Native
+# *Data.xcdatamodeld/
+
+# AppCode
+/AppCodeBuildServer/
+
+# CocoaPods
+# Pods/
+
+# XcodeGen
+# /Generated/
+
+# Nimbus
+# /Nimbus/
+
+# Gold Master
+# /GoldMaster/
+
+# BubbleWrap
+# /bubblewrap/
+
+# Gale
+# /Gale/
+
+# Generate Project
+# /Generated/
+
+# Tuist
+.tuist-staging/
+.tuist-cache/
+Tuist/Dependencies/
+
+# XcodeGen
+Generated/
+
+# Core Data
+*.xcdatamodel
+*.xcdatamodeld
+
+# Core Data Stack
+*.xcmappingmodel
+
+# Core ML
+*.mlmodel
+*.mlmodelc
+
+# Data Models
+# *.xcdatamodeld
+# *.xcmappingmodel
+
+# Server model files
+# Pods/Models/
+# GeneratedModels/
+
+# Microsoft ReactiveCocoa
+# ReactiveCocoa/
+# Carthage/Build/Mac/
+# Carthage/Build/iOS/
+
+# ReactiveCharts
+# ReactiveCharts/
+
+# R.swift
+# .rswift/
+
+# TestFlight External Testing
+# /TestFlightExternal/
+
+# Firebase
+# Firebase configuration files
+GoogleService-Info.plist
+GoogleService-*.plist
+
+# Firebase Debug Logs
+*.log
+
+# Firebase Crashlytics
+crashlytics-symbolicate*
+firebase-symbolicate*
+
+# Google Analytics
+*.gaplugin
+
+# Bundle Settings
+/ios/Debug-iphonesimulator/
+/ios/Debug-iphoneos/
+/ios/Release-iphonesimulator/
+/ios/Release-iphoneos/
+
+# Bundle Version
+App.framework.dSYM.zip
+App.framework.unsigned.zip
+App.framework.zip
+App.framework/
+App.ipa
+
+# Bundle Resources
+App.app.dSYM.zip
+App.app.dSYM.zip/
+App.app.dSYM/**
+
+# GoogleService-Info.plist
+/ios/GoogleService-Info.plist
+
+# Flutter Generated Plugin registrant
+GeneratedPluginRegistrant.m
+GeneratedPluginRegistrant.h
+
+# CocoaPods Debug Logs
+# Pods/Pods.xcodeproj/xcuserdata/
+
+# App Config Files
+# ios/Runner/GeneratedPluginRegistrant.swift
+
+# Generated Files
+# build/
+
+# Runtime Symbols
+# App.framework.dSYM.zip/
+
+# Android
+# android/app/google-services.json
+# android/app/keystore.properties
+
+# React Native
+# node_modules/
+# npm-debug.log*
+# yarn-error.log*
+
+# Sentry Config File
+.sentryclirc
+
+# Apple Developer Account
+# /ios/.*/
+/ios/Runner/GeneratedPluginRegistrant.swift
+
+# Flutter Integration Tests
+integration_test/
+
+# Gradle
+# gradle/wrapper/gradle-wrapper.jar
+# **/gradlew
+# **/gradlew.bat
+# **/gradle-wrapper.jar
+# **/*.iml
+# **/.idea/workspace.xml
+# **/.idea/tasks.xml
+# **/.idea/gradle.xml
+# **/.idea/assetWizardSettings.xml
+# **/.idea/dictionaries
+# **/.idea/libraries
+# Android/google-services.json
+# ios/Flutter/Generated.xcconfig
+# ios/Flutter/FlutterExportEnvironment.sh
+# ios/ServiceDefinitions.json
+# ios/Runner/GeneratedPluginRegistrant.swift
+
+# macOS
+# General
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Xcode User State
+*.xcuserstate
+
+# Xcode Archive
+*.xcarchive
+
+# Xcode Profile
+*.xcodeproj/xcuserdata/
+
+# CocoaPods Templates
+# Source/InitPodTemplates/
+
+# Carthage Build
+# Carthage/Build/
+
+# Apple Developer Account
+# /ios/.*/
+
+# Generated Files
+# build/
+
+# Service Account Key
+service-account-key.json
+
+# Debug Files
+*.dSYM.zip
+*.dSYM
+
+# Temporary files
+*.tmp
+*.temp
+
+# Cache directories
+.cache/
+build/
+.deriveddata/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test Results
+test-results/
+coverage/
+
+# Documentation
+docs/build/
+
+# Web
+# Dependencies
+# node_modules/
+# .pnp
+# .pnp.js
+
+# Testing
+coverage/
+
+# Production
+build/
+
+# Misc
+.DS_Store
+.env
+.env.local
+.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons (https://nodejs.org/api/addons.html)
+build/Release
+
+# Dependency directories
+jspm_packages/
+
+# Snowpack dependency directory (https://snowpack.dev/)
+web_modules/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+.env.test
+.env.production
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Logs
+logs
+*.log
+
+# Mac
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# IDEs
+.idea/
+*.swp
+*.swo
+*~
+
+# Auto-generated files
+*.generated.*
+
+# Project specific
+# Add any project-specific ignores below this line
+
+# Documentation (contains internal notes and backend code samples)
+Docs/
+
+# Local configuration files
+Config/Local/
+*.local
+local-*.json
+
+# API Keys and Secrets - More comprehensive
+*api-key*
+*apikey*
+*_secret*
+*-secret*
+*_credential*
+*-credential*
+*_auth*
+*-auth*
+*_token*
+*-token*
+
+# Configuration files with secrets
+**/secrets.yaml
+**/secrets.yml
+**/secrets.json
+**/credentials.yaml
+**/credentials.yml
+**/credentials.json
+**/config/secret*
+**/config/credential*
+
+# Sensitive files
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.crt
+
+# Xcode scheme secrets
+*.xcscheme/*/EnvironmentVariables.xcscheme
+
+# Secret backups
+*.secret.backup
+*.key.backup
+*.token.backup
+
+# Temporary secret files
+secret*
+credential*
+auth-key*
+api-key*
+
+# Project-specific config
+Axon/Config/*.secret
+Axon/Config/*.local
+
+# Build artifacts
+*.app
+*.ipa
+*.dSYM.zip
+*.framework.zip
+*.framework.dSYM.zip
+
+# Development certificates
+*.p12
+*.key
+*.cer
+*.crt
+*.pem
+
+# Backup files
+*.bak
+*.backup
+*~
+*.orig
+
+# Temporary build files
+*.build/
+*.tmp/
+.temp/
+build-temp/
+temp-build/
+
+# Generated documentation
+docs/build/
+api-docs/
+
+# Test outputs
+test-results/
+test-output/
+*.testlog
+*.trx
+
+# Coverage reports
+coverage/
+*.coverage
+*.lcov
+
+# Performance profiles
+*.prof
+*.perf
+*.heapprofd
+*.heapsnapshot
+
+# Workspace files
+# Keep workspace/project files tracked; ignore only user-specific data.
+
+# User-specific Xcode files
+*.xcuserdatad/
+
+# Generated workspace data
+xcuserdata/
+
+# Custom user data
+project.xcworkspace/xcuserdata/
+project.xcworkspace/xcshareddata/
+
+# Swift compilation databases
+compile_commands.json
+compile_commands_*.json
+
+# SwiftPM generated files
+.build/
+Packages/
+
+# Package resolved files
+# Note: We include Package.resolved as it's typically checked in for dependency versions
+# But if you want to exclude it completely, uncomment the line below
+# Package.resolved
+
+# SPM checkout directories
+.checkouts/
+
+# SPM generated Swift modules
+*.swiftinterface
+*.swiftmodule
+*.swiftdoc
+
+# SPM generated plugin capabilities
+*.plugincapability
+
+# Carthage checkout directory
+.checkouts/
+
+# Carthage build directory
+.build/
+
+# SPM dependencies
+.checkouts/
+.build/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Workspace user data
+*.xcworkspace/xcuserdata/
+
+# CocoaPods build directories
+Pods/Target\ Support\ Files/
+
+# CocoaPods generated files
+CocoaPods-External/
+
+# Pods
+Pods/
+Pods-*/
+*Podfile.lock
+
+# Carthage
+Cartfile
+Cartfile.resolved
+Carthage/
+
+# SwiftGen generated files
+Generated/
+
+# R.swift generated files
+.rswift/
+
+# SwiftLint
+.swiftlint.yml
+.swiftlintignore
+
+# Danger
+Dangerfile.swift
+
+# Fastlane
+fastlane/
+Appfile
+Deliverfile
+Screengrabfile
+snapshot/
+deliver/
+
+# Bitrise
+bitrise.yml
+
+# App Store Connect
+/ios/.[Pp]rovisioning*
+# /ios/Runner/GoogleService-Info.plist
+# /ios/Runner/GeneratedPluginRegistrant.swift
+
+# Device logs
+logs/
+*.log
+
+# Development helpers
+dev-scripts/
+scripts/dev/
+
+# Development configuration
+dev-config/
+local-config/
+local.properties
+Axon/Resources/KokoroTTS/Model/kokoro-v1_0.safetensors
+Axon/Resources/MLXModels/mlx-community_Qwen3-VL-2B-Instruct-4bit/model.safetensors
+Axon/Resources/KokoroTTS/Voices/voices_builtin.npz
+Axon/Resources/MLXModels/lmstudio-community_gemma-3-270m-it-MLX-8bit
+Axon/create_voices_builtin.py
+
+# Design source files
+assets/logos/psd/
+
+# Public repo quarantine and local artifacts
+.private_quarantine/
+node_modules/
+ChatLog.json
+firebase-debug.log
+.claude/
+.DS_Store
+Axon/Config/PublicConfig.local.plist
+
+# Exceptions
+!Axon/Views/Settings/ProvidersSettingsViews/APIKeySettingsView
+!Axon/Views/Settings/ProvidersSettingsViews/APIKeySettingsView/*.swift
+!Axon/Views/Settings/ProvidersSettingsViews/APIKeySettingsView/Components/*.swift
+!Axon/ViewModels/SettingsViewModels/APIKeysSettingsViewModel.swift

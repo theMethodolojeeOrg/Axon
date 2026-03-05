@@ -1,0 +1,53 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_file_read",
+    "name": "Mac Read File",
+    "description": "Read the contents of a file from the local filesystem.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "doc.text"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "mac",
+      "files",
+      "read",
+      "content"
+    ]
+  },
+  "parameters": {
+    "path": {
+      "type": "string",
+      "required": true,
+      "description": "Path to the file to read"
+    },
+    "maxBytes": {
+      "type": "integer",
+      "required": false,
+      "description": "Maximum bytes to read (default: 1MB)",
+      "default": 1000000
+    },
+    "encoding": {
+      "type": "string",
+      "required": false,
+      "description": "Text encoding (utf8, utf16, ascii, latin1)",
+      "default": "utf8"
+    }
+  },
+  "inputFormat": {
+    "style": "json"
+  },
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "file/read"
+  },
+  "ai": {
+    "systemPromptSection": "### mac_file_read\nRead file contents from the local filesystem.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_file_read\", \"query\": \"{\\\"path\\\": \\\"/path/to/file.txt\\\"}\"}\n```\n\n**Parameters:**\n- path: File path (required)\n- maxBytes: Max bytes to read (default: 1MB)\n- encoding: Text encoding - utf8, utf16, ascii, latin1 (default: utf8)\n\n**Returns:** File content, size, encoding, truncation status",
+    "whenToUse": [
+      "Need to read a file's contents",
+      "Viewing source code or configuration files",
+      "Reading text files on the local Mac"
+    ]
+  }
+}

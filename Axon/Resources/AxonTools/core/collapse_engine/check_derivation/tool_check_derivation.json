@@ -1,0 +1,97 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "check_derivation",
+    "name": "Check Derivation",
+    "description": "Verify if a structural claim is PROVEN or CONJECTURED (Phase 5). Record derivation steps and evidence.",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "checkmark.seal"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "derivation", "proof", "phase5"]
+  },
+
+  "parameters": {
+    "session_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the collapse session"
+    },
+    "claim": {
+      "type": "object",
+      "required": true,
+      "description": "The structural claim being verified",
+      "properties": {
+        "statement": { "type": "string", "required": true },
+        "formal_expression": { "type": "string" },
+        "scope": { "type": "string" }
+      }
+    },
+    "status": {
+      "type": "string",
+      "required": true,
+      "description": "Derivation status: proven or conjectured"
+    },
+    "derivation_steps": {
+      "type": "array",
+      "required": false,
+      "description": "Steps in the derivation/proof",
+      "items": {
+        "type": "object",
+        "properties": {
+          "step_number": { "type": "integer" },
+          "statement": { "type": "string" },
+          "justification": { "type": "string" }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "required": false,
+      "description": "Supporting evidence (citations, experiments, etc.)"
+    },
+    "gaps": {
+      "type": "array",
+      "required": false,
+      "description": "Logical gaps or unproven assumptions"
+    },
+    "confidence": {
+      "type": "number",
+      "required": false,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Confidence in the derivation"
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "systemPromptSection": "### check_derivation\nVerify structural claims with formal derivations. This is Phase 5 of the Collapse Engine workflow.",
+    "usageExamples": [
+      {
+        "description": "Record a proven claim",
+        "input": "{\"session_id\": \"sess-123\", \"claim\": {\"statement\": \"SGD with learning rate η converges to Gibbs distribution at temperature T=η\", \"scope\": \"continuous-time limit\"}, \"status\": \"proven\", \"derivation_steps\": [{\"step_number\": 1, \"statement\": \"Write SGD as Langevin dynamics\", \"justification\": \"Standard SDE formulation\"}], \"confidence\": 0.9}"
+      }
+    ],
+    "whenToUse": [
+      "Verifying structural correspondence claims",
+      "Phase 5 of collapse workflow",
+      "Documenting proof status of key claims"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_capture",
+    "scopes": ["collapse_engine.write"],
+    "riskLevel": "low"
+  }
+}

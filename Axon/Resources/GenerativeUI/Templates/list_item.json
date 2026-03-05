@@ -1,0 +1,73 @@
+{
+  "version": "1.0",
+  "definition": {
+    "id": "00000000-0000-0000-0000-000000000003",
+    "name": "List Row",
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-01T00:00:00Z",
+    "source": "bundle",
+    "root": {
+      "type": "VStack",
+      "properties": {
+        "keys": ["spacing"],
+        "values": [0]
+      },
+      "children": [
+        {
+          "type": "HStack",
+          "properties": {
+            "keys": ["spacing", "alignment"],
+            "values": [12, "center"]
+          },
+          "children": [
+            {
+              "type": "Image",
+              "properties": {
+                "keys": ["systemName", "color"],
+                "values": ["star.fill", "copper"]
+              }
+            },
+            {
+              "type": "VStack",
+              "properties": {
+                "keys": ["spacing", "alignment"],
+                "values": [4, "leading"]
+              },
+              "children": [
+                {
+                  "type": "Text",
+                  "properties": {
+                    "keys": ["text", "font", "color"],
+                    "values": ["List Item Title", "bodyMedium", "textPrimary"]
+                  }
+                },
+                {
+                  "type": "Text",
+                  "properties": {
+                    "keys": ["text", "font", "color"],
+                    "values": ["Subtitle or description text", "labelSmall", "textTertiary"]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "Spacer",
+              "properties": { "keys": [], "values": [] }
+            },
+            {
+              "type": "Image",
+              "properties": {
+                "keys": ["systemName", "color"],
+                "values": ["chevron.right", "textTertiary"]
+              }
+            }
+          ]
+        },
+        {
+          "type": "Divider",
+          "properties": { "keys": [], "values": [] }
+        }
+      ]
+    }
+  }
+}

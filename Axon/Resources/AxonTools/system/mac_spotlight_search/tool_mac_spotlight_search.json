@@ -1,0 +1,52 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_spotlight_search",
+    "name": "Mac Spotlight Search",
+    "description": "Search for files on the Mac using Spotlight.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "magnifyingglass"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "mac",
+      "search",
+      "files",
+      "spotlight"
+    ]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": true,
+      "description": "Search query"
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "description": "Maximum results to return",
+      "default": 20
+    },
+    "contentType": {
+      "type": "string",
+      "required": false,
+      "description": "Filter by content type (e.g., public.text, public.image)"
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "spotlight/search"
+  },
+  "ai": {
+    "systemPromptSection": "### mac_spotlight_search\nSearch for files using macOS Spotlight.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_spotlight_search\", \"query\": \"{\\\"query\\\": \\\"search term\\\", \\\"limit\\\": 20}\"}\n```\n\n**Parameters:**\n- query: Search query (required)\n- limit: Max results (default: 20)\n- contentType: Filter by type (optional, e.g., \"public.text\")\n\n**Returns:** List of files with path, name, contentType, sizeBytes, modifiedDate",
+    "whenToUse": [
+      "User asks to find a file",
+      "Need to locate documents",
+      "Searching for specific file types"
+    ]
+  }
+}

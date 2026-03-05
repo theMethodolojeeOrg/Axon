@@ -1,0 +1,38 @@
+{
+  "id": "mlxAudio",
+  "displayName": "F5 Neural",
+  "type": "tts",
+  "description": "On-device neural TTS - Free - ~300MB model",
+  "icon": "waveform.badge.mic",
+  "requiresAPIKey": false,
+  "isOnDevice": true,
+  "isEnabled": false,
+  "disabledReason": "F5-TTS is currently disabled pending further development",
+  "voices": [
+    {
+      "id": "defaultVoice",
+      "displayName": "Default",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Default/Mother Nature voice",
+      "toneDescription": "Natural"
+    }
+  ],
+  "models": [
+    {
+      "id": "f5-tts-v1",
+      "displayName": "F5-TTS",
+      "description": "Flow-matching based TTS model",
+      "sizeBytes": 314572800,
+      "isDefault": true
+    }
+  ],
+  "settings": {
+    "speedRange": {
+      "min": 0.5,
+      "max": 2.0,
+      "default": 1.0
+    }
+  }
+}

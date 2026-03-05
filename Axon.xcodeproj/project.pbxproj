@@ -1,0 +1,1271 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		E217D4312EEA494A00D3DAB2 /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4302EEA494A00D3DAB2 /* CloudKit.framework */; };
+		E217D4332EEA4BF700D3DAB2 /* CryptoKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4322EEA4BF700D3DAB2 /* CryptoKit.framework */; };
+		E217D4352EEA4BFF00D3DAB2 /* CryptoTokenKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4342EEA4BFF00D3DAB2 /* CryptoTokenKit.framework */; };
+		E217D7B62EEDDD5C00D3DAB2 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D7B52EEDDD5C00D3DAB2 /* CoreLocation.framework */; };
+		E22498CA2ED5D1880053D459 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = E22498C92ED5D1880053D459 /* MarkdownUI */; };
+		E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9A2EB23493009B116D /* FirebaseAuth */; };
+		E23FFF9D2EB23493009B116D /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9C2EB23493009B116D /* FirebaseCore */; };
+		E23FFF9F2EB23493009B116D /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9E2EB23493009B116D /* FirebaseFirestore */; };
+		E23FFFA12EB23493009B116D /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFFA02EB23493009B116D /* FirebaseFunctions */; };
+		E23FFFA32EB23493009B116D /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFFA22EB23493009B116D /* FirebaseMessaging */; };
+		E23FFFA52EB23493009B116D /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFFA42EB23493009B116D /* FirebaseStorage */; };
+		E2403AFD2F03725C00CC9418 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = E2403AFC2F03725C00CC9418 /* MLX */; };
+		E2403AFF2F03725C00CC9418 /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = E2403AFE2F03725C00CC9418 /* MLXFFT */; settings = {ATTRIBUTES = (Weak, ); }; };
+		E2403B012F03725C00CC9418 /* MLXFast in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B002F03725C00CC9418 /* MLXFast */; settings = {ATTRIBUTES = (Weak, ); }; };
+		E2403B032F03725C00CC9418 /* MLXLinalg in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B022F03725C00CC9418 /* MLXLinalg */; settings = {ATTRIBUTES = (Weak, ); }; };
+		E2403B052F03725C00CC9418 /* MLXNN in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B042F03725C00CC9418 /* MLXNN */; settings = {ATTRIBUTES = (Weak, ); }; };
+		E2403B0A2F0372D100CC9418 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B092F0372D100CC9418 /* MLXLLM */; };
+		E2403B0C2F0372D100CC9418 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B0B2F0372D100CC9418 /* MLXLMCommon */; };
+		E2403B102F0372D100CC9418 /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B0F2F0372D100CC9418 /* MLXVLM */; };
+		E2403B132F03739200CC9418 /* MLXUtilsLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B122F03739200CC9418 /* MLXUtilsLibrary */; };
+		E2403B1C2F037E0E00CC9418 /* MLXRandom in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B1B2F037E0E00CC9418 /* MLXRandom */; settings = {ATTRIBUTES = (Weak, ); }; };
+		E254EDD82EB222B3000CDD9D /* FirebaseAI in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDD72EB222B3000CDD9D /* FirebaseAI */; };
+		E254EDDA2EB222B3000CDD9D /* FirebaseAILogic in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDD92EB222B3000CDD9D /* FirebaseAILogic */; };
+		E254EDDC2EB222B3000CDD9D /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDDB2EB222B3000CDD9D /* FirebaseAnalytics */; };
+		E254EDDE2EB222B3000CDD9D /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDDD2EB222B3000CDD9D /* FirebaseAnalyticsCore */; };
+		E254EDE02EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDDF2EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport */; };
+		E26F51F32EF3D441000E55BD /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E26F51F22EF3D441000E55BD /* WidgetKit.framework */; };
+		E26F51F52EF3D441000E55BD /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E26F51F42EF3D441000E55BD /* SwiftUI.framework */; };
+		E26F52042EF3D442000E55BD /* AxonLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E26F51F12EF3D441000E55BD /* AxonLiveActivityExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E273631A2EBD237F0031CFF7 /* FlyingFox in Frameworks */ = {isa = PBXBuildFile; productRef = E27363192EBD237F0031CFF7 /* FlyingFox */; };
+		E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */ = {isa = PBXBuildFile; productRef = E273631B2EBD237F0031CFF7 /* FlyingSocks */; };
+		E27FB5ED2ECD5E2F003C52BF /* Clibsodium in Frameworks */ = {isa = PBXBuildFile; productRef = E27FB5EC2ECD5E2F003C52BF /* Clibsodium */; };
+		E27FB5EF2ECD5E2F003C52BF /* Sodium in Frameworks */ = {isa = PBXBuildFile; productRef = E27FB5EE2ECD5E2F003C52BF /* Sodium */; };
+		E27FB5F12ECD5E2F003C52BF /* SodiumFoundationCompat in Frameworks */ = {isa = PBXBuildFile; productRef = E27FB5F02ECD5E2F003C52BF /* SodiumFoundationCompat */; };
+		E27FB5F32ECD5E2F003C52BF /* SodiumNIOCompat in Frameworks */ = {isa = PBXBuildFile; productRef = E27FB5F22ECD5E2F003C52BF /* SodiumNIOCompat */; };
+		E2C1DD8D2F4D0EA200DD6080 /* AxonArtifacts in Frameworks */ = {isa = PBXBuildFile; productRef = E2C1DD8C2F4D0EA200DD6080 /* AxonArtifacts */; };
+		E2D7BCE92F456A9B00A9FB38 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E26F333F2EEE017C000E55BD /* AppKit.framework */; platformFilters = (macos, ); };
+		E2D7BD0B2F45A4E100A9FB38 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = E2D7BD0A2F45A4E100A9FB38 /* Yams */; };
+		E2E057EA2F0357F1009339D8 /* HuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = E2E057E92F0357F1009339D8 /* HuggingFace */; };
+		E2E5FD802EFF401E00E4835C /* KokoroSwift in Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FD7F2EFF401E00E4835C /* KokoroSwift */; };
+		E2E5FD812EFF401E00E4835C /* KokoroSwift in Embed Frameworks */ = {isa = PBXBuildFile; productRef = E2E5FD7F2EFF401E00E4835C /* KokoroSwift */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		E254EDA92EB21B77000CDD9D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E254ED8E2EB21B75000CDD9D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E254ED952EB21B76000CDD9D;
+			remoteInfo = Axon;
+		};
+		E254EDB32EB21B77000CDD9D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E254ED8E2EB21B75000CDD9D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E254ED952EB21B76000CDD9D;
+			remoteInfo = Axon;
+		};
+		E26F52022EF3D442000E55BD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E254ED8E2EB21B75000CDD9D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E26F51F02EF3D441000E55BD;
+			remoteInfo = AxonLiveActivityExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		E26F52092EF3D442000E55BD /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				E26F52042EF3D442000E55BD /* AxonLiveActivityExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2E5FD822EFF401E00E4835C /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				E2E5FD812EFF401E00E4835C /* KokoroSwift in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		E217D4302EEA494A00D3DAB2 /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.1.sdk/System/Library/Frameworks/CloudKit.framework; sourceTree = DEVELOPER_DIR; };
+		E217D4322EEA4BF700D3DAB2 /* CryptoKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CryptoKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.1.sdk/System/Library/Frameworks/CryptoKit.framework; sourceTree = DEVELOPER_DIR; };
+		E217D4342EEA4BFF00D3DAB2 /* CryptoTokenKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CryptoTokenKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.1.sdk/System/Library/Frameworks/CryptoTokenKit.framework; sourceTree = DEVELOPER_DIR; };
+		E217D7B52EEDDD5C00D3DAB2 /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.1.sdk/System/Library/Frameworks/CoreLocation.framework; sourceTree = DEVELOPER_DIR; };
+		E217D7BF2EEDF49800D3DAB2 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.1.sdk/System/Library/Frameworks/UIKit.framework; sourceTree = DEVELOPER_DIR; };
+		E254ED962EB21B76000CDD9D /* Axon.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Axon.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E254EDA82EB21B77000CDD9D /* AxonTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AxonTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E254EDB22EB21B77000CDD9D /* AxonUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AxonUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E26F333F2EEE017C000E55BD /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		E26F51F12EF3D441000E55BD /* AxonLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AxonLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E26F51F22EF3D441000E55BD /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		E26F51F42EF3D441000E55BD /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		E26F52182EF3D87E000E55BD /* AxonLiveActivityExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AxonLiveActivityExtension.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		E254EE272EB229BD000CDD9D /* Exceptions for "Axon" folder in "Axon" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+				Resources/MLXModels,
+			);
+			target = E254ED952EB21B76000CDD9D /* Axon */;
+		};
+		E26F52082EF3D442000E55BD /* Exceptions for "AxonLiveActivity" folder in "AxonLiveActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = E26F51F02EF3D441000E55BD /* AxonLiveActivityExtension */;
+		};
+		E26F52102EF3D509000E55BD /* Exceptions for "Axon" folder in "AxonLiveActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/HeartbeatActivityAttributes.swift,
+			);
+			target = E26F51F02EF3D441000E55BD /* AxonLiveActivityExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		E254ED982EB21B76000CDD9D /* Axon */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E254EE272EB229BD000CDD9D /* Exceptions for "Axon" folder in "Axon" target */,
+				E26F52102EF3D509000E55BD /* Exceptions for "Axon" folder in "AxonLiveActivityExtension" target */,
+			);
+			explicitFolders = (
+				Resources/AxonTools,
+				Resources/KokoroTTS,
+				Resources/MLXModels,
+			);
+			path = Axon;
+			sourceTree = "<group>";
+		};
+		E254EDAB2EB21B77000CDD9D /* AxonTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AxonTests;
+			sourceTree = "<group>";
+		};
+		E254EDB52EB21B77000CDD9D /* AxonUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AxonUITests;
+			sourceTree = "<group>";
+		};
+		E26F51F62EF3D441000E55BD /* AxonLiveActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E26F52082EF3D442000E55BD /* Exceptions for "AxonLiveActivity" folder in "AxonLiveActivityExtension" target */,
+			);
+			path = AxonLiveActivity;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		E254ED932EB21B76000CDD9D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E254EDDA2EB222B3000CDD9D /* FirebaseAILogic in Frameworks */,
+				E217D4312EEA494A00D3DAB2 /* CloudKit.framework in Frameworks */,
+				E2403B1C2F037E0E00CC9418 /* MLXRandom in Frameworks */,
+				E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */,
+				E2403B0C2F0372D100CC9418 /* MLXLMCommon in Frameworks */,
+				E27FB5F12ECD5E2F003C52BF /* SodiumFoundationCompat in Frameworks */,
+				E22498CA2ED5D1880053D459 /* MarkdownUI in Frameworks */,
+				E2D7BCE92F456A9B00A9FB38 /* AppKit.framework in Frameworks */,
+				E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */,
+				E23FFFA32EB23493009B116D /* FirebaseMessaging in Frameworks */,
+				E2D7BD0B2F45A4E100A9FB38 /* Yams in Frameworks */,
+				E2403B0A2F0372D100CC9418 /* MLXLLM in Frameworks */,
+				E217D4352EEA4BFF00D3DAB2 /* CryptoTokenKit.framework in Frameworks */,
+				E254EDE02EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport in Frameworks */,
+				E2403B102F0372D100CC9418 /* MLXVLM in Frameworks */,
+				E2403B012F03725C00CC9418 /* MLXFast in Frameworks */,
+				E2403AFF2F03725C00CC9418 /* MLXFFT in Frameworks */,
+				E27FB5EF2ECD5E2F003C52BF /* Sodium in Frameworks */,
+				E2403B052F03725C00CC9418 /* MLXNN in Frameworks */,
+				E27FB5ED2ECD5E2F003C52BF /* Clibsodium in Frameworks */,
+				E23FFFA12EB23493009B116D /* FirebaseFunctions in Frameworks */,
+				E217D7B62EEDDD5C00D3DAB2 /* CoreLocation.framework in Frameworks */,
+				E2E057EA2F0357F1009339D8 /* HuggingFace in Frameworks */,
+				E254EDD82EB222B3000CDD9D /* FirebaseAI in Frameworks */,
+				E217D4332EEA4BF700D3DAB2 /* CryptoKit.framework in Frameworks */,
+				E2403AFD2F03725C00CC9418 /* MLX in Frameworks */,
+				E23FFF9D2EB23493009B116D /* FirebaseCore in Frameworks */,
+				E273631A2EBD237F0031CFF7 /* FlyingFox in Frameworks */,
+				E23FFF9F2EB23493009B116D /* FirebaseFirestore in Frameworks */,
+				E23FFFA52EB23493009B116D /* FirebaseStorage in Frameworks */,
+				E2403B032F03725C00CC9418 /* MLXLinalg in Frameworks */,
+				E254EDDC2EB222B3000CDD9D /* FirebaseAnalytics in Frameworks */,
+				E2E5FD802EFF401E00E4835C /* KokoroSwift in Frameworks */,
+				E27FB5F32ECD5E2F003C52BF /* SodiumNIOCompat in Frameworks */,
+				E2C1DD8D2F4D0EA200DD6080 /* AxonArtifacts in Frameworks */,
+				E2403B132F03739200CC9418 /* MLXUtilsLibrary in Frameworks */,
+				E254EDDE2EB222B3000CDD9D /* FirebaseAnalyticsCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E254EDA52EB21B77000CDD9D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E254EDAF2EB21B77000CDD9D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E26F51EE2EF3D441000E55BD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E26F51F52EF3D441000E55BD /* SwiftUI.framework in Frameworks */,
+				E26F51F32EF3D441000E55BD /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		E23FFF992EB23493009B116D /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				E26F333F2EEE017C000E55BD /* AppKit.framework */,
+				E217D7BF2EEDF49800D3DAB2 /* UIKit.framework */,
+				E217D7B52EEDDD5C00D3DAB2 /* CoreLocation.framework */,
+				E217D4342EEA4BFF00D3DAB2 /* CryptoTokenKit.framework */,
+				E217D4322EEA4BF700D3DAB2 /* CryptoKit.framework */,
+				E217D4302EEA494A00D3DAB2 /* CloudKit.framework */,
+				E26F51F22EF3D441000E55BD /* WidgetKit.framework */,
+				E26F51F42EF3D441000E55BD /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		E254ED8D2EB21B75000CDD9D = {
+			isa = PBXGroup;
+			children = (
+				E26F52182EF3D87E000E55BD /* AxonLiveActivityExtension.entitlements */,
+				E254ED982EB21B76000CDD9D /* Axon */,
+				E254EDAB2EB21B77000CDD9D /* AxonTests */,
+				E254EDB52EB21B77000CDD9D /* AxonUITests */,
+				E26F51F62EF3D441000E55BD /* AxonLiveActivity */,
+				E23FFF992EB23493009B116D /* Frameworks */,
+				E254ED972EB21B76000CDD9D /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		E254ED972EB21B76000CDD9D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E254ED962EB21B76000CDD9D /* Axon.app */,
+				E254EDA82EB21B77000CDD9D /* AxonTests.xctest */,
+				E254EDB22EB21B77000CDD9D /* AxonUITests.xctest */,
+				E26F51F12EF3D441000E55BD /* AxonLiveActivityExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E254ED952EB21B76000CDD9D /* Axon */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E254EDBC2EB21B77000CDD9D /* Build configuration list for PBXNativeTarget "Axon" */;
+			buildPhases = (
+				E254ED922EB21B76000CDD9D /* Sources */,
+				E254ED932EB21B76000CDD9D /* Frameworks */,
+				E254ED942EB21B76000CDD9D /* Resources */,
+				E26F52092EF3D442000E55BD /* Embed Foundation Extensions */,
+				E2E5FD822EFF401E00E4835C /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E26F52032EF3D442000E55BD /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				E254ED982EB21B76000CDD9D /* Axon */,
+			);
+			name = Axon;
+			packageProductDependencies = (
+				E254EDD72EB222B3000CDD9D /* FirebaseAI */,
+				E254EDD92EB222B3000CDD9D /* FirebaseAILogic */,
+				E254EDDB2EB222B3000CDD9D /* FirebaseAnalytics */,
+				E254EDDD2EB222B3000CDD9D /* FirebaseAnalyticsCore */,
+				E254EDDF2EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport */,
+				E23FFF9A2EB23493009B116D /* FirebaseAuth */,
+				E23FFF9C2EB23493009B116D /* FirebaseCore */,
+				E23FFF9E2EB23493009B116D /* FirebaseFirestore */,
+				E23FFFA02EB23493009B116D /* FirebaseFunctions */,
+				E23FFFA22EB23493009B116D /* FirebaseMessaging */,
+				E23FFFA42EB23493009B116D /* FirebaseStorage */,
+				E27363192EBD237F0031CFF7 /* FlyingFox */,
+				E273631B2EBD237F0031CFF7 /* FlyingSocks */,
+				E27FB5EC2ECD5E2F003C52BF /* Clibsodium */,
+				E27FB5EE2ECD5E2F003C52BF /* Sodium */,
+				E27FB5F02ECD5E2F003C52BF /* SodiumFoundationCompat */,
+				E27FB5F22ECD5E2F003C52BF /* SodiumNIOCompat */,
+				E22498C92ED5D1880053D459 /* MarkdownUI */,
+				E2E5FD7F2EFF401E00E4835C /* KokoroSwift */,
+				E2E057E92F0357F1009339D8 /* HuggingFace */,
+				E2403AFC2F03725C00CC9418 /* MLX */,
+				E2403AFE2F03725C00CC9418 /* MLXFFT */,
+				E2403B002F03725C00CC9418 /* MLXFast */,
+				E2403B022F03725C00CC9418 /* MLXLinalg */,
+				E2403B042F03725C00CC9418 /* MLXNN */,
+				E2403B092F0372D100CC9418 /* MLXLLM */,
+				E2403B0B2F0372D100CC9418 /* MLXLMCommon */,
+				E2403B0F2F0372D100CC9418 /* MLXVLM */,
+				E2403B122F03739200CC9418 /* MLXUtilsLibrary */,
+				E2403B1B2F037E0E00CC9418 /* MLXRandom */,
+				E2D7BD0A2F45A4E100A9FB38 /* Yams */,
+				E2C1DD8C2F4D0EA200DD6080 /* AxonArtifacts */,
+			);
+			productName = Axon;
+			productReference = E254ED962EB21B76000CDD9D /* Axon.app */;
+			productType = "com.apple.product-type.application";
+		};
+		E254EDA72EB21B77000CDD9D /* AxonTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E254EDBF2EB21B77000CDD9D /* Build configuration list for PBXNativeTarget "AxonTests" */;
+			buildPhases = (
+				E254EDA42EB21B77000CDD9D /* Sources */,
+				E254EDA52EB21B77000CDD9D /* Frameworks */,
+				E254EDA62EB21B77000CDD9D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E254EDAA2EB21B77000CDD9D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				E254EDAB2EB21B77000CDD9D /* AxonTests */,
+			);
+			name = AxonTests;
+			productName = AxonTests;
+			productReference = E254EDA82EB21B77000CDD9D /* AxonTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		E254EDB12EB21B77000CDD9D /* AxonUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E254EDC22EB21B77000CDD9D /* Build configuration list for PBXNativeTarget "AxonUITests" */;
+			buildPhases = (
+				E254EDAE2EB21B77000CDD9D /* Sources */,
+				E254EDAF2EB21B77000CDD9D /* Frameworks */,
+				E254EDB02EB21B77000CDD9D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E254EDB42EB21B77000CDD9D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				E254EDB52EB21B77000CDD9D /* AxonUITests */,
+			);
+			name = AxonUITests;
+			productName = AxonUITests;
+			productReference = E254EDB22EB21B77000CDD9D /* AxonUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		E26F51F02EF3D441000E55BD /* AxonLiveActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E26F52052EF3D442000E55BD /* Build configuration list for PBXNativeTarget "AxonLiveActivityExtension" */;
+			buildPhases = (
+				E26F51ED2EF3D441000E55BD /* Sources */,
+				E26F51EE2EF3D441000E55BD /* Frameworks */,
+				E26F51EF2EF3D441000E55BD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				E26F51F62EF3D441000E55BD /* AxonLiveActivity */,
+			);
+			name = AxonLiveActivityExtension;
+			packageProductDependencies = (
+			);
+			productName = AxonLiveActivityExtension;
+			productReference = E26F51F12EF3D441000E55BD /* AxonLiveActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E254ED8E2EB21B75000CDD9D /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2610;
+				LastUpgradeCheck = 2610;
+				TargetAttributes = {
+					E254ED952EB21B76000CDD9D = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
+					E254EDA72EB21B77000CDD9D = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = E254ED952EB21B76000CDD9D;
+					};
+					E254EDB12EB21B77000CDD9D = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = E254ED952EB21B76000CDD9D;
+					};
+					E26F51F02EF3D441000E55BD = {
+						CreatedOnToolsVersion = 26.1.1;
+					};
+				};
+			};
+			buildConfigurationList = E254ED912EB21B76000CDD9D /* Build configuration list for PBXProject "Axon" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = E254ED8D2EB21B75000CDD9D;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				E27363182EBD237F0031CFF7 /* XCRemoteSwiftPackageReference "FlyingFox" */,
+				E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */,
+				E22498C82ED5D1880053D459 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+				E21FCC002EFA24B1009EF882 /* XCRemoteSwiftPackageReference "kokoro-ios" */,
+				E2E057E82F0357F1009339D8 /* XCRemoteSwiftPackageReference "swift-huggingface" */,
+				E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */,
+				E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
+				E2403B112F03739200CC9418 /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */,
+				E2D7BD092F45A4E100A9FB38 /* XCRemoteSwiftPackageReference "Yams" */,
+				E2C1DD8B2F4D0EA200DD6080 /* XCLocalSwiftPackageReference "../a_MethodolojeePackages/Axon-Artifacts" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = E254ED972EB21B76000CDD9D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E254ED952EB21B76000CDD9D /* Axon */,
+				E254EDA72EB21B77000CDD9D /* AxonTests */,
+				E254EDB12EB21B77000CDD9D /* AxonUITests */,
+				E26F51F02EF3D441000E55BD /* AxonLiveActivityExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		E254ED942EB21B76000CDD9D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E254EDA62EB21B77000CDD9D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E254EDB02EB21B77000CDD9D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E26F51EF2EF3D441000E55BD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		E254ED922EB21B76000CDD9D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E254EDA42EB21B77000CDD9D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E254EDAE2EB21B77000CDD9D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E26F51ED2EF3D441000E55BD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		E254EDAA2EB21B77000CDD9D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E254ED952EB21B76000CDD9D /* Axon */;
+			targetProxy = E254EDA92EB21B77000CDD9D /* PBXContainerItemProxy */;
+		};
+		E254EDB42EB21B77000CDD9D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E254ED952EB21B76000CDD9D /* Axon */;
+			targetProxy = E254EDB32EB21B77000CDD9D /* PBXContainerItemProxy */;
+		};
+		E26F52032EF3D442000E55BD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilter = ios;
+			target = E26F51F02EF3D441000E55BD /* AxonLiveActivityExtension */;
+			targetProxy = E26F52022EF3D442000E55BD /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		E254EDBA2EB21B77000CDD9D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 546A88TQB5;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		E254EDBB2EB21B77000CDD9D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 546A88TQB5;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		E254EDBD2EB21B77000CDD9D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				AUTOMATION_APPLE_EVENTS = NO;
+				CODE_SIGN_ENTITLEMENTS = Axon/Axon.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 546A88TQB5;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = YES;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = YES;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = YES;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Axon/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Axon;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Axon uses Face ID to protect your privacy.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Axon provides a local API server to allow developer tools like Cline to access your conversations via OpenAI-compatible endpoints.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Axon needs access to your photos to attach images to messages.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.e2a0f78c018434b3.Axon;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_PACKAGE_LIBRARY_LINKAGE = static;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		E254EDBE2EB21B77000CDD9D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				AUTOMATION_APPLE_EVENTS = NO;
+				CODE_SIGN_ENTITLEMENTS = Axon/Axon.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 546A88TQB5;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = YES;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = YES;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = YES;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Axon/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Axon;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Axon uses Face ID to protect your privacy.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Axon provides a local API server to allow developer tools like Cline to access your conversations via OpenAI-compatible endpoints.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Axon needs access to your photos to attach images to messages.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.e2a0f78c018434b3.Axon;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_PACKAGE_LIBRARY_LINKAGE = static;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		E254EDC02EB21B77000CDD9D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 546A88TQB5;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.e2a0f78c018434b3.AxonTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Axon.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Axon";
+			};
+			name = Debug;
+		};
+		E254EDC12EB21B77000CDD9D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 546A88TQB5;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.e2a0f78c018434b3.AxonTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Axon.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Axon";
+			};
+			name = Release;
+		};
+		E254EDC32EB21B77000CDD9D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 546A88TQB5;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.e2a0f78c018434b3.AxonUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Axon;
+			};
+			name = Debug;
+		};
+		E254EDC42EB21B77000CDD9D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 546A88TQB5;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.e2a0f78c018434b3.AxonUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Axon;
+			};
+			name = Release;
+		};
+		E26F52062EF3D442000E55BD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = AxonLiveActivityExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 546A88TQB5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AxonLiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = AxonLiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.e2a0f78c018434b3.Axon.AxonLiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		E26F52072EF3D442000E55BD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = AxonLiveActivityExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 546A88TQB5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AxonLiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = AxonLiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.e2a0f78c018434b3.Axon.AxonLiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		E254ED912EB21B76000CDD9D /* Build configuration list for PBXProject "Axon" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E254EDBA2EB21B77000CDD9D /* Debug */,
+				E254EDBB2EB21B77000CDD9D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E254EDBC2EB21B77000CDD9D /* Build configuration list for PBXNativeTarget "Axon" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E254EDBD2EB21B77000CDD9D /* Debug */,
+				E254EDBE2EB21B77000CDD9D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E254EDBF2EB21B77000CDD9D /* Build configuration list for PBXNativeTarget "AxonTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E254EDC02EB21B77000CDD9D /* Debug */,
+				E254EDC12EB21B77000CDD9D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E254EDC22EB21B77000CDD9D /* Build configuration list for PBXNativeTarget "AxonUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E254EDC32EB21B77000CDD9D /* Debug */,
+				E254EDC42EB21B77000CDD9D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E26F52052EF3D442000E55BD /* Build configuration list for PBXNativeTarget "AxonLiveActivityExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E26F52062EF3D442000E55BD /* Debug */,
+				E26F52072EF3D442000E55BD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		E2C1DD8B2F4D0EA200DD6080 /* XCLocalSwiftPackageReference "../a_MethodolojeePackages/Axon-Artifacts" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../a_MethodolojeePackages/Axon-Artifacts";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E21FCC002EFA24B1009EF882 /* XCRemoteSwiftPackageReference "kokoro-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mlalma/kokoro-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.10;
+			};
+		};
+		E22498C82ED5D1880053D459 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.4.1;
+			};
+		};
+		E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.29.1;
+			};
+		};
+		E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-examples";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.29.1;
+			};
+		};
+		E2403B112F03739200CC9418 /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mlalma/MLXUtilsLibrary";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.0.6;
+			};
+		};
+		E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.5.0;
+			};
+		};
+		E27363182EBD237F0031CFF7 /* XCRemoteSwiftPackageReference "FlyingFox" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swhitty/FlyingFox";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.25.0;
+			};
+		};
+		E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sinoru/swift-sodium.git";
+			requirement = {
+				branch = develop;
+				kind = branch;
+			};
+		};
+		E2D7BD092F45A4E100A9FB38 /* XCRemoteSwiftPackageReference "Yams" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/jpsim/Yams.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.2.1;
+			};
+		};
+		E2E057E82F0357F1009339D8 /* XCRemoteSwiftPackageReference "swift-huggingface" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/tooury/swift-huggingface";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E22498C92ED5D1880053D459 /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E22498C82ED5D1880053D459 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
+		};
+		E23FFF9A2EB23493009B116D /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		E23FFF9C2EB23493009B116D /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		E23FFF9E2EB23493009B116D /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		E23FFFA02EB23493009B116D /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
+		E23FFFA22EB23493009B116D /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		E23FFFA42EB23493009B116D /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+		E2403AFC2F03725C00CC9418 /* MLX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLX;
+		};
+		E2403AFE2F03725C00CC9418 /* MLXFFT */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXFFT;
+		};
+		E2403B002F03725C00CC9418 /* MLXFast */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXFast;
+		};
+		E2403B022F03725C00CC9418 /* MLXLinalg */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXLinalg;
+		};
+		E2403B042F03725C00CC9418 /* MLXNN */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXNN;
+		};
+		E2403B092F0372D100CC9418 /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLLM;
+		};
+		E2403B0B2F0372D100CC9418 /* MLXLMCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLMCommon;
+		};
+		E2403B0F2F0372D100CC9418 /* MLXVLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXVLM;
+		};
+		E2403B122F03739200CC9418 /* MLXUtilsLibrary */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403B112F03739200CC9418 /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */;
+			productName = MLXUtilsLibrary;
+		};
+		E2403B1B2F037E0E00CC9418 /* MLXRandom */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXRandom;
+		};
+		E254EDD72EB222B3000CDD9D /* FirebaseAI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAI;
+		};
+		E254EDD92EB222B3000CDD9D /* FirebaseAILogic */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAILogic;
+		};
+		E254EDDB2EB222B3000CDD9D /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		E254EDDD2EB222B3000CDD9D /* FirebaseAnalyticsCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalyticsCore;
+		};
+		E254EDDF2EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalyticsIdentitySupport;
+		};
+		E27363192EBD237F0031CFF7 /* FlyingFox */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E27363182EBD237F0031CFF7 /* XCRemoteSwiftPackageReference "FlyingFox" */;
+			productName = FlyingFox;
+		};
+		E273631B2EBD237F0031CFF7 /* FlyingSocks */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E27363182EBD237F0031CFF7 /* XCRemoteSwiftPackageReference "FlyingFox" */;
+			productName = FlyingSocks;
+		};
+		E27FB5EC2ECD5E2F003C52BF /* Clibsodium */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */;
+			productName = Clibsodium;
+		};
+		E27FB5EE2ECD5E2F003C52BF /* Sodium */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */;
+			productName = Sodium;
+		};
+		E27FB5F02ECD5E2F003C52BF /* SodiumFoundationCompat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */;
+			productName = SodiumFoundationCompat;
+		};
+		E27FB5F22ECD5E2F003C52BF /* SodiumNIOCompat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E27FB5EB2ECD5E2F003C52BF /* XCRemoteSwiftPackageReference "swift-sodium" */;
+			productName = SodiumNIOCompat;
+		};
+		E2C1DD8C2F4D0EA200DD6080 /* AxonArtifacts */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AxonArtifacts;
+		};
+		E2D7BD0A2F45A4E100A9FB38 /* Yams */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2D7BD092F45A4E100A9FB38 /* XCRemoteSwiftPackageReference "Yams" */;
+			productName = Yams;
+		};
+		E2E057E92F0357F1009339D8 /* HuggingFace */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2E057E82F0357F1009339D8 /* XCRemoteSwiftPackageReference "swift-huggingface" */;
+			productName = HuggingFace;
+		};
+		E2E5FD7F2EFF401E00E4835C /* KokoroSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E21FCC002EFA24B1009EF882 /* XCRemoteSwiftPackageReference "kokoro-ios" */;
+			productName = KokoroSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = E254ED8E2EB21B75000CDD9D /* Project object */;
+}

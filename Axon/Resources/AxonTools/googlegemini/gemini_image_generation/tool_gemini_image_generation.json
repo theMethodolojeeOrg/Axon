@@ -1,0 +1,57 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "gemini_image_generation",
+        "name": "Image Generation",
+        "description": "Generate high-quality images from text descriptions using the Imagine model.",
+        "category": "custom",
+        "icon": {
+            "sfSymbol": "photo.artframe"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "gemini",
+            "image",
+            "creative",
+            "art",
+            "drawing"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "gemini"
+    },
+    "parameters": {
+        "prompt": {
+            "type": "string",
+            "description": "Descriptive prompt for the image to generate",
+            "required": true
+        },
+        "negative_prompt": {
+            "type": "string",
+            "description": "What to exclude from the image",
+            "required": false
+        },
+        "aspect_ratio": {
+            "type": "string",
+            "description": "Aspect ratio of the generated image",
+            "enum": [
+                "1:1",
+                "16:9",
+                "4:3",
+                "3:4",
+                "9:16"
+            ],
+            "default": "1:1"
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Image Generation\nGenerate images based on text prompts.\n\n**Capabilities:**\n- Text-to-Image generation\n- Photorealistic or stylized output\n\n**Usage:**\nCall this tool with a detailed prompt describing the desired image.",
+        "imageGeneration": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

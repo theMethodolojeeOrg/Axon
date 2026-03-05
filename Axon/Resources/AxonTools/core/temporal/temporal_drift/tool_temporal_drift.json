@@ -1,0 +1,99 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "temporal_drift",
+    "name": "Temporal Drift",
+    "description": "Enable or disable drift mode (suspend temporal tracking).",
+    "category": "temporal",
+    "icon": {
+      "sfSymbol": "clock.badge.xmark"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "temporal",
+      "drift",
+      "suspend",
+      "timeless"
+    ]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": false,
+      "description": "'enable' or 'disable'",
+      "default": "enable"
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "temporal"
+  },
+  "ai": {
+    "systemPromptSection": "### temporal_drift\nEnable/disable drift mode.\n\n**Format:**\n```tool_request\n{\"tool\": \"temporal_drift\", \"query\": \"enable\"}\n```\n\n**Options:** enable, disable\n\n**Effect:** When enabled, temporal tracking is suspended (timeless void mode).",
+    "usageExamples": [
+      {
+        "description": "Enable drift",
+        "input": "enable"
+      },
+      {
+        "description": "Disable drift",
+        "input": "disable"
+      }
+    ],
+    "whenToUse": [
+      "User invokes /drift",
+      "Timeless exploration needed"
+    ],
+    "whenNotToUse": [
+      "Already in drift mode"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        {
+          "param": "query",
+          "widget": "segmented",
+          "label": "Action",
+          "options": [
+            {
+              "value": "enable",
+              "label": "Enable"
+            },
+            {
+              "value": "disable",
+              "label": "Disable"
+            }
+          ]
+        }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Apply"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        {
+          "type": "header",
+          "title": "Temporal Drift",
+          "icon": "clock.badge.xmark"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "temporal_mode",
+    "approvalDescription": "Enable temporal drift",
+    "scopes": [
+      "temporal.mode"
+    ],
+    "riskLevel": "low"
+  }
+}

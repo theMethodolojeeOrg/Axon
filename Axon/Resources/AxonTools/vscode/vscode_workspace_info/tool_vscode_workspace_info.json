@@ -1,0 +1,75 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "vscode_workspace_info",
+        "name": "VS Code Workspace Info",
+        "description": "Get information about the connected VS Code workspace including open files and folders.",
+        "category": "vscode",
+        "icon": {
+            "sfSymbol": "rectangle.3.group.fill"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "vscode",
+            "workspace",
+            "info",
+            "project",
+            "bridge"
+        ]
+    },
+    "parameters": {},
+    "inputFormat": {
+        "style": "freeform"
+    },
+    "execution": {
+        "type": "bridge",
+        "bridgeMethod": "workspace/info",
+        "bridgeTarget": "vscode"
+    },
+    "ai": {
+        "systemPromptSection": "### vscode_workspace_info\nGet information about the connected VS Code workspace.\n\n**Format:**\n```tool_request\n{\"tool\": \"vscode_workspace_info\", \"query\": \"\"}\n```\n\n**Parameters:** None\n\n**Returns:** Workspace name, root folders, currently open files, and active editor info",
+        "usageExamples": [
+            {
+                "description": "Get workspace info",
+                "input": ""
+            }
+        ],
+        "whenToUse": [
+            "Need to understand the VS Code workspace structure",
+            "Want to see which files are currently open",
+            "Getting project context before making changes"
+        ],
+        "whenNotToUse": [
+            "VS Code bridge not connected"
+        ]
+    },
+    "ui": {
+        "inputForm": {
+            "fields": [],
+            "layout": "vertical",
+            "submitLabel": "Get Info"
+        },
+        "resultDisplay": {
+            "style": "card",
+            "sections": [
+                {
+                    "type": "header",
+                    "title": "Workspace Info",
+                    "icon": "rectangle.3.group.fill"
+                },
+                {
+                    "type": "text",
+                    "source": "**Name:** {{name}}\n**Folders:** {{folders}}\n**Open Files:** {{openFiles}}"
+                }
+            ]
+        }
+    },
+    "sovereignty": {
+        "actionCategory": "discovery_query",
+        "approvalDescription": "Get VS Code workspace information",
+        "scopes": [
+            "vscode.workspace.read"
+        ],
+        "riskLevel": "low"
+    }
+}

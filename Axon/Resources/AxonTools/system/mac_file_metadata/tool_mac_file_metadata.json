@@ -1,0 +1,41 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_file_metadata",
+    "name": "Mac File Info",
+    "description": "Get detailed metadata about a file.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "info.circle"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "mac",
+      "files",
+      "metadata",
+      "info"
+    ]
+  },
+  "parameters": {
+    "path": {
+      "type": "string",
+      "required": true,
+      "description": "Path to the file"
+    }
+  },
+  "inputFormat": {
+    "style": "json"
+  },
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "file/metadata"
+  },
+  "ai": {
+    "systemPromptSection": "### mac_file_metadata\nGet detailed file metadata.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_file_metadata\", \"query\": \"{\\\"path\\\": \\\"/path/to/file\\\"}\"}\n```\n\n**Parameters:**\n- path: File path (required)\n\n**Returns:** exists, isDirectory, sizeBytes, permissions, owner, createdDate, modifiedDate, contentType",
+    "whenToUse": [
+      "Need file size or dates",
+      "Checking file permissions",
+      "Getting file type information"
+    ]
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_shell",
+    "name": "Mac Shell Command",
+    "description": "Execute a shell command on the Mac. Dangerous commands are blocked for security.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "terminal"
+    },
+    "requiresApproval": true,
+    "trustTierCategory": "system_execute",
+    "tags": [
+      "mac",
+      "shell",
+      "terminal",
+      "command"
+    ]
+  },
+  "parameters": {
+    "command": {
+      "type": "string",
+      "required": true,
+      "description": "Shell command to execute"
+    },
+    "timeout": {
+      "type": "integer",
+      "required": false,
+      "description": "Timeout in milliseconds",
+      "default": 30000
+    },
+    "workingDirectory": {
+      "type": "string",
+      "required": false,
+      "description": "Working directory for the command"
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "shell/execute"
+  },
+  "ai": {
+    "systemPromptSection": "### mac_shell\nExecute a shell command on the Mac.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_shell\", \"query\": \"{\\\"command\\\": \\\"ls -la\\\"}\"}\n```\n\n**Parameters:**\n- command: Shell command to execute (required)\n- timeout: Timeout in ms (default: 30000)\n- workingDirectory: Working directory (optional)\n\n**Returns:** success, stdout, stderr, exitCode, timedOut, blocked, blockedReason\n\n**Security:** Dangerous commands (rm -rf, sudo, etc.) are blocked.",
+    "whenToUse": [
+      "User explicitly asks to run a command",
+      "Need to execute a specific terminal command",
+      "Automation tasks requiring shell access"
+    ],
+    "whenNotToUse": [
+      "Can be done with safer file/app tools",
+      "Potentially destructive operations",
+      "User didn't explicitly request command execution"
+    ]
+  },
+  "sovereignty": {
+    "actionCategory": "system_execute",
+    "approvalDescription": "Execute shell command: {{command}}",
+    "scopes": [
+      "shell.execute"
+    ],
+    "riskLevel": "high"
+  }
+}

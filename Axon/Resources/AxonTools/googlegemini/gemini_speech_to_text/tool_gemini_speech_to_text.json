@@ -1,0 +1,50 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "gemini_speech_to_text",
+        "name": "Speech to Text",
+        "description": "Transcribes audio files into text using Gemini's audio understanding capabilities.",
+        "category": "system",
+        "icon": {
+            "sfSymbol": "waveform.circle"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "gemini",
+            "audio",
+            "transcription",
+            "stt"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "google"
+    },
+    "parameters": {
+        "file": {
+            "type": "string",
+            "description": "Path to the audio file to transcribe",
+            "required": true
+        },
+        "prompt": {
+            "type": "string",
+            "description": "Optional instructions for transcription (e.g., 'Generate a verbatim transcript')",
+            "required": false
+        },
+        "model": {
+            "type": "string",
+            "description": "The model to use",
+            "default": "gemini-1.5-flash",
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Audio Transcription\nTranscribe audio using Gemini models.",
+        "audioTranscription": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

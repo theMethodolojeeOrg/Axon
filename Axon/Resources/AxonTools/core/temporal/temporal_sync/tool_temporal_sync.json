@@ -1,0 +1,99 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "temporal_sync",
+    "name": "Temporal Sync",
+    "description": "Enable or disable temporal sync mode for mutual time awareness.",
+    "category": "temporal",
+    "icon": {
+      "sfSymbol": "clock.badge.checkmark"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "temporal",
+      "sync",
+      "time",
+      "awareness"
+    ]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": false,
+      "description": "'enable' or 'disable'",
+      "default": "enable"
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "temporal"
+  },
+  "ai": {
+    "systemPromptSection": "### temporal_sync\nEnable/disable temporal sync.\n\n**Format:**\n```tool_request\n{\"tool\": \"temporal_sync\", \"query\": \"enable\"}\n```\n\n**Options:** enable, disable\n\n**Effect:** When enabled, you have mutual time awareness with the human.",
+    "usageExamples": [
+      {
+        "description": "Enable sync",
+        "input": "enable"
+      },
+      {
+        "description": "Disable sync",
+        "input": "disable"
+      }
+    ],
+    "whenToUse": [
+      "User invokes /sync",
+      "Need mutual time awareness"
+    ],
+    "whenNotToUse": [
+      "Already in sync mode"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        {
+          "param": "query",
+          "widget": "segmented",
+          "label": "Action",
+          "options": [
+            {
+              "value": "enable",
+              "label": "Enable"
+            },
+            {
+              "value": "disable",
+              "label": "Disable"
+            }
+          ]
+        }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Apply"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        {
+          "type": "header",
+          "title": "Temporal Sync",
+          "icon": "clock.badge.checkmark"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "temporal_mode",
+    "approvalDescription": "Enable temporal sync",
+    "scopes": [
+      "temporal.mode"
+    ],
+    "riskLevel": "low"
+  }
+}

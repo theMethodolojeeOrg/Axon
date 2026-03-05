@@ -1,0 +1,32 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "gemini_google_search",
+        "name": "Google Search",
+        "description": "Grounds responses with real-time web search results for factual accuracy.",
+        "category": "discovery",
+        "icon": {
+            "sfSymbol": "magnifyingglass"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "gemini",
+            "search",
+            "web",
+            "finding",
+            "facts"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "gemini"
+    },
+    "ai": {
+        "systemPromptSection": "### Google Search\nUse Google Search to find real-time information, verify facts, and answer questions about current events.\n\n**Capabilities:**\n- Web search retrieval\n- Fact verification\n- Citation generation\n\n**Usage:**\nEnabled via tool configuration. The model will invoke it automatically when it needs external information."
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

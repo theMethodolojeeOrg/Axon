@@ -1,0 +1,42 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "gemini_file_search",
+        "name": "File Search",
+        "description": "Search and retrieve information from uploaded documents (PDF, CSV, etc.) using semantic search.",
+        "category": "memory",
+        "icon": {
+            "sfSymbol": "doc.text.magnifyingglass"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "gemini",
+            "files",
+            "documents",
+            "rag",
+            "search"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "gemini"
+    },
+    "parameters": {
+        "file_search_store_names": {
+            "type": "array",
+            "description": "List of File Search Store names to search against",
+            "required": false,
+            "items": {
+                "type": "string"
+            }
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### File Search\nSearch within uploaded documents to answer questions based on specific file content.\n\n**Capabilities:**\n- Semantic search over large documents\n- Information extraction\n- Citation from file content\n\n**Usage:**\nRequires a File Search Store to be active. The model will query the store to find relevant contexts."
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_clipboard_read",
+    "name": "Mac Read Clipboard",
+    "description": "Read the current content of the Mac clipboard (pasteboard).",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "doc.on.clipboard"
+    },
+    "requiresApproval": false,
+    "tags": ["mac", "clipboard", "paste", "copy"]
+  },
+
+  "parameters": {},
+
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "clipboard/read"
+  },
+
+  "ai": {
+    "systemPromptSection": "### mac_clipboard_read\nRead the current Mac clipboard content.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_clipboard_read\", \"query\": \"\"}\n```\n\n**Returns:** content (text if available), hasContent, contentType (text/image/file/unknown)",
+    "whenToUse": [
+      "User asks what's on their clipboard",
+      "Need to process copied text",
+      "User says 'use what I copied'"
+    ],
+    "whenNotToUse": [
+      "User hasn't mentioned clipboard or copying"
+    ]
+  }
+}

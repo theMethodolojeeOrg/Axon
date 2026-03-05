@@ -1,0 +1,90 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "query_job_status",
+    "name": "Query Job Status",
+    "description": "Query status of sub-agent jobs.",
+    "category": "sub_agents",
+    "icon": {
+      "sfSymbol": "list.clipboard"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "sub-agent",
+      "job",
+      "status",
+      "query"
+    ]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": false,
+      "description": "Job ID or 'all' for all jobs",
+      "default": "all"
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "sub_agent"
+  },
+  "ai": {
+    "systemPromptSection": "### query_job_status\nQuery sub-agent job status.\n\n**Format:**\n```tool_request\n{\"tool\": \"query_job_status\", \"query\": \"all\"}\n```\n\nOr specific job:\n```tool_request\n{\"tool\": \"query_job_status\", \"query\": \"job-abc123\"}\n```\n\n**Returns:** Job status, progress, and result (if complete).",
+    "usageExamples": [
+      {
+        "description": "Check all jobs",
+        "input": "all"
+      },
+      {
+        "description": "Check specific job",
+        "input": "job-abc123"
+      }
+    ],
+    "whenToUse": [
+      "Check on spawned agents",
+      "Monitor progress"
+    ],
+    "whenNotToUse": [
+      "No active jobs"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        {
+          "param": "query",
+          "widget": "text_field",
+          "label": "Job ID",
+          "placeholder": "'all' or specific job ID"
+        }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Query"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        {
+          "type": "header",
+          "title": "Job Status",
+          "icon": "list.clipboard"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "agent_query",
+    "approvalDescription": "Query job status",
+    "scopes": [
+      "agent.read"
+    ],
+    "riskLevel": "low"
+  }
+}

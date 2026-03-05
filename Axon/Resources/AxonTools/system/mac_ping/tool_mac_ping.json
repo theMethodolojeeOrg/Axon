@@ -1,0 +1,53 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_ping",
+    "name": "Mac Ping Host",
+    "description": "Test network connectivity by pinging a host.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "antenna.radiowaves.left.and.right"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "mac",
+      "network",
+      "ping",
+      "connectivity"
+    ]
+  },
+  "parameters": {
+    "host": {
+      "type": "string",
+      "required": true,
+      "description": "Hostname or IP address to ping"
+    },
+    "count": {
+      "type": "integer",
+      "required": false,
+      "description": "Number of ping packets to send",
+      "default": 4
+    },
+    "timeout": {
+      "type": "integer",
+      "required": false,
+      "description": "Timeout in milliseconds",
+      "default": 5000
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "network/ping"
+  },
+  "ai": {
+    "systemPromptSection": "### mac_ping\nPing a host to test connectivity.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_ping\", \"query\": \"{\\\"host\\\": \\\"google.com\\\", \\\"count\\\": 4}\"}\n```\n\n**Parameters:**\n- host: Hostname or IP (required)\n- count: Number of pings (default: 4)\n- timeout: Timeout in ms (default: 5000)\n\n**Returns:** success, packetsTransmitted, packetsReceived, packetLoss, minTime, avgTime, maxTime",
+    "whenToUse": [
+      "Testing network connectivity",
+      "Checking if a server is reachable",
+      "Diagnosing network issues"
+    ]
+  }
+}

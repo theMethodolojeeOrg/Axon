@@ -1,0 +1,60 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "openai_embeddings",
+        "name": "Embeddings",
+        "description": "Generates vector embeddings for input text.",
+        "category": "system",
+        "icon": {
+            "sfSymbol": "arrow.up.left.and.arrow.down.right"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "openai",
+            "embeddings",
+            "vector",
+            "search"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "openai"
+    },
+    "parameters": {
+        "input": {
+            "type": "string",
+            "description": "Input text to embed",
+            "required": true
+        },
+        "model": {
+            "type": "string",
+            "description": "ID of the model to use (e.g., 'text-embedding-3-small')",
+            "default": "text-embedding-3-small",
+            "required": false
+        },
+        "dimensions": {
+            "type": "integer",
+            "description": "The number of dimensions the resulting output embeddings should have",
+            "required": false
+        },
+        "encoding_format": {
+            "type": "string",
+            "description": "The format to return the embeddings in ('float' or 'base64')",
+            "enum": [
+                "float",
+                "base64"
+            ],
+            "default": "float",
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Embeddings\nGet vector representation of text.",
+        "embeddings": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

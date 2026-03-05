@@ -1,0 +1,61 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "discover_ports",
+    "name": "Discover Ports",
+    "description": "Discover available external app integrations (ports).",
+    "category": "discovery",
+    "icon": { "sfSymbol": "app.connected.to.app.below.fill" },
+    "requiresApproval": false,
+    "tags": ["discovery", "ports", "external", "apps"]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": false,
+      "description": "Category filter (optional)"
+    }
+  },
+  "inputFormat": { "style": "freeform" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "discovery"
+  },
+  "ai": {
+    "systemPromptSection": "### discover_ports\nDiscover external app integrations.\n\n**Format:**\n```tool_request\n{\"tool\": \"discover_ports\", \"query\": \"\"}\n```\n\n**Optional category filter:** notes, tasks, automation, etc.\n\n**Returns:** Available ports grouped by category.",
+    "usageExamples": [
+      { "description": "List all ports", "input": "" },
+      { "description": "List note apps", "input": "notes" },
+      { "description": "List task apps", "input": "tasks" }
+    ],
+    "whenToUse": [
+      "Need to interact with external apps",
+      "User asks about integrations"
+    ],
+    "whenNotToUse": [
+      "Already know available ports"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "query", "widget": "text_field", "label": "Category", "placeholder": "Optional category filter..." }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Discover"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "External App Ports", "icon": "app.connected.to.app.below.fill" },
+        { "type": "text", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "discovery_query",
+    "approvalDescription": "Discover available ports",
+    "scopes": ["discovery.read"],
+    "riskLevel": "low"
+  }
+}

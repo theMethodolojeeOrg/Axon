@@ -1,0 +1,61 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "grok_image_understanding",
+        "name": "Image Understanding",
+        "description": "Analyzes images and answers questions about their contents using Grok vision models.",
+        "category": "system",
+        "icon": {
+            "sfSymbol": "eye"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "grok",
+            "image",
+            "vision",
+            "understanding"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "grok"
+    },
+    "parameters": {
+        "image_url": {
+            "type": "string",
+            "description": "Image URL or local file path",
+            "required": true
+        },
+        "prompt": {
+            "type": "string",
+            "description": "Question or instruction for analyzing the image",
+            "required": true
+        },
+        "detail": {
+            "type": "string",
+            "description": "Level of detail for image processing",
+            "enum": [
+                "auto",
+                "low",
+                "high"
+            ],
+            "default": "auto",
+            "required": false
+        },
+        "model": {
+            "type": "string",
+            "description": "The Grok vision model to use",
+            "default": "grok-4",
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Image Understanding\nAnalyze images and answer questions about their contents.",
+        "imageUnderstanding": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

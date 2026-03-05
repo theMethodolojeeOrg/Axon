@@ -1,0 +1,65 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "set_presence_intent",
+    "name": "Set Presence Intent",
+    "description": "Declare preferred device intent for routing decisions.",
+    "category": "system",
+    "icon": { "sfSymbol": "location.fill" },
+    "requiresApproval": false,
+    "tags": ["device", "intent", "presence", "routing"]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": true,
+      "description": "Format: device_id|reason"
+    }
+  },
+  "inputFormat": {
+    "style": "pipe_delimited",
+    "pattern": "{{device_id}}|{{reason}}",
+    "delimiter": "|",
+    "fields": ["device_id", "reason"]
+  },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "device_presence"
+  },
+  "ai": {
+    "systemPromptSection": "### set_presence_intent\nDeclare device preference.\n\n**Format:**\n```tool_request\n{\"tool\": \"set_presence_intent\", \"query\": \"device_id|reason\"}\n```\n\n**Effect:** Influences routing decisions but doesn't force a switch.",
+    "usageExamples": [
+      { "description": "Prefer Mac", "input": "mac-abc123|Coding task requires Mac" },
+      { "description": "Stay on current", "input": "current|User is engaged here" }
+    ],
+    "whenToUse": [
+      "Express device preference",
+      "Influence routing decisions"
+    ],
+    "whenNotToUse": [
+      "No clear preference"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "query", "widget": "textarea", "label": "Intent", "placeholder": "device_id|reason", "rows": 2 }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Set Intent"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Intent Set", "icon": "location.fill" },
+        { "type": "text", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "device_intent",
+    "approvalDescription": "Set presence intent",
+    "scopes": ["device.intent"],
+    "riskLevel": "low"
+  }
+}

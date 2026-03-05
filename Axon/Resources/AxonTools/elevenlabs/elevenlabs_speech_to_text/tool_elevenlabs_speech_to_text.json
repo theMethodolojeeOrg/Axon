@@ -1,0 +1,85 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "elevenlabs_speech_to_text",
+        "name": "ElevenLabs Speech to Text",
+        "description": "Transcribes audio into text using ElevenLabs Scribe.",
+        "category": "system",
+        "icon": {
+            "sfSymbol": "waveform.circle"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "elevenlabs",
+            "audio",
+            "stt",
+            "transcription"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "elevenlabs"
+    },
+    "parameters": {
+        "file": {
+            "type": "string",
+            "description": "Path to the audio file to transcribe",
+            "required": true
+        },
+        "cloud_storage_url": {
+            "type": "string",
+            "description": "HTTPS URL of audio to transcribe (alternative to local file)",
+            "required": false
+        },
+        "model_id": {
+            "type": "string",
+            "description": "The transcription model to use",
+            "default": "scribe_v1",
+            "required": false
+        },
+        "language_code": {
+            "type": "string",
+            "description": "ISO language code (e.g., 'eng', 'spa')",
+            "required": false
+        },
+        "diarize": {
+            "type": "boolean",
+            "description": "Enable speaker diarization",
+            "required": false
+        },
+        "tag_audio_events": {
+            "type": "boolean",
+            "description": "Tag non-speech audio events",
+            "required": false
+        },
+        "num_speakers": {
+            "type": "integer",
+            "description": "Expected number of speakers",
+            "required": false
+        },
+        "diarization_threshold": {
+            "type": "number",
+            "description": "Speaker separation sensitivity",
+            "required": false
+        },
+        "use_multi_channel": {
+            "type": "boolean",
+            "description": "Process multi-channel audio separately",
+            "required": false
+        },
+        "webhook": {
+            "type": "boolean",
+            "description": "Enable async processing with webhook",
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### ElevenLabs Speech to Text\nTranscribe audio into text.",
+        "audioTranscription": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

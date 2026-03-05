@@ -1,0 +1,2 @@
+Testing Axon Bridge write_file after enabling tools.
+If you can read this back, approval + write path works.

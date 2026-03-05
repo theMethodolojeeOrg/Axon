@@ -1,0 +1,72 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "openai_image_generation",
+        "name": "Image Generation",
+        "description": "Generates images based on text descriptions using DALL·E or GPT Image models.",
+        "category": "provider",
+        "icon": {
+            "sfSymbol": "paintbrush.fill"
+        },
+        "requiresApproval": true,
+        "tags": [
+            "openai",
+            "dalle",
+            "image",
+            "generation",
+            "creative"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "openai"
+    },
+    "parameters": {
+        "prompt": {
+            "type": "string",
+            "description": "Description of the image to generate",
+            "required": true
+        },
+        "n": {
+            "type": "integer",
+            "description": "Number of images to generate",
+            "default": 1,
+            "required": false
+        },
+        "size": {
+            "type": "string",
+            "description": "Size of the generated image (e.g., '1024x1024')",
+            "default": "1024x1024",
+            "required": false
+        },
+        "quality": {
+            "type": "string",
+            "description": "Quality of the image ('standard' or 'hd')",
+            "enum": [
+                "standard",
+                "hd"
+            ],
+            "default": "standard",
+            "required": false
+        },
+        "response_format": {
+            "type": "string",
+            "description": "Format of the response ('url' or 'b64_json')",
+            "enum": [
+                "url",
+                "b64_json"
+            ],
+            "default": "url",
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Image Generation\nGenerate images from text prompts.",
+        "imageGeneration": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "medium"
+    }
+}

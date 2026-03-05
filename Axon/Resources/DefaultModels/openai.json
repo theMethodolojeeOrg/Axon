@@ -1,0 +1,362 @@
+{
+  "id": "openai",
+  "displayName": "OpenAI (GPT)",
+  "models": [
+    {
+      "id": "gpt-5.2",
+      "displayName": "GPT-5.2",
+      "category": "frontier",
+      "contextWindow": 400000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 1.50,
+        "outputPerMillion": 12.00,
+        "cachedInputPerMillion": 0.15,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Latest frontier model with stronger reasoning and long-context performance",
+      "sourceUrls": [
+        "https://platform.openai.com/docs/models",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "gpt-5.1",
+      "displayName": "GPT-5.1",
+      "category": "frontier",
+      "contextWindow": 400000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 1.25,
+        "outputPerMillion": 10.00,
+        "cachedInputPerMillion": 0.13,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Upgraded GPT-5 with improved conversational abilities and customization",
+      "sourceUrls": [
+        "https://platform.openai.com/docs/models",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "gpt-5.1-chat-latest",
+      "displayName": "GPT-5.1 Chat Latest",
+      "category": "frontier",
+      "contextWindow": 400000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 1.25,
+        "outputPerMillion": 10.00,
+        "cachedInputPerMillion": 0.13,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Latest conversational variant with multimodal support",
+      "sourceUrls": [
+        "https://platform.openai.com/docs/models",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "gpt-5-2025-08-07",
+      "displayName": "GPT-5",
+      "category": "frontier",
+      "contextWindow": 400000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 1.25,
+        "outputPerMillion": 10.00,
+        "cachedInputPerMillion": 0.125,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Flagship model for coding, reasoning, and agentic tasks",
+      "sourceUrls": [
+        "https://platform.openai.com/docs/models",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "gpt-5-mini-2025-08-07",
+      "displayName": "GPT-5 Mini",
+      "category": "fast",
+      "contextWindow": 400000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.25,
+        "outputPerMillion": 2.00,
+        "cachedInputPerMillion": 0.025,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Fast and cost-efficient with strong performance",
+      "sourceUrls": [
+        "https://platform.openai.com/docs/models",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "gpt-5-nano-2025-08-07",
+      "displayName": "GPT-5 Nano",
+      "category": "fast",
+      "contextWindow": 400000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.05,
+        "outputPerMillion": 0.40,
+        "cachedInputPerMillion": 0.005,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Smallest, fastest, cheapest. Great for classification and extraction",
+      "sourceUrls": [
+        "https://platform.openai.com/docs/models",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "o3",
+      "displayName": "o3",
+      "category": "reasoning",
+      "contextWindow": 200000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 2.00,
+        "outputPerMillion": 8.00,
+        "cachedInputPerMillion": 0.50,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Most powerful reasoning model for coding, math, science, and vision",
+      "sourceUrls": [
+        "https://platform.openai.com/docs/models",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "o4-mini",
+      "displayName": "o4-mini",
+      "category": "reasoning",
+      "contextWindow": 200000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 1.10,
+        "outputPerMillion": 4.40,
+        "cachedInputPerMillion": 0.275,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Fast, cost-efficient reasoning model with multimodal support",
+      "sourceUrls": [
+        "https://platform.openai.com/docs/models",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "o3-mini",
+      "displayName": "o3-mini",
+      "category": "reasoning",
+      "contextWindow": 200000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 1.10,
+        "outputPerMillion": 4.40,
+        "cachedInputPerMillion": 0.55,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Specialized reasoning for STEM tasks with configurable effort levels",
+      "sourceUrls": [
+        "https://platform.openai.com/docs/models",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "gpt-4.1",
+      "displayName": "GPT-4.1",
+      "category": "frontier",
+      "contextWindow": 1000000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 2.00,
+        "outputPerMillion": 8.00,
+        "cachedInputPerMillion": 0.50,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Enhanced coding and instruction following with 1M context",
+      "sourceUrls": [
+        "https://platform.openai.com/docs/models",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "gpt-4.1-mini",
+      "displayName": "GPT-4.1 Mini",
+      "category": "fast",
+      "contextWindow": 1000000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.40,
+        "outputPerMillion": 1.60,
+        "cachedInputPerMillion": 0.10,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Mid-tier with 1M context. Fast and cost-effective",
+      "sourceUrls": [
+        "https://platform.openai.com/docs/models",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "gpt-4.1-nano",
+      "displayName": "GPT-4.1 Nano",
+      "category": "fast",
+      "contextWindow": 1000000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.10,
+        "outputPerMillion": 0.40,
+        "cachedInputPerMillion": 0.025,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Smallest 4.1 model with 1M context. Great for bulk processing",
+      "sourceUrls": [
+        "https://platform.openai.com/docs/models",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "gpt-4o",
+      "displayName": "GPT-4o",
+      "category": "legacy",
+      "contextWindow": 128000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 2.50,
+        "outputPerMillion": 10.00,
+        "cachedInputPerMillion": 1.25,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Legacy multimodal model with good balance of speed and capability",
+      "sourceUrls": [
+        "https://platform.openai.com/docs/models",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "gpt-4o-mini",
+      "displayName": "GPT-4o Mini",
+      "category": "legacy",
+      "contextWindow": 128000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.15,
+        "outputPerMillion": 0.60,
+        "cachedInputPerMillion": 0.075,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Legacy fast model. Very cost-effective for simple tasks",
+      "sourceUrls": [
+        "https://platform.openai.com/docs/models",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "gpt-4o-realtime-preview",
+      "displayName": "GPT-4o Realtime",
+      "category": "fast",
+      "contextWindow": 128000,
+      "modalities": [
+        "text",
+        "audio"
+      ],
+      "pricing": {
+        "inputPerMillion": 5.00,
+        "outputPerMillion": 20.00,
+        "audioInputPerMillion": 100.00,
+        "audioOutputPerMillion": 200.00,
+        "tier": "standard"
+      },
+      "status": "preview",
+      "capabilitiesSummary": "Real-time audio model for voice conversations with low latency",
+      "supportsLiveAudio": true,
+      "sourceUrls": [
+        "https://platform.openai.com/docs/guides/realtime",
+        "https://openai.com/api/pricing"
+      ]
+    },
+    {
+      "id": "gpt-4o-mini-realtime-preview",
+      "displayName": "GPT-4o Mini Realtime",
+      "category": "fast",
+      "contextWindow": 128000,
+      "modalities": [
+        "text",
+        "audio"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.60,
+        "outputPerMillion": 2.40,
+        "audioInputPerMillion": 10.00,
+        "audioOutputPerMillion": 20.00,
+        "tier": "standard"
+      },
+      "status": "preview",
+      "capabilitiesSummary": "Cost-efficient real-time audio model for voice conversations",
+      "supportsLiveAudio": true,
+      "sourceUrls": [
+        "https://platform.openai.com/docs/guides/realtime",
+        "https://openai.com/api/pricing"
+      ]
+    }
+  ]
+}

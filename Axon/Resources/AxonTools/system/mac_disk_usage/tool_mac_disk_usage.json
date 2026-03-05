@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_disk_usage",
+    "name": "Mac Disk Usage",
+    "description": "Get disk usage statistics for a specified path on the Mac.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "internaldrive"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "mac",
+      "disk",
+      "storage",
+      "monitoring"
+    ]
+  },
+  "parameters": {
+    "path": {
+      "type": "string",
+      "required": false,
+      "description": "Path to check disk usage for",
+      "default": "/"
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "system/disk_usage"
+  },
+  "ai": {
+    "systemPromptSection": "### mac_disk_usage\nGet disk usage statistics for a path.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_disk_usage\", \"query\": \"{\\\"path\\\": \\\"/\\\"}\"}\n```\n\n**Parameters:**\n- path: Filesystem path (default: \"/\")\n\n**Returns:** totalGB, usedGB, freeGB, usagePercent",
+    "whenToUse": [
+      "User asks about disk space",
+      "Need to check available storage",
+      "Diagnosing low disk space issues"
+    ]
+  }
+}

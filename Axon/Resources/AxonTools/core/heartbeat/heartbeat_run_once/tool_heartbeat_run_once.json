@@ -1,0 +1,88 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "heartbeat_run_once",
+    "name": "Heartbeat Run Once",
+    "description": "Trigger a single heartbeat execution immediately.",
+    "category": "heartbeat",
+    "icon": {
+      "sfSymbol": "heart.fill"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "heartbeat",
+      "trigger",
+      "immediate"
+    ]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": false,
+      "description": "Reason for running heartbeat"
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "heartbeat"
+  },
+  "ai": {
+    "systemPromptSection": "### heartbeat_run_once\nTrigger immediate heartbeat.\n\n**Format:**\n```tool_request\n{\"tool\": \"heartbeat_run_once\", \"query\": \"reason for running\"}\n```\n\n**Returns:** Entry ID and notification status.",
+    "usageExamples": [
+      {
+        "description": "Manual trigger",
+        "input": "manual check-in"
+      },
+      {
+        "description": "Test heartbeat",
+        "input": "testing configuration"
+      }
+    ],
+    "whenToUse": [
+      "Test heartbeat configuration",
+      "Force an immediate check-in"
+    ],
+    "whenNotToUse": [
+      "Regular scheduled operation"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        {
+          "param": "query",
+          "widget": "text_field",
+          "label": "Reason",
+          "placeholder": "Optional reason..."
+        }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Run Now"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        {
+          "type": "header",
+          "title": "Heartbeat Executed",
+          "icon": "heart.fill"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "heartbeat_execute",
+    "approvalDescription": "Run heartbeat once",
+    "scopes": [
+      "heartbeat.execute"
+    ],
+    "riskLevel": "low"
+  }
+}

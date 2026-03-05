@@ -1,0 +1,143 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "openai_deep_research",
+    "name": "OpenAI Deep Research",
+    "description": "Comprehensive multi-step research using reasoning models with web search.",
+    "category": "provider",
+    "icon": {
+      "sfSymbol": "brain.head.profile"
+    },
+    "requiresApproval": true,
+    "tags": [
+      "research",
+      "deep",
+      "analysis",
+      "reasoning",
+      "comprehensive"
+    ]
+  },
+  "parameters": {
+    "topic": {
+      "type": "string",
+      "required": true,
+      "description": "Research topic or question"
+    },
+    "effort": {
+      "type": "enum",
+      "required": false,
+      "description": "Depth of research",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "enumDescriptions": {
+        "low": "Quick overview (1-2 minutes)",
+        "medium": "Balanced analysis (3-5 minutes)",
+        "high": "Comprehensive deep dive (5-10 minutes)"
+      },
+      "default": "medium"
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "provider_native",
+    "handler": "openai",
+    "provider": "openai",
+    "nativeToolName": "openai_deep_research",
+    "model": "o3-deep-research",
+    "longRunning": true,
+    "timeout": 600000
+  },
+  "ai": {
+    "systemPromptSection": "### openai_deep_research\nComprehensive multi-step research using reasoning models.\n\n**Format:**\n```tool_request\n{\"tool\": \"openai_deep_research\", \"query\": \"{\\\"topic\\\": \\\"Impact of AI on healthcare\\\", \\\"effort\\\": \\\"high\\\"}\"}\n```\n\n**Parameters:**\n- topic: Research topic (required)\n- effort: low, medium (default), or high\n\n**Note:** Requires approval. May take several minutes. Uses o3-deep-research model.",
+    "usageExamples": [
+      {
+        "description": "Quick research",
+        "input": "{\"topic\": \"Current state of quantum computing\", \"effort\": \"low\"}"
+      },
+      {
+        "description": "Deep analysis",
+        "input": "{\"topic\": \"Impact of AI on healthcare diagnostics\", \"effort\": \"high\"}"
+      }
+    ],
+    "whenToUse": [
+      "Complex research questions",
+      "Multi-faceted analysis needed",
+      "Comprehensive topic exploration"
+    ],
+    "whenNotToUse": [
+      "Simple fact lookups (use web_search)",
+      "Time-sensitive queries",
+      "Quick answers needed"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        {
+          "param": "topic",
+          "widget": "textarea",
+          "label": "Research Topic",
+          "placeholder": "What would you like to research?",
+          "rows": 3
+        },
+        {
+          "param": "effort",
+          "widget": "segmented",
+          "label": "Research Depth",
+          "options": [
+            {
+              "value": "low",
+              "label": "Quick"
+            },
+            {
+              "value": "medium",
+              "label": "Balanced"
+            },
+            {
+              "value": "high",
+              "label": "Deep"
+            }
+          ]
+        }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Start Research"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        {
+          "type": "header",
+          "title": "Research Complete",
+          "icon": "brain.head.profile"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        },
+        {
+          "type": "text",
+          "title": "Sources",
+          "source": "{{annotations}}"
+        }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "research",
+    "approvalDescription": "Deep research: {{topic}}",
+    "scopes": [
+      "research.deep"
+    ],
+    "riskLevel": "medium"
+  },
+  "requirements": {
+    "apiKey": "openaiApiKey",
+    "provider": "openai"
+  }
+}

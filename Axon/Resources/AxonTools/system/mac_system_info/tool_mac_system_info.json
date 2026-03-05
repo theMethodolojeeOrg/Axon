@@ -1,0 +1,73 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_system_info",
+    "name": "Mac System Info",
+    "description": "Get comprehensive macOS system information including CPU, memory, disk usage, and uptime. On iOS, this requires connection to a Mac running Axon via bridge.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "cpu"
+    },
+    "requiresApproval": false,
+    "tags": ["mac", "system", "hardware", "monitoring"]
+  },
+
+  "parameters": {},
+
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "system/info"
+  },
+
+  "ai": {
+    "systemPromptSection": "### mac_system_info\nGet comprehensive macOS system information including CPU model, core count, memory usage, uptime, and boot time.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_system_info\", \"query\": \"\"}\n```\n\n**Returns:** hostname, osVersion, cpuModel, cpuCores, memoryTotalGB, memoryUsedGB, memoryFreeGB, uptimeFormatted, bootTime",
+    "whenToUse": [
+      "User asks about their Mac's specs or hardware",
+      "Need to check memory or CPU usage",
+      "Diagnosing performance issues",
+      "Getting system context for troubleshooting"
+    ],
+    "whenNotToUse": [
+      "On iOS without Mac connection"
+    ]
+  },
+
+  "ui": {
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        {
+          "type": "header",
+          "title": "System Information",
+          "icon": "cpu"
+        },
+        {
+          "type": "key_value",
+          "title": "Hardware",
+          "items": [
+            { "type": "text", "title": "CPU", "source": "{{cpuModel}}" },
+            { "type": "text", "title": "Cores", "source": "{{cpuCores}} ({{cpuCoresLogical}} logical)" }
+          ]
+        },
+        {
+          "type": "key_value",
+          "title": "Memory",
+          "items": [
+            { "type": "text", "title": "Total", "source": "{{memoryTotalGB}} GB" },
+            { "type": "text", "title": "Used", "source": "{{memoryUsedGB}} GB ({{memoryUsagePercent}}%)" },
+            { "type": "text", "title": "Free", "source": "{{memoryFreeGB}} GB" }
+          ]
+        },
+        {
+          "type": "key_value",
+          "title": "System",
+          "items": [
+            { "type": "text", "title": "Hostname", "source": "{{hostname}}" },
+            { "type": "text", "title": "OS", "source": "{{osVersion}}" },
+            { "type": "text", "title": "Uptime", "source": "{{uptimeFormatted}}" }
+          ]
+        }
+      ]
+    }
+  }
+}

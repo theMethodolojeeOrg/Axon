@@ -1,0 +1,58 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "openai_video_generation",
+        "name": "Video Generation",
+        "description": "Generates videos based on text prompts using Sora models.",
+        "category": "provider",
+        "icon": {
+            "sfSymbol": "film.fill"
+        },
+        "requiresApproval": true,
+        "tags": [
+            "openai",
+            "sora",
+            "video",
+            "generation",
+            "creative"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "openai"
+    },
+    "parameters": {
+        "prompt": {
+            "type": "string",
+            "description": "Description of the video to generate",
+            "required": true
+        },
+        "model": {
+            "type": "string",
+            "description": "The video generation model to use (e.g., 'sora-2')",
+            "default": "sora-2",
+            "required": false
+        },
+        "size": {
+            "type": "string",
+            "description": "Resolution of the video (e.g., '1280x720')",
+            "default": "1280x720",
+            "required": false
+        },
+        "seconds": {
+            "type": "integer",
+            "description": "Duration of the video in seconds",
+            "default": 8,
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Video Generation\nGenerate videos from text prompts using Sora.",
+        "videoGeneration": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "medium"
+    }
+}

@@ -1,0 +1,63 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "glm_web_search",
+        "name": "Web Search",
+        "description": "Performs web searches to retrieve up-to-date information.",
+        "category": "discovery",
+        "icon": {
+            "sfSymbol": "globe"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "zai",
+            "glm",
+            "search",
+            "web",
+            "discovery"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "glm"
+    },
+    "parameters": {
+        "query": {
+            "type": "string",
+            "description": "The search query",
+            "required": true
+        },
+        "search_engine": {
+            "type": "string",
+            "description": "The search engine to use (e.g., 'search-prime')",
+            "default": "search-prime",
+            "required": false
+        },
+        "count": {
+            "type": "integer",
+            "description": "Number of results to return (1-50)",
+            "default": 10,
+            "required": false
+        },
+        "search_domain_filter": {
+            "type": "string",
+            "description": "Filter results by domain",
+            "required": false
+        },
+        "search_recency_filter": {
+            "type": "string",
+            "description": "Filter by recency (e.g., 'noLimit')",
+            "default": "noLimit",
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Web Search\nSearch the web for information using Z.AI search.",
+        "webSearch": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

@@ -1,0 +1,51 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "query_collapse_session",
+    "name": "Query Collapse Session",
+    "description": "Get the current status and artifacts of a collapse session.",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "doc.text.magnifyingglass"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "session", "query"]
+  },
+
+  "parameters": {
+    "session_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the session to query"
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "usageExamples": [
+      {
+        "description": "Query a session",
+        "input": "{\"session_id\": \"sess-abc123\"}"
+      }
+    ],
+    "whenToUse": [
+      "Need to check session progress",
+      "Want to see what artifacts exist",
+      "Before continuing work on a session"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_read",
+    "scopes": ["collapse_engine.read"],
+    "riskLevel": "low"
+  }
+}

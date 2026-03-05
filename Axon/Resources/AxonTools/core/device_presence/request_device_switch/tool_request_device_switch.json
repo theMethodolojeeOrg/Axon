@@ -1,0 +1,66 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "request_device_switch",
+    "name": "Request Device Switch",
+    "description": "Request to switch focus to another device.",
+    "category": "system",
+    "icon": { "sfSymbol": "arrow.left.arrow.right" },
+    "requiresApproval": true,
+    "tags": ["device", "switch", "handoff", "multi-device"]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": true,
+      "description": "Format: device_id|reason"
+    }
+  },
+  "inputFormat": {
+    "style": "pipe_delimited",
+    "pattern": "{{device_id}}|{{reason}}",
+    "delimiter": "|",
+    "fields": ["device_id", "reason"]
+  },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "device_presence"
+  },
+  "ai": {
+    "systemPromptSection": "### request_device_switch\nRequest device focus switch.\n\n**Format:**\n```tool_request\n{\"tool\": \"request_device_switch\", \"query\": \"device_id|reason\"}\n```\n\n**Example:** `iphone-abc123|User is now on phone`\n\n**Note:** User will be notified based on their door policy settings.",
+    "usageExamples": [
+      { "description": "Switch to phone", "input": "iphone-abc123|User is on mobile" },
+      { "description": "Switch to Mac", "input": "mac-def456|Better for coding task" }
+    ],
+    "whenToUse": [
+      "Task better suited for another device",
+      "User is active on different device"
+    ],
+    "whenNotToUse": [
+      "User is engaged on current device",
+      "No clear benefit"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        { "param": "query", "widget": "textarea", "label": "Switch Request", "placeholder": "device_id|reason", "rows": 2 }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Request Switch"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        { "type": "header", "title": "Switch Requested", "icon": "arrow.left.arrow.right" },
+        { "type": "text", "source": "{{output}}" }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "device_switch",
+    "approvalDescription": "Request device switch",
+    "scopes": ["device.switch"],
+    "riskLevel": "medium"
+  }
+}

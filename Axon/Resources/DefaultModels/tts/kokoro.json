@@ -1,0 +1,335 @@
+{
+  "id": "kokoro",
+  "displayName": "Kokoro Neural",
+  "type": "tts",
+  "description": "On-device neural TTS - Free - ~600MB model",
+  "icon": "waveform.badge.magnifyingglass",
+  "requiresAPIKey": false,
+  "isOnDevice": true,
+  "voices": [
+    {
+      "id": "af_heart",
+      "displayName": "Heart",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Warm, expressive female voice",
+      "toneDescription": "Warm",
+      "isBuiltIn": true,
+      "downloadURL": null
+    },
+    {
+      "id": "af_alloy",
+      "displayName": "Alloy",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Balanced, versatile female voice",
+      "toneDescription": "Balanced",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/af_alloy.npz"
+    },
+    {
+      "id": "af_aoede",
+      "displayName": "Aoede",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Melodic, artistic female voice",
+      "toneDescription": "Melodic",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/af_aoede.npz"
+    },
+    {
+      "id": "af_bella",
+      "displayName": "Bella",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Clear, friendly female voice",
+      "toneDescription": "Clear",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/af_bella.npz"
+    },
+    {
+      "id": "af_jessica",
+      "displayName": "Jessica",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Professional, articulate female voice",
+      "toneDescription": "Professional",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/af_jessica.npz"
+    },
+    {
+      "id": "af_kore",
+      "displayName": "Kore",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Youthful, energetic female voice",
+      "toneDescription": "Youthful",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/af_kore.npz"
+    },
+    {
+      "id": "af_nicole",
+      "displayName": "Nicole",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Smooth, sophisticated female voice",
+      "toneDescription": "Sophisticated",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/af_nicole.npz"
+    },
+    {
+      "id": "af_nova",
+      "displayName": "Nova",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Bright, modern female voice",
+      "toneDescription": "Bright",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/af_nova.npz"
+    },
+    {
+      "id": "af_river",
+      "displayName": "River",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Calm, flowing female voice",
+      "toneDescription": "Calm",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/af_river.npz"
+    },
+    {
+      "id": "af_sarah",
+      "displayName": "Sarah",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Natural, conversational female voice",
+      "toneDescription": "Natural",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/af_sarah.npz"
+    },
+    {
+      "id": "af_sky",
+      "displayName": "Sky",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Light, airy female voice",
+      "toneDescription": "Light",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/af_sky.npz"
+    },
+    {
+      "id": "am_echo",
+      "displayName": "Echo",
+      "gender": "male",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Resonant, clear male voice",
+      "toneDescription": "Resonant",
+      "isBuiltIn": true,
+      "downloadURL": null
+    },
+    {
+      "id": "am_adam",
+      "displayName": "Adam",
+      "gender": "male",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Deep, authoritative male voice",
+      "toneDescription": "Deep",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/am_adam.npz"
+    },
+    {
+      "id": "am_eric",
+      "displayName": "Eric",
+      "gender": "male",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Friendly, approachable male voice",
+      "toneDescription": "Friendly",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/am_eric.npz"
+    },
+    {
+      "id": "am_fenrir",
+      "displayName": "Fenrir",
+      "gender": "male",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Strong, powerful male voice",
+      "toneDescription": "Powerful",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/am_fenrir.npz"
+    },
+    {
+      "id": "am_liam",
+      "displayName": "Liam",
+      "gender": "male",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Warm, relatable male voice",
+      "toneDescription": "Warm",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/am_liam.npz"
+    },
+    {
+      "id": "am_michael",
+      "displayName": "Michael",
+      "gender": "male",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Professional, steady male voice",
+      "toneDescription": "Steady",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/am_michael.npz"
+    },
+    {
+      "id": "am_onyx",
+      "displayName": "Onyx",
+      "gender": "male",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Rich, deep male voice",
+      "toneDescription": "Rich",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/am_onyx.npz"
+    },
+    {
+      "id": "am_puck",
+      "displayName": "Puck",
+      "gender": "male",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Playful, mischievous male voice",
+      "toneDescription": "Playful",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/am_puck.npz"
+    },
+    {
+      "id": "am_santa",
+      "displayName": "Santa",
+      "gender": "male",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Jolly, festive male voice",
+      "toneDescription": "Jolly",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/am_santa.npz"
+    },
+    {
+      "id": "bf_alice",
+      "displayName": "Alice",
+      "gender": "female",
+      "accent": "british",
+      "locale": "en-GB",
+      "description": "Elegant British female voice",
+      "toneDescription": "Elegant",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/bf_alice.npz"
+    },
+    {
+      "id": "bf_emma",
+      "displayName": "Emma",
+      "gender": "female",
+      "accent": "british",
+      "locale": "en-GB",
+      "description": "Refined British female voice",
+      "toneDescription": "Refined",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/bf_emma.npz"
+    },
+    {
+      "id": "bf_isabella",
+      "displayName": "Isabella",
+      "gender": "female",
+      "accent": "british",
+      "locale": "en-GB",
+      "description": "Sophisticated British female voice",
+      "toneDescription": "Sophisticated",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/bf_isabella.npz"
+    },
+    {
+      "id": "bf_lily",
+      "displayName": "Lily",
+      "gender": "female",
+      "accent": "british",
+      "locale": "en-GB",
+      "description": "Gentle British female voice",
+      "toneDescription": "Gentle",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/bf_lily.npz"
+    },
+    {
+      "id": "bm_daniel",
+      "displayName": "Daniel",
+      "gender": "male",
+      "accent": "british",
+      "locale": "en-GB",
+      "description": "Distinguished British male voice",
+      "toneDescription": "Distinguished",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/bm_daniel.npz"
+    },
+    {
+      "id": "bm_fable",
+      "displayName": "Fable",
+      "gender": "male",
+      "accent": "british",
+      "locale": "en-GB",
+      "description": "Storytelling British male voice",
+      "toneDescription": "Storytelling",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/bm_fable.npz"
+    },
+    {
+      "id": "bm_george",
+      "displayName": "George",
+      "gender": "male",
+      "accent": "british",
+      "locale": "en-GB",
+      "description": "Classic British male voice",
+      "toneDescription": "Classic",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/bm_george.npz"
+    },
+    {
+      "id": "bm_lewis",
+      "displayName": "Lewis",
+      "gender": "male",
+      "accent": "british",
+      "locale": "en-GB",
+      "description": "Thoughtful British male voice",
+      "toneDescription": "Thoughtful",
+      "isBuiltIn": false,
+      "downloadURL": "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/bm_lewis.npz"
+    }
+  ],
+  "models": [
+    {
+      "id": "kokoro-82m",
+      "displayName": "Kokoro 82M",
+      "description": "Default Kokoro model - high quality neural TTS",
+      "sizeBytes": 629145600,
+      "isDefault": true
+    }
+  ],
+  "settings": {
+    "speedRange": {
+      "min": 0.5,
+      "max": 2.0,
+      "default": 1.0
+    }
+  }
+}

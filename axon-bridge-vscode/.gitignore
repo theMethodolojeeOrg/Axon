@@ -1,0 +1,28 @@
+# Build outputs
+out/
+dist/
+*.vsix
+
+# Dependencies
+node_modules/
+
+# VS Code testing
+.vscode-test/
+
+# macOS
+.DS_Store
+
+# Environment files
+.env
+.env.local
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript cache
+*.tsbuildinfo

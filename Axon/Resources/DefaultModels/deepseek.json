@@ -1,0 +1,46 @@
+{
+  "id": "deepseek",
+  "displayName": "DeepSeek",
+  "models": [
+    {
+      "id": "deepseek-reasoner",
+      "displayName": "DeepSeek Reasoner (R1)",
+      "category": "reasoning",
+      "contextWindow": 128000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.55,
+        "outputPerMillion": 2.19,
+        "cachedInputPerMillion": 0.14,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Flagship reasoning model with visible Chain-of-Thought. Best for math/code",
+      "sourceUrls": [
+        "https://api-docs.deepseek.com/quick_start/pricing"
+      ]
+    },
+    {
+      "id": "deepseek-chat",
+      "displayName": "DeepSeek Chat (V3)",
+      "category": "fast",
+      "contextWindow": 128000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.27,
+        "outputPerMillion": 1.10,
+        "cachedInputPerMillion": 0.07,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Standard frontier model. Extremely cost-effective and fast",
+      "sourceUrls": [
+        "https://api-docs.deepseek.com/quick_start/pricing"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="24411" systemVersion="25B78" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="YES" userDefinedModelVersionIdentifier="">
+    <entity name="ConversationEntity" representedClassName="ConversationEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="archived" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="createdAt" attributeType="Date" defaultDateTimeInterval="783558060" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="String" defaultValueString=""/>
+        <attribute name="isPinned" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="lastMessage" optional="YES" attributeType="String"/>
+        <attribute name="lastMessageAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="locallyModified" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="messageCount" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="projectId" attributeType="String" defaultValueString="default"/>
+        <attribute name="summary" optional="YES" attributeType="String"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <attribute name="tags" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromData" customClassName="NSArray"/>
+        <attribute name="title" attributeType="String" defaultValueString="New Chat"/>
+        <attribute name="updatedAt" attributeType="Date" defaultDateTimeInterval="788828520" usesScalarValueType="NO"/>
+        <attribute name="userId" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="CreativeItemEntity" representedClassName="CreativeItemEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="artifactBundleJSON" optional="YES" attributeType="String"/>
+        <attribute name="artifactEntryPath" optional="YES" attributeType="String"/>
+        <attribute name="contentBase64" optional="YES" attributeType="String"/>
+        <attribute name="contentURL" optional="YES" attributeType="String"/>
+        <attribute name="conversationId" attributeType="String" defaultValueString=""/>
+        <attribute name="createdAt" attributeType="Date" defaultDateTimeInterval="783558060" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="fileSize" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="id" attributeType="String" defaultValueString=""/>
+        <attribute name="isEditableFork" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="language" optional="YES" attributeType="String"/>
+        <attribute name="markedDeleted" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="messageId" attributeType="String" defaultValueString=""/>
+        <attribute name="mimeType" optional="YES" attributeType="String"/>
+        <attribute name="prompt" optional="YES" attributeType="String"/>
+        <attribute name="sourceItemId" optional="YES" attributeType="String"/>
+        <attribute name="thumbnailBase64" optional="YES" attributeType="String"/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+        <attribute name="type" attributeType="String" defaultValueString="photo"/>
+    </entity>
+    <entity name="DevicePresenceEntity" representedClassName="DevicePresenceEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="activatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="appVersion" attributeType="String" defaultValueString=""/>
+        <attribute name="capabilitiesJSON" optional="YES" attributeType="String"/>
+        <attribute name="constraintsJSON" optional="YES" attributeType="String"/>
+        <attribute name="deviceId" attributeType="String" defaultValueString=""/>
+        <attribute name="deviceName" attributeType="String" defaultValueString=""/>
+        <attribute name="doorPolicy" attributeType="String" defaultValueString="invitation"/>
+        <attribute name="exitStateId" optional="YES" attributeType="String"/>
+        <attribute name="lastActiveAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="lastHeartbeatAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="osVersion" attributeType="String" defaultValueString=""/>
+        <attribute name="platform" attributeType="String" defaultValueString="iOS"/>
+        <attribute name="presenceState" attributeType="String" defaultValueString="dormant"/>
+        <attribute name="updatedAt" attributeType="Date" defaultDateTimeInterval="783558060" usesScalarValueType="NO"/>
+    </entity>
+    <entity name="ElevenLabsVoiceCacheMetaEntity" representedClassName="ElevenLabsVoiceCacheMetaEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="String" defaultValueString="singleton"/>
+        <attribute name="lastFetchedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+    </entity>
+    <entity name="ElevenLabsVoiceEntity" representedClassName="ElevenLabsVoiceEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="language" optional="YES" attributeType="String"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="voiceId" attributeType="String" defaultValueString=""/>
+    </entity>
+    <entity name="GeneratedAudioEntity" representedClassName="GeneratedAudioEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="cacheKey" attributeType="String" defaultValueString=""/>
+        <attribute name="cloudRecordName" optional="YES" attributeType="String"/>
+        <attribute name="conversationId" attributeType="String" defaultValueString=""/>
+        <attribute name="createdAt" attributeType="Date" defaultDateTimeInterval="783558060" usesScalarValueType="NO"/>
+        <attribute name="durationSeconds" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="fileSizeBytes" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="format" attributeType="String" defaultValueString="mp3"/>
+        <attribute name="id" attributeType="String" defaultValueString=""/>
+        <attribute name="messageId" attributeType="String" defaultValueString=""/>
+        <attribute name="provider" attributeType="String" defaultValueString=""/>
+        <attribute name="syncStatus" attributeType="String" defaultValueString="pending"/>
+        <attribute name="voiceId" optional="YES" attributeType="String"/>
+        <attribute name="voiceName" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="InternalThreadEntryEntity" representedClassName="InternalThreadEntryEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="content" attributeType="String" defaultValueString=""/>
+        <attribute name="covenantId" optional="YES" attributeType="String"/>
+        <attribute name="deviceId" attributeType="String" defaultValueString=""/>
+        <attribute name="encryptionContext" optional="YES" attributeType="String"/>
+        <attribute name="id" attributeType="String" defaultValueString=""/>
+        <attribute name="kind" attributeType="String" defaultValueString="note"/>
+        <attribute name="origin" attributeType="String" defaultValueString="ai"/>
+        <attribute name="tags" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromData" customClassName="NSArray"/>
+        <attribute name="timestamp" attributeType="Date" defaultDateTimeInterval="783558060" usesScalarValueType="NO"/>
+        <attribute name="visibility" attributeType="String" defaultValueString="userVisible"/>
+    </entity>
+    <entity name="Item" representedClassName="Item" syncable="YES" codeGenerationType="class">
+        <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+    </entity>
+    <entity name="MemoryEntity" representedClassName="MemoryEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="accessCount" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="confidence" attributeType="Double" minValueString="0" maxValueString="1" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="content" attributeType="String" defaultValueString=""/>
+        <attribute name="context" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="String" defaultValueString=""/>
+        <attribute name="lastAccessedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="locallyModified" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="metadata" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromData"/>
+        <attribute name="relatedMemoryIds" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromData"/>
+        <attribute name="sourceConversationId" optional="YES" attributeType="String"/>
+        <attribute name="sourceMessageId" optional="YES" attributeType="String"/>
+        <attribute name="sourceTimestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <attribute name="tags" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromData"/>
+        <attribute name="type" attributeType="String" defaultValueString="fact"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="userId" attributeType="String" defaultValueString=""/>
+    </entity>
+    <entity name="MessageEntity" representedClassName="MessageEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="attachmentsJSON" optional="YES" attributeType="String"/>
+        <attribute name="content" attributeType="String" defaultValueString=""/>
+        <attribute name="contextDebugJSON" optional="YES" attributeType="String"/>
+        <attribute name="conversationId" attributeType="String" defaultValueString=""/>
+        <attribute name="currentVersion" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="editHistoryJSON" optional="YES" attributeType="String" defaultValueString="-"/>
+        <attribute name="groundingSourcesJSON" optional="YES" attributeType="String"/>
+        <attribute name="hiddenReason" optional="YES" attributeType="String"/>
+        <attribute name="id" attributeType="String" defaultValueString=""/>
+        <attribute name="liveToolCallsJSON" optional="YES" attributeType="String"/>
+        <attribute name="memoryOperationsJSON" optional="YES" attributeType="String"/>
+        <attribute name="messageIsDeleted" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="modelName" optional="YES" attributeType="String"/>
+        <attribute name="providerName" optional="YES" attributeType="String"/>
+        <attribute name="reasoningText" optional="YES" attributeType="String"/>
+        <attribute name="role" attributeType="String" defaultValueString="user"/>
+        <attribute name="timestamp" attributeType="Date" defaultDateTimeInterval="783558060" usesScalarValueType="NO"/>
+        <attribute name="tokensUsed" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="toolApprovalRecordJSON" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="RemoteToolApprovalEntity" representedClassName="RemoteToolApprovalEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="context" attributeType="String" defaultValueString=""/>
+        <attribute name="createdAt" attributeType="Date" defaultDateTimeInterval="783558060" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="String" defaultValueString=""/>
+        <attribute name="parametersJSON" optional="YES" attributeType="String"/>
+        <attribute name="respondedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="sourceDeviceId" attributeType="String" defaultValueString=""/>
+        <attribute name="sourceDeviceName" attributeType="String" defaultValueString=""/>
+        <attribute name="status" attributeType="String" defaultValueString="pending"/>
+        <attribute name="targetDeviceId" attributeType="String" defaultValueString=""/>
+        <attribute name="taskId" optional="YES" attributeType="String"/>
+        <attribute name="toolDisplayName" attributeType="String" defaultValueString=""/>
+        <attribute name="toolId" attributeType="String" defaultValueString=""/>
+    </entity>
+    <entity name="SystemStateSnapshotEntity" representedClassName="SystemStateSnapshotEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="deviceId" attributeType="String" defaultValueString=""/>
+        <attribute name="id" attributeType="String" defaultValueString=""/>
+        <attribute name="isActive" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="snapshotJSON" attributeType="String" defaultValueString="{}"/>
+        <attribute name="sourceDeviceId" optional="YES" attributeType="String"/>
+        <attribute name="timestamp" attributeType="Date" defaultDateTimeInterval="783558060" usesScalarValueType="NO"/>
+        <attribute name="transferReason" optional="YES" attributeType="String"/>
+        <attribute name="version" attributeType="Integer 32" defaultValueString="1" usesScalarValueType="YES"/>
+    </entity>
+</model>

@@ -1,0 +1,191 @@
+{
+  "id": "zai",
+  "displayName": "Z.ai (GLM)",
+  "models": [
+    {
+      "id": "glm-4.7",
+      "displayName": "GLM-4.7",
+      "category": "frontier",
+      "contextWindow": 200000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.60,
+        "outputPerMillion": 2.20,
+        "cachedInputPerMillion": 0.11,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Latest flagship with enhanced coding and multi-step reasoning. 73.8% on SWE-bench",
+      "sourceUrls": [
+        "https://docs.z.ai/guides/llm/glm-4.7",
+        "https://docs.z.ai/guides/overview/pricing"
+      ]
+    },
+    {
+      "id": "glm-4.6",
+      "displayName": "GLM-4.6",
+      "category": "frontier",
+      "contextWindow": 200000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.60,
+        "outputPerMillion": 2.20,
+        "cachedInputPerMillion": 0.11,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Previous flagship. Strong reasoning, coding, and agentic capability",
+      "sourceUrls": [
+        "https://docs.z.ai/guides/overview/pricing"
+      ]
+    },
+    {
+      "id": "glm-4.6v",
+      "displayName": "GLM-4.6V",
+      "category": "frontier",
+      "contextWindow": 128000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.30,
+        "outputPerMillion": 0.90,
+        "cachedInputPerMillion": 0.05,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Flagship vision. Native multimodal with thinking support",
+      "sourceUrls": [
+        "https://docs.z.ai/guides/vlm/glm-4.6v"
+      ]
+    },
+    {
+      "id": "glm-4.6v-flashx",
+      "displayName": "GLM-4.6V FlashX",
+      "category": "fast",
+      "contextWindow": 128000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.04,
+        "outputPerMillion": 0.40,
+        "cachedInputPerMillion": 0.004,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Ultra-fast vision. Lowest latency and cost",
+      "sourceUrls": [
+        "https://docs.z.ai/guides/vlm/glm-4.6v"
+      ]
+    },
+    {
+      "id": "glm-4.6v-flash",
+      "displayName": "GLM-4.6V Flash",
+      "category": "fast",
+      "contextWindow": 128000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.00,
+        "outputPerMillion": 0.00,
+        "cachedInputPerMillion": null,
+        "tier": "free"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Free vision model. Great for testing and development",
+      "sourceUrls": [
+        "https://docs.z.ai/guides/vlm/glm-4.6v"
+      ]
+    },
+    {
+      "id": "glm-4.5",
+      "displayName": "GLM-4.5",
+      "category": "legacy",
+      "contextWindow": 128000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.60,
+        "outputPerMillion": 2.20,
+        "cachedInputPerMillion": 0.11,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Previous flagship. Strong generalist",
+      "sourceUrls": [
+        "https://docs.z.ai/guides/overview/pricing"
+      ]
+    },
+    {
+      "id": "glm-4.5v",
+      "displayName": "GLM-4.5V",
+      "category": "legacy",
+      "contextWindow": 128000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.60,
+        "outputPerMillion": 1.80,
+        "cachedInputPerMillion": 0.11,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Multimodal variant of GLM-4.5",
+      "sourceUrls": [
+        "https://docs.z.ai/guides/overview/pricing"
+      ]
+    },
+    {
+      "id": "glm-4.5-air",
+      "displayName": "GLM-4.5 Air",
+      "category": "fast",
+      "contextWindow": 128000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.20,
+        "outputPerMillion": 1.10,
+        "cachedInputPerMillion": 0.03,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Balanced Air tier. Speed/performance mix",
+      "sourceUrls": [
+        "https://docs.z.ai/guides/overview/pricing"
+      ]
+    },
+    {
+      "id": "glm-4.5-flash",
+      "displayName": "GLM-4.5 Flash",
+      "category": "fast",
+      "contextWindow": 128000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.00,
+        "outputPerMillion": 0.00,
+        "cachedInputPerMillion": null,
+        "tier": "free"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Free model. Great for testing and development",
+      "sourceUrls": [
+        "https://docs.z.ai/guides/overview/pricing"
+      ]
+    }
+  ]
+}

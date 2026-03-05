@@ -1,0 +1,1167 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-01-15T00:00:00Z",
+  "providers": [
+    {
+      "id": "anthropic",
+      "displayName": "Anthropic (Claude)",
+      "models": [
+        {
+          "id": "claude-opus-4-5-20251022",
+          "displayName": "Claude Opus 4.5",
+          "category": "frontier",
+          "contextWindow": 200000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 15.00,
+            "outputPerMillion": 75.00,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Most capable Claude model for deep reasoning, agents, and long-horizon coding",
+          "sourceUrls": [
+            "https://docs.anthropic.com/en/docs/about-claude/models"
+          ]
+        },
+        {
+          "id": "claude-sonnet-4-5-20250929",
+          "displayName": "Claude Sonnet 4.5",
+          "category": "frontier",
+          "contextWindow": 200000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 3.00,
+            "outputPerMillion": 15.00,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Best coding model. Strongest for complex agents and computer use",
+          "sourceUrls": [
+            "https://docs.anthropic.com/en/docs/about-claude/models"
+          ]
+        },
+        {
+          "id": "claude-haiku-4-5-20251001",
+          "displayName": "Claude Haiku 4.5",
+          "category": "fast",
+          "contextWindow": 200000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 1.00,
+            "outputPerMillion": 5.00,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Fast hybrid reasoning model. Great for coding and quick tasks",
+          "sourceUrls": [
+            "https://docs.anthropic.com/en/docs/about-claude/models"
+          ]
+        },
+        {
+          "id": "claude-opus-4-1-20250805",
+          "displayName": "Claude Opus 4.1",
+          "category": "frontier",
+          "contextWindow": 200000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 15.00,
+            "outputPerMillion": 75.00,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Most powerful for long-running tasks and deep reasoning",
+          "sourceUrls": [
+            "https://docs.anthropic.com/en/docs/about-claude/models"
+          ]
+        },
+        {
+          "id": "claude-sonnet-4-20250514",
+          "displayName": "Claude Sonnet 4",
+          "category": "legacy",
+          "contextWindow": 200000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 3.00,
+            "outputPerMillion": 15.00,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Previous generation Sonnet model",
+          "sourceUrls": [
+            "https://docs.anthropic.com/en/docs/about-claude/models"
+          ]
+        },
+        {
+          "id": "claude-opus-4-20250514",
+          "displayName": "Claude Opus 4",
+          "category": "legacy",
+          "contextWindow": 200000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 15.00,
+            "outputPerMillion": 75.00,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Previous generation Opus model",
+          "sourceUrls": [
+            "https://docs.anthropic.com/en/docs/about-claude/models"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "openai",
+      "displayName": "OpenAI (GPT)",
+      "models": [
+        {
+          "id": "gpt-5.2",
+          "displayName": "GPT-5.2",
+          "category": "frontier",
+          "contextWindow": 400000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 1.50,
+            "outputPerMillion": 12.00,
+            "cachedInputPerMillion": 0.15,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Latest frontier model with stronger reasoning and long-context performance",
+          "sourceUrls": [
+            "https://platform.openai.com/docs/models",
+            "https://openai.com/api/pricing"
+          ]
+        },
+        {
+          "id": "gpt-5.1",
+          "displayName": "GPT-5.1",
+          "category": "frontier",
+          "contextWindow": 400000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 1.25,
+            "outputPerMillion": 10.00,
+            "cachedInputPerMillion": 0.13,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Upgraded GPT-5 with improved conversational abilities and customization",
+          "sourceUrls": [
+            "https://platform.openai.com/docs/models",
+            "https://openai.com/api/pricing"
+          ]
+        },
+        {
+          "id": "gpt-5.1-chat-latest",
+          "displayName": "GPT-5.1 Chat Latest",
+          "category": "frontier",
+          "contextWindow": 400000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 1.25,
+            "outputPerMillion": 10.00,
+            "cachedInputPerMillion": 0.13,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Latest conversational variant with multimodal support",
+          "sourceUrls": [
+            "https://platform.openai.com/docs/models",
+            "https://openai.com/api/pricing"
+          ]
+        },
+        {
+          "id": "gpt-5-2025-08-07",
+          "displayName": "GPT-5",
+          "category": "frontier",
+          "contextWindow": 400000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 1.25,
+            "outputPerMillion": 10.00,
+            "cachedInputPerMillion": 0.125,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Flagship model for coding, reasoning, and agentic tasks",
+          "sourceUrls": [
+            "https://platform.openai.com/docs/models",
+            "https://openai.com/api/pricing"
+          ]
+        },
+        {
+          "id": "gpt-5-mini-2025-08-07",
+          "displayName": "GPT-5 Mini",
+          "category": "fast",
+          "contextWindow": 400000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.25,
+            "outputPerMillion": 2.00,
+            "cachedInputPerMillion": 0.025,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Fast and cost-efficient with strong performance",
+          "sourceUrls": [
+            "https://platform.openai.com/docs/models",
+            "https://openai.com/api/pricing"
+          ]
+        },
+        {
+          "id": "gpt-5-nano-2025-08-07",
+          "displayName": "GPT-5 Nano",
+          "category": "fast",
+          "contextWindow": 400000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.05,
+            "outputPerMillion": 0.40,
+            "cachedInputPerMillion": 0.005,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Smallest, fastest, cheapest. Great for classification and extraction",
+          "sourceUrls": [
+            "https://platform.openai.com/docs/models",
+            "https://openai.com/api/pricing"
+          ]
+        },
+        {
+          "id": "o3",
+          "displayName": "o3",
+          "category": "reasoning",
+          "contextWindow": 200000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 2.00,
+            "outputPerMillion": 8.00,
+            "cachedInputPerMillion": 0.50,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Most powerful reasoning model for coding, math, science, and vision",
+          "sourceUrls": [
+            "https://platform.openai.com/docs/models",
+            "https://openai.com/api/pricing"
+          ]
+        },
+        {
+          "id": "o4-mini",
+          "displayName": "o4-mini",
+          "category": "reasoning",
+          "contextWindow": 200000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 1.10,
+            "outputPerMillion": 4.40,
+            "cachedInputPerMillion": 0.275,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Fast, cost-efficient reasoning model with multimodal support",
+          "sourceUrls": [
+            "https://platform.openai.com/docs/models",
+            "https://openai.com/api/pricing"
+          ]
+        },
+        {
+          "id": "o3-mini",
+          "displayName": "o3-mini",
+          "category": "reasoning",
+          "contextWindow": 200000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 1.10,
+            "outputPerMillion": 4.40,
+            "cachedInputPerMillion": 0.55,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Specialized reasoning for STEM tasks with configurable effort levels",
+          "sourceUrls": [
+            "https://platform.openai.com/docs/models",
+            "https://openai.com/api/pricing"
+          ]
+        },
+        {
+          "id": "gpt-4.1",
+          "displayName": "GPT-4.1",
+          "category": "frontier",
+          "contextWindow": 1000000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 2.00,
+            "outputPerMillion": 8.00,
+            "cachedInputPerMillion": 0.50,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Enhanced coding and instruction following with 1M context",
+          "sourceUrls": [
+            "https://platform.openai.com/docs/models",
+            "https://openai.com/api/pricing"
+          ]
+        },
+        {
+          "id": "gpt-4.1-mini",
+          "displayName": "GPT-4.1 Mini",
+          "category": "fast",
+          "contextWindow": 1000000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.40,
+            "outputPerMillion": 1.60,
+            "cachedInputPerMillion": 0.10,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Mid-tier with 1M context. Fast and cost-effective",
+          "sourceUrls": [
+            "https://platform.openai.com/docs/models",
+            "https://openai.com/api/pricing"
+          ]
+        },
+        {
+          "id": "gpt-4.1-nano",
+          "displayName": "GPT-4.1 Nano",
+          "category": "fast",
+          "contextWindow": 1000000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.10,
+            "outputPerMillion": 0.40,
+            "cachedInputPerMillion": 0.025,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Smallest 4.1 model with 1M context. Great for bulk processing",
+          "sourceUrls": [
+            "https://platform.openai.com/docs/models",
+            "https://openai.com/api/pricing"
+          ]
+        },
+        {
+          "id": "gpt-4o",
+          "displayName": "GPT-4o",
+          "category": "legacy",
+          "contextWindow": 128000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 2.50,
+            "outputPerMillion": 10.00,
+            "cachedInputPerMillion": 1.25,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Legacy multimodal model with good balance of speed and capability",
+          "sourceUrls": [
+            "https://platform.openai.com/docs/models",
+            "https://openai.com/api/pricing"
+          ]
+        },
+        {
+          "id": "gpt-4o-mini",
+          "displayName": "GPT-4o Mini",
+          "category": "legacy",
+          "contextWindow": 128000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.15,
+            "outputPerMillion": 0.60,
+            "cachedInputPerMillion": 0.075,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Legacy fast model. Very cost-effective for simple tasks",
+          "sourceUrls": [
+            "https://platform.openai.com/docs/models",
+            "https://openai.com/api/pricing"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gemini",
+      "displayName": "Google Gemini",
+      "models": [
+        {
+          "id": "gemini-3-pro",
+          "displayName": "Gemini 3 Pro",
+          "category": "frontier",
+          "contextWindow": 1000000,
+          "modalities": [
+            "text",
+            "image",
+            "video",
+            "audio",
+            "pdf"
+          ],
+          "pricing": {
+            "inputPerMillion": 2.00,
+            "outputPerMillion": 12.00,
+            "cachedInputPerMillion": 0.20,
+            "tier": "standard"
+          },
+          "status": "preview",
+          "capabilitiesSummary": "Preview of Gemini 3 with multimodal and advanced reasoning",
+          "sourceUrls": [
+            "https://ai.google.dev/gemini-api/docs/models",
+            "https://ai.google.dev/gemini-api/docs/pricing"
+          ]
+        },
+        {
+          "id": "gemini-3-flash",
+          "displayName": "Gemini 3 Flash",
+          "category": "fast",
+          "contextWindow": 1048576,
+          "modalities": [
+            "text",
+            "image",
+            "video",
+            "audio",
+            "pdf"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.50,
+            "outputPerMillion": 3.00,
+            "cachedInputPerMillion": 0.05,
+            "tier": "standard"
+          },
+          "status": "preview",
+          "capabilitiesSummary": "Most intelligent model built for speed, combining frontier intelligence with superior search and grounding",
+          "sourceUrls": [
+            "https://ai.google.dev/gemini-api/docs/models",
+            "https://ai.google.dev/gemini-api/docs/pricing"
+          ]
+        },
+        {
+          "id": "gemini-2.5-flash-lite-preview-06-17",
+          "displayName": "Gemini 2.5 Flash Lite",
+          "category": "fast",
+          "contextWindow": 1000000,
+          "modalities": [
+            "text",
+            "image",
+            "video",
+            "audio"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.10,
+            "outputPerMillion": 0.40,
+            "cachedInputPerMillion": 0.01,
+            "tier": "standard"
+          },
+          "status": "preview",
+          "capabilitiesSummary": "Ultra-fast and cheap. Good for high-volume simple tasks",
+          "sourceUrls": [
+            "https://ai.google.dev/gemini-api/docs/models",
+            "https://ai.google.dev/gemini-api/docs/pricing"
+          ]
+        },
+        {
+          "id": "gemini-2.5-pro",
+          "displayName": "Gemini 2.5 Pro",
+          "category": "frontier",
+          "contextWindow": 1000000,
+          "modalities": [
+            "text",
+            "image",
+            "video",
+            "audio",
+            "pdf"
+          ],
+          "pricing": {
+            "inputPerMillion": 1.25,
+            "outputPerMillion": 10.00,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Best Gemini model for complex reasoning and coding",
+          "sourceUrls": [
+            "https://ai.google.dev/gemini-api/docs/models",
+            "https://ai.google.dev/gemini-api/docs/pricing"
+          ]
+        },
+        {
+          "id": "gemini-2.5-flash",
+          "displayName": "Gemini 2.5 Flash",
+          "category": "fast",
+          "contextWindow": 1000000,
+          "modalities": [
+            "text",
+            "image",
+            "video",
+            "audio"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.30,
+            "outputPerMillion": 2.50,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Fast and capable. Great for real-time applications",
+          "sourceUrls": [
+            "https://ai.google.dev/gemini-api/docs/models",
+            "https://ai.google.dev/gemini-api/docs/pricing"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "xai",
+      "displayName": "xAI (Grok)",
+      "models": [
+        {
+          "id": "grok-4-fast-reasoning",
+          "displayName": "Grok 4 Fast Reasoning",
+          "category": "reasoning",
+          "contextWindow": 131072,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.20,
+            "outputPerMillion": 0.75,
+            "cachedInputPerMillion": 0.05,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Fast reasoning with chain-of-thought for complex problems",
+          "sourceUrls": [
+            "https://docs.x.ai/docs/models"
+          ]
+        },
+        {
+          "id": "grok-4-fast-non-reasoning",
+          "displayName": "Grok 4 Fast",
+          "category": "fast",
+          "contextWindow": 131072,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.20,
+            "outputPerMillion": 0.50,
+            "cachedInputPerMillion": 0.05,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Fast responses without extended reasoning",
+          "sourceUrls": [
+            "https://docs.x.ai/docs/models"
+          ]
+        },
+        {
+          "id": "grok-code-fast-1",
+          "displayName": "Grok Code Fast",
+          "category": "fast",
+          "contextWindow": 131072,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.20,
+            "outputPerMillion": 1.50,
+            "cachedInputPerMillion": 0.05,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Specialized for code generation and completion",
+          "sourceUrls": [
+            "https://docs.x.ai/docs/models"
+          ]
+        },
+        {
+          "id": "grok-4-0709",
+          "displayName": "Grok 4",
+          "category": "frontier",
+          "contextWindow": 131072,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 3.00,
+            "outputPerMillion": 15.00,
+            "cachedInputPerMillion": 0.75,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Most capable Grok model for complex tasks",
+          "sourceUrls": [
+            "https://docs.x.ai/docs/models"
+          ]
+        },
+        {
+          "id": "grok-3-mini",
+          "displayName": "Grok 3 Mini",
+          "category": "fast",
+          "contextWindow": 131072,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.30,
+            "outputPerMillion": 0.50,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Small and fast for simple tasks",
+          "sourceUrls": [
+            "https://docs.x.ai/docs/models"
+          ]
+        },
+        {
+          "id": "grok-3",
+          "displayName": "Grok 3",
+          "category": "legacy",
+          "contextWindow": 131072,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 3.00,
+            "outputPerMillion": 15.00,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Previous generation flagship Grok model",
+          "sourceUrls": [
+            "https://docs.x.ai/docs/models"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "perplexity",
+      "displayName": "Perplexity (Sonar)",
+      "models": [
+        {
+          "id": "sonar-reasoning-pro",
+          "displayName": "Sonar Reasoning Pro",
+          "category": "reasoning",
+          "contextWindow": 128000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 2.00,
+            "outputPerMillion": 8.00,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Best for complex queries. Advanced reasoning (CoT) + real-time web search",
+          "sourceUrls": [
+            "https://docs.perplexity.ai/getting-started/pricing"
+          ]
+        },
+        {
+          "id": "sonar-reasoning",
+          "displayName": "Sonar Reasoning",
+          "category": "reasoning",
+          "contextWindow": 128000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 1.00,
+            "outputPerMillion": 5.00,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Lighter reasoning model with web search. Good balance of speed/intelligence",
+          "sourceUrls": [
+            "https://docs.perplexity.ai/getting-started/pricing"
+          ]
+        },
+        {
+          "id": "sonar-pro",
+          "displayName": "Sonar Pro",
+          "category": "frontier",
+          "contextWindow": 200000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 3.00,
+            "outputPerMillion": 15.00,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "High-capacity standard search model (no reasoning tokens)",
+          "sourceUrls": [
+            "https://docs.perplexity.ai/getting-started/pricing"
+          ]
+        },
+        {
+          "id": "sonar",
+          "displayName": "Sonar",
+          "category": "fast",
+          "contextWindow": 128000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 1.00,
+            "outputPerMillion": 1.00,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Cheapest standard search model. Good for simple lookups",
+          "sourceUrls": [
+            "https://docs.perplexity.ai/getting-started/pricing"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "deepseek",
+      "displayName": "DeepSeek",
+      "models": [
+        {
+          "id": "deepseek-reasoner",
+          "displayName": "DeepSeek Reasoner (R1)",
+          "category": "reasoning",
+          "contextWindow": 128000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.55,
+            "outputPerMillion": 2.19,
+            "cachedInputPerMillion": 0.14,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Flagship reasoning model with visible Chain-of-Thought. Best for math/code",
+          "sourceUrls": [
+            "https://api-docs.deepseek.com/quick_start/pricing"
+          ]
+        },
+        {
+          "id": "deepseek-chat",
+          "displayName": "DeepSeek Chat (V3)",
+          "category": "fast",
+          "contextWindow": 128000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.27,
+            "outputPerMillion": 1.10,
+            "cachedInputPerMillion": 0.07,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Standard frontier model. Extremely cost-effective and fast",
+          "sourceUrls": [
+            "https://api-docs.deepseek.com/quick_start/pricing"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "zai",
+      "displayName": "Z.ai (GLM)",
+      "models": [
+        {
+          "id": "glm-4.7",
+          "displayName": "GLM-4.7",
+          "category": "frontier",
+          "contextWindow": 200000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.60,
+            "outputPerMillion": 2.20,
+            "cachedInputPerMillion": 0.11,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Latest flagship with enhanced coding and multi-step reasoning. 73.8% on SWE-bench",
+          "sourceUrls": [
+            "https://docs.z.ai/guides/llm/glm-4.7",
+            "https://docs.z.ai/guides/overview/pricing"
+          ]
+        },
+        {
+          "id": "glm-4.6",
+          "displayName": "GLM-4.6",
+          "category": "frontier",
+          "contextWindow": 200000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.60,
+            "outputPerMillion": 2.20,
+            "cachedInputPerMillion": 0.11,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Previous flagship. Strong reasoning, coding, and agentic capability",
+          "sourceUrls": [
+            "https://docs.z.ai/guides/overview/pricing"
+          ]
+        },
+        {
+          "id": "glm-4.6v",
+          "displayName": "GLM-4.6V",
+          "category": "frontier",
+          "contextWindow": 128000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.30,
+            "outputPerMillion": 0.90,
+            "cachedInputPerMillion": 0.05,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Flagship vision. Native multimodal with thinking support",
+          "sourceUrls": [
+            "https://docs.z.ai/guides/vlm/glm-4.6v"
+          ]
+        },
+        {
+          "id": "glm-4.6v-flashx",
+          "displayName": "GLM-4.6V FlashX",
+          "category": "fast",
+          "contextWindow": 128000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.04,
+            "outputPerMillion": 0.40,
+            "cachedInputPerMillion": 0.004,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Ultra-fast vision. Lowest latency and cost",
+          "sourceUrls": [
+            "https://docs.z.ai/guides/vlm/glm-4.6v"
+          ]
+        },
+        {
+          "id": "glm-4.6v-flash",
+          "displayName": "GLM-4.6V Flash",
+          "category": "fast",
+          "contextWindow": 128000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.00,
+            "outputPerMillion": 0.00,
+            "cachedInputPerMillion": null,
+            "tier": "free"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Free vision model. Great for testing and development",
+          "sourceUrls": [
+            "https://docs.z.ai/guides/vlm/glm-4.6v"
+          ]
+        },
+        {
+          "id": "glm-4.5",
+          "displayName": "GLM-4.5",
+          "category": "legacy",
+          "contextWindow": 128000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.60,
+            "outputPerMillion": 2.20,
+            "cachedInputPerMillion": 0.11,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Previous flagship. Strong generalist",
+          "sourceUrls": [
+            "https://docs.z.ai/guides/overview/pricing"
+          ]
+        },
+        {
+          "id": "glm-4.5v",
+          "displayName": "GLM-4.5V",
+          "category": "legacy",
+          "contextWindow": 128000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.60,
+            "outputPerMillion": 1.80,
+            "cachedInputPerMillion": 0.11,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Multimodal variant of GLM-4.5",
+          "sourceUrls": [
+            "https://docs.z.ai/guides/overview/pricing"
+          ]
+        },
+        {
+          "id": "glm-4.5-air",
+          "displayName": "GLM-4.5 Air",
+          "category": "fast",
+          "contextWindow": 128000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.20,
+            "outputPerMillion": 1.10,
+            "cachedInputPerMillion": 0.03,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Balanced Air tier. Speed/performance mix",
+          "sourceUrls": [
+            "https://docs.z.ai/guides/overview/pricing"
+          ]
+        },
+        {
+          "id": "glm-4.5-flash",
+          "displayName": "GLM-4.5 Flash",
+          "category": "fast",
+          "contextWindow": 128000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.00,
+            "outputPerMillion": 0.00,
+            "cachedInputPerMillion": null,
+            "tier": "free"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Free model. Great for testing and development",
+          "sourceUrls": [
+            "https://docs.z.ai/guides/overview/pricing"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "minimax",
+      "displayName": "MiniMax",
+      "models": [
+        {
+          "id": "MiniMax-M2",
+          "displayName": "MiniMax M2",
+          "category": "frontier",
+          "contextWindow": 1000000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.15,
+            "outputPerMillion": 0.60,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Flagship agentic model. 1M context, 92% cheaper than Claude Sonnet",
+          "sourceUrls": [
+            "https://platform.minimax.io/docs/guides/pricing"
+          ]
+        },
+        {
+          "id": "MiniMax-M2-Stable",
+          "displayName": "MiniMax M2 Stable",
+          "category": "frontier",
+          "contextWindow": 1000000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.15,
+            "outputPerMillion": 0.60,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Stable version with higher rate limits",
+          "sourceUrls": [
+            "https://platform.minimax.io/docs/guides/pricing"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mistral",
+      "displayName": "Mistral AI",
+      "models": [
+        {
+          "id": "mistral-large-latest",
+          "displayName": "Mistral Large",
+          "category": "frontier",
+          "contextWindow": 128000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 2.00,
+            "outputPerMillion": 6.00,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Flagship reasoning model. Top-tier performance",
+          "sourceUrls": [
+            "https://mistral.ai/pricing"
+          ]
+        },
+        {
+          "id": "pixtral-large-2411",
+          "displayName": "Pixtral Large",
+          "category": "frontier",
+          "contextWindow": 128000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 2.00,
+            "outputPerMillion": 6.00,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Flagship vision. Multimodal version of Mistral Large",
+          "sourceUrls": [
+            "https://mistral.ai/pricing"
+          ]
+        },
+        {
+          "id": "pixtral-12b-2409",
+          "displayName": "Pixtral 12B",
+          "category": "fast",
+          "contextWindow": 128000,
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.10,
+            "outputPerMillion": 0.10,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Edge vision. Efficient multimodal model",
+          "sourceUrls": [
+            "https://mistral.ai/pricing"
+          ]
+        },
+        {
+          "id": "codestral-latest",
+          "displayName": "Codestral",
+          "category": "fast",
+          "contextWindow": 32000,
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "inputPerMillion": 0.20,
+            "outputPerMillion": 0.60,
+            "cachedInputPerMillion": null,
+            "tier": "standard"
+          },
+          "status": "stable",
+          "capabilitiesSummary": "Coding optimized. Best for FIM and code generation",
+          "sourceUrls": [
+            "https://mistral.ai/pricing"
+          ]
+        }
+      ]
+    }
+  ]
+}

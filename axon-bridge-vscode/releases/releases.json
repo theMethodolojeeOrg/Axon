@@ -1,0 +1,48 @@
+{
+  "releases": [
+    {
+      "version": "0.2.3",
+      "date": "2025-12-18",
+      "timestamp": "20251218-233044",
+      "humanTime": "12182025_at_1130PM",
+      "filename": "axon-bridge-0.2.3_12182025_at_1130PM.vsix",
+      "path": "2025-12-18/axon-bridge-0.2.3_12182025_at_1130PM.vsix",
+      "downloadUrl": "https://github.com/tooury/Axon/raw/main/axon-bridge-vscode/releases/2025-12-18/axon-bridge-0.2.3_12182025_at_1130PM.vsix",
+      "changelog": "- docs: bump version to 0.2.2 and update release information\n- docs: update version to 0.2.1 and add release information\n- Initial commit: Axon Bridge VS Code Extension\n- Initial commit: Axon Bridge VS Code Extension"
+    },
+    {
+      "version": "0.2.2",
+      "date": "2025-12-17",
+      "timestamp": "20251217-211437",
+      "humanTime": "12172025_at_0914PM",
+      "filename": "axon-bridge-0.2.2_12172025_at_0914PM.vsix",
+      "path": "2025-12-17/axon-bridge-0.2.2_12172025_at_0914PM.vsix",
+      "downloadUrl": "https://github.com/tooury/Axon/raw/main/axon-bridge-vscode/releases/2025-12-17/axon-bridge-0.2.2_12172025_at_0914PM.vsix",
+      "changelog": "- docs: update version to 0.2.1 and add release information\n- Initial commit: Axon Bridge VS Code Extension\n- Initial commit: Axon Bridge VS Code Extension"
+    },
+    {
+      "version": "0.2.1",
+      "date": "2025-12-17",
+      "timestamp": "20251217-204512",
+      "humanTime": "12172025_at_0845PM",
+      "filename": "axon-bridge-0.2.1_12172025_at_0845PM.vsix",
+      "path": "2025-12-17/axon-bridge-0.2.1_12172025_at_0845PM.vsix",
+      "downloadUrl": "https://github.com/tooury/Axon/raw/main/axon-bridge-vscode/releases/2025-12-17/axon-bridge-0.2.1_12172025_at_0845PM.vsix",
+      "changelog": "- Initial commit: Axon Bridge VS Code Extension\n- Initial commit: Axon Bridge VS Code Extension"
+    },
+    {
+      "version": "0.2.0",
+      "date": "2025-12-17",
+      "timestamp": "20251217-203707",
+      "filename": "axon-bridge-0.2.0.vsix",
+      "path": "2025-12-17/axon-bridge-0.2.0.vsix",
+      "downloadUrl": "https://github.com/tooury/Axon/raw/main/axon-bridge-vscode/releases/2025-12-17/axon-bridge-0.2.0.vsix",
+      "changelog": "Remote Mode support - VS Code can now act as server for LAN connections from Axon"
+    }
+  ],
+  "latest": {
+    "version": "0.2.3",
+    "downloadUrl": "https://github.com/tooury/Axon/raw/main/axon-bridge-vscode/releases/2025-12-18/axon-bridge-0.2.3_12182025_at_1130PM.vsix",
+    "latestUrl": "https://github.com/tooury/Axon/raw/main/axon-bridge-vscode/releases/latest/axon-bridge-latest.vsix"
+  }
+}

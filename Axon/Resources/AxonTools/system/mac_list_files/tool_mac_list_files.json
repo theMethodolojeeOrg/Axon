@@ -1,0 +1,69 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_list_files",
+    "name": "Mac List Files",
+    "description": "List files and directories in a specified path.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "folder"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "mac",
+      "files",
+      "list",
+      "directory",
+      "ls"
+    ]
+  },
+  "parameters": {
+    "path": {
+      "type": "string",
+      "required": false,
+      "description": "Directory path to list",
+      "default": "."
+    },
+    "includeHidden": {
+      "type": "boolean",
+      "required": false,
+      "description": "Include hidden files (starting with .)",
+      "default": false
+    },
+    "maxItems": {
+      "type": "integer",
+      "required": false,
+      "description": "Maximum number of items to return",
+      "default": 100
+    }
+  },
+  "inputFormat": {
+    "style": "json"
+  },
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "file/list"
+  },
+  "ai": {
+    "systemPromptSection": "### mac_list_files\nList files and directories in a path.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_list_files\", \"query\": \"{\\\"path\\\": \\\".\\\"}\") \n```\n\n**Parameters:**\n- path: Directory path (default: .)\n- includeHidden: Show hidden files (default: false)\n- maxItems: Max items to return (default: 100)\n\n**Returns:** List of files with name, path, isDirectory, sizeBytes",
+    "whenToUse": [
+      "Need to see directory contents",
+      "Exploring file structure",
+      "Listing files before operations"
+    ],
+    "usageExamples": [
+      {
+        "description": "List current directory",
+        "input": "{\"path\": \".\"}"
+      },
+      {
+        "description": "List home directory with hidden files",
+        "input": "{\"path\": \"~\", \"includeHidden\": true}"
+      },
+      {
+        "description": "List Documents folder",
+        "input": "{\"path\": \"~/Documents\"}"
+      }
+    ]
+  }
+}

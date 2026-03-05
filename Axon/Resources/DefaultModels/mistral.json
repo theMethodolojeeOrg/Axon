@@ -1,0 +1,88 @@
+{
+  "id": "mistral",
+  "displayName": "Mistral AI",
+  "models": [
+    {
+      "id": "mistral-large-latest",
+      "displayName": "Mistral Large",
+      "category": "frontier",
+      "contextWindow": 128000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 2.00,
+        "outputPerMillion": 6.00,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Flagship reasoning model. Top-tier performance",
+      "sourceUrls": [
+        "https://mistral.ai/pricing"
+      ]
+    },
+    {
+      "id": "pixtral-large-2411",
+      "displayName": "Pixtral Large",
+      "category": "frontier",
+      "contextWindow": 128000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 2.00,
+        "outputPerMillion": 6.00,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Flagship vision. Multimodal version of Mistral Large",
+      "sourceUrls": [
+        "https://mistral.ai/pricing"
+      ]
+    },
+    {
+      "id": "pixtral-12b-2409",
+      "displayName": "Pixtral 12B",
+      "category": "fast",
+      "contextWindow": 128000,
+      "modalities": [
+        "text",
+        "image"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.10,
+        "outputPerMillion": 0.10,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Edge vision. Efficient multimodal model",
+      "sourceUrls": [
+        "https://mistral.ai/pricing"
+      ]
+    },
+    {
+      "id": "codestral-latest",
+      "displayName": "Codestral",
+      "category": "fast",
+      "contextWindow": 32000,
+      "modalities": [
+        "text"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.20,
+        "outputPerMillion": 0.60,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Coding optimized. Best for FIM and code generation",
+      "sourceUrls": [
+        "https://mistral.ai/pricing"
+      ]
+    }
+  ]
+}

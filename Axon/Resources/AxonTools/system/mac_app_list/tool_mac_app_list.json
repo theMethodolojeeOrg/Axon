@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_app_list",
+    "name": "Mac Running Apps",
+    "description": "List running applications on the Mac.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "square.grid.2x2"
+    },
+    "requiresApproval": false,
+    "tags": ["mac", "apps", "applications", "running"]
+  },
+
+  "parameters": {},
+
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "app/list"
+  },
+
+  "ai": {
+    "systemPromptSection": "### mac_app_list\nList running applications on the Mac.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_app_list\", \"query\": \"\"}\n```\n\n**Returns:** List of apps with name, bundleIdentifier, pid, isActive, isHidden",
+    "whenToUse": [
+      "Need to see what apps are running",
+      "Looking for a specific app",
+      "Checking if an app is open"
+    ]
+  }
+}

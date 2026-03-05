@@ -1,0 +1,68 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "create_collapse_session",
+    "name": "Create Collapse Session",
+    "description": "Create a new Collapse Engine session to begin transforming an analogy into a research artifact.",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "plus.rectangle.on.folder"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "session", "create"]
+  },
+
+  "parameters": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Human-readable name for this session",
+      "minLength": 3
+    },
+    "description": {
+      "type": "string",
+      "required": false,
+      "description": "Description of what this session will explore"
+    },
+    "tags": {
+      "type": "array",
+      "required": false,
+      "description": "Tags for organization and retrieval"
+    },
+    "use_sub_agents": {
+      "type": "boolean",
+      "required": false,
+      "description": "Enable sub-agent spawning for parallel work"
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "systemPromptSection": "### create_collapse_session\nCreate a new Collapse Engine session to explore an analogy between two systems.",
+    "usageExamples": [
+      {
+        "description": "Create a new session",
+        "input": "{\"name\": \"Physics-ML Analogy\", \"description\": \"Exploring structural correspondences between statistical mechanics and neural network optimization\", \"tags\": [\"physics\", \"ml\", \"optimization\"]}"
+      }
+    ],
+    "whenToUse": [
+      "User wants to explore an analogy formally",
+      "Starting a new research investigation",
+      "User mentions two systems that might have structural correspondence"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_create",
+    "scopes": ["collapse_engine.write"],
+    "riskLevel": "low"
+  }
+}

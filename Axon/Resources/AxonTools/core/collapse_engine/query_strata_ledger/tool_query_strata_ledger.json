@@ -1,0 +1,78 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "query_strata_ledger",
+    "name": "Query Strata Ledger",
+    "description": "Query the version history and evolution of a collapse session (Phase 10). Track how the analogy developed over time.",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "clock.arrow.circlepath"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "strata", "ledger", "history", "phase10"]
+  },
+
+  "parameters": {
+    "session_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the collapse session"
+    },
+    "entry_type_filter": {
+      "type": "string",
+      "required": false,
+      "description": "Filter by entry type (artifact_created, phase_transition, revision, annotation)"
+    },
+    "phase_filter": {
+      "type": "string",
+      "required": false,
+      "description": "Filter by phase"
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "minimum": 1,
+      "maximum": 100,
+      "description": "Maximum entries to return"
+    },
+    "include_content": {
+      "type": "boolean",
+      "required": false,
+      "description": "Whether to include full content of referenced artifacts"
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "systemPromptSection": "### query_strata_ledger\nQuery session version history. This is Phase 10 of the Collapse Engine workflow.",
+    "usageExamples": [
+      {
+        "description": "Query all ledger entries",
+        "input": "{\"session_id\": \"sess-123\"}"
+      },
+      {
+        "description": "Query phase transitions only",
+        "input": "{\"session_id\": \"sess-123\", \"entry_type_filter\": \"phase_transition\"}"
+      }
+    ],
+    "whenToUse": [
+      "Reviewing session evolution",
+      "Understanding how analogy developed",
+      "Tracking revisions and changes"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_read",
+    "scopes": ["collapse_engine.read"],
+    "riskLevel": "low"
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "save_state_checkpoint",
+    "name": "Save State Checkpoint",
+    "description": "Save current state checkpoint for device handoff.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "arrow.down.doc"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "checkpoint",
+      "state",
+      "handoff",
+      "save"
+    ]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": false,
+      "description": "Reason for checkpoint"
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "device_presence"
+  },
+  "ai": {
+    "systemPromptSection": "### save_state_checkpoint\nSave state for handoff.\n\n**Format:**\n```tool_request\n{\"tool\": \"save_state_checkpoint\", \"query\": \"reason for checkpoint\"}\n```\n\n**Returns:**\n- Checkpoint ID\n- Timestamp\n\n**Use:** Before device switches to preserve context.",
+    "usageExamples": [
+      {
+        "description": "Save before switch",
+        "input": "Preparing for handoff to Mac"
+      },
+      {
+        "description": "Manual save",
+        "input": "Mid-task checkpoint"
+      }
+    ],
+    "whenToUse": [
+      "Before device switch",
+      "Preserve important context"
+    ],
+    "whenNotToUse": [
+      "Trivial state"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        {
+          "param": "query",
+          "widget": "text_field",
+          "label": "Reason",
+          "placeholder": "Optional reason..."
+        }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Save Checkpoint"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        {
+          "type": "header",
+          "title": "Checkpoint Saved",
+          "icon": "arrow.down.doc"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "state_checkpoint",
+    "approvalDescription": "Save state checkpoint",
+    "scopes": [
+      "state.write"
+    ],
+    "riskLevel": "low"
+  }
+}

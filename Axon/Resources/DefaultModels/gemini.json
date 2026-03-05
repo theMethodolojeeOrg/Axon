@@ -1,0 +1,153 @@
+{
+  "id": "gemini",
+  "displayName": "Google Gemini",
+  "models": [
+    {
+      "id": "gemini-2.5-flash-native-audio-preview-12-2025",
+      "displayName": "Gemini 2.5 Flash Native Audio",
+      "category": "fast",
+      "contextWindow": 1000000,
+      "modalities": [
+        "text",
+        "audio"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.50,
+        "outputPerMillion": 2.00,
+        "audioInputPerMillion": 3.00,
+        "audioOutputPerMillion": 12.00,
+        "tier": "standard"
+      },
+      "status": "preview",
+      "capabilitiesSummary": "Native audio model optimized for higher quality audio outputs with better pacing, voice naturalness, verbosity, and mood",
+      "supportsLiveAudio": true,
+      "sourceUrls": [
+        "https://ai.google.dev/gemini-api/docs/models",
+        "https://ai.google.dev/gemini-api/docs/live"
+      ]
+    },
+    {
+      "id": "gemini-3-pro",
+      "displayName": "Gemini 3 Pro",
+      "category": "frontier",
+      "contextWindow": 1000000,
+      "modalities": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "pricing": {
+        "inputPerMillion": 2.00,
+        "outputPerMillion": 12.00,
+        "cachedInputPerMillion": 0.20,
+        "tier": "standard"
+      },
+      "status": "preview",
+      "capabilitiesSummary": "Preview of Gemini 3 with multimodal and advanced reasoning",
+      "sourceUrls": [
+        "https://ai.google.dev/gemini-api/docs/models",
+        "https://ai.google.dev/gemini-api/docs/pricing"
+      ]
+    },
+    {
+      "id": "gemini-3-flash",
+      "displayName": "Gemini 3 Flash",
+      "category": "fast",
+      "contextWindow": 1048576,
+      "modalities": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.50,
+        "outputPerMillion": 3.00,
+        "cachedInputPerMillion": 0.05,
+        "tier": "standard"
+      },
+      "status": "preview",
+      "capabilitiesSummary": "Most intelligent model built for speed, combining frontier intelligence with superior search and grounding",
+      "sourceUrls": [
+        "https://ai.google.dev/gemini-api/docs/models",
+        "https://ai.google.dev/gemini-api/docs/pricing"
+      ]
+    },
+    {
+      "id": "gemini-2.5-flash-lite-preview-06-17",
+      "displayName": "Gemini 2.5 Flash Lite",
+      "category": "fast",
+      "contextWindow": 1000000,
+      "modalities": [
+        "text",
+        "image",
+        "video",
+        "audio"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.10,
+        "outputPerMillion": 0.40,
+        "cachedInputPerMillion": 0.01,
+        "tier": "standard"
+      },
+      "status": "preview",
+      "capabilitiesSummary": "Ultra-fast and cheap. Good for high-volume simple tasks",
+      "sourceUrls": [
+        "https://ai.google.dev/gemini-api/docs/models",
+        "https://ai.google.dev/gemini-api/docs/pricing"
+      ]
+    },
+    {
+      "id": "gemini-2.5-pro",
+      "displayName": "Gemini 2.5 Pro",
+      "category": "frontier",
+      "contextWindow": 1000000,
+      "modalities": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "pricing": {
+        "inputPerMillion": 1.25,
+        "outputPerMillion": 10.00,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Best Gemini model for complex reasoning and coding",
+      "sourceUrls": [
+        "https://ai.google.dev/gemini-api/docs/models",
+        "https://ai.google.dev/gemini-api/docs/pricing"
+      ]
+    },
+    {
+      "id": "gemini-2.5-flash",
+      "displayName": "Gemini 2.5 Flash",
+      "category": "fast",
+      "contextWindow": 1000000,
+      "modalities": [
+        "text",
+        "image",
+        "video",
+        "audio"
+      ],
+      "pricing": {
+        "inputPerMillion": 0.30,
+        "outputPerMillion": 2.50,
+        "cachedInputPerMillion": null,
+        "tier": "standard"
+      },
+      "status": "stable",
+      "capabilitiesSummary": "Fast and capable. Great for real-time applications",
+      "sourceUrls": [
+        "https://ai.google.dev/gemini-api/docs/models",
+        "https://ai.google.dev/gemini-api/docs/pricing"
+      ]
+    }
+  ]
+}

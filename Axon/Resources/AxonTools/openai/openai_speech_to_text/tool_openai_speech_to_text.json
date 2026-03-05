@@ -1,0 +1,68 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "openai_speech_to_text",
+        "name": "Speech to Text",
+        "description": "Transcribes audio into text.",
+        "category": "system",
+        "icon": {
+            "sfSymbol": "waveform"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "openai",
+            "audio",
+            "stt",
+            "transcription",
+            "whisper"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "openai"
+    },
+    "parameters": {
+        "file": {
+            "type": "string",
+            "description": "Path to the audio file to transcribe",
+            "required": true
+        },
+        "model": {
+            "type": "string",
+            "description": "The model to use (e.g., 'whisper-1', 'gpt-4o-transcribe')",
+            "default": "whisper-1",
+            "required": false
+        },
+        "language": {
+            "type": "string",
+            "description": "The language of the input audio (ISO-639-1 code)",
+            "required": false
+        },
+        "prompt": {
+            "type": "string",
+            "description": "An optional text to guide the model's style or continue a previous audio segment",
+            "required": false
+        },
+        "response_format": {
+            "type": "string",
+            "description": "The format of the transcript output ('json', 'text', 'srt', 'verbose_json', 'vtt')",
+            "default": "json",
+            "required": false
+        },
+        "temperature": {
+            "type": "number",
+            "description": "The sampling temperature, between 0 and 1",
+            "default": 0,
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Speech to Text\nTranscribe audio files to text.",
+        "audioTranscription": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

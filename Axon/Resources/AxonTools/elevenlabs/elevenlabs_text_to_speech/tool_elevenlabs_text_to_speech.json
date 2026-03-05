@@ -1,0 +1,122 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "elevenlabs_text_to_speech",
+        "name": "ElevenLabs Text to Speech",
+        "description": "Converts text into high-quality speech using ElevenLabs voices.",
+        "category": "provider",
+        "icon": {
+            "sfSymbol": "waveform"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "elevenlabs",
+            "audio",
+            "tts",
+            "speech"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "elevenlabs"
+    },
+    "parameters": {
+        "text": {
+            "type": "string",
+            "description": "The text to convert to speech",
+            "required": true
+        },
+        "voice_id": {
+            "type": "string",
+            "description": "The ElevenLabs voice ID to use",
+            "required": true
+        },
+        "model_id": {
+            "type": "string",
+            "description": "The ElevenLabs TTS model to use",
+            "default": "eleven_multilingual_v2",
+            "required": false
+        },
+        "output_format": {
+            "type": "string",
+            "description": "Audio output format",
+            "enum": [
+                "mp3_22050_32",
+                "mp3_44100_32",
+                "mp3_44100_64",
+                "mp3_44100_96",
+                "mp3_44100_128",
+                "mp3_44100_192",
+                "pcm_16000",
+                "pcm_22050",
+                "pcm_24000",
+                "pcm_44100",
+                "ulaw_8000",
+                "opus_16000",
+                "opus_24000"
+            ],
+            "default": "mp3_22050_32",
+            "required": false
+        },
+        "voice_settings": {
+            "type": "object",
+            "description": "Voice tuning settings",
+            "required": false,
+            "properties": {
+                "stability": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "default": 0.5
+                },
+                "similarity_boost": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "default": 0.75
+                },
+                "style": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "default": 0.0
+                },
+                "use_speaker_boost": {
+                    "type": "boolean",
+                    "default": true
+                }
+            }
+        },
+        "optimize_streaming_latency": {
+            "type": "integer",
+            "description": "Latency optimization level (0-4)",
+            "minimum": 0,
+            "maximum": 4,
+            "required": false
+        },
+        "seed": {
+            "type": "integer",
+            "description": "Deterministic generation seed",
+            "required": false
+        },
+        "previous_text": {
+            "type": "string",
+            "description": "Previous text for prosody continuity",
+            "required": false
+        },
+        "next_text": {
+            "type": "string",
+            "description": "Next text for prosody continuity",
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### ElevenLabs Text to Speech\nGenerate speech audio from text.",
+        "audioGeneration": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

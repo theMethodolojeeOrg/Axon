@@ -1,0 +1,82 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "select_gauge_anchor",
+    "name": "Select Gauge Anchor",
+    "description": "Choose the representational frame for stating results (Phase 6). The gauge anchor determines how claims are expressed.",
+    "category": "custom",
+    "icon": {
+      "sfSymbol": "scope"
+    },
+    "requiresApproval": false,
+    "tags": ["collapse_engine", "gauge", "anchor", "phase6"]
+  },
+
+  "parameters": {
+    "session_id": {
+      "type": "string",
+      "required": true,
+      "description": "ID of the collapse session"
+    },
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Name of the gauge anchor"
+    },
+    "description": {
+      "type": "string",
+      "required": true,
+      "description": "What this representational frame entails"
+    },
+    "system_origin": {
+      "type": "string",
+      "required": true,
+      "description": "Which system this gauge comes from (A, B, or neutral)"
+    },
+    "vocabulary": {
+      "type": "array",
+      "required": false,
+      "description": "Key terms/concepts in this gauge"
+    },
+    "rationale": {
+      "type": "string",
+      "required": false,
+      "description": "Why this gauge was chosen"
+    },
+    "alternative_gauges": {
+      "type": "array",
+      "required": false,
+      "description": "Other gauges that were considered"
+    }
+  },
+
+  "inputFormat": {
+    "style": "json"
+  },
+
+  "execution": {
+    "type": "internal_handler",
+    "handler": "collapse_engine"
+  },
+
+  "ai": {
+    "systemPromptSection": "### select_gauge_anchor\nChoose the representational frame for stating results. This is Phase 6 of the Collapse Engine workflow.",
+    "usageExamples": [
+      {
+        "description": "Select ML gauge for physics-ML analogy",
+        "input": "{\"session_id\": \"sess-123\", \"name\": \"ML Optimization Gauge\", \"description\": \"Express results in terms of loss landscapes, gradients, and learning rates\", \"system_origin\": \"B\", \"vocabulary\": [\"loss function\", \"gradient descent\", \"learning rate\", \"convergence\"], \"rationale\": \"Target audience is ML practitioners\"}"
+      }
+    ],
+    "whenToUse": [
+      "Choosing how to express collapse results",
+      "Phase 6 of collapse workflow",
+      "Setting the vocabulary for final claims"
+    ]
+  },
+
+  "sovereignty": {
+    "actionCategory": "collapse_engine_capture",
+    "scopes": ["collapse_engine.write"],
+    "riskLevel": "low"
+  }
+}

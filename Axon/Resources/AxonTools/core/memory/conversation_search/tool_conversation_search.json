@@ -1,0 +1,92 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "conversation_search",
+    "name": "Conversation Search",
+    "description": "Search through stored memories and conversation history for relevant context.",
+    "category": "memory",
+    "icon": {
+      "sfSymbol": "magnifyingglass"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "memory",
+      "search",
+      "context",
+      "history"
+    ]
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": true,
+      "description": "Search text to find in memories (searches content and tags)",
+      "minLength": 1
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "memory"
+  },
+  "ai": {
+    "systemPromptSection": "### conversation_search\nSearch through stored memories for relevant context.\n\n**Format:**\n```tool_request\n{\"tool\": \"conversation_search\", \"query\": \"search text\"}\n```\n\n**Returns:** Matching memories with content, type, and tags.",
+    "usageExamples": [
+      {
+        "description": "Find iOS preferences",
+        "input": "ios preferences"
+      },
+      {
+        "description": "Search project context",
+        "input": "axon architecture"
+      }
+    ],
+    "whenToUse": [
+      "Need to recall previously stored information",
+      "Looking for user preferences or context",
+      "Searching for relevant past learnings"
+    ],
+    "whenNotToUse": [
+      "Current conversation has the needed context",
+      "Information hasn't been stored to memory"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        {
+          "param": "query",
+          "widget": "text_field",
+          "label": "Search",
+          "placeholder": "Search memories..."
+        }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Search"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        {
+          "type": "header",
+          "title": "Search Results",
+          "icon": "magnifyingglass"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "memory_read",
+    "approvalDescription": "Search memories: {{query}}",
+    "scopes": [
+      "memory.read"
+    ],
+    "riskLevel": "low"
+  }
+}

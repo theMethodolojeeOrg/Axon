@@ -1,0 +1,359 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-01-15T00:00:00Z",
+  "tools": [
+    {
+      "id": "jules-create-task",
+      "name": "Create Jules Task",
+      "description": "Assign a coding task to Google Jules AI agent for async execution",
+      "category": "integration",
+      "enabled": false,
+      "icon": "figure.wave",
+      "requiredSecrets": ["jules_api_key"],
+      "requiresApproval": true,
+      "approvalScopes": [
+        "Create coding tasks in GitHub repositories",
+        "Access repository: {{input.repo_source}}",
+        "Modify code on branch: {{input.branch}}"
+      ],
+      "pipeline": [
+        {
+          "type": "api_call",
+          "id": "create_session",
+          "config": {
+            "method": "POST",
+            "endpoint": "https://jules.googleapis.com/v1alpha/sessions",
+            "headers": {
+              "X-Goog-Api-Key": "{{secrets.jules_api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "prompt": "{{input.task_description}}",
+              "sourceContext": {
+                "source": "{{input.repo_source}}",
+                "githubRepoContext": {
+                  "startingBranch": "{{input.branch}}"
+                }
+              },
+              "title": "{{input.title}}",
+              "requirePlanApproval": false
+            }
+          }
+        }
+      ],
+      "parameters": {
+        "task_description": {
+          "type": "string",
+          "required": true,
+          "description": "The coding task to assign to Jules"
+        },
+        "repo_source": {
+          "type": "string",
+          "required": true,
+          "description": "Source reference (e.g., sources/github/owner/repo)"
+        },
+        "branch": {
+          "type": "string",
+          "required": false,
+          "default": "main",
+          "description": "Starting branch for the task"
+        },
+        "title": {
+          "type": "string",
+          "required": true,
+          "description": "Title for the Jules session"
+        }
+      },
+      "outputTemplate": "Jules task created successfully!\n\n**Session:** {{steps.create_session.output.name}}\n**Title:** {{input.title}}\n\nJules is now working on: {{input.task_description}}"
+    },
+    {
+      "id": "jules-check-status",
+      "name": "Check Jules Status",
+      "description": "Check the status of a Jules coding session",
+      "category": "integration",
+      "enabled": false,
+      "icon": "clock.badge.checkmark",
+      "requiredSecrets": ["jules_api_key"],
+      "pipeline": [
+        {
+          "type": "api_call",
+          "id": "get_session",
+          "config": {
+            "method": "GET",
+            "endpoint": "https://jules.googleapis.com/v1alpha/sessions/{{input.session_id}}",
+            "headers": {
+              "X-Goog-Api-Key": "{{secrets.jules_api_key}}"
+            }
+          }
+        }
+      ],
+      "parameters": {
+        "session_id": {
+          "type": "string",
+          "required": true,
+          "description": "The Jules session ID to check"
+        }
+      },
+      "outputTemplate": "**Jules Session Status**\n\n**ID:** {{steps.get_session.output.id}}\n**Title:** {{steps.get_session.output.title}}\n**State:** {{steps.get_session.output.state}}"
+    },
+    {
+      "id": "research-summarize",
+      "name": "Research & Summarize",
+      "description": "Use one model to research a topic, then another to create a concise summary",
+      "category": "composite",
+      "enabled": false,
+      "icon": "doc.text.magnifyingglass",
+      "requiredSecrets": [],
+      "pipeline": [
+        {
+          "type": "model_call",
+          "id": "research",
+          "config": {
+            "provider": "openai",
+            "model": "gpt-5.1",
+            "systemPrompt": "You are a thorough research assistant. Provide detailed, factual, well-sourced information on the topic. Include key facts, statistics, and different perspectives.",
+            "userPrompt": "Research the following topic comprehensively: {{input.topic}}"
+          }
+        },
+        {
+          "type": "model_call",
+          "id": "summarize",
+          "config": {
+            "provider": "anthropic",
+            "model": "claude-haiku-4-5-20251001",
+            "systemPrompt": "You are an expert at distilling complex information into clear, actionable summaries. Create a concise summary with key takeaways.",
+            "userPrompt": "Create a concise summary with 3-5 key takeaways from this research:\n\n{{steps.research.output}}"
+          }
+        }
+      ],
+      "parameters": {
+        "topic": {
+          "type": "string",
+          "required": true,
+          "description": "The topic to research"
+        }
+      },
+      "outputTemplate": "## Research Summary: {{input.topic}}\n\n{{steps.summarize.output}}\n\n---\n<details>\n<summary>Full Research</summary>\n\n{{steps.research.output}}\n</details>"
+    },
+    {
+      "id": "code-review-issue",
+      "name": "Code Review → Create Issue",
+      "description": "Review code with Claude, optionally create a Linear issue if critical problems found",
+      "category": "composite",
+      "enabled": false,
+      "icon": "exclamationmark.bubble",
+      "requiredSecrets": ["linear_api_key"],
+      "requiresApproval": true,
+      "approvalScopes": [
+        "Create issues in Linear project",
+        "Access team: {{input.team_id}}"
+      ],
+      "pipeline": [
+        {
+          "type": "model_call",
+          "id": "review",
+          "config": {
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-5-20250929",
+            "systemPrompt": "You are an expert code reviewer. Analyze the code for bugs, security issues, performance problems, and improvements. Return a JSON object with this structure: {\"hasCriticalIssues\": boolean, \"summary\": string, \"issues\": [{\"severity\": \"critical\"|\"warning\"|\"info\", \"description\": string, \"suggestion\": string}]}",
+            "userPrompt": "Review this code:\n\n{{input.code}}",
+            "responseFormat": "json"
+          }
+        },
+        {
+          "type": "conditional",
+          "id": "check_critical",
+          "condition": "{{steps.review.output.hasCriticalIssues}} == true",
+          "then": [
+            {
+              "type": "api_call",
+              "id": "create_issue",
+              "config": {
+                "method": "POST",
+                "endpoint": "https://api.linear.app/graphql",
+                "headers": {
+                  "Authorization": "{{secrets.linear_api_key}}",
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "query": "mutation IssueCreate($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { id identifier url title } } }",
+                  "variables": {
+                    "input": {
+                      "title": "Code Review: Critical Issues Found",
+                      "description": "{{steps.review.output.summary}}",
+                      "teamId": "{{input.team_id}}"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "parameters": {
+        "code": {
+          "type": "string",
+          "required": true,
+          "description": "The code to review"
+        },
+        "team_id": {
+          "type": "string",
+          "required": false,
+          "description": "Linear team ID for issue creation (optional)"
+        }
+      },
+      "outputTemplate": "## Code Review Results\n\n{{steps.review.output.summary}}\n\n### Issues Found:\n{{#each steps.review.output.issues}}\n- **{{this.severity}}**: {{this.description}}\n  - Suggestion: {{this.suggestion}}\n{{/each}}\n\n{{#if steps.create_issue.output}}\n**Linear Issue Created:** [{{steps.create_issue.output.issue.identifier}}]({{steps.create_issue.output.issue.url}})\n{{/if}}"
+    },
+    {
+      "id": "translate-multi",
+      "name": "Multi-Model Translation",
+      "description": "Translate text using multiple models and compare results for accuracy",
+      "category": "composite",
+      "enabled": false,
+      "icon": "globe",
+      "requiredSecrets": [],
+      "pipeline": [
+        {
+          "type": "parallel",
+          "id": "translations",
+          "steps": [
+            {
+              "type": "model_call",
+              "id": "gpt_translation",
+              "config": {
+                "provider": "openai",
+                "model": "gpt-5-mini-2025-08-07",
+                "systemPrompt": "You are a professional translator. Translate the text accurately while preserving tone and nuance.",
+                "userPrompt": "Translate the following text to {{input.target_language}}:\n\n{{input.text}}"
+              }
+            },
+            {
+              "type": "model_call",
+              "id": "claude_translation",
+              "config": {
+                "provider": "anthropic",
+                "model": "claude-haiku-4-5-20251001",
+                "systemPrompt": "You are a professional translator. Translate the text accurately while preserving tone and nuance.",
+                "userPrompt": "Translate the following text to {{input.target_language}}:\n\n{{input.text}}"
+              }
+            }
+          ]
+        },
+        {
+          "type": "model_call",
+          "id": "compare",
+          "config": {
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-5-20250929",
+            "systemPrompt": "You are a translation quality expert. Compare these two translations and provide the best version, noting any significant differences.",
+            "userPrompt": "Compare these two translations of the same text to {{input.target_language}}:\n\nTranslation A:\n{{steps.translations.gpt_translation.output}}\n\nTranslation B:\n{{steps.translations.claude_translation.output}}\n\nProvide the best translation and note any significant differences."
+          }
+        }
+      ],
+      "parameters": {
+        "text": {
+          "type": "string",
+          "required": true,
+          "description": "The text to translate"
+        },
+        "target_language": {
+          "type": "string",
+          "required": true,
+          "description": "Target language for translation"
+        }
+      },
+      "outputTemplate": "## Translation to {{input.target_language}}\n\n{{steps.compare.output}}"
+    },
+    {
+      "id": "webhook-notify",
+      "name": "Webhook Notification",
+      "description": "Send a notification to any webhook URL (Slack, Discord, custom)",
+      "category": "utility",
+      "enabled": false,
+      "icon": "bell.badge",
+      "requiredSecrets": [],
+      "requiresApproval": true,
+      "approvalScopes": [
+        "Send data to external webhook",
+        "Endpoint: {{input.webhook_url}}"
+      ],
+      "pipeline": [
+        {
+          "type": "api_call",
+          "id": "send_webhook",
+          "config": {
+            "method": "POST",
+            "endpoint": "{{input.webhook_url}}",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "text": "{{input.message}}",
+              "username": "Axon Bot",
+              "icon_emoji": ":robot_face:"
+            }
+          }
+        }
+      ],
+      "parameters": {
+        "webhook_url": {
+          "type": "string",
+          "required": true,
+          "description": "The webhook URL to send to"
+        },
+        "message": {
+          "type": "string",
+          "required": true,
+          "description": "The message to send"
+        }
+      },
+      "outputTemplate": "Notification sent successfully!"
+    },
+    {
+      "id": "perplexity-research",
+      "name": "Perplexity Deep Research",
+      "description": "Use Perplexity for web-grounded research with citations",
+      "category": "research",
+      "enabled": false,
+      "icon": "globe.americas",
+      "requiredSecrets": ["perplexity_api_key"],
+      "pipeline": [
+        {
+          "type": "api_call",
+          "id": "research",
+          "config": {
+            "method": "POST",
+            "endpoint": "https://api.perplexity.ai/chat/completions",
+            "headers": {
+              "Authorization": "Bearer {{secrets.perplexity_api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "model": "sonar-reasoning-pro",
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "You are a thorough research assistant. Provide detailed, well-sourced information with citations."
+                },
+                {
+                  "role": "user",
+                  "content": "{{input.query}}"
+                }
+              ],
+              "temperature": 0.2,
+              "return_citations": true
+            }
+          }
+        }
+      ],
+      "parameters": {
+        "query": {
+          "type": "string",
+          "required": true,
+          "description": "The research question or topic"
+        }
+      },
+      "outputTemplate": "## Research Results\n\n{{steps.research.output.choices[0].message.content}}\n\n### Sources\n{{#each steps.research.output.citations}}\n- {{this}}\n{{/each}}"
+    }
+  ]
+}

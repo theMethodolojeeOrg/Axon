@@ -1,0 +1,133 @@
+{
+  "id": "openai",
+  "displayName": "OpenAI",
+  "type": "tts",
+  "description": "Promptable TTS with natural voices",
+  "icon": "brain.head.profile",
+  "requiresAPIKey": true,
+  "apiKeyProvider": "openai",
+  "isOnDevice": false,
+  "voices": [
+    {
+      "id": "alloy",
+      "displayName": "Alloy",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Neutral female voice",
+      "toneDescription": "Neutral, balanced"
+    },
+    {
+      "id": "ash",
+      "displayName": "Ash",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Confident male voice",
+      "toneDescription": "Warm, confident"
+    },
+    {
+      "id": "ballad",
+      "displayName": "Ballad",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Expressive female voice",
+      "toneDescription": "Soft, expressive"
+    },
+    {
+      "id": "coral",
+      "displayName": "Coral",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Friendly female voice",
+      "toneDescription": "Clear, friendly"
+    },
+    {
+      "id": "echo",
+      "displayName": "Echo",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Composed male voice",
+      "toneDescription": "Measured, composed"
+    },
+    {
+      "id": "fable",
+      "displayName": "Fable",
+      "gender": "male",
+      "accent": "british",
+      "locale": "en-GB",
+      "description": "Storytelling male voice",
+      "toneDescription": "Expressive, storytelling"
+    },
+    {
+      "id": "nova",
+      "displayName": "Nova",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Upbeat female voice",
+      "toneDescription": "Bright, upbeat"
+    },
+    {
+      "id": "onyx",
+      "displayName": "Onyx",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Deep male voice",
+      "toneDescription": "Deep, authoritative"
+    },
+    {
+      "id": "sage",
+      "displayName": "Sage",
+      "gender": "male",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Thoughtful male voice",
+      "toneDescription": "Calm, thoughtful"
+    },
+    {
+      "id": "shimmer",
+      "displayName": "Shimmer",
+      "gender": "female",
+      "accent": null,
+      "locale": "en-US",
+      "description": "Airy female voice",
+      "toneDescription": "Light, airy"
+    }
+  ],
+  "models": [
+    {
+      "id": "gpt-4o-mini-tts",
+      "displayName": "GPT-4o Mini TTS",
+      "description": "Newest, promptable voice control",
+      "supportsInstructions": true,
+      "isDefault": true
+    },
+    {
+      "id": "tts-1",
+      "displayName": "TTS-1",
+      "description": "Fast, lower latency",
+      "supportsInstructions": false,
+      "isDefault": false
+    },
+    {
+      "id": "tts-1-hd",
+      "displayName": "TTS-1 HD",
+      "description": "Higher quality audio",
+      "supportsInstructions": false,
+      "isDefault": false
+    }
+  ],
+  "settings": {
+    "speedRange": {
+      "min": 0.25,
+      "max": 4.0,
+      "default": 1.0
+    },
+    "supportsVoiceInstructions": true
+  }
+}

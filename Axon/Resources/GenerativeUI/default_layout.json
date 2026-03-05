@@ -1,0 +1,91 @@
+{
+  "type": "VStack",
+  "properties": {
+    "keys": ["spacing", "alignment"],
+    "values": [16, "leading"]
+  },
+  "children": [
+    {
+      "type": "Text",
+      "properties": {
+        "keys": ["text", "font", "color"],
+        "values": ["Hello, Generative UI!", "titleLarge", "textPrimary"]
+      }
+    },
+    {
+      "type": "Text",
+      "properties": {
+        "keys": ["text", "font", "color"],
+        "values": ["Edit the JSON or use visual edit mode.", "bodyMedium", "textSecondary"]
+      }
+    },
+    {
+      "type": "Divider",
+      "properties": { "keys": [], "values": [] }
+    },
+    {
+      "type": "HStack",
+      "properties": {
+        "keys": ["spacing"],
+        "values": [12]
+      },
+      "children": [
+        {
+          "type": "Image",
+          "properties": {
+            "keys": ["systemName", "color"],
+            "values": ["star.fill", "copper"]
+          }
+        },
+        {
+          "type": "Text",
+          "properties": {
+            "keys": ["text", "font"],
+            "values": ["Featured Item", "bodyMedium"]
+          }
+        },
+        {
+          "type": "Spacer",
+          "properties": { "keys": [], "values": [] }
+        },
+        {
+          "type": "Button",
+          "properties": {
+            "keys": ["label"],
+            "values": ["Action"]
+          }
+        }
+      ]
+    },
+    {
+      "type": "Spacer",
+      "properties": {
+        "keys": ["minLength"],
+        "values": [20]
+      }
+    },
+    {
+      "type": "VStack",
+      "properties": {
+        "keys": ["spacing"],
+        "values": [8]
+      },
+      "children": [
+        {
+          "type": "Text",
+          "properties": {
+            "keys": ["text", "font", "color"],
+            "values": ["Supported Components:", "labelMedium", "mercury"]
+          }
+        },
+        {
+          "type": "Text",
+          "properties": {
+            "keys": ["text", "font", "color"],
+            "values": ["VStack, HStack, ZStack, Text, Button, Image, Spacer, Divider", "codeSmall", "textTertiary"]
+          }
+        }
+      ]
+    }
+  ]
+}

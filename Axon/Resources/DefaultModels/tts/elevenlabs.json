@@ -1,0 +1,67 @@
+{
+  "id": "elevenlabs",
+  "displayName": "ElevenLabs",
+  "type": "tts",
+  "description": "High-quality voices with fine-tuned controls",
+  "icon": "waveform",
+  "requiresAPIKey": true,
+  "apiKeyProvider": "elevenlabs",
+  "isOnDevice": false,
+  "voices": [],
+  "voicesNote": "ElevenLabs voices are fetched dynamically via API - user's custom voices and ElevenLabs library voices",
+  "models": [
+    {
+      "id": "eleven_turbo_v2_5",
+      "displayName": "Turbo v2.5",
+      "description": "Fastest, most natural",
+      "isDefault": true
+    },
+    {
+      "id": "eleven_multilingual_v2",
+      "displayName": "Multilingual v2",
+      "description": "Supports 29 languages",
+      "isDefault": false
+    },
+    {
+      "id": "eleven_flash_v2_5",
+      "displayName": "Flash v2.5",
+      "description": "Latest flash model",
+      "isDefault": false
+    }
+  ],
+  "outputFormats": [
+    {
+      "id": "mp3_44100_128",
+      "displayName": "MP3 128kbps",
+      "description": "Highest quality"
+    },
+    {
+      "id": "mp3_44100_64",
+      "displayName": "MP3 64kbps",
+      "description": "Balanced"
+    },
+    {
+      "id": "mp3_22050_32",
+      "displayName": "MP3 32kbps",
+      "description": "Smallest size"
+    }
+  ],
+  "settings": {
+    "stabilityRange": {
+      "min": 0.0,
+      "max": 1.0,
+      "default": 0.5
+    },
+    "similarityBoostRange": {
+      "min": 0.0,
+      "max": 1.0,
+      "default": 0.75
+    },
+    "styleRange": {
+      "min": 0.0,
+      "max": 1.0,
+      "default": 0.0
+    },
+    "supportsSpeakerBoost": true
+  }
+}

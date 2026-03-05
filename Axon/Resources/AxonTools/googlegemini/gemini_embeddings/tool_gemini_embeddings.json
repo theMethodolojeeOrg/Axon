@@ -1,0 +1,63 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "gemini_embeddings",
+        "name": "Embeddings",
+        "description": "Generates text embeddings for semantic search, classification, and clustering.",
+        "category": "system",
+        "icon": {
+            "sfSymbol": "number.square.fill"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "gemini",
+            "embeddings",
+            "vector",
+            "semantic"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "google"
+    },
+    "parameters": {
+        "content": {
+            "type": "string",
+            "description": "The text content to embed",
+            "required": true
+        },
+        "model": {
+            "type": "string",
+            "description": "The embedding model to use",
+            "default": "gemini-embedding-001",
+            "required": false
+        },
+        "task_type": {
+            "type": "string",
+            "description": "The intended task type (e.g., 'RETRIEVAL_DOCUMENT', 'SEMANTIC_SIMILARITY')",
+            "enum": [
+                "RETRIEVAL_QUERY",
+                "RETRIEVAL_DOCUMENT",
+                "SEMANTIC_SIMILARITY",
+                "CLASSIFICATION",
+                "CLUSTERING"
+            ],
+            "default": "SEMANTIC_SIMILARITY",
+            "required": false
+        },
+        "output_dimensionality": {
+            "type": "integer",
+            "description": "Optional dimension size (e.g. 768)",
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Embeddings\nGenerate vector embeddings for text.",
+        "embeddings": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

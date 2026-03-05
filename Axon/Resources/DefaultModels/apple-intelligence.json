@@ -1,0 +1,24 @@
+{
+  "id": "appleFoundation",
+  "displayName": "Apple Intelligence",
+  "type": "foundation",
+  "description": "On-device ~3B model. Private, offline, free.",
+  "icon": "apple.intelligence",
+  "requiresAPIKey": false,
+  "isOnDevice": true,
+  "platformRequirements": {
+    "minimumOS": "iOS 26.0",
+    "requiresAppleSilicon": true,
+    "requiresPhysicalDevice": true
+  },
+  "models": [
+    {
+      "id": "apple-foundation-default",
+      "displayName": "Apple Intelligence",
+      "contextWindow": 4096,
+      "modalities": ["text"],
+      "description": "On-device ~3B model. Private, offline, free. Requires iOS 26+",
+      "status": "stable"
+    }
+  ]
+}

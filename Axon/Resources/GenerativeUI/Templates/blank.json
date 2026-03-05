@@ -1,0 +1,34 @@
+{
+  "version": "1.0",
+  "definition": {
+    "id": "00000000-0000-0000-0000-000000000001",
+    "name": "Blank Canvas",
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-01T00:00:00Z",
+    "source": "bundle",
+    "root": {
+      "type": "VStack",
+      "properties": {
+        "keys": ["spacing", "alignment"],
+        "values": [16, "center"]
+      },
+      "children": [
+        {
+          "type": "Spacer",
+          "properties": { "keys": [], "values": [] }
+        },
+        {
+          "type": "Text",
+          "properties": {
+            "keys": ["text", "font", "color"],
+            "values": ["Start building here", "bodyMedium", "textTertiary"]
+          }
+        },
+        {
+          "type": "Spacer",
+          "properties": { "keys": [], "values": [] }
+        }
+      ]
+    }
+  }
+}

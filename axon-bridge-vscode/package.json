@@ -1,0 +1,258 @@
+{
+  "name": "axon-bridge",
+  "displayName": "Axon Bridge",
+  "description": "Connect VS Code to Axon AI assistant for AI-powered coding assistance",
+  "version": "0.2.7",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "axon-bridge.connect",
+        "title": "Axon: Connect to Bridge"
+      },
+      {
+        "command": "axon-bridge.disconnect",
+        "title": "Axon: Disconnect from Bridge"
+      },
+      {
+        "command": "axon-bridge.status",
+        "title": "Axon: Show Bridge Status"
+      },
+      {
+        "command": "axon-bridge.logs",
+        "title": "Axon: Show Bridge Logs"
+      },
+      {
+        "command": "axon-bridge.logs.clear",
+        "title": "Axon: Clear Bridge Logs"
+      },
+      {
+        "command": "axon-bridge.startServer",
+        "title": "Axon: Start Server (Remote Mode)"
+      },
+      {
+        "command": "axon-bridge.stopServer",
+        "title": "Axon: Stop Server (Remote Mode)"
+      },
+      {
+        "command": "axon-bridge.showServerAddress",
+        "title": "Axon: Show Server Address"
+      },
+      {
+        "command": "axon-bridge.switchMode",
+        "title": "Axon: Switch Connection Mode"
+      },
+      {
+        "command": "axon-bridge.showFingerprint",
+        "title": "Axon: Show TLS Certificate Fingerprint"
+      },
+      {
+        "command": "axon-bridge.importProfile",
+        "title": "Axon: Import Connection Profile (QR Payload)"
+      },
+      {
+        "command": "axon-bridge.connectToProfile",
+        "title": "Axon: Connect to Saved Profile"
+      },
+      {
+        "command": "axon-bridge.manageProfiles",
+        "title": "Axon: Manage Connection Profiles"
+      },
+      {
+        "command": "axon-bridge.manageTrustedCerts",
+        "title": "Axon: Manage Trusted Certificates"
+      }
+    ],
+    "configuration": {
+      "title": "Axon Bridge",
+      "properties": {
+        "axonBridge.mode": {
+          "type": "string",
+          "enum": [
+            "local",
+            "remote"
+          ],
+          "default": "local",
+          "enumDescriptions": [
+            "Local Mode: VS Code connects to Axon (default)",
+            "Remote Mode: VS Code acts as server, Axon connects over LAN"
+          ],
+          "description": "Connection mode. Local: connect to Axon. Remote: accept connections from Axon."
+        },
+        "axonBridge.host": {
+          "type": "string",
+          "default": "localhost",
+          "description": "Host where Axon is running (Local Mode)"
+        },
+        "axonBridge.port": {
+          "type": "number",
+          "default": 8081,
+          "description": "Port for connecting to Axon (Local Mode)"
+        },
+        "axonBridge.autoConnect": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically connect/start when VS Code starts"
+        },
+        "axonBridge.reconnectInterval": {
+          "type": "number",
+          "default": 5000,
+          "description": "Reconnection interval in milliseconds (Local Mode)"
+        },
+        "axonBridge.pairingToken": {
+          "type": "string",
+          "default": "",
+          "description": "Optional pairing token for authentication. Must match in both Axon and VS Code."
+        },
+        "axonBridge.serverPort": {
+          "type": "number",
+          "default": 8082,
+          "description": "Port to listen on (Remote Mode)"
+        },
+        "axonBridge.serverBindAddress": {
+          "type": "string",
+          "default": "0.0.0.0",
+          "description": "Address to bind server (Remote Mode). Use 0.0.0.0 for LAN access."
+        },
+        "axonBridge.tlsEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable TLS encryption (wss://)"
+        },
+        "axonBridge.connectionProfiles": {
+          "type": "array",
+          "default": [],
+          "description": "Saved connection profiles for connecting to Axon hosts",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "host": {
+                "type": "string"
+              },
+              "port": {
+                "type": "number"
+              },
+              "tlsEnabled": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "lastConnectedAt": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "axonBridge.defaultProfileId": {
+          "type": "string",
+          "default": "",
+          "description": "ID of the default connection profile"
+        },
+        "axonBridge.trustedCertFingerprints": {
+          "type": "array",
+          "default": [],
+          "description": "Trusted TLS certificate fingerprints (SHA-256 hex) for self-signed certs",
+          "items": {
+            "type": "string"
+          }
+        },
+        "axonBridge.blockedPatterns": {
+          "type": "array",
+          "default": [
+            "**/.env",
+            "**/.env.*",
+            "**/credentials*",
+            "**/secrets*",
+            "**/*.pem",
+            "**/*.key",
+            "**/id_rsa*",
+            "**/id_ed25519*"
+          ],
+          "description": "Glob patterns for files blocked from bridge access",
+          "items": {
+            "type": "string"
+          }
+        },
+        "axonBridge.maxFileSize": {
+          "type": "number",
+          "default": 10485760,
+          "description": "Maximum file size in bytes for bridge file operations (default 10MB)"
+        },
+        "axonBridge.deviceName": {
+          "type": "string",
+          "default": "",
+          "description": "Name to identify this VS Code instance to Axon"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "axonBridge",
+          "title": "Axon",
+          "icon": "resources/axon.svg"
+        }
+      ]
+    },
+    "views": {
+      "axonBridge": [
+        {
+          "id": "axonSetupView",
+          "name": "Axon Setup",
+          "type": "webview",
+          "icon": "resources/axon.svg"
+        },
+        {
+          "id": "axonChatView",
+          "name": "Axon Chat",
+          "type": "webview",
+          "icon": "resources/axon.svg"
+        },
+        {
+          "id": "axonBridgeLogsView",
+          "name": "Bridge Logs",
+          "type": "webview",
+          "icon": "resources/axon.svg"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/selfsigned": "^2.0.4",
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.18.1",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "@types/qrcode": "^1.5.6",
+    "qrcode": "^1.5.4",
+    "selfsigned": "^5.5.0",
+    "ws": "^8.14.0"
+  }
+}

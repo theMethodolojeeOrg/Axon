@@ -1,0 +1,40 @@
+{
+    "version": "1.0.0",
+    "tool": {
+        "id": "grok_code_execution",
+        "name": "Code Execution",
+        "description": "Enables the model to write and execute Python code in real-time for calculations, data analysis, and complex logic.",
+        "category": "system",
+        "icon": {
+            "sfSymbol": "chevron.left.forwardslash.chevron.right"
+        },
+        "requiresApproval": false,
+        "tags": [
+            "grok",
+            "python",
+            "code",
+            "analysis",
+            "math"
+        ],
+        "trustTierCategory": "provider_capability"
+    },
+    "execution": {
+        "type": "provider_native",
+        "provider": "grok"
+    },
+    "parameters": {
+        "code": {
+            "type": "string",
+            "description": "The Python code to execute",
+            "required": false
+        }
+    },
+    "ai": {
+        "systemPromptSection": "### Code Execution\nWrite and execute Python code to solve problems.\n\n**Capabilities:**\n- Solve complex math.\n- Process data.\n- Run simulations.\n\n**Usage:**\nWrite code in the response to have it executed.",
+        "isCodeInterpreter": true
+    },
+    "sovereignty": {
+        "actionCategory": "provider_capability",
+        "riskLevel": "low"
+    }
+}

@@ -1,0 +1,188 @@
+{
+  "id": "apple",
+  "displayName": "Apple (Siri)",
+  "type": "tts",
+  "description": "On-device Siri voices - Free - No API key",
+  "icon": "apple.logo",
+  "requiresAPIKey": false,
+  "isOnDevice": true,
+  "voices": [
+    {
+      "id": "Samantha",
+      "displayName": "Samantha (US)",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Clear, friendly American female voice",
+      "toneDescription": "Clear",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Alex",
+      "displayName": "Alex (US)",
+      "gender": "male",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Natural American male voice",
+      "toneDescription": "Natural",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Allison",
+      "displayName": "Allison (US)",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Warm American female voice",
+      "toneDescription": "Warm",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Ava",
+      "displayName": "Ava (US)",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Expressive American female voice",
+      "toneDescription": "Expressive",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Tom",
+      "displayName": "Tom (US)",
+      "gender": "male",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Friendly American male voice",
+      "toneDescription": "Friendly",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Nicky",
+      "displayName": "Nicky (US)",
+      "gender": "female",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Bright American female voice",
+      "toneDescription": "Bright",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Evan",
+      "displayName": "Evan (US)",
+      "gender": "male",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Casual American male voice",
+      "toneDescription": "Casual",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Aaron",
+      "displayName": "Aaron (US)",
+      "gender": "male",
+      "accent": "american",
+      "locale": "en-US",
+      "description": "Professional American male voice",
+      "toneDescription": "Professional",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Susan",
+      "displayName": "Susan (UK)",
+      "gender": "female",
+      "accent": "british",
+      "locale": "en-GB",
+      "description": "Refined British female voice",
+      "toneDescription": "Refined",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Daniel",
+      "displayName": "Daniel (UK)",
+      "gender": "male",
+      "accent": "british",
+      "locale": "en-GB",
+      "description": "Distinguished British male voice",
+      "toneDescription": "Distinguished",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Kate",
+      "displayName": "Kate (UK)",
+      "gender": "female",
+      "accent": "british",
+      "locale": "en-GB",
+      "description": "Elegant British female voice",
+      "toneDescription": "Elegant",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Oliver",
+      "displayName": "Oliver (UK)",
+      "gender": "male",
+      "accent": "british",
+      "locale": "en-GB",
+      "description": "Warm British male voice",
+      "toneDescription": "Warm",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Moira",
+      "displayName": "Moira (Irish)",
+      "gender": "female",
+      "accent": "irish",
+      "locale": "en-IE",
+      "description": "Melodic Irish female voice",
+      "toneDescription": "Melodic",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Rishi",
+      "displayName": "Rishi (Indian)",
+      "gender": "male",
+      "accent": "indian",
+      "locale": "en-IN",
+      "description": "Clear Indian male voice",
+      "toneDescription": "Clear",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Veena",
+      "displayName": "Veena (Indian)",
+      "gender": "female",
+      "accent": "indian",
+      "locale": "en-IN",
+      "description": "Warm Indian female voice",
+      "toneDescription": "Warm",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Karen",
+      "displayName": "Karen (Australian)",
+      "gender": "female",
+      "accent": "australian",
+      "locale": "en-AU",
+      "description": "Friendly Australian female voice",
+      "toneDescription": "Friendly",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    },
+    {
+      "id": "Lee",
+      "displayName": "Lee (Australian)",
+      "gender": "male",
+      "accent": "australian",
+      "locale": "en-AU",
+      "description": "Casual Australian male voice",
+      "toneDescription": "Casual",
+      "qualityTiers": ["compact", "enhanced", "premium"]
+    }
+  ],
+  "settings": {
+    "rateRange": {
+      "min": 0.0,
+      "max": 1.0,
+      "default": 0.5
+    }
+  }
+}

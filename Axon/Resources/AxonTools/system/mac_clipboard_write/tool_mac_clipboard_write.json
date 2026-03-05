@@ -1,0 +1,53 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_clipboard_write",
+    "name": "Mac Write Clipboard",
+    "description": "Write text content to the Mac clipboard (pasteboard).",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "doc.on.clipboard.fill"
+    },
+    "requiresApproval": true,
+    "trustTierCategory": "system_clipboard",
+    "tags": [
+      "mac",
+      "clipboard",
+      "copy"
+    ]
+  },
+  "parameters": {
+    "content": {
+      "type": "string",
+      "required": true,
+      "description": "Text content to write to clipboard"
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "clipboard/write"
+  },
+  "ai": {
+    "systemPromptSection": "### mac_clipboard_write\nWrite text to the Mac clipboard.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_clipboard_write\", \"query\": \"{\\\"content\\\": \\\"text to copy\\\"}\"}\n```\n\n**Parameters:**\n- content: Text to write to clipboard (required)\n\n**Returns:** success boolean",
+    "whenToUse": [
+      "User explicitly asks to copy something",
+      "User wants text put on clipboard",
+      "User says 'copy this for me'"
+    ],
+    "whenNotToUse": [
+      "Just showing code - let user copy manually",
+      "User didn't explicitly request copying"
+    ]
+  },
+  "sovereignty": {
+    "actionCategory": "system_clipboard",
+    "approvalDescription": "Write to Mac clipboard",
+    "scopes": [
+      "clipboard.write"
+    ],
+    "riskLevel": "low"
+  }
+}

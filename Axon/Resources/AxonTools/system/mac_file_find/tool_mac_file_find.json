@@ -1,0 +1,53 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_file_find",
+    "name": "Mac Find Files",
+    "description": "Find files by name pattern in a directory.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "rectangle.and.text.magnifyingglass"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "mac",
+      "files",
+      "find",
+      "search"
+    ]
+  },
+  "parameters": {
+    "pattern": {
+      "type": "string",
+      "required": true,
+      "description": "File name pattern (supports * wildcard)"
+    },
+    "directory": {
+      "type": "string",
+      "required": false,
+      "description": "Directory to search in",
+      "default": "~"
+    },
+    "maxDepth": {
+      "type": "integer",
+      "required": false,
+      "description": "Maximum directory depth to search",
+      "default": 3
+    }
+  },
+  "inputFormat": {
+    "style": "json"
+  },
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "file/find"
+  },
+  "ai": {
+    "systemPromptSection": "### mac_file_find\nFind files by name pattern.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_file_find\", \"query\": \"{\\\"pattern\\\": \\\"*.swift\\\", \\\"directory\\\": \\\"~/Projects\\\"}\"}\n```\n\n**Parameters:**\n- pattern: File name pattern with * wildcard (required)\n- directory: Search directory (default: ~)\n- maxDepth: Max search depth (default: 3)\n\n**Returns:** List of files with path, name, sizeBytes, isDirectory",
+    "whenToUse": [
+      "Need to find files by extension",
+      "Searching within a specific directory",
+      "Looking for files matching a pattern"
+    ]
+  }
+}

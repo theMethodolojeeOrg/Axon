@@ -1,0 +1,54 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_screenshot",
+    "name": "Mac Screenshot",
+    "description": "Capture a screenshot of the Mac screen.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "camera.viewfinder"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "mac",
+      "screenshot",
+      "capture",
+      "screen"
+    ]
+  },
+  "parameters": {
+    "path": {
+      "type": "string",
+      "required": false,
+      "description": "Path to save screenshot (if not provided, returns base64 data)"
+    },
+    "display": {
+      "type": "integer",
+      "required": false,
+      "description": "Display index to capture (null for main display)"
+    },
+    "includeWindows": {
+      "type": "boolean",
+      "required": false,
+      "description": "Include window contents",
+      "default": true
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "screenshot/capture"
+  },
+  "ai": {
+    "systemPromptSection": "### mac_screenshot\nCapture a screenshot of the Mac screen.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_screenshot\", \"query\": \"{\\\"path\\\": \\\"/path/to/save.png\\\"}\"}\n```\n\n**Parameters:**\n- path: Save location (optional, returns base64 if not provided)\n- display: Display index (optional)\n- includeWindows: Include window contents (default: true)\n\n**Returns:** success, path or imageData (base64), width, height",
+    "whenToUse": [
+      "User asks for a screenshot",
+      "Need visual context of what's on screen"
+    ],
+    "whenNotToUse": [
+      "Privacy-sensitive situations without explicit consent"
+    ]
+  }
+}

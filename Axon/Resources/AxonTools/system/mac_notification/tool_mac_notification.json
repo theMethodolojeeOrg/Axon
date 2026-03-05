@@ -1,0 +1,53 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "mac_notification",
+    "name": "Mac Send Notification",
+    "description": "Send a system notification on the Mac.",
+    "category": "system",
+    "icon": {
+      "sfSymbol": "bell.fill"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "mac",
+      "notification",
+      "alert"
+    ]
+  },
+  "parameters": {
+    "title": {
+      "type": "string",
+      "required": true,
+      "description": "Notification title"
+    },
+    "message": {
+      "type": "string",
+      "required": true,
+      "description": "Notification body text"
+    },
+    "subtitle": {
+      "type": "string",
+      "required": false,
+      "description": "Optional subtitle"
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "bridge",
+    "bridgeMethod": "notification/send"
+  },
+  "ai": {
+    "systemPromptSection": "### mac_notification\nSend a macOS system notification.\n\n**Format:**\n```tool_request\n{\"tool\": \"mac_notification\", \"query\": \"{\\\"title\\\": \\\"Title\\\", \\\"message\\\": \\\"Body text\\\"}\"}\n```\n\n**Parameters:**\n- title: Notification title (required)\n- message: Body text (required)\n- subtitle: Optional subtitle\n\n**Returns:** success, notificationId",
+    "whenToUse": [
+      "User asks to be notified",
+      "Long-running task completed",
+      "Need to alert user of something"
+    ],
+    "whenNotToUse": [
+      "Normal responses - don't spam notifications"
+    ]
+  }
+}
