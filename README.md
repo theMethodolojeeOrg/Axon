@@ -81,13 +81,13 @@ A local-first AI orchestration assistant for iOS and macOS. Connect to multiple 
 ### 1. Clone
 
 ```bash
-git clone https://github.com/tooury/Axon.git
+git clone https://github.com/theMethodolojeeOrg/Axon.git
 cd Axon
 ```
 
 ### 2. Axon-Artifacts Package (Required)
 
-Axon depends on the `Axon-Artifacts` Swift package, which is being prepared for release as a separate public repository. Until it is available, the project will not build without it. Check the [Issues](https://github.com/tooury/Axon/issues) page for the tracking issue.
+Axon depends on the `Axon-Artifacts` Swift package, which is being prepared for release as a separate public repository. Until it is available, the project will not build without it. Check the [Issues](https://github.com/theMethodolojeeOrg/Axon/issues) page for the tracking issue.
 
 ### 3. Open in Xcode
 
