@@ -12,6 +12,7 @@ DerivedData/
 
 # Xcode Scheme Management
 *.xcscheme
+!Axon.xcodeproj/xcshareddata/xcschemes/*.xcscheme
 
 # Xcode Quick Look
 *.xcscmblueprint

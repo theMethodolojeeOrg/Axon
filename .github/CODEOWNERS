@@ -1,0 +1,7 @@
+# CODEOWNERS
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Default reviewer for all pull requests.
+# Add directory-specific rules when collaborators join.
+
+* @tooury
