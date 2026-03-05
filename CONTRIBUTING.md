@@ -5,7 +5,7 @@ Thank you for your interest in contributing. This document covers how to get sta
 ## Before You Start
 
 - Read the [README](README.md) for architecture and setup
-- Check [open issues](https://github.com/tooury/Axon/issues) and PRs to avoid duplicating work
+- Check [open issues](https://github.com/theMethodolojeeOrg/Axon/issues) and PRs to avoid duplicating work
 - For significant changes, open an issue first to discuss your approach
 
 ## Setup
@@ -26,7 +26,7 @@ Thank you for your interest in contributing. This document covers how to get sta
 
 ### Axon-Artifacts Package
 
-Axon depends on a local Swift package (`Axon-Artifacts`) that is being prepared for public release as a separate repository. Check the [Issues](https://github.com/tooury/Axon/issues) page for the tracking issue and setup instructions.
+Axon depends on a local Swift package (`Axon-Artifacts`) that is being prepared for public release as a separate repository. Check the [Issues](https://github.com/theMethodolojeeOrg/Axon/issues) page for the tracking issue and setup instructions.
 
 ### Firebase / Cloud Backend (Optional)
 

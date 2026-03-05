@@ -119,7 +119,7 @@ const newRelease = {
     humanTime: humanTime,
     filename: vsixName,
     path: `${date}/${vsixName}`,
-    downloadUrl: `https://github.com/tooury/Axon/raw/main/axon-bridge-vscode/releases/${date}/${vsixName}`,
+    downloadUrl: `https://github.com/theMethodolojeeOrg/Axon/raw/main/axon-bridge-vscode/releases/${date}/${vsixName}`,
     changelog: changelog
 };
 
@@ -133,7 +133,7 @@ manifest.releases.unshift(newRelease);
 manifest.latest = {
     version: version,
     downloadUrl: newRelease.downloadUrl,
-    latestUrl: 'https://github.com/tooury/Axon/raw/main/axon-bridge-vscode/releases/latest/axon-bridge-latest.vsix'
+    latestUrl: 'https://github.com/theMethodolojeeOrg/Axon/raw/main/axon-bridge-vscode/releases/latest/axon-bridge-latest.vsix'
 };
 
 fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + '\n');
@@ -164,8 +164,8 @@ const releaseInfo = `## Current Release
 ${changelog}
 
 ### Download
-- [Download Latest VSIX](https://github.com/tooury/Axon/raw/main/axon-bridge-vscode/releases/latest/axon-bridge-latest.vsix)
-- [Download This Version](https://github.com/tooury/Axon/raw/main/axon-bridge-vscode/releases/${date}/${vsixName})
+- [Download Latest VSIX](https://github.com/theMethodolojeeOrg/Axon/raw/main/axon-bridge-vscode/releases/latest/axon-bridge-latest.vsix)
+- [Download This Version](https://github.com/theMethodolojeeOrg/Axon/raw/main/axon-bridge-vscode/releases/${date}/${vsixName})
 
 ---
 
@@ -197,8 +197,8 @@ echo "  File Location:"
 echo "    $VSIX_PATH"
 echo ""
 echo "  Download URLs:"
-echo "    Latest:   https://github.com/tooury/Axon/raw/main/axon-bridge-vscode/releases/latest/axon-bridge-latest.vsix"
-echo "    Specific: https://github.com/tooury/Axon/raw/main/axon-bridge-vscode/releases/$DATE/$VSIX_NAME"
+echo "    Latest:   https://github.com/theMethodolojeeOrg/Axon/raw/main/axon-bridge-vscode/releases/latest/axon-bridge-latest.vsix"
+echo "    Specific: https://github.com/theMethodolojeeOrg/Axon/raw/main/axon-bridge-vscode/releases/$DATE/$VSIX_NAME"
 echo ""
 echo "  Changes:"
 echo "$CHANGELOG"
