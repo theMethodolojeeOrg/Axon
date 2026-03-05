@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E2118D6B2F5989BE0068E2C5 /* AxonArtifacts in Frameworks */ = {isa = PBXBuildFile; productRef = E2118D6A2F5989BE0068E2C5 /* AxonArtifacts */; };
 		E217D4312EEA494A00D3DAB2 /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4302EEA494A00D3DAB2 /* CloudKit.framework */; };
 		E217D4332EEA4BF700D3DAB2 /* CryptoKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4322EEA4BF700D3DAB2 /* CryptoKit.framework */; };
 		E217D4352EEA4BFF00D3DAB2 /* CryptoTokenKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4342EEA4BFF00D3DAB2 /* CryptoTokenKit.framework */; };
@@ -186,6 +187,7 @@
 				E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */,
 				E2403B0C2F0372D100CC9418 /* MLXLMCommon in Frameworks */,
 				E27FB5F12ECD5E2F003C52BF /* SodiumFoundationCompat in Frameworks */,
+				E2118D6B2F5989BE0068E2C5 /* AxonArtifacts in Frameworks */,
 				E22498CA2ED5D1880053D459 /* MarkdownUI in Frameworks */,
 				E2D7BCE92F456A9B00A9FB38 /* AppKit.framework in Frameworks */,
 				E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */,
@@ -340,6 +342,7 @@
 				E2403B1B2F037E0E00CC9418 /* MLXRandom */,
 				E2D7BD0A2F45A4E100A9FB38 /* Yams */,
 				E2C1DD8C2F4D0EA200DD6080 /* AxonArtifacts */,
+				E2118D6A2F5989BE0068E2C5 /* AxonArtifacts */,
 			);
 			productName = Axon;
 			productReference = E254ED962EB21B76000CDD9D /* Axon.app */;
@@ -455,7 +458,7 @@
 				E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
 				E2403B112F03739200CC9418 /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */,
 				E2D7BD092F45A4E100A9FB38 /* XCRemoteSwiftPackageReference "Yams" */,
-				E2C1DD8B2F4D0EA200DD6080 /* XCLocalSwiftPackageReference "../a_MethodolojeePackages/Axon-Artifacts" */,
+				E2118D692F5989BE0068E2C5 /* XCRemoteSwiftPackageReference "Axon-Artifacts" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E254ED972EB21B76000CDD9D /* Products */;
@@ -1015,14 +1018,15 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		E2C1DD8B2F4D0EA200DD6080 /* XCLocalSwiftPackageReference "../a_MethodolojeePackages/Axon-Artifacts" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = "../a_MethodolojeePackages/Axon-Artifacts";
-		};
-/* End XCLocalSwiftPackageReference section */
-
 /* Begin XCRemoteSwiftPackageReference section */
+		E2118D692F5989BE0068E2C5 /* XCRemoteSwiftPackageReference "Axon-Artifacts" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/theMethodolojeeOrg/Axon-Artifacts";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 		E21FCC002EFA24B1009EF882 /* XCRemoteSwiftPackageReference "kokoro-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/mlalma/kokoro-ios";
@@ -1106,6 +1110,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		E2118D6A2F5989BE0068E2C5 /* AxonArtifacts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2118D692F5989BE0068E2C5 /* XCRemoteSwiftPackageReference "Axon-Artifacts" */;
+			productName = AxonArtifacts;
+		};
 		E22498C92ED5D1880053D459 /* MarkdownUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E22498C82ED5D1880053D459 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;

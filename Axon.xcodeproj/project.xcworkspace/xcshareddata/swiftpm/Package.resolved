@@ -1,5 +1,5 @@
 {
-  "originHash" : "f20711c144899b0951988f5fb9a27036b1f686bd78b26dac4234cb5cf0f8d485",
+  "originHash" : "0138abdc7d5c1d3b5e9a9022712b6e689f253e7d0ed57eeeb001109d0ff5ae11",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "61b85103a1aeed8218f17c794687781505fbbef5",
         "version" : "11.2.0"
+      }
+    },
+    {
+      "identity" : "axon-artifacts",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/theMethodolojeeOrg/Axon-Artifacts",
+      "state" : {
+        "branch" : "main",
+        "revision" : "0e3425a5de798a5f0b674f84226953bd124b97f2"
       }
     },
     {
