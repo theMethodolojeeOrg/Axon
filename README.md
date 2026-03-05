@@ -87,7 +87,7 @@ cd Axon
 
 ### 2. Axon-Artifacts Package (Required)
 
-Axon depends on the `Axon-Artifacts` Swift package, which is being prepared for release as a separate public repository. Until it is available, the project will not build without it. Check the [Issues](https://github.com/theMethodolojeeOrg/Axon/issues) page for the tracking issue.
+Axon depends on the `Axon-Artifacts` Swift package, which can be found at https://github.com/theMethodolojeeOrg/Axon-Artifacts. 
 
 ### 3. Open in Xcode
 
