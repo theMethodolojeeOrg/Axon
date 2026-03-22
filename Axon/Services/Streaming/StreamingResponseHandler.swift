@@ -88,7 +88,7 @@ class StreamingResponseHandler {
                     } else {
                         continuation.yield(.error(.connectionFailed(error.localizedDescription)))
                     }
-                    continuation.finish(throwing: error)
+                    continuation.finish()
                 }
             }
         }
@@ -136,7 +136,18 @@ class StreamingResponseHandler {
         }
 
         guard httpResponse.statusCode == 200 else {
-            throw StreamingError.providerError(httpResponse.statusCode, "Anthropic API error")
+            var errorBody = ""
+            do {
+                for try await line in bytes.lines {
+                    errorBody += line
+                }
+            } catch {
+                // Ignore error-body parsing failures and preserve status.
+            }
+            throw StreamingError.providerError(
+                httpResponse.statusCode,
+                errorBody.isEmpty ? "Anthropic API error" : errorBody
+            )
         }
 
         var accumulatedContent = ""
@@ -327,34 +338,101 @@ class StreamingResponseHandler {
         }
 
         var accumulatedContent = ""
+        var accumulatedReasoning = ""
+        var sawAnyProviderEvent = false
+        var sawCompletionSignal = false
+        var loggedUnknownPayload = false
+        let providerName = providerDisplayName(for: config.provider, baseUrl: baseUrl)
 
         for try await line in bytes.lines {
             guard let data = SSEParser.parseDataLine(line) else { continue }
 
-            if let event = SSEParser.parseOpenAIEvent(data) {
-                switch event {
-                case .delta(let content, _, let finishReason):
-                    if let content = content {
-                        accumulatedContent += content
-                        continuation.yield(.textDelta(content))
-                    }
-                    if finishReason != nil {
-                        continuation.yield(.completion(StreamingCompletion(
-                            fullContent: accumulatedContent,
-                            reasoning: nil,
-                            toolCalls: [],
-                            groundingSources: [],
-                            memoryOperations: [],
-                            tokens: nil,
-                            modelName: config.model,
-                            providerName: "OpenAI"
-                        )))
-                        return  // Exit the function after completion
-                    }
-                case .done:
-                    return  // Exit the function when [DONE] signal received
+            guard let event = SSEParser.parseOpenAIEvent(data) else {
+                if !loggedUnknownPayload {
+                    loggedUnknownPayload = true
+                    print("[StreamingHTTP] ⚠️ Unrecognized stream frame: provider=\(config.provider) model=\(config.model) payload=\(String(data.prefix(240)))")
                 }
+                continue
             }
+
+            sawAnyProviderEvent = true
+
+            switch event {
+            case .delta(let content, _, let finishReason):
+                if let content, !content.isEmpty {
+                    accumulatedContent += content
+                    continuation.yield(.textDelta(content))
+                }
+                if finishReason != nil {
+                    sawCompletionSignal = true
+                    continuation.yield(.completion(StreamingCompletion(
+                        fullContent: accumulatedContent,
+                        reasoning: accumulatedReasoning.isEmpty ? nil : accumulatedReasoning,
+                        toolCalls: [],
+                        groundingSources: [],
+                        memoryOperations: [],
+                        tokens: nil,
+                        modelName: config.model,
+                        providerName: providerName
+                    )))
+                    return
+                }
+
+            case .reasoningDelta(let text):
+                guard !text.isEmpty else { continue }
+                accumulatedReasoning += text
+                continuation.yield(.reasoningDelta(text))
+
+            case .completion(_):
+                sawCompletionSignal = true
+                continuation.yield(.completion(StreamingCompletion(
+                    fullContent: accumulatedContent,
+                    reasoning: accumulatedReasoning.isEmpty ? nil : accumulatedReasoning,
+                    toolCalls: [],
+                    groundingSources: [],
+                    memoryOperations: [],
+                    tokens: nil,
+                    modelName: config.model,
+                    providerName: providerName
+                )))
+                return
+
+            case .providerError(let type, let message, let code):
+                var detail = "\(type): \(message)"
+                if let code, !code.isEmpty {
+                    detail += " (code: \(code))"
+                }
+                throw StreamingError.providerError(0, detail)
+
+            case .done:
+                sawCompletionSignal = true
+                continuation.yield(.completion(StreamingCompletion(
+                    fullContent: accumulatedContent,
+                    reasoning: accumulatedReasoning.isEmpty ? nil : accumulatedReasoning,
+                    toolCalls: [],
+                    groundingSources: [],
+                    memoryOperations: [],
+                    tokens: nil,
+                    modelName: config.model,
+                    providerName: providerName
+                )))
+                return
+            }
+        }
+
+        // Some providers end stream without finish_reason or [DONE].
+        // Emit deterministic completion when we parsed valid provider events.
+        if sawAnyProviderEvent && !sawCompletionSignal {
+            continuation.yield(.completion(StreamingCompletion(
+                fullContent: accumulatedContent,
+                reasoning: accumulatedReasoning.isEmpty ? nil : accumulatedReasoning,
+                toolCalls: [],
+                groundingSources: [],
+                memoryOperations: [],
+                tokens: nil,
+                modelName: config.model,
+                providerName: providerName
+            )))
         }
     }
 
@@ -403,52 +481,104 @@ class StreamingResponseHandler {
         }
 
         guard httpResponse.statusCode == 200 else {
-            throw StreamingError.providerError(httpResponse.statusCode, "Gemini API error")
+            var errorBody = ""
+            do {
+                for try await line in bytes.lines {
+                    errorBody += line
+                }
+            } catch {
+                // Ignore error-body parsing failures and preserve status.
+            }
+            throw StreamingError.providerError(
+                httpResponse.statusCode,
+                errorBody.isEmpty ? "Gemini API error" : errorBody
+            )
         }
 
         var accumulatedContent = ""
         var lastTokens: TokenUsage? = nil
-        let lineBuffer = SSELineBuffer()
+        var sawAnyProviderEvent = false
+        var sawCompletionSignal = false
+        var loggedUnknownPayload = false
 
-        // Gemini returns newline-delimited JSON chunks
-        for try await chunk in bytes {
-            let lines = await lineBuffer.append(Data([chunk]))
-            for line in lines {
-                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty else { continue }
+        for try await line in bytes.lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
 
-                let events = SSEParser.parseGeminiChunk(trimmed)
-                for event in events {
-                    switch event {
-                    case .textDelta(let text):
-                        accumulatedContent += text
-                        continuation.yield(.textDelta(text))
+            let events = SSEParser.parseGeminiChunk(trimmed)
+            if events.isEmpty {
+                let looksLikePayload = trimmed.hasPrefix("data:") || trimmed.hasPrefix("{") || trimmed.hasPrefix("[")
+                if looksLikePayload && !loggedUnknownPayload {
+                    loggedUnknownPayload = true
+                    print("[StreamingGemini] ⚠️ Unrecognized stream frame: provider=\(config.provider) model=\(config.model) payload=\(String(trimmed.prefix(240)))")
+                }
+                continue
+            }
 
-                    case .usageMetadata(let promptTokens, let candidatesTokens, let totalTokens):
-                        lastTokens = TokenUsage(
-                            input: promptTokens,
-                            output: candidatesTokens,
-                            total: totalTokens
-                        )
+            sawAnyProviderEvent = true
 
-                    case .finishReason(_):
-                        continuation.yield(.completion(StreamingCompletion(
-                            fullContent: accumulatedContent,
-                            reasoning: nil,
-                            toolCalls: [],
-                            groundingSources: [],
-                            memoryOperations: [],
-                            tokens: lastTokens,
-                            modelName: config.model,
-                            providerName: "Gemini"
-                        )))
-                        return  // Exit the function after completion
+            for event in events {
+                switch event {
+                case .textDelta(let text):
+                    accumulatedContent += text
+                    continuation.yield(.textDelta(text))
 
-                    default:
-                        break
-                    }
+                case .usageMetadata(let promptTokens, let candidatesTokens, let totalTokens):
+                    lastTokens = TokenUsage(
+                        input: promptTokens,
+                        output: candidatesTokens,
+                        total: totalTokens
+                    )
+
+                case .finishReason(_):
+                    sawCompletionSignal = true
+                    continuation.yield(.completion(StreamingCompletion(
+                        fullContent: accumulatedContent,
+                        reasoning: nil,
+                        toolCalls: [],
+                        groundingSources: [],
+                        memoryOperations: [],
+                        tokens: lastTokens,
+                        modelName: config.model,
+                        providerName: "Gemini"
+                    )))
+                    return
+
+                case .providerError(let code, let status, let message):
+                    let statusText = status ?? "UNKNOWN"
+                    throw StreamingError.providerError(code ?? 0, "[\(statusText)] \(message)")
+
+                case .done:
+                    sawCompletionSignal = true
+                    continuation.yield(.completion(StreamingCompletion(
+                        fullContent: accumulatedContent,
+                        reasoning: nil,
+                        toolCalls: [],
+                        groundingSources: [],
+                        memoryOperations: [],
+                        tokens: lastTokens,
+                        modelName: config.model,
+                        providerName: "Gemini"
+                    )))
+                    return
+
+                default:
+                    break
                 }
             }
+        }
+
+        if sawAnyProviderEvent && !sawCompletionSignal {
+            continuation.yield(.completion(StreamingCompletion(
+                fullContent: accumulatedContent,
+                reasoning: nil,
+                toolCalls: [],
+                groundingSources: [],
+                memoryOperations: [],
+                tokens: lastTokens,
+                modelName: config.model,
+                providerName: "Gemini"
+            )))
         }
     }
 
@@ -488,7 +618,18 @@ class StreamingResponseHandler {
         }
 
         guard httpResponse.statusCode == 200 else {
-            throw StreamingError.providerError(httpResponse.statusCode, "DeepSeek API error")
+            var errorBody = ""
+            do {
+                for try await line in bytes.lines {
+                    errorBody += line
+                }
+            } catch {
+                // Ignore error-body parsing failures and preserve status.
+            }
+            throw StreamingError.providerError(
+                httpResponse.statusCode,
+                errorBody.isEmpty ? "DeepSeek API error" : errorBody
+            )
         }
 
         var accumulatedContent = ""
@@ -547,6 +688,19 @@ class StreamingResponseHandler {
     }
 
     // MARK: - Attachment Formatting
+
+    private func providerDisplayName(for provider: String, baseUrl: String?) -> String {
+        let normalized = provider.lowercased()
+        if normalized == "grok" { return "Grok" }
+        if normalized == "openai" { return "OpenAI" }
+        if normalized == "openai-compatible" {
+            if let baseUrl, baseUrl.lowercased().contains("x.ai") {
+                return "Grok"
+            }
+            return "OpenAI-Compatible"
+        }
+        return provider
+    }
 
     private func anthropicContentBlocks(for message: Message) -> [[String: Any]] {
         var blocks: [[String: Any]] = []

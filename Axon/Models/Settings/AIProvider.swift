@@ -62,6 +62,23 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
         case .anthropic:
             return [
                 AIModel(
+                    id: "claude-opus-4-6-20260205",
+                    name: "Claude Opus 4.6",
+                    provider: .anthropic,
+                    contextWindow: 1_000_000,
+                    modalities: ["text", "image"],
+                    description: "Frontier Claude model with 1M token context, adaptive reasoning effort, and the longest task-completion horizon for complex agents and coding"
+                ),
+
+                AIModel(
+                    id: "claude-sonnet-4-6-20260217",
+                    name: "Claude Sonnet 4.6",
+                    provider: .anthropic,
+                    contextWindow: 1_000_000,
+                    modalities: ["text", "image"],
+                    description: "Most capable Sonnet model with upgraded coding, computer use, long-context reasoning, and agent planning for high-volume workloads"
+                ),
+                AIModel(
                     id: "claude-opus-4-5-20251022",
                     name: "Claude Opus 4.5",
                     provider: .anthropic,
@@ -112,6 +129,32 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
             ]
         case .openai:
             return [
+                AIModel(
+                    id: "gpt-5.4",
+                    name: "GPT-5.4",
+                    provider: .openai,
+                    contextWindow: 1_050_000,
+                    modalities: ["text", "image"],
+                    description: "Frontier model with 1M token context and advanced reasoning for complex professional and coding workloads"
+                ),
+
+                AIModel(
+                    id: "gpt-5.4-mini",
+                    name: "GPT-5.4 mini",
+                    provider: .openai,
+                    contextWindow: 400_000,
+                    modalities: ["text", "image"],
+                    description: "Strongest mini variant of GPT-5.4 for high-volume coding, computer use, and subagents with lower cost and latency"
+                ),
+
+                AIModel(
+                    id: "gpt-5.3-codex",
+                    name: "GPT-5.3 Codex",
+                    provider: .openai,
+                    contextWindow: 400_000,
+                    modalities: ["text"],
+                    description: "Agentic coding model with tool-use support and higher reasoning effort for long-horizon development workflows"
+                ),
                 AIModel(
                     id: "gpt-5.2",
                     name: "GPT-5.2",
@@ -244,8 +287,8 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
         case .gemini:
             return [
                 AIModel(
-                    id: "gemini-3-pro-preview",
-                    name: "Gemini 3 Pro Preview",
+                    id: "gemini-3.1-pro-preview",
+                    name: "Gemini 3.1 Pro Preview",
                     provider: .gemini,
                     contextWindow: 1_000_000,
                     modalities: ["text", "image", "video", "audio", "pdf"],
@@ -256,6 +299,14 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                     name: "Gemini 3 Flash Preview",
                     provider: .gemini,
                     contextWindow: 1_048_576,
+                    modalities: ["text", "image", "video", "audio", "pdf"],
+                    description: "Most intelligent model built for speed, combining frontier intelligence with superior search and grounding"
+                ),
+                AIModel(
+                    id: "gemini-3.1-flash-lite-preview",
+                    name: "Gemini 3.1 Flash Lite Preview",
+                    provider: .gemini,
+                    contextWindow: 200_000,
                     modalities: ["text", "image", "video", "audio", "pdf"],
                     description: "Most intelligent model built for speed, combining frontier intelligence with superior search and grounding"
                 ),
@@ -391,6 +442,23 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
             ]
         case .zai:
             return [
+                AIModel(
+                    id: "glm-5",
+                    name: "GLM-5",
+                    provider: .zai,
+                    contextWindow: 200_000,
+                    modalities: ["text"],
+                    description: "Next-generation flagship GLM with 200K context, MoE architecture, and state-of-the-art open-weight performance on coding and long-horizon agentic tasks"
+                ),
+
+                AIModel(
+                    id: "glm-5-turbo",
+                    name: "GLM-5 Turbo",
+                    provider: .zai,
+                    contextWindow: 200_000,
+                    modalities: ["text"],
+                    description: "Optimized GLM-5 variant for API use with lower cost and latency while retaining strong reasoning, coding, and agent capabilities"
+                ),
                 AIModel(
                     id: "glm-4.6",
                     name: "GLM-4.6",

@@ -73,12 +73,15 @@ final class ModelConfigurationService: ObservableObject {
 
     // MARK: - Loading
 
-    /// Load configuration with fallback chain: active -> bundled
+    /// Load configuration with fallback chain: active -> bundled.
+    /// If active config is missing, seed it from bundled defaults.
     func loadConfiguration() {
         logger.info("Loading model configuration...")
+        let activeFileExists = activeConfigURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
 
         // Try to load active configuration
         if let activeURL = activeConfigURL,
+           activeFileExists,
            let catalog = loadCatalog(from: activeURL) {
             activeCatalog = catalog
             logger.info("Loaded active configuration v\(catalog.version) with \(catalog.providers.count) providers")
@@ -88,12 +91,26 @@ final class ModelConfigurationService: ObservableObject {
                 let catalog = loadCatalog(from: bundledURL) {
             activeCatalog = catalog
             logger.info("Loaded bundled configuration v\(catalog.version) with \(catalog.providers.count) providers")
+
+            // Seed missing or invalid active config so subsequent launches load from user storage.
+            if let activeURL = activeConfigURL {
+                do {
+                    if activeFileExists {
+                        try? FileManager.default.removeItem(at: activeURL)
+                    }
+                    try FileManager.default.copyItem(at: bundledURL, to: activeURL)
+                    logger.info("Seeded models-active.json from bundled defaults")
+                } catch {
+                    logger.error("Failed to seed active configuration: \(error.localizedDescription)")
+                }
+            }
         } else {
             logger.error("Failed to load any model configuration!")
         }
 
         // Check for pending draft
         if let draftURL = draftConfigURL,
+           FileManager.default.fileExists(atPath: draftURL.path),
            let catalog = loadCatalog(from: draftURL) {
             draftCatalog = catalog
             hasPendingDraft = true

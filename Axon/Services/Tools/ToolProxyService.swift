@@ -4826,10 +4826,22 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     /// Format tool results for injection into conversation
     func formatToolResult(_ result: ToolResult) -> String {
+        let status = result.success ? "success" : "failure"
+        let failureSummary = result.success ? nil : summarizeFailureForModel(result.result)
+        var statusJSON = "{\"tool\":\"\(jsonEscape(result.tool))\",\"success\":\(result.success ? "true" : "false")"
+        if let failureSummary {
+            statusJSON += ",\"error\":\"\(jsonEscape(failureSummary))\""
+        }
+        statusJSON += "}"
+
         var formatted = """
 
         ---
+        ```tool_result
+        \(statusJSON)
+        ```
         **Tool Result** (\(result.tool)):
+        **Status:** \(status)
 
         \(result.result)
         """
@@ -4844,6 +4856,16 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         formatted += "\n---\n"
 
         return formatted
+    }
+
+    /// Keep failure hints compact and parseable for model retries.
+    private func summarizeFailureForModel(_ resultText: String) -> String {
+        let trimmed = resultText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Tool returned a failure with no detail." }
+        if let newlineIndex = trimmed.firstIndex(of: "\n") {
+            return String(trimmed[..<newlineIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return String(trimmed.prefix(240))
     }
 
     // MARK: - Location Services

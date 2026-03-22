@@ -1757,6 +1757,7 @@ struct ChatContainerView: View {
         var finalMemoryOps: [MessageMemoryOperation] = []
 
         var didReceiveAnyDelta = false
+        var didReceiveProviderError = false
 
         for try await event in stream {
             try Task.checkCancellation()
@@ -1772,6 +1773,10 @@ struct ChatContainerView: View {
                     streamedContent[assistantId] = finalContent
 
                 case .reasoningDelta(let text):
+                    if !didReceiveAnyDelta {
+                        didReceiveAnyDelta = true
+                        print("[ChatContainer] First reasoning delta received for \(assistantId)")
+                    }
                     finalReasoning += text
                     streamedReasoning[assistantId] = finalReasoning
 
@@ -1803,7 +1808,9 @@ struct ChatContainerView: View {
                         print("[Streaming] Completion fullContent shorter than accumulated deltas (completion=\(completion.fullContent.count), accumulated=\(finalContent.count)). Keeping accumulated.")
                     }
 
-                    finalReasoning = completion.reasoning ?? ""
+                    if let completionReasoning = completion.reasoning, !completionReasoning.isEmpty {
+                        finalReasoning = completionReasoning
+                    }
                     finalSources = completion.groundingSources
                     finalMemoryOps = completion.memoryOperations
                     // Store context debug info if available
@@ -1813,6 +1820,7 @@ struct ChatContainerView: View {
 
                 case .error(let error):
                     print("[ChatContainer] Streaming error: \(error.localizedDescription)")
+                    didReceiveProviderError = true
                     // Surface streaming errors to the user instead of silent failure
                     let errorText = error.localizedDescription
                     if finalContent.isEmpty {
@@ -1824,7 +1832,7 @@ struct ChatContainerView: View {
         }
 
         // If streaming ended but we never received any deltas, surface a visible error.
-        if !didReceiveAnyDelta && finalContent.isEmpty {
+        if !didReceiveAnyDelta && finalContent.isEmpty && finalReasoning.isEmpty && !didReceiveProviderError {
             // Provide more actionable guidance based on the provider
             let providerGuidance: String
             if config.provider == "appleFoundation" {

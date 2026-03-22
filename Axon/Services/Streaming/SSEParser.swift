@@ -22,8 +22,7 @@ struct SSEParser {
 
         let data = String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces)
 
-        // Check for stream termination signals
-        if data == "[DONE]" || data.isEmpty { return nil }
+        if data.isEmpty { return nil }
 
         return data
     }
@@ -127,6 +126,9 @@ extension SSEParser {
 
 enum OpenAISSEEvent: Sendable {
     case delta(content: String?, role: String?, finishReason: String?)
+    case reasoningDelta(String)
+    case completion(finishReason: String?)
+    case providerError(type: String, message: String, code: String?)
     case done
 
     struct Choice: Sendable {
@@ -151,8 +153,25 @@ extension SSEParser {
         }
 
         guard let jsonData = data.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
+              let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+            return nil
+        }
+
+        if let error = json["error"] as? [String: Any] {
+            let type = error["type"] as? String ?? "provider_error"
+            let message = error["message"] as? String ?? "Unknown provider error"
+            let code: String?
+            if let codeString = error["code"] as? String {
+                code = codeString
+            } else if let codeInt = error["code"] as? Int {
+                code = String(codeInt)
+            } else {
+                code = nil
+            }
+            return .providerError(type: type, message: message, code: code)
+        }
+
+        guard let choices = json["choices"] as? [[String: Any]],
               let firstChoice = choices.first else {
             return nil
         }
@@ -162,7 +181,32 @@ extension SSEParser {
         let role = delta?["role"] as? String
         let finishReason = firstChoice["finish_reason"] as? String
 
-        return .delta(content: content, role: role, finishReason: finishReason)
+        let reasoningDelta: String? = {
+            if let reasoningContent = delta?["reasoning_content"] as? String, !reasoningContent.isEmpty {
+                return reasoningContent
+            }
+            if let reasoning = delta?["reasoning"] as? String, !reasoning.isEmpty {
+                return reasoning
+            }
+            if let reasoningText = delta?["reasoning_text"] as? String, !reasoningText.isEmpty {
+                return reasoningText
+            }
+            return nil
+        }()
+
+        if let reasoningDelta, content == nil {
+            return .reasoningDelta(reasoningDelta)
+        }
+
+        if content != nil || role != nil {
+            return .delta(content: content, role: role, finishReason: finishReason)
+        }
+
+        if finishReason != nil {
+            return .completion(finishReason: finishReason)
+        }
+
+        return nil
     }
 }
 
@@ -174,6 +218,8 @@ enum GeminiStreamEvent: Sendable {
     case finishReason(String)
     case safetyRating(category: String, probability: String)
     case usageMetadata(promptTokens: Int, candidatesTokens: Int, totalTokens: Int)
+    case providerError(code: Int?, status: String?, message: String)
+    case done
 }
 
 extension SSEParser {
@@ -181,11 +227,41 @@ extension SSEParser {
     /// Parse Gemini streaming response chunk
     /// Gemini uses chunked JSON, not SSE format
     static func parseGeminiChunk(_ data: String) -> [GeminiStreamEvent] {
+        var payload = data.trimmingCharacters(in: .whitespacesAndNewlines)
+        if payload.hasPrefix("data:") {
+            payload = String(payload.dropFirst(5)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        guard !payload.isEmpty else { return [] }
+        if payload == "[DONE]" { return [.done] }
+
+        guard let jsonData = payload.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: jsonData) else {
+            return []
+        }
+
+        if let objects = json as? [[String: Any]] {
+            var events: [GeminiStreamEvent] = []
+            for object in objects {
+                events.append(contentsOf: parseGeminiObject(object))
+            }
+            return events
+        }
+        if let object = json as? [String: Any] {
+            return parseGeminiObject(object)
+        }
+
+        return []
+    }
+
+    private static func parseGeminiObject(_ json: [String: Any]) -> [GeminiStreamEvent] {
         var events: [GeminiStreamEvent] = []
 
-        guard let jsonData = data.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
-            return events
+        if let error = json["error"] as? [String: Any] {
+            let code = error["code"] as? Int
+            let status = error["status"] as? String
+            let message = error["message"] as? String ?? "Gemini provider error"
+            return [.providerError(code: code, status: status, message: message)]
         }
 
         // Parse candidates array

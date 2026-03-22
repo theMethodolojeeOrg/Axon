@@ -245,12 +245,32 @@ struct ToolCall: Codable, Equatable, Identifiable {
     let name: String
     let arguments: [String: AnyCodable]?
     let result: String?
+    let success: Bool?
+    let errorMessage: String?
 
     enum CodingKeys: String, CodingKey {
         case id
         case name
         case arguments
         case result
+        case success
+        case errorMessage
+    }
+
+    init(
+        id: String,
+        name: String,
+        arguments: [String: AnyCodable]? = nil,
+        result: String? = nil,
+        success: Bool? = nil,
+        errorMessage: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.arguments = arguments
+        self.result = result
+        self.success = success
+        self.errorMessage = errorMessage
     }
 }
 

@@ -450,7 +450,9 @@ extension LiveToolCall {
             arguments: request.flatMap { req in
                 ["query": .string(req.query)]
             },
-            result: result?.output
+            result: result?.output,
+            success: result?.success,
+            errorMessage: result?.errorMessage
         )
     }
 }

@@ -363,8 +363,12 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     )
                     continuation.finish()
                 } catch {
-                    continuation.yield(.error(.connectionFailed(error.localizedDescription)))
-                    continuation.finish(throwing: error)
+                    if let streamingError = error as? StreamingError {
+                        continuation.yield(.error(streamingError))
+                    } else {
+                        continuation.yield(.error(.connectionFailed(error.localizedDescription)))
+                    }
+                    continuation.finish()
                 }
             }
         }
@@ -687,7 +691,6 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
             // Collect all tool results to send back together
             var allToolResults: [(request: ToolRequest, result: ToolResult, formattedResult: String)] = []
-            var hadFailure = false
 
             // Process each tool request sequentially
             for toolRequest in toolRequests {
@@ -718,11 +721,12 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                         output: execResult.output,
                         sources: streamingSources,
                         memoryOperation: execResult.memoryOperation,
-                        duration: duration
+                        duration: duration,
+                        errorMessage: execResult.success ? nil : extractToolFailureMessage(from: execResult.output)
                     )
 
                     if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
-                        collectedToolCalls[index].state = .success
+                        collectedToolCalls[index].state = execResult.success ? .success : .failure
                         collectedToolCalls[index].result = result
                         collectedToolCalls[index].completedAt = Date()
                     }
@@ -730,10 +734,12 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     continuation.yield(.toolCallComplete(liveToolCall.id, result))
 
                     // Mark as executed for deduplication in UI
-                    ToolRequestTracker.shared.markExecuted(
-                        request: ToolRequest(tool: toolRequest.tool, query: toolRequest.query),
-                        result: execResult.output
-                    )
+                    if execResult.success {
+                        ToolRequestTracker.shared.markExecuted(
+                            request: ToolRequest(tool: toolRequest.tool, query: toolRequest.query),
+                            result: execResult.output
+                        )
+                    }
 
                     // Collect sources and memory ops
                     if let sources = execResult.groundingSources {
@@ -757,10 +763,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     allToolResults.append((request: toolRequest, result: toolResult, formattedResult: formattedResult))
 
                 } catch {
+                    let toolResult = makeThrownToolFailureResult(tool: toolRequest.tool, error: error)
                     let duration = Date().timeIntervalSince(startTime)
                     let result = ToolCallResult(
                         success: false,
-                        output: "",
+                        output: toolResult.result,
                         duration: duration,
                         errorMessage: error.localizedDescription
                     )
@@ -772,13 +779,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     }
 
                     continuation.yield(.toolCallComplete(liveToolCall.id, result))
-                    hadFailure = true
-                    break
-                }
-            }
 
-            if hadFailure {
-                break
+                    // Keep the loop alive by feeding this failure back to the model.
+                    let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
+                    allToolResults.append((request: toolRequest, result: toolResult, formattedResult: formattedResult))
+                }
             }
 
             // Get next response with all results combined
@@ -944,22 +949,30 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 toolUsed = true
 
                 // Execute tool via unified routing (V1/V2 automatic based on toggle)
-                let execResult = try await ToolRoutingService.shared.executeTool(
-                    toolId: toolRequest.tool,
-                    query: toolRequest.query
-                )
-                
-                // Convert to V1 ToolResult for the rest of the flow
-                let toolResult = ToolResult(
-                    tool: toolRequest.tool,
-                    success: execResult.success,
-                    result: execResult.output,
-                    sources: execResult.groundingSources?.map { ToolResultSource(title: $0.title, url: $0.url) },
-                    memoryOperation: execResult.memoryOperation
-                )
+                var executedSources: [MessageGroundingSource]? = nil
+                let toolResult: ToolResult
+                do {
+                    let execResult = try await ToolRoutingService.shared.executeTool(
+                        toolId: toolRequest.tool,
+                        query: toolRequest.query
+                    )
+                    executedSources = execResult.groundingSources
+
+                    // Convert to V1 ToolResult for the rest of the flow
+                    toolResult = ToolResult(
+                        tool: toolRequest.tool,
+                        success: execResult.success,
+                        result: execResult.output,
+                        sources: execResult.groundingSources?.map { ToolResultSource(title: $0.title, url: $0.url) },
+                        memoryOperation: execResult.memoryOperation
+                    )
+                } catch {
+                    toolResult = makeThrownToolFailureResult(tool: toolRequest.tool, error: error)
+                    print("[OnDeviceOrchestrator] Tool \(toolRequest.tool) threw an execution error: \(error.localizedDescription)")
+                }
 
                 // Collect grounding sources from tool result
-                if let sources = execResult.groundingSources {
+                if let sources = executedSources {
                     collectedSources.append(contentsOf: sources)
                 }
 
@@ -1070,6 +1083,28 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         let overlapRatio = Double(intersection.count) / Double(smallerSet)
 
         return overlapRatio >= 0.6  // 60% word overlap suggests same memory retry
+    }
+
+    /// Build a standardized tool failure payload when execution throws instead of returning ToolResult.
+    private func makeThrownToolFailureResult(tool: String, error: Error) -> ToolResult {
+        let errorMessage = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        return ToolResult(
+            tool: tool,
+            success: false,
+            result: "Tool execution failed: \(errorMessage.isEmpty ? "Unknown error" : errorMessage)",
+            sources: nil,
+            memoryOperation: nil
+        )
+    }
+
+    /// Best-effort extraction of a concise failure reason for streaming UI metadata.
+    private func extractToolFailureMessage(from output: String) -> String? {
+        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if let newlineIndex = trimmed.firstIndex(of: "\n") {
+            return String(trimmed[..<newlineIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return String(trimmed.prefix(240))
     }
 
     // MARK: - Provider Routing

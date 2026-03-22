@@ -199,6 +199,7 @@ struct ModelPricingConfig: Codable, Equatable, Sendable {
 }
 
 enum PricingTier: String, Codable, Sendable {
+    case free
     case standard
     case priority
     case batch
