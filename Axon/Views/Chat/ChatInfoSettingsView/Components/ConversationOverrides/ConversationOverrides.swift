@@ -52,4 +52,11 @@ struct ConversationOverrides: Codable, Equatable {
 
     /// When nil, use global defaults. When set, these override for this conversation only.
     var enabledToolIds: Set<String>?
+
+    // MARK: - Subconscious Memory Logging
+
+    /// Thread-level override for subconscious memory logging.
+    /// - true: disabled for this conversation
+    /// - nil/false: follows global setting
+    var subconsciousLoggingDisabled: Bool?
 }

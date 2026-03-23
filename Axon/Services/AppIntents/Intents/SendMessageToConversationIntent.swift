@@ -112,6 +112,14 @@ struct SendMessageToConversationIntent: AppIntent {
             try? await MemorySyncManager.shared.saveMemoriesToCoreData(memories)
         }
 
+        // Trigger subconscious memory logging in background for AppIntent reply path.
+        let postTurnMessages = (try? LocalConversationStore.shared.loadMessages(for: conversationId, limit: 400))
+            ?? (existingMessages + [userMessage, response])
+        MemoryService.shared.enqueuePostTurnLogging(
+            conversationId: conversationId,
+            messages: postTurnMessages
+        )
+
         // 11. Return response to Siri
         return .result(value: response.content)
     }

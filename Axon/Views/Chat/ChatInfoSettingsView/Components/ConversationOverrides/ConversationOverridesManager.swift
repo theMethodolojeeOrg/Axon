@@ -192,4 +192,18 @@ class ConversationOverridesManager {
         overrides.enabledToolIds = tools
         saveOverrides(overrides, for: conversationId)
     }
+
+    // MARK: - Subconscious Memory Logging
+
+    /// Returns true if subconscious logging is disabled for this conversation.
+    func isSubconsciousLoggingDisabled(for conversationId: String) -> Bool {
+        loadOverrides(for: conversationId)?.subconsciousLoggingDisabled == true
+    }
+
+    /// Persist thread-level subconscious logging disable state.
+    func setSubconsciousLoggingDisabled(_ disabled: Bool, for conversationId: String) {
+        var overrides = loadOverrides(for: conversationId) ?? ConversationOverrides()
+        overrides.subconsciousLoggingDisabled = disabled ? true : nil
+        saveOverrides(overrides, for: conversationId)
+    }
 }

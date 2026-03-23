@@ -14,6 +14,7 @@ class MemoryService: ObservableObject {
 
     private let apiClient = APIClient.shared
     private let syncManager = MemorySyncManager.shared
+    private let salienceService = SalienceService.shared
 
     // Co-sovereignty services
     private var sovereigntyService: SovereigntyService { SovereigntyService.shared }
@@ -27,10 +28,56 @@ class MemoryService: ObservableObject {
     // Co-sovereignty state
     @Published var pendingConsentRequest: MemoryConsentRequest?
     @Published var consentRequired: Bool = false
+    @Published var subconsciousWarnings: [String: SubconsciousLoggingWarning] = [:]
+
+    private var subconsciousTasks: [String: Task<Void, Never>] = [:]
 
     private init() {
         // Load memories from local Core Data immediately (instant UI)
         loadLocalMemories()
+    }
+
+    // MARK: - Subconscious Memory Logging
+
+    struct SubconsciousLoggingWarning: Identifiable, Equatable, Sendable {
+        let conversationId: String
+        let message: String
+        let timestamp: Date
+
+        var id: String { conversationId }
+    }
+
+    /// Fire-and-forget background memory logging run after an assistant reply.
+    func enqueuePostTurnLogging(conversationId: String, messages: [Message]) {
+        let settings = SettingsStorage.shared.loadSettingsOrDefault()
+        guard settings.memoryEnabled else { return }
+        guard settings.resolvedSubconsciousMemoryLogging.enabled else { return }
+        guard !ConversationOverridesManager.shared.isSubconsciousLoggingDisabled(for: conversationId) else { return }
+
+        // Keep one active task per conversation to avoid stale overlapping passes.
+        subconsciousTasks[conversationId]?.cancel()
+        let snapshot = messages
+
+        subconsciousTasks[conversationId] = Task { [weak self] in
+            guard let self else { return }
+            defer { self.subconsciousTasks[conversationId] = nil }
+            await self.runSubconsciousLogging(conversationId: conversationId, messages: snapshot)
+        }
+    }
+
+    func dismissSubconsciousWarning(conversationId: String) {
+        subconsciousWarnings.removeValue(forKey: conversationId)
+    }
+
+    func ignoreSubconsciousLoggingForThread(conversationId: String) {
+        ConversationOverridesManager.shared.setSubconsciousLoggingDisabled(true, for: conversationId)
+        subconsciousWarnings.removeValue(forKey: conversationId)
+        subconsciousTasks[conversationId]?.cancel()
+        subconsciousTasks.removeValue(forKey: conversationId)
+    }
+
+    func subconsciousWarning(for conversationId: String) -> SubconsciousLoggingWarning? {
+        subconsciousWarnings[conversationId]
     }
 
     // MARK: - Co-Sovereignty: Consent Request
@@ -711,6 +758,635 @@ class MemoryService: ObservableObject {
             )
         }
     }
+
+    private func runSubconsciousLogging(conversationId: String, messages: [Message]) async {
+        if Task.isCancelled { return }
+
+        let settings = SettingsStorage.shared.loadSettingsOrDefault()
+        let subsystem = settings.resolvedSubconsciousMemoryLogging
+
+        guard settings.memoryEnabled, subsystem.enabled else { return }
+        guard !ConversationOverridesManager.shared.isSubconsciousLoggingDisabled(for: conversationId) else { return }
+
+        let messageCandidates = messages.filter { $0.role == .user || $0.role == .assistant }
+        guard !messageCandidates.isEmpty else { return }
+
+        let runtimeResult = resolveSubconsciousRuntimeConfig(selection: subsystem, settings: settings)
+        guard case .success(let runtime) = runtimeResult else {
+            if case .failure(let warning) = runtimeResult {
+                setSubconsciousWarning(conversationId: conversationId, message: warning.message)
+            }
+            return
+        }
+
+        let rollingBudget = Self.clampedRollingTokenBudget(
+            percent: subsystem.rollingContextPercent,
+            contextWindow: runtime.contextWindow
+        )
+        let rollingContext = buildRollingContextMessages(from: messageCandidates, tokenBudget: rollingBudget)
+        guard !rollingContext.isEmpty else { return }
+
+        let candidateMemories = memories.filter { $0.confidence >= subsystem.confidenceThreshold }
+        let injectionSettings = MemoryInjectionSettings(
+            maxMemories: max(1, subsystem.maxMemories),
+            minSalienceThreshold: max(0.0, min(1.0, subsystem.minSalienceThreshold)),
+            relevanceWeight: max(0.0, subsystem.relevanceWeight),
+            confidenceWeight: max(0.0, subsystem.confidenceWeight),
+            recencyWeight: max(0.0, subsystem.recencyWeight),
+            showConfidence: subsystem.showConfidence,
+            includeEpistemicBoundaries: subsystem.includeEpistemicBoundaries
+        )
+
+        let injectionBudget = max(256, min(4_000, rollingBudget / 3))
+        let correlationId = "subconscious-\(UUID().uuidString)"
+        let memoryInjection = await salienceService.injectSalient(
+            conversation: rollingContext,
+            memories: candidateMemories,
+            availableTokens: injectionBudget,
+            correlationId: correlationId,
+            settings: injectionSettings,
+            userName: currentUserDisplayName(from: settings)
+        )
+
+        let systemPrompt = buildSubconsciousSystemPrompt()
+        let userPrompt = buildSubconsciousUserPrompt(
+            rollingContext: rollingContext,
+            memoryInjection: memoryInjection.injectionBlock,
+            tokenBudget: rollingBudget
+        )
+
+        var llmMessages: [SubconsciousLLMMessage] = [
+            SubconsciousLLMMessage(role: "user", content: userPrompt)
+        ]
+
+        let maxRounds = max(1, min(8, subsystem.maxToolRounds))
+        for _ in 0..<maxRounds {
+            if Task.isCancelled { return }
+
+            let response: String
+            do {
+                response = try await SubconsciousProviderHTTPClient.generate(
+                    system: systemPrompt,
+                    messages: llmMessages,
+                    runtime: runtime
+                )
+            } catch {
+                setSubconsciousWarning(
+                    conversationId: conversationId,
+                    message: "Subconscious memory logging failed for \(runtime.providerDisplayName)/\(runtime.model): \(error.localizedDescription)"
+                )
+                return
+            }
+
+            let parsedRequests = ToolProxyService.shared.parseAllToolRequests(from: response)
+            let filteredRequests = Self.filterSubconsciousToolRequests(parsedRequests)
+            let memoryRequests = filteredRequests.allowed
+            let ignoredRequests = filteredRequests.ignored
+
+            guard !memoryRequests.isEmpty else {
+                if !ignoredRequests.isEmpty {
+                    let ignoredIds = ignoredRequests.map(\.tool).joined(separator: ", ")
+                    print("[MemoryService] Subconscious logger ignored non-memory tool request(s): \(ignoredIds)")
+                }
+                subconsciousWarnings.removeValue(forKey: conversationId)
+                return
+            }
+
+            let assistantText = ToolProxyService.shared.removeToolRequest(from: response)
+            if !assistantText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                llmMessages.append(SubconsciousLLMMessage(role: "assistant", content: assistantText))
+            }
+
+            var toolResultLines: [String] = []
+
+            for request in memoryRequests {
+                do {
+                    let result = try await ToolProxyService.shared.executeToolRequest(
+                        request,
+                        geminiApiKey: "",
+                        conversationContext: nil
+                    )
+                    toolResultLines.append(ToolProxyService.shared.formatToolResult(result))
+                } catch {
+                    toolResultLines.append("Tool `\(request.tool)` failed: \(error.localizedDescription)")
+                }
+            }
+
+            if !ignoredRequests.isEmpty {
+                let ignoredIds = ignoredRequests.map(\.tool).joined(separator: ", ")
+                toolResultLines.append("Ignored non-memory tool request(s): \(ignoredIds). Only `create_memory` is permitted.")
+            }
+
+            let feedback = """
+            Tool results:
+            \(toolResultLines.joined(separator: "\n\n"))
+
+            If additional durable memories should be saved, emit more `create_memory` tool requests.
+            Otherwise reply with `DONE`.
+            """
+            llmMessages.append(SubconsciousLLMMessage(role: "user", content: feedback))
+        }
+
+        subconsciousWarnings.removeValue(forKey: conversationId)
+    }
+
+    private func resolveSubconsciousRuntimeConfig(
+        selection: SubconsciousMemoryLoggingSettings,
+        settings: AppSettings
+    ) -> Result<SubconsciousRuntimeConfig, SubconsciousRuntimeResolutionError> {
+        let apiKeysStorage = APIKeysStorage.shared
+
+        if let customProviderId = selection.customProviderId {
+            guard let customProvider = settings.customProviders.first(where: { $0.id == customProviderId }) else {
+                return .failure(SubconsciousRuntimeResolutionError(message: "Subconscious model is unavailable: selected custom provider no longer exists."))
+            }
+            guard let selectedModel = customProvider.models.first(where: { $0.id == selection.customModelId }) ?? customProvider.models.first else {
+                return .failure(SubconsciousRuntimeResolutionError(message: "Subconscious model is unavailable: selected custom model no longer exists."))
+            }
+            guard let apiKey = try? apiKeysStorage.getCustomProviderAPIKey(providerId: customProviderId), !apiKey.isEmpty else {
+                return .failure(SubconsciousRuntimeResolutionError(message: "Subconscious model is unavailable: missing API key for custom provider \(customProvider.providerName)."))
+            }
+
+            return .success(
+                SubconsciousRuntimeConfig(
+                    provider: "openai-compatible",
+                    providerDisplayName: customProvider.providerName,
+                    model: selectedModel.modelCode,
+                    contextWindow: max(1_024, selectedModel.contextWindow),
+                    apiKey: apiKey,
+                    baseUrl: customProvider.apiEndpoint
+                )
+            )
+        }
+
+        let builtInProviderRaw = selection.builtInProvider ?? settings.defaultProvider.rawValue
+        guard let builtInProvider = AIProvider(rawValue: builtInProviderRaw) else {
+            return .failure(SubconsciousRuntimeResolutionError(message: "Subconscious model is unavailable: unknown provider selection."))
+        }
+
+        switch builtInProvider {
+        case .appleFoundation, .localMLX:
+            return .failure(SubconsciousRuntimeResolutionError(message: "Subconscious model is unavailable: \(builtInProvider.displayName) is not currently supported for background memory logging."))
+        default:
+            break
+        }
+
+        let modelId: String = {
+            if let selected = selection.builtInModel {
+                return selected
+            }
+            if builtInProvider == settings.defaultProvider {
+                return settings.defaultModel
+            }
+            return builtInProvider.availableModels.first?.id ?? settings.defaultModel
+        }()
+
+        let contextWindow = max(1_024, AIProvider.contextWindowForModel(modelId, settings: settings))
+
+        let providerApiKey: String? = {
+            switch builtInProvider {
+            case .anthropic: return try? apiKeysStorage.getAPIKey(for: .anthropic)
+            case .openai: return try? apiKeysStorage.getAPIKey(for: .openai)
+            case .gemini: return try? apiKeysStorage.getAPIKey(for: .gemini)
+            case .xai: return try? apiKeysStorage.getAPIKey(for: .xai)
+            case .perplexity: return try? apiKeysStorage.getAPIKey(for: .perplexity)
+            case .deepseek: return try? apiKeysStorage.getAPIKey(for: .deepseek)
+            case .zai: return try? apiKeysStorage.getAPIKey(for: .zai)
+            case .minimax: return try? apiKeysStorage.getAPIKey(for: .minimax)
+            case .mistral: return try? apiKeysStorage.getAPIKey(for: .mistral)
+            case .appleFoundation, .localMLX: return nil
+            }
+        }()
+
+        guard let apiKey = providerApiKey, !apiKey.isEmpty else {
+            return .failure(SubconsciousRuntimeResolutionError(message: "Subconscious model is unavailable: missing API key for \(builtInProvider.displayName)."))
+        }
+
+        let providerString = builtInProvider == .xai ? "grok" : builtInProvider.rawValue
+        return .success(
+            SubconsciousRuntimeConfig(
+                provider: providerString,
+                providerDisplayName: builtInProvider.displayName,
+                model: modelId,
+                contextWindow: contextWindow,
+                apiKey: apiKey,
+                baseUrl: nil
+            )
+        )
+    }
+
+    private func buildRollingContextMessages(from messages: [Message], tokenBudget: Int) -> [Message] {
+        let eligible = messages.filter { $0.role == .user || $0.role == .assistant }
+        guard !eligible.isEmpty else { return [] }
+
+        var selected: [Message] = []
+        var usedTokens = 0
+
+        for message in eligible.reversed() {
+            let tokens = estimateTokens(message.content)
+            if !selected.isEmpty && (usedTokens + tokens) > tokenBudget {
+                break
+            }
+            selected.append(message)
+            usedTokens += tokens
+        }
+
+        return selected.reversed()
+    }
+
+    nonisolated static func clampedRollingTokenBudget(percent: Double, contextWindow: Int) -> Int {
+        let clampedPercent = max(0.01, min(1.0, percent))
+        let raw = Int(Double(contextWindow) * clampedPercent)
+        let minBudget = 256
+        let maxBudget = max(1_024, contextWindow)
+        return max(minBudget, min(maxBudget, raw))
+    }
+
+    nonisolated static func filterSubconsciousToolRequests(_ requests: [ToolRequest]) -> (allowed: [ToolRequest], ignored: [ToolRequest]) {
+        let allowed = requests.filter { $0.tool == ToolId.createMemory.rawValue }
+        let ignored = requests.filter { $0.tool != ToolId.createMemory.rawValue }
+        return (allowed, ignored)
+    }
+
+    private func estimateTokens(_ text: String) -> Int {
+        max(1, Int(Double(text.count) / 4.0))
+    }
+
+    private func buildSubconsciousSystemPrompt() -> String {
+        """
+        I am Axon's subconscious memory logging subsystem.
+        I maintain Axon's identity while focusing narrowly on durable memory formation.
+        I only use memory operations when appropriate.
+
+        Tool policy:
+        - The only permitted tool is `create_memory`.
+        - Ignore all other tool opportunities.
+        - If nothing worth saving appears, reply `DONE`.
+        """
+    }
+
+    private func buildSubconsciousUserPrompt(
+        rollingContext: [Message],
+        memoryInjection: String,
+        tokenBudget: Int
+    ) -> String {
+        let contextLines = rollingContext.map { msg -> String in
+            let prefix = msg.role == .user ? "User" : "Axon"
+            return "\(prefix): \(msg.content)"
+        }
+
+        let memoryBlock: String
+        if memoryInjection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            memoryBlock = "No salient injected memories for this pass."
+        } else {
+            memoryBlock = memoryInjection
+        }
+
+        return """
+        Rolling context window budget: ~\(tokenBudget) tokens.
+
+        Existing salient memory context:
+        \(memoryBlock)
+
+        Recent rolling conversation context:
+        \(contextLines.joined(separator: "\n\n"))
+
+        Task:
+        - Identify durable facts/preferences or reliable interaction patterns worth retaining.
+        - Emit `create_memory` tool requests for high-value items only.
+        - Keep each saved memory concise and retrieval-oriented.
+        - If there is nothing worth saving, reply `DONE`.
+        """
+    }
+
+    private func currentUserDisplayName(from settings: AppSettings) -> String? {
+        let first = settings.firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let last = settings.lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let full = "\(first) \(last)".trimmingCharacters(in: .whitespacesAndNewlines)
+        return full.isEmpty ? nil : full
+    }
+
+    private func setSubconsciousWarning(conversationId: String, message: String) {
+        subconsciousWarnings[conversationId] = SubconsciousLoggingWarning(
+            conversationId: conversationId,
+            message: message,
+            timestamp: Date()
+        )
+    }
+}
+
+private struct SubconsciousRuntimeConfig: Sendable {
+    let provider: String
+    let providerDisplayName: String
+    let model: String
+    let contextWindow: Int
+    let apiKey: String
+    let baseUrl: String?
+}
+
+private struct SubconsciousRuntimeResolutionError: Error, LocalizedError, Sendable {
+    let message: String
+
+    var errorDescription: String? { message }
+}
+
+private struct SubconsciousLLMMessage: Sendable {
+    let role: String
+    let content: String
+}
+
+private enum SubconsciousProviderHTTPClient {
+    static func generate(
+        system: String,
+        messages: [SubconsciousLLMMessage],
+        runtime: SubconsciousRuntimeConfig
+    ) async throws -> String {
+        switch runtime.provider {
+        case "anthropic":
+            return try await callAnthropic(
+                apiKey: runtime.apiKey,
+                model: runtime.model,
+                system: system,
+                messages: messages
+            )
+        case "gemini":
+            return try await callGemini(
+                apiKey: runtime.apiKey,
+                model: runtime.model,
+                system: system,
+                messages: messages
+            )
+        case "minimax":
+            return try await callMiniMax(
+                apiKey: runtime.apiKey,
+                model: runtime.model,
+                system: system,
+                messages: messages
+            )
+        case "openai-compatible":
+            guard let baseUrl = runtime.baseUrl, !baseUrl.isEmpty else {
+                throw APIError.networkError("Missing custom provider base URL for subconscious logger")
+            }
+            return try await callOpenAICompatible(
+                apiKey: runtime.apiKey,
+                baseUrl: baseUrl,
+                model: runtime.model,
+                system: system,
+                messages: messages
+            )
+        case "openai":
+            return try await callOpenAICompatible(
+                apiKey: runtime.apiKey,
+                baseUrl: "https://api.openai.com/v1",
+                model: runtime.model,
+                system: system,
+                messages: messages
+            )
+        case "grok":
+            return try await callOpenAICompatible(
+                apiKey: runtime.apiKey,
+                baseUrl: "https://api.x.ai/v1",
+                model: runtime.model,
+                system: system,
+                messages: messages
+            )
+        case "perplexity":
+            return try await callOpenAICompatible(
+                apiKey: runtime.apiKey,
+                baseUrl: "https://api.perplexity.ai",
+                model: runtime.model,
+                system: system,
+                messages: messages
+            )
+        case "deepseek":
+            return try await callOpenAICompatible(
+                apiKey: runtime.apiKey,
+                baseUrl: "https://api.deepseek.com",
+                model: runtime.model,
+                system: system,
+                messages: messages
+            )
+        case "zai":
+            return try await callOpenAICompatible(
+                apiKey: runtime.apiKey,
+                baseUrl: "https://api.z.ai/api/paas/v4",
+                model: runtime.model,
+                system: system,
+                messages: messages
+            )
+        case "mistral":
+            return try await callOpenAICompatible(
+                apiKey: runtime.apiKey,
+                baseUrl: "https://api.mistral.ai/v1",
+                model: runtime.model,
+                system: system,
+                messages: messages
+            )
+        default:
+            throw APIError.networkError("Unsupported subconscious provider: \(runtime.provider)")
+        }
+    }
+
+    private static func callAnthropic(
+        apiKey: String,
+        model: String,
+        system: String,
+        messages: [SubconsciousLLMMessage]
+    ) async throws -> String {
+        let url = URL(string: "https://api.anthropic.com/v1/messages")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.addValue("application/json", forHTTPHeaderField: "content-type")
+
+        let apiMessages = messages.map { msg in
+            [
+                "role": msg.role == "assistant" ? "assistant" : "user",
+                "content": [["type": "text", "text": msg.content]]
+            ] as [String: Any]
+        }
+
+        let body: [String: Any] = [
+            "model": model,
+            "max_tokens": 1_200,
+            "system": system,
+            "messages": apiMessages
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.serverError((response as? HTTPURLResponse)?.statusCode ?? 500)
+        }
+
+        struct AnthropicResponse: Decodable {
+            struct Content: Decodable { let text: String }
+            let content: [Content]
+        }
+
+        let decoded = try JSONDecoder().decode(AnthropicResponse.self, from: data)
+        return decoded.content.first?.text ?? ""
+    }
+
+    private static func callOpenAICompatible(
+        apiKey: String,
+        baseUrl: String,
+        model: String,
+        system: String,
+        messages: [SubconsciousLLMMessage]
+    ) async throws -> String {
+        let normalizedBase = baseUrl.hasSuffix("/") ? String(baseUrl.dropLast()) : baseUrl
+        let url = URL(string: "\(normalizedBase)/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var apiMessages: [[String: Any]] = [
+            ["role": "system", "content": system]
+        ]
+        apiMessages.append(
+            contentsOf: messages.map { msg in
+                [
+                    "role": msg.role == "assistant" ? "assistant" : "user",
+                    "content": msg.content
+                ] as [String: Any]
+            }
+        )
+
+        let body: [String: Any] = [
+            "model": model,
+            "messages": apiMessages,
+            "max_tokens": 1_200,
+            "temperature": 0.2
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.serverError((response as? HTTPURLResponse)?.statusCode ?? 500)
+        }
+
+        struct OpenAIResponse: Decodable {
+            struct Choice: Decodable {
+                struct Message: Decodable { let content: String }
+                let message: Message
+            }
+            let choices: [Choice]
+        }
+
+        let decoded = try JSONDecoder().decode(OpenAIResponse.self, from: data)
+        return decoded.choices.first?.message.content ?? ""
+    }
+
+    private static func callGemini(
+        apiKey: String,
+        model: String,
+        system: String,
+        messages: [SubconsciousLLMMessage]
+    ) async throws -> String {
+        let modelPath = model.starts(with: "models/") ? model : "models/\(model)"
+        let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/\(modelPath):generateContent?key=\(apiKey)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let contents: [[String: Any]] = messages.map { msg in
+            [
+                "role": msg.role == "assistant" ? "model" : "user",
+                "parts": [["text": msg.content]]
+            ]
+        }
+
+        let body: [String: Any] = [
+            "system_instruction": [
+                "parts": [["text": system]]
+            ],
+            "contents": contents,
+            "generationConfig": [
+                "maxOutputTokens": 1_200,
+                "temperature": 0.2
+            ]
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.serverError((response as? HTTPURLResponse)?.statusCode ?? 500)
+        }
+
+        struct GeminiResponse: Decodable {
+            struct Candidate: Decodable {
+                struct Content: Decodable {
+                    struct Part: Decodable { let text: String? }
+                    let parts: [Part]
+                }
+                let content: Content
+            }
+            let candidates: [Candidate]?
+        }
+
+        let decoded = try JSONDecoder().decode(GeminiResponse.self, from: data)
+        return decoded.candidates?.first?.content.parts.first?.text ?? ""
+    }
+
+    private static func callMiniMax(
+        apiKey: String,
+        model: String,
+        system: String,
+        messages: [SubconsciousLLMMessage]
+    ) async throws -> String {
+        let url = URL(string: "https://api.minimax.io/v1/text/chatcompletion_v2")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var apiMessages: [[String: Any]] = [[
+            "sender_type": "BOT",
+            "sender_name": "System",
+            "text": system
+        ]]
+
+        apiMessages.append(
+            contentsOf: messages.map { msg in
+                [
+                    "sender_type": msg.role == "assistant" ? "BOT" : "USER",
+                    "sender_name": msg.role == "assistant" ? "Assistant" : "User",
+                    "text": msg.content
+                ]
+            }
+        )
+
+        let body: [String: Any] = [
+            "model": model,
+            "messages": apiMessages,
+            "temperature": 0.2
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.serverError((response as? HTTPURLResponse)?.statusCode ?? 500)
+        }
+
+        struct MiniMaxResponse: Decodable {
+            struct Choices: Decodable {
+                struct Message: Decodable { let text: String }
+                let messages: [Message]
+            }
+            let choices: Choices?
+            let reply: String?
+        }
+
+        let decoded = try JSONDecoder().decode(MiniMaxResponse.self, from: data)
+        return decoded.reply ?? decoded.choices?.messages.first?.text ?? ""
+    }
 }
 
 // MARK: - Memory Errors
@@ -737,4 +1413,3 @@ struct MemoryStats: Codable {
     let averageConfidence: Double
     let recentCount: Int
 }
-

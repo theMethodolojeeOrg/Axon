@@ -775,6 +775,12 @@ class ConversationService: ObservableObject {
                 }
             }
 
+            // Fire-and-forget subconscious pass after successful assistant completion.
+            MemoryService.shared.enqueuePostTurnLogging(
+                conversationId: conversationId,
+                messages: messages
+            )
+
             // Update widget data so home screen widget shows latest messages
             if let conversation = currentConversation ?? conversations.first(where: { $0.id == conversationId }) {
                 Task { @MainActor in

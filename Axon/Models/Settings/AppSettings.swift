@@ -37,6 +37,7 @@ struct AppSettings: Codable, Equatable, Sendable {
     var memoryConfidenceThreshold: Double = 0.3  // 0-1.0
     var maxMemoriesPerRequest: Int = 10  // 5-50
     var memoryAnalyticsEnabled: Bool = true
+    var subconsciousMemoryLogging: SubconsciousMemoryLoggingSettings? = nil
 
     // Internal Thread (Agent State)
     var internalThreadEnabled: Bool = true
@@ -139,4 +140,45 @@ struct AppSettings: Codable, Equatable, Sendable {
     var version: Int = 1
     var lastUpdated: Date = Date()
     var lastSyncedAt: Date?
+}
+
+// MARK: - Subconscious Memory Logging Settings
+
+/// Settings for autonomous background memory logging.
+///
+/// Important: this is stored as an optional field in AppSettings so older persisted
+/// settings blobs can decode without reset. Use `resolved` to read effective defaults.
+struct SubconsciousMemoryLoggingSettings: Codable, Equatable, Sendable {
+    // Master toggle
+    var enabled: Bool = false
+
+    // Provider/model selection
+    var builtInProvider: String? = nil
+    var customProviderId: UUID? = nil
+    var builtInModel: String? = nil
+    var customModelId: UUID? = nil
+
+    // Context behavior
+    var rollingContextPercent: Double = 0.25
+
+    // Salience / epistemic controls
+    var maxMemories: Int = 10
+    var confidenceThreshold: Double = 0.30
+    var minSalienceThreshold: Double = 0.20
+    var relevanceWeight: Double = 0.40
+    var confidenceWeight: Double = 0.30
+    var recencyWeight: Double = 0.20
+    var includeEpistemicBoundaries: Bool = false
+    var showConfidence: Bool = true
+
+    // Execution guardrails
+    var maxToolRounds: Int = 3
+
+    static let `default` = SubconsciousMemoryLoggingSettings()
+}
+
+extension AppSettings {
+    var resolvedSubconsciousMemoryLogging: SubconsciousMemoryLoggingSettings {
+        subconsciousMemoryLogging ?? .default
+    }
 }

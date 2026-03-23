@@ -193,6 +193,7 @@ struct SyncableSettings: Codable {
     var memoryAutoInject: Bool
     var memoryConfidenceThreshold: Double
     var maxMemoriesPerRequest: Int
+    var subconsciousMemoryLogging: SubconsciousMemoryLoggingSettings?
 
     // Epistemic Settings
     var epistemicEnabled: Bool
@@ -315,6 +316,7 @@ struct SyncableSettings: Codable {
         self.memoryAutoInject = settings.memoryAutoInject
         self.memoryConfidenceThreshold = settings.memoryConfidenceThreshold
         self.maxMemoriesPerRequest = settings.maxMemoriesPerRequest
+        self.subconsciousMemoryLogging = settings.subconsciousMemoryLogging
 
         self.epistemicEnabled = settings.epistemicEnabled
         self.epistemicVerbose = settings.epistemicVerbose
@@ -434,6 +436,7 @@ struct SyncableSettings: Codable {
         settings.memoryAutoInject = memoryAutoInject
         settings.memoryConfidenceThreshold = memoryConfidenceThreshold
         settings.maxMemoriesPerRequest = maxMemoriesPerRequest
+        settings.subconsciousMemoryLogging = subconsciousMemoryLogging
 
         settings.epistemicEnabled = epistemicEnabled
         settings.epistemicVerbose = epistemicVerbose

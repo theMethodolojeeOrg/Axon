@@ -483,6 +483,7 @@ struct ChatContainerView: View {
     let onConversationCreated: (Conversation) -> Void
 
     @StateObject private var conversationService = ConversationService.shared
+    @StateObject private var memoryService = MemoryService.shared
     @StateObject private var costService = CostService.shared
     @StateObject private var taglineManager = TaglineManager.shared
     @StateObject private var promptManager = PromptManager.shared
@@ -1122,6 +1123,21 @@ struct ChatContainerView: View {
                 }
                 .padding(.bottom, 16)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .overlay(alignment: .top) {
+            if let warning = memoryService.subconsciousWarning(for: conversation.id) {
+                SubconsciousLoggingWarningBanner(
+                    message: warning.message,
+                    onClose: {
+                        memoryService.dismissSubconsciousWarning(conversationId: conversation.id)
+                    },
+                    onIgnoreThread: {
+                        memoryService.ignoreSubconsciousLoggingForThread(conversationId: conversation.id)
+                    }
+                )
+                .padding(.horizontal)
+                .padding(.top, 8)
             }
         }
     }
@@ -1878,7 +1894,8 @@ struct ChatContainerView: View {
                     sources: [],
                     memoryOps: [],
                     modelName: config.model,
-                    providerName: config.providerName
+                    providerName: config.providerName,
+                    triggerSubconsciousLogging: false
                 )
                 // Clear first-message flag on error path
                 isFirstMessageSending = false
@@ -1902,7 +1919,8 @@ struct ChatContainerView: View {
                 sources: finalSources,
                 memoryOps: finalMemoryOps,
                 modelName: config.model,
-                providerName: config.providerName
+                providerName: config.providerName,
+                triggerSubconsciousLogging: shouldConsumeTurnLease
             )
             if shouldConsumeTurnLease {
                 ConversationRuntimeOverrideManager.shared.consumeTurnLeaseOnSuccessfulReply(conversationId: conversationId)
@@ -1922,7 +1940,8 @@ struct ChatContainerView: View {
         sources: [MessageGroundingSource],
         memoryOps: [MessageMemoryOperation],
         modelName: String,
-        providerName: String?
+        providerName: String?,
+        triggerSubconsciousLogging: Bool = false
     ) {
         // Retrieve context debug info from state
         let contextDebugInfo = contextDebugInfos[assistantId]
@@ -1969,6 +1988,13 @@ struct ChatContainerView: View {
                 contextTokens: contextTokens,
                 contextLimit: contextLimit
             )
+
+            if triggerSubconsciousLogging {
+                memoryService.enqueuePostTurnLogging(
+                    conversationId: conversationId,
+                    messages: conversationService.messages
+                )
+            }
         }
 
         // Clean up streaming state
@@ -2211,6 +2237,65 @@ struct ScrollToBottomButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .accessibilityLabel("Jump to latest message")
+    }
+}
+
+struct SubconsciousLoggingWarningBanner: View {
+    let message: String
+    let onClose: () -> Void
+    let onIgnoreThread: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "brain.head.profile")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppColors.accentWarning)
+
+                Text("Subconscious Memory Logging")
+                    .font(AppTypography.bodySmall(.medium))
+                    .foregroundColor(AppColors.accentWarning)
+            }
+
+            Text(message)
+                .font(AppTypography.labelSmall())
+                .foregroundColor(AppColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 10) {
+                Button("Close", action: onClose)
+                    .buttonStyle(.plain)
+                    .font(AppTypography.labelSmall(.medium))
+                    .foregroundColor(AppColors.textSecondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(AppColors.glassBorder, lineWidth: 1)
+                    )
+
+                Button("Ignore This Thread", action: onIgnoreThread)
+                    .buttonStyle(.plain)
+                    .font(AppTypography.labelSmall(.medium))
+                    .foregroundColor(AppColors.accentWarning)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(AppColors.accentWarning.opacity(0.6), lineWidth: 1)
+                    )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(AppColors.accentWarning.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(AppColors.accentWarning.opacity(0.35), lineWidth: 1)
+                )
+        )
     }
 }
 
