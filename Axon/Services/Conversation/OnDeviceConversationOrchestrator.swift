@@ -619,6 +619,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     geminiKey: geminiKey,
                     maxIterations: maxToolCalls,
                     emitInitialVisiblePrefix: true,
+                    suppressVisiblePrefixOnToolTurn: true,
                     continuation: continuation,
                     accumulatedContent: &accumulatedContent,
                     collectedToolCalls: &collectedToolCalls,
@@ -682,22 +683,12 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
         let handler = StreamingResponseHandler()
         var rawStreamResponse = ""
-        var emittedVisibleCount = 0
 
         streamLoop: for try await event in handler.stream(config: streamConfig, messages: messages) {
             switch event {
             case .textDelta(let text):
                 rawStreamResponse += text
                 let segment = ToolGatedResponseSegmenter.segment(rawStreamResponse)
-                let visiblePrefix = segment.visiblePrefix
-
-                if visiblePrefix.count > emittedVisibleCount {
-                    let start = visiblePrefix.index(visiblePrefix.startIndex, offsetBy: emittedVisibleCount)
-                    let delta = String(visiblePrefix[start...])
-                    emittedVisibleCount = visiblePrefix.count
-                    accumulatedContent += delta
-                    continuation.yield(.textDelta(delta))
-                }
 
                 if segment.firstToolRequest != nil {
                     print("[StreamToolProxy] Detected first tool request during stream. Pausing generation for immediate execution.")
@@ -706,7 +697,6 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
             case .reasoningDelta(let text):
                 accumulatedReasoning += text
-                continuation.yield(.reasoningDelta(text))
 
             case .error(let error):
                 continuation.yield(.error(error))
@@ -731,7 +721,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             messages: messages,
             geminiKey: geminiKey,
             maxIterations: maxToolCalls,
-            emitInitialVisiblePrefix: false,
+            emitInitialVisiblePrefix: true,
+            suppressVisiblePrefixOnToolTurn: true,
             continuation: continuation,
             accumulatedContent: &accumulatedContent,
             collectedToolCalls: &collectedToolCalls,
@@ -750,6 +741,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         geminiKey: String,
         maxIterations: Int,
         emitInitialVisiblePrefix: Bool,
+        suppressVisiblePrefixOnToolTurn: Bool,
         continuation: AsyncThrowingStream<StreamingEvent, Error>.Continuation,
         accumulatedContent: inout String,
         collectedToolCalls: inout [LiveToolCall],
@@ -769,8 +761,10 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         while iteration < maxIterations {
             let segment = ToolGatedResponseSegmenter.segment(currentResponse)
             let visiblePrefix = segment.visiblePrefix
+            let hasToolRequest = segment.firstToolRequest != nil
+            let shouldEmitThisPass = shouldEmitVisiblePrefix && !(suppressVisiblePrefixOnToolTurn && hasToolRequest)
 
-            if shouldEmitVisiblePrefix && !visiblePrefix.isEmpty {
+            if shouldEmitThisPass && !visiblePrefix.isEmpty {
                 for char in visiblePrefix {
                     continuation.yield(.textDelta(String(char)))
                 }
@@ -861,9 +855,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 continuation.yield(.toolCallComplete(liveToolCall.id, result))
             }
 
-            let assistantPrefix = visiblePrefix.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !assistantPrefix.isEmpty {
-                rollingMessages.append(Message(conversationId: conversationId, role: .assistant, content: assistantPrefix))
+            if !suppressVisiblePrefixOnToolTurn {
+                let assistantPrefix = visiblePrefix.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !assistantPrefix.isEmpty {
+                    rollingMessages.append(Message(conversationId: conversationId, role: .assistant, content: assistantPrefix))
+                }
             }
 
             let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
@@ -882,7 +878,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         if iteration >= maxIterations {
             print("[StreamToolProxy] Tool proxy loop reached max iterations")
             let fallbackSegment = ToolGatedResponseSegmenter.segment(currentResponse)
-            if shouldEmitVisiblePrefix, !fallbackSegment.visiblePrefix.isEmpty {
+            let shouldEmitFallback = shouldEmitVisiblePrefix && !(suppressVisiblePrefixOnToolTurn && fallbackSegment.firstToolRequest != nil)
+            if shouldEmitFallback, !fallbackSegment.visiblePrefix.isEmpty {
                 for char in fallbackSegment.visiblePrefix {
                     continuation.yield(.textDelta(String(char)))
                 }
@@ -1044,7 +1041,6 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
             print("[OnDeviceOrchestrator] Tool request detected: \(toolRequest.tool) - \"\(toolRequest.query)\"")
             toolUsed = true
-            appendVisibleSegment(visiblePrefix, into: &accumulatedVisibleResponse)
 
             // Execute one tool request per round-trip (strict causality)
             var executedSources: [MessageGroundingSource]? = nil
@@ -1090,15 +1086,6 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 ToolRequestTracker.shared.markExecuted(request: toolRequest, result: toolResult.result)
             }
 
-            let assistantPrefix = visiblePrefix.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !assistantPrefix.isEmpty {
-                rollingMessages.append(Message(
-                    conversationId: conversationId,
-                    role: .assistant,
-                    content: assistantPrefix
-                ))
-            }
-
             let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
             rollingMessages.append(Message(
                 conversationId: conversationId,
@@ -1120,7 +1107,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         if iteration >= maxIterations {
             print("[OnDeviceOrchestrator] Tool proxy loop reached max iterations")
             let fallbackSegment = ToolGatedResponseSegmenter.segment(currentResponse)
-            appendVisibleSegment(fallbackSegment.visiblePrefix, into: &accumulatedVisibleResponse)
+            if fallbackSegment.firstToolRequest == nil {
+                appendVisibleSegment(fallbackSegment.visiblePrefix, into: &accumulatedVisibleResponse)
+            }
         }
 
         return (accumulatedVisibleResponse, toolUsed, collectedSources, collectedMemoryOperations)
