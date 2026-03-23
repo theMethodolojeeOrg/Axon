@@ -62,7 +62,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
         case .anthropic:
             return [
                 AIModel(
-                    id: "claude-opus-4-6-20260205",
+                    id: "claude-opus-4-6",
                     name: "Claude Opus 4.6",
                     provider: .anthropic,
                     contextWindow: 1_000_000,
@@ -71,7 +71,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
                 ),
 
                 AIModel(
-                    id: "claude-sonnet-4-6-20260217",
+                    id: "claude-sonnet-4-6",
                     name: "Claude Sonnet 4.6",
                     provider: .anthropic,
                     contextWindow: 1_000_000,

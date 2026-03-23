@@ -247,6 +247,11 @@ struct SovereigntySettingsView: View {
 
                 Divider().background(AppColors.divider)
 
+                // Agent Runtime Self-Reconfiguration Approval Mode
+                agentSelfReconfigurationApprovalPicker
+
+                Divider().background(AppColors.divider)
+
                 // Show Detailed Reasoning
                 SettingsToggleRow(
                     title: "Show Detailed AI Reasoning",
@@ -627,6 +632,49 @@ struct SovereigntySettingsView: View {
 
             // Intentionally do NOT allow custom providers for consent yet.
             // (The consent pipeline uses AIProvider and assumes built-in provider semantics.)
+        }
+    }
+
+    private var agentSelfReconfigurationApprovalPicker: some View {
+        let currentMode = viewModel.settings.sovereigntySettings.agentSelfReconfigApprovalMode
+
+        return StyledMenuPicker(
+            icon: "slider.horizontal.3",
+            title: currentMode.displayName,
+            selection: Binding(
+                get: { currentMode.rawValue },
+                set: { newModeRaw in
+                    guard let newMode = AgentSelfReconfigApprovalMode(rawValue: newModeRaw) else {
+                        return
+                    }
+                    Task {
+                        var updated = viewModel.settings.sovereigntySettings
+                        updated.agentSelfReconfigApprovalMode = newMode
+                        await viewModel.updateSetting(\.sovereigntySettings, updated)
+                    }
+                }
+            ),
+            iconColor: .purple
+        ) {
+            Section("Agent Self-Reconfiguration Approval") {
+                ForEach(AgentSelfReconfigApprovalMode.allCases, id: \.rawValue) { mode in
+                    #if os(macOS)
+                    MenuButtonItem(
+                        id: mode.rawValue,
+                        label: mode.displayName,
+                        isSelected: mode == currentMode
+                    ) {
+                        Task {
+                            var updated = viewModel.settings.sovereigntySettings
+                            updated.agentSelfReconfigApprovalMode = mode
+                            await viewModel.updateSetting(\.sovereigntySettings, updated)
+                        }
+                    }
+                    #else
+                    Text(mode.displayName).tag(mode.rawValue)
+                    #endif
+                }
+            }
         }
     }
 }

@@ -513,7 +513,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 model: config.model,
                 baseUrl: config.customBaseUrl,
                 system: systemPrompt,
-                maxTokens: 4096
+                maxTokens: 4096,
+                modelParams: config.modelParams
             )
 
             let handler = StreamingResponseHandler()
@@ -621,7 +622,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             model: config.model,
             baseUrl: config.customBaseUrl,
             system: systemPrompt,
-            maxTokens: 4096
+            maxTokens: 4096,
+            modelParams: config.modelParams
         )
 
         let handler = StreamingResponseHandler()
@@ -681,6 +683,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     ) async throws {
         var currentResponse = initialResponse
         var iteration = 0
+        let toolContext = ToolContextV2(
+            conversationId: conversationId,
+            runtimeProvider: config.provider,
+            runtimeModel: config.model
+        )
 
         while iteration < maxIterations {
             // Parse ALL tool requests from the response (handles back-to-back tool calls)
@@ -705,7 +712,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 do {
                     let execResult = try await ToolRoutingService.shared.executeTool(
                         toolId: toolRequest.tool,
-                        query: toolRequest.query
+                        query: toolRequest.query,
+                        context: toolContext
                     )
 
                     let duration = Date().timeIntervalSince(startTime)
@@ -846,6 +854,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var collectedSources: [MessageGroundingSource] = []
         var collectedMemoryOperations: [MessageMemoryOperation] = []
         var iteration = 0
+        let toolContext = ToolContextV2(
+            conversationId: conversationId,
+            runtimeProvider: config.provider,
+            runtimeModel: config.model
+        )
 
         while iteration < maxIterations {
             // Parse ALL tool requests from the response (handles back-to-back tool calls)
@@ -954,7 +967,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 do {
                     let execResult = try await ToolRoutingService.shared.executeTool(
                         toolId: toolRequest.tool,
-                        query: toolRequest.query
+                        query: toolRequest.query,
+                        context: toolContext
                     )
                     executedSources = execResult.groundingSources
 
@@ -1109,6 +1123,31 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
     // MARK: - Provider Routing
 
+    private func openAIStyleSamplingParameters(from modelParams: ModelGenerationSettings?, provider: String) -> [String: Any] {
+        guard let modelParams else {
+            return [:]
+        }
+        return modelParams.parameters(for: provider)
+    }
+
+    private func geminiGenerationConfig(from modelParams: ModelGenerationSettings?) -> [String: Any] {
+        guard let modelParams else {
+            return [:]
+        }
+        let raw = modelParams.parameters(for: "gemini")
+        var config: [String: Any] = [:]
+        if let temperature = raw["temperature"] {
+            config["temperature"] = temperature
+        }
+        if let topP = raw["top_p"] {
+            config["topP"] = topP
+        }
+        if let topK = raw["top_k"] {
+            config["topK"] = topK
+        }
+        return config
+    }
+
     /// Route to appropriate provider
     private func callProvider(
         provider: String,
@@ -1123,7 +1162,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
-                messages: messages
+                messages: messages,
+                modelParams: config.modelParams
             )
             return ProviderResponse(content: content)
 
@@ -1133,7 +1173,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
-                messages: messages
+                messages: messages,
+                modelParams: config.modelParams
             )
             return ProviderResponse(content: content)
 
@@ -1143,7 +1184,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
-                messages: messages
+                messages: messages,
+                modelParams: config.modelParams
             )
             return ProviderResponse(content: content)
 
@@ -1153,7 +1195,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
-                messages: messages
+                messages: messages,
+                modelParams: config.modelParams
             )
             return ProviderResponse(content: content)
 
@@ -1164,7 +1207,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
-                messages: messages
+                messages: messages,
+                modelParams: config.modelParams
             )
             let result = ReasoningExtractor.extract(from: rawContent, provider: provider, model: config.model)
             return ProviderResponse(content: result.content, reasoning: result.reasoning)
@@ -1176,7 +1220,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
-                messages: messages
+                messages: messages,
+                modelParams: config.modelParams
             )
 
         case "zai":
@@ -1186,7 +1231,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
-                messages: messages
+                messages: messages,
+                modelParams: config.modelParams
             )
             let result = ReasoningExtractor.extract(from: rawContent, provider: provider, model: config.model)
             return ProviderResponse(content: result.content, reasoning: result.reasoning)
@@ -1197,7 +1243,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
-                messages: messages
+                messages: messages,
+                modelParams: config.modelParams
             )
             return ProviderResponse(content: content)
 
@@ -1207,7 +1254,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
-                messages: messages
+                messages: messages,
+                modelParams: config.modelParams
             )
             return ProviderResponse(content: content)
 
@@ -1218,7 +1266,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 baseUrl: baseUrl,
                 model: config.model,
                 system: system,
-                messages: messages
+                messages: messages,
+                modelParams: config.modelParams
             )
             return ProviderResponse(content: content)
 
@@ -1233,7 +1282,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             let content = try await callLocalMLX(
                 modelId: config.model,
                 system: system,
-                messages: messages
+                messages: messages,
+                modelParams: config.modelParams
             )
             return ProviderResponse(content: content)
 
@@ -1686,7 +1736,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     
     // MARK: - Provider Implementations
     
-    private func callAnthropic(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
+    private func callAnthropic(
+        apiKey: String,
+        model: String,
+        system: String?,
+        messages: [Message],
+        modelParams: ModelGenerationSettings?
+    ) async throws -> String {
         let url = URL(string: "https://api.anthropic.com/v1/messages")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -1702,11 +1758,12 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             apiMessages.append(["role": role, "content": contentBlocks])
         }
         
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "max_tokens": 4096,
             "messages": apiMessages
         ].merging(system.flatMap { ["system": $0] } ?? [:]) { $1 }
+        body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "anthropic")) { _, new in new }
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         
@@ -1731,17 +1788,31 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         return decoded.content.first?.text ?? ""
     }
     
-    private func callOpenAI(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
+    private func callOpenAI(
+        apiKey: String,
+        model: String,
+        system: String?,
+        messages: [Message],
+        modelParams: ModelGenerationSettings?
+    ) async throws -> String {
         return try await callOpenAICompatible(
             apiKey: apiKey,
             baseUrl: "https://api.openai.com/v1",
             model: model,
             system: system,
-            messages: messages
+            messages: messages,
+            modelParams: modelParams
         )
     }
     
-    private func callOpenAICompatible(apiKey: String, baseUrl: String, model: String, system: String?, messages: [Message]) async throws -> String {
+    private func callOpenAICompatible(
+        apiKey: String,
+        baseUrl: String,
+        model: String,
+        system: String?,
+        messages: [Message],
+        modelParams: ModelGenerationSettings?
+    ) async throws -> String {
         let url = URL(string: "\(baseUrl)/chat/completions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -1757,10 +1828,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             apiMessages.append(["role": msg.role.rawValue, "content": content])
         }
         
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "messages": apiMessages
         ]
+        body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "openai")) { _, new in new }
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         
@@ -1787,7 +1859,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         return decoded.choices.first?.message.content ?? ""
     }
 
-    private func callGrok(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
+    private func callGrok(
+        apiKey: String,
+        model: String,
+        system: String?,
+        messages: [Message],
+        modelParams: ModelGenerationSettings?
+    ) async throws -> String {
         // Grok uses OpenAI-compatible API but with xAI endpoint
         // Supports: images (JPEG, PNG) via image_url
         // Does NOT support: audio, video, PDFs
@@ -1806,10 +1884,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             apiMessages.append(["role": msg.role.rawValue, "content": content])
         }
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "messages": apiMessages
         ]
+        body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "grok")) { _, new in new }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -1836,7 +1915,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         return decoded.choices.first?.message.content ?? ""
     }
 
-    private func callPerplexity(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
+    private func callPerplexity(
+        apiKey: String,
+        model: String,
+        system: String?,
+        messages: [Message],
+        modelParams: ModelGenerationSettings?
+    ) async throws -> String {
         // Perplexity uses OpenAI-compatible API
         // Base URL: https://api.perplexity.ai
         // Supports: text only (no image/audio/video)
@@ -1856,10 +1941,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             apiMessages.append(["role": msg.role.rawValue, "content": msg.content])
         }
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "messages": apiMessages
         ]
+        body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "perplexity")) { _, new in new }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -1897,7 +1983,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         return responseText
     }
 
-    private func callDeepSeek(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> ProviderResponse {
+    private func callDeepSeek(
+        apiKey: String,
+        model: String,
+        system: String?,
+        messages: [Message],
+        modelParams: ModelGenerationSettings?
+    ) async throws -> ProviderResponse {
         // DeepSeek uses OpenAI-compatible API
         // Base URL: https://api.deepseek.com
         // Supports: text only (no image/audio/video)
@@ -1917,10 +2009,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             apiMessages.append(["role": msg.role.rawValue, "content": msg.content])
         }
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "messages": apiMessages
         ]
+        body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "deepseek")) { _, new in new }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -1957,7 +2050,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         return ProviderResponse(content: content, reasoning: reasoning)
     }
 
-    private func callZai(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
+    private func callZai(
+        apiKey: String,
+        model: String,
+        system: String?,
+        messages: [Message],
+        modelParams: ModelGenerationSettings?
+    ) async throws -> String {
         // Z.ai (Zhipu AI) uses OpenAI-compatible API
         // Base URL: https://api.z.ai/api/paas/v4
         // Supports: text, and vision for V models
@@ -1986,6 +2085,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             "model": model,
             "messages": apiMessages
         ]
+        body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "zai")) { _, new in new }
 
         // Enable thinking mode for enhanced reasoning on flagship models
         if model.contains("4.6") {
@@ -2045,7 +2145,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         return parts.isEmpty ? msg.content : parts
     }
 
-    private func callMiniMax(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
+    private func callMiniMax(
+        apiKey: String,
+        model: String,
+        system: String?,
+        messages: [Message],
+        modelParams: ModelGenerationSettings?
+    ) async throws -> String {
         // MiniMax uses a custom API format
         // Base URL: https://api.minimax.io/v1
         // Supports: text only
@@ -2075,11 +2181,18 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             ])
         }
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "messages": apiMessages,
             "temperature": 0.7
         ]
+        let minimaxParams = openAIStyleSamplingParameters(from: modelParams, provider: "minimax")
+        if let temperature = minimaxParams["temperature"] {
+            body["temperature"] = temperature
+        }
+        if let topP = minimaxParams["top_p"] {
+            body["top_p"] = topP
+        }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -2107,7 +2220,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         return decoded.reply ?? decoded.choices?.messages.first?.text ?? ""
     }
 
-    private func callMistral(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
+    private func callMistral(
+        apiKey: String,
+        model: String,
+        system: String?,
+        messages: [Message],
+        modelParams: ModelGenerationSettings?
+    ) async throws -> String {
         // Mistral uses OpenAI-compatible API
         // Base URL: https://api.mistral.ai/v1
         // Supports: text, and vision for pixtral models
@@ -2131,10 +2250,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             }
         }
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "messages": apiMessages
         ]
+        body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "mistral")) { _, new in new }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -2189,7 +2309,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         return parts.isEmpty ? msg.content : parts
     }
 
-    private func callGemini(apiKey: String, model: String, system: String?, messages: [Message]) async throws -> String {
+    private func callGemini(
+        apiKey: String,
+        model: String,
+        system: String?,
+        messages: [Message],
+        modelParams: ModelGenerationSettings?
+    ) async throws -> String {
         // Gemini API: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
         // Model name usually needs "models/" prefix or just the ID.
         // The app uses "gemini-2.5-flash" etc.
@@ -2214,9 +2340,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             ])
         }
         
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "contents": contents
         ].merging(system.flatMap { ["system_instruction": ["parts": [["text": $0]]]] } ?? [:]) { $1 }
+        let generationConfig = geminiGenerationConfig(from: modelParams)
+        if !generationConfig.isEmpty {
+            body["generationConfig"] = generationConfig
+        }
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         
@@ -2621,7 +2751,12 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
     /// Call a local MLX model (downloads from HuggingFace on first use)
     /// - Parameter modelId: HuggingFace model ID (e.g., "mlx-community/SmolLM2-1.7B-Instruct-4bit")
-    private func callLocalMLX(modelId: String, system: String?, messages: [Message]) async throws -> String {
+    private func callLocalMLX(
+        modelId: String,
+        system: String?,
+        messages: [Message],
+        modelParams: ModelGenerationSettings?
+    ) async throws -> String {
         #if targetEnvironment(simulator)
         throw APIError.networkError("MLX models require a physical device (Metal GPU)")
         #else
@@ -2629,10 +2764,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             // Load the specific model (will download if not cached)
             try await MLXModelService.shared.loadModel(modelId: modelId)
 
-            // Get generation settings from user preferences
-            let genSettings = await MainActor.run {
-                SettingsViewModel.shared.settings.modelGenerationSettings
-            }
+            // Use resolved runtime model parameters for this request.
+            let genSettings = modelParams ?? ModelGenerationSettings()
 
             // Apply user settings with sensible defaults for Qwen3
             let temperature = genSettings.temperatureEnabled ? genSettings.temperature : 0.7

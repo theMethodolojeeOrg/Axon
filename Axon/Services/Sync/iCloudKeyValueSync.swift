@@ -283,6 +283,7 @@ struct SyncableSettings: Codable {
     var sovereigntyConsentProviderHasBeenSetByUser: Bool
     var sovereigntyConsentProvider: String
     var sovereigntyConsentModel: String
+    var sovereigntyAgentSelfReconfigApprovalMode: String?
     var sovereigntyShowDetailedReasoning: Bool
     var sovereigntyConsentTimeoutSeconds: Int
     var sovereigntyAuditLoggingEnabled: Bool
@@ -396,6 +397,7 @@ struct SyncableSettings: Codable {
         self.sovereigntyConsentProviderHasBeenSetByUser = settings.sovereigntySettings.consentProviderHasBeenSetByUser
         self.sovereigntyConsentProvider = settings.sovereigntySettings.consentProvider.rawValue
         self.sovereigntyConsentModel = settings.sovereigntySettings.consentModel
+        self.sovereigntyAgentSelfReconfigApprovalMode = settings.sovereigntySettings.agentSelfReconfigApprovalMode.rawValue
         self.sovereigntyShowDetailedReasoning = settings.sovereigntySettings.showDetailedReasoning
         self.sovereigntyConsentTimeoutSeconds = settings.sovereigntySettings.consentTimeoutSeconds
         self.sovereigntyAuditLoggingEnabled = settings.sovereigntySettings.auditLoggingEnabled
@@ -541,6 +543,10 @@ struct SyncableSettings: Codable {
             settings.sovereigntySettings.consentProvider = provider
         }
         settings.sovereigntySettings.consentModel = sovereigntyConsentModel
+        if let modeRaw = sovereigntyAgentSelfReconfigApprovalMode,
+           let mode = AgentSelfReconfigApprovalMode(rawValue: modeRaw) {
+            settings.sovereigntySettings.agentSelfReconfigApprovalMode = mode
+        }
         settings.sovereigntySettings.showDetailedReasoning = sovereigntyShowDetailedReasoning
         settings.sovereigntySettings.consentTimeoutSeconds = sovereigntyConsentTimeoutSeconds
         settings.sovereigntySettings.auditLoggingEnabled = sovereigntyAuditLoggingEnabled

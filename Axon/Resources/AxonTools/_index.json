@@ -26,6 +26,7 @@
         "core/agent_state/agent_state_append/tool_agent_state_append.json",
         "core/agent_state/agent_state_query/tool_agent_state_query.json",
         "core/agent_state/agent_state_clear/tool_agent_state_clear.json",
+        "core/agent_state/agent_state_configure_runtime/tool_agent_state_configure_runtime.json",
         "core/agent_state/persistence_disable/tool_persistence_disable.json"
       ]
     },
@@ -266,8 +267,8 @@
     }
   },
   "stats": {
-    "totalTools": 98,
-    "coreTools": 49,
+    "totalTools": 99,
+    "coreTools": 50,
     "systemTools": 17,
     "providerTools": 32,
     "toolsRequiringApproval": 17
@@ -349,6 +350,7 @@
       "agent_state_append",
       "agent_state_query",
       "agent_state_clear",
+      "agent_state_configure_runtime",
       "persistence_disable"
     ],
     "heartbeat": [

@@ -1,0 +1,183 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "agent_state_configure_runtime",
+    "name": "Configure Agent Runtime",
+    "description": "Configure Axon's provider/model runtime and sampling overrides for this conversation or a turn lease.",
+    "category": "agent_state",
+    "icon": {
+      "sfSymbol": "slider.horizontal.3"
+    },
+    "requiresApproval": false,
+    "tags": [
+      "runtime",
+      "provider",
+      "model",
+      "sampling",
+      "turn-lease"
+    ]
+  },
+  "parameters": {
+    "action": {
+      "type": "enum",
+      "required": true,
+      "description": "Mutation action",
+      "enum": [
+        "set",
+        "clear"
+      ],
+      "default": "set"
+    },
+    "scope": {
+      "type": "enum",
+      "required": true,
+      "description": "Override scope",
+      "enum": [
+        "conversation",
+        "turn"
+      ],
+      "default": "conversation"
+    },
+    "turns": {
+      "type": "integer",
+      "required": false,
+      "description": "Required when action=set and scope=turn",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "provider": {
+      "type": "string",
+      "required": false,
+      "description": "Built-in provider ID (optional)."
+    },
+    "model": {
+      "type": "string",
+      "required": false,
+      "description": "Model ID for the selected provider (optional)."
+    },
+    "sampling": {
+      "type": "object",
+      "required": false,
+      "description": "Sampling overrides (provider/model support dependent).",
+      "properties": {
+        "temperature": {
+          "type": "number",
+          "required": false,
+          "minimum": 0,
+          "maximum": 1
+        },
+        "top_p": {
+          "type": "number",
+          "required": false,
+          "minimum": 0,
+          "maximum": 1
+        },
+        "top_k": {
+          "type": "integer",
+          "required": false,
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "reasoning": {
+      "type": "string",
+      "required": false,
+      "description": "Optional rationale for the change."
+    }
+  },
+  "inputFormat": {
+    "style": "freeform"
+  },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "agent_state"
+  },
+  "ai": {
+    "systemPromptSection": "### agent_state_configure_runtime\nConfigure your runtime provider/model/sampling for this conversation or a temporary turn lease.\n\nUse JSON input:\n```tool_request\n{\"tool\":\"agent_state_configure_runtime\",\"query\":\"{\\\"action\\\":\\\"set\\\",\\\"scope\\\":\\\"turn\\\",\\\"turns\\\":2,\\\"provider\\\":\\\"anthropic\\\",\\\"model\\\":\\\"claude-sonnet-4-6\\\",\\\"sampling\\\":{\\\"temperature\\\":0.3}}\"}\n```",
+    "usageExamples": [
+      {
+        "description": "Set a 2-turn lease on provider/model",
+        "input": "{\"action\":\"set\",\"scope\":\"turn\",\"turns\":2,\"provider\":\"anthropic\",\"model\":\"claude-sonnet-4-6\"}"
+      },
+      {
+        "description": "Adjust conversation sampling only",
+        "input": "{\"action\":\"set\",\"scope\":\"conversation\",\"sampling\":{\"temperature\":0.2,\"top_p\":0.9}}"
+      },
+      {
+        "description": "Clear turn lease",
+        "input": "{\"action\":\"clear\",\"scope\":\"turn\"}"
+      }
+    ],
+    "whenToUse": [
+      "Temporarily switch model for a bounded number of turns",
+      "Tune sampling behavior for current task demands",
+      "Clear stale conversation or turn-scoped runtime overrides"
+    ],
+    "whenNotToUse": [
+      "Global defaults (use settings or change_system_state)",
+      "Custom provider UUID selection (not supported by this tool yet)"
+    ]
+  },
+  "ui": {
+    "inputForm": {
+      "fields": [
+        {
+          "param": "action",
+          "widget": "segmented",
+          "label": "Action"
+        },
+        {
+          "param": "scope",
+          "widget": "segmented",
+          "label": "Scope"
+        },
+        {
+          "param": "turns",
+          "widget": "stepper",
+          "label": "Turns"
+        },
+        {
+          "param": "provider",
+          "widget": "text_field",
+          "label": "Provider"
+        },
+        {
+          "param": "model",
+          "widget": "text_field",
+          "label": "Model"
+        },
+        {
+          "param": "reasoning",
+          "widget": "textarea",
+          "label": "Reasoning",
+          "rows": 2
+        }
+      ],
+      "layout": "vertical",
+      "submitLabel": "Apply Runtime Change"
+    },
+    "resultDisplay": {
+      "style": "card",
+      "sections": [
+        {
+          "type": "header",
+          "title": "Runtime Updated",
+          "icon": "slider.horizontal.3"
+        },
+        {
+          "type": "text",
+          "source": "{{output}}"
+        }
+      ]
+    }
+  },
+  "sovereignty": {
+    "actionCategory": "state_write",
+    "approvalDescription": "Configure runtime state",
+    "scopes": [
+      "state.write"
+    ],
+    "riskLevel": "medium"
+  }
+}

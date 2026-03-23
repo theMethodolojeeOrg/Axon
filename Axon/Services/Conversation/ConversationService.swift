@@ -616,7 +616,18 @@ class ConversationService: ObservableObject {
         // modelId is the API identifier (e.g., "claude-haiku-4-5-20251001")
         // modelDisplayName is for UI display (e.g., "Claude Haiku 4.5")
         let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
-        var (providerString, modelId, modelDisplayName, providerDisplayName) = getProviderAndModel(for: conversationId, settings: settings)
+        var (providerString, modelId, _, providerDisplayName) = getProviderAndModel(for: conversationId, settings: settings)
+        let runtimeOverrides = ConversationRuntimeOverrideManager.shared.resolve(
+            conversationId: conversationId,
+            baseProvider: providerString,
+            baseModel: modelId,
+            baseProviderDisplayName: providerDisplayName,
+            baseModelParams: settings.modelGenerationSettings
+        )
+        providerString = runtimeOverrides.provider
+        modelId = runtimeOverrides.model
+        providerDisplayName = runtimeOverrides.providerDisplayName
+        let resolvedModelParams = runtimeOverrides.modelParams
 
         if !attachments.isEmpty {
             let policy = AttachmentMimePolicyService.resolvePolicy(conversationId: conversationId, settings: settings)
@@ -696,7 +707,7 @@ class ConversationService: ObservableObject {
             mistralKey: mistralKey,
             customBaseUrl: customBaseUrl,
             customApiKey: customApiKey,
-            modelParams: settings.modelGenerationSettings
+            modelParams: resolvedModelParams
         )
 
         do {
@@ -732,6 +743,7 @@ class ConversationService: ObservableObject {
             // We assume the user message we created is fine.
             
             messages.append(assistantMessage)
+            ConversationRuntimeOverrideManager.shared.consumeTurnLeaseOnSuccessfulReply(conversationId: conversationId)
 
             // Save both messages to Core Data immediately
             try await syncManager.saveMessagesToCoreData([userMessage, assistantMessage], conversationId: conversationId)

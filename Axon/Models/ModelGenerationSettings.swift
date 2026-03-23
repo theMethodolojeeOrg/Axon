@@ -53,7 +53,13 @@ struct ProviderParameterSupport {
             return ProviderParameterSupport(supportsTemperature: true, supportsTopP: true, supportsTopK: true)
         case "gemini":
             return ProviderParameterSupport(supportsTemperature: true, supportsTopP: true, supportsTopK: true)
+        case "applefoundation", "apple_foundation", "apple-foundation":
+            return ProviderParameterSupport(supportsTemperature: false, supportsTopP: false, supportsTopK: false)
+        case "localmlx", "local_mlx", "local-mlx":
+            return ProviderParameterSupport(supportsTemperature: true, supportsTopP: true, supportsTopK: false)
         case "openai", "grok", "perplexity", "deepseek", "zai", "mistral", "minimax":
+            return ProviderParameterSupport(supportsTemperature: true, supportsTopP: true, supportsTopK: false)
+        case "openai-compatible":
             return ProviderParameterSupport(supportsTemperature: true, supportsTopP: true, supportsTopK: false)
         default:
             // Custom providers - assume OpenAI-compatible

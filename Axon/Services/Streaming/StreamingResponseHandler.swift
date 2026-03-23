@@ -22,6 +22,7 @@ class StreamingResponseHandler {
         let baseUrl: String?
         let system: String?
         let maxTokens: Int
+        let modelParams: ModelGenerationSettings?
 
         init(
             provider: String,
@@ -29,7 +30,8 @@ class StreamingResponseHandler {
             model: String,
             baseUrl: String? = nil,
             system: String? = nil,
-            maxTokens: Int = 4096
+            maxTokens: Int = 4096,
+            modelParams: ModelGenerationSettings? = nil
         ) {
             self.provider = provider
             self.apiKey = apiKey
@@ -37,7 +39,36 @@ class StreamingResponseHandler {
             self.baseUrl = baseUrl
             self.system = system
             self.maxTokens = maxTokens
+            self.modelParams = modelParams
         }
+    }
+
+    private func openAIStyleSamplingParameters(
+        from modelParams: ModelGenerationSettings?,
+        provider: String
+    ) -> [String: Any] {
+        guard let modelParams else {
+            return [:]
+        }
+        return modelParams.parameters(for: provider)
+    }
+
+    private func geminiGenerationConfig(from modelParams: ModelGenerationSettings?) -> [String: Any] {
+        guard let modelParams else {
+            return [:]
+        }
+        let raw = modelParams.parameters(for: "gemini")
+        var config: [String: Any] = [:]
+        if let temperature = raw["temperature"] {
+            config["temperature"] = temperature
+        }
+        if let topP = raw["top_p"] {
+            config["topP"] = topP
+        }
+        if let topK = raw["top_k"] {
+            config["topK"] = topK
+        }
+        return config
     }
 
     // MARK: - Supported Providers
@@ -126,6 +157,7 @@ class StreamingResponseHandler {
         if let system = config.system, !system.isEmpty {
             body["system"] = system
         }
+        body.merge(openAIStyleSamplingParameters(from: config.modelParams, provider: "anthropic")) { _, new in new }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -208,7 +240,8 @@ class StreamingResponseHandler {
                 model: config.model,
                 baseUrl: "https://api.openai.com/v1",
                 system: config.system,
-                maxTokens: config.maxTokens
+                maxTokens: config.maxTokens,
+                modelParams: config.modelParams
             ),
             messages: messages,
             continuation: continuation
@@ -285,11 +318,12 @@ class StreamingResponseHandler {
             apiMessages.append(["role": msg.role.rawValue, "content": content])
         }
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": config.model,
             "messages": apiMessages,
             "stream": true
         ]
+        body.merge(openAIStyleSamplingParameters(from: config.modelParams, provider: config.provider)) { _, new in new }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -468,9 +502,11 @@ class StreamingResponseHandler {
             body["systemInstruction"] = ["parts": [["text": system]]]
         }
 
-        body["generationConfig"] = [
+        var generationConfig: [String: Any] = [
             "maxOutputTokens": config.maxTokens
         ]
+        generationConfig.merge(geminiGenerationConfig(from: config.modelParams)) { _, new in new }
+        body["generationConfig"] = generationConfig
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -603,11 +639,12 @@ class StreamingResponseHandler {
             apiMessages.append(["role": msg.role.rawValue, "content": msg.content])
         }
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": config.model,
             "messages": apiMessages,
             "stream": true
         ]
+        body.merge(openAIStyleSamplingParameters(from: config.modelParams, provider: "deepseek")) { _, new in new }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -680,7 +717,8 @@ class StreamingResponseHandler {
                 model: config.model,
                 baseUrl: "https://api.x.ai/v1",
                 system: config.system,
-                maxTokens: config.maxTokens
+                maxTokens: config.maxTokens,
+                modelParams: config.modelParams
             ),
             messages: messages,
             continuation: continuation

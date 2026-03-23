@@ -680,6 +680,7 @@ class SlashCommandParser {
         "agent_state_append",           // AI's internal state
         "agent_state_query",            // AI's internal state
         "agent_state_clear",            // AI's internal state
+        "agent_state_configure_runtime",// AI runtime self-reconfiguration
         "reflect_on_conversation",      // AI self-reflection
         "list_tools",                   // AI tool discovery
         "get_tool_details",             // AI tool discovery

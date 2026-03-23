@@ -55,13 +55,13 @@ struct SendMessageToConversationIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
         // 1. Resolve or create conversation
-        let (conversationId, conversationTitle) = try await resolveConversation()
+        let (conversationId, _) = try await resolveConversation()
 
         // 2. Load existing messages for context
         let existingMessages = try await loadMessages(for: conversationId)
 
         // 3. Build orchestrator config
-        let config = try await buildOrchestrationConfig()
+        let config = try await buildOrchestrationConfig(conversationId: conversationId)
 
         // 4. Create user message
         let userMessage = Message(
@@ -95,6 +95,7 @@ struct SendMessageToConversationIntent: AppIntent {
             messages: contextMessages,
             config: config
         )
+        ConversationRuntimeOverrideManager.shared.consumeTurnLeaseOnSuccessfulReply(conversationId: conversationId)
 
         // 8. Persist both messages to CoreData
         try await persistMessages(
@@ -184,29 +185,59 @@ struct SendMessageToConversationIntent: AppIntent {
     }
 
     /// Build orchestration config from settings
-    private func buildOrchestrationConfig() async throws -> OrchestrationConfig {
+    @MainActor
+    private func buildOrchestrationConfig(conversationId: String) async throws -> OrchestrationConfig {
         guard let settings = SettingsStorage.shared.loadSettings() else {
             throw SendMessageError.noConfiguredProvider
         }
         let apiKeys = APIKeysStorage.shared
 
-        var providerString = settings.defaultProvider.rawValue
-        var modelId = settings.defaultModel
-        var providerDisplayName = settings.defaultProvider.displayName
+        let resolved = ConversationModelResolver.resolve(conversationId: conversationId, settings: settings)
+        var providerString = resolved.normalizedProvider
+        var modelId = resolved.modelId
+        var providerDisplayName = resolved.providerName
+        let runtimeOverrides = ConversationRuntimeOverrideManager.shared.resolve(
+            conversationId: conversationId,
+            baseProvider: providerString,
+            baseModel: modelId,
+            baseProviderDisplayName: providerDisplayName,
+            baseModelParams: settings.modelGenerationSettings
+        )
+        providerString = runtimeOverrides.provider
+        modelId = runtimeOverrides.model
+        providerDisplayName = runtimeOverrides.providerDisplayName
+        let resolvedModelParams = runtimeOverrides.modelParams
+
         var customBaseUrl: String? = nil
         var customApiKey: String? = nil
 
         // Handle custom providers
-        if let customProviderId = settings.selectedCustomProviderId,
-           let customProvider = settings.customProviders.first(where: { $0.id == customProviderId }),
-           let customModelId = settings.selectedCustomModelId,
-           let customModel = customProvider.models.first(where: { $0.id == customModelId }) {
-            providerString = "openai-compatible"
-            modelId = customModel.modelCode
-            providerDisplayName = customProvider.providerName
-            customBaseUrl = customProvider.apiEndpoint
-            if let key = try? apiKeys.getCustomProviderAPIKey(providerId: customProviderId) {
-                customApiKey = key
+        if providerString == "openai-compatible" {
+            let overridesKey = "conversation_overrides_\(conversationId)"
+            var customProviderId: UUID? = nil
+            var customModelId: UUID? = nil
+
+            if let data = UserDefaults.standard.data(forKey: overridesKey),
+               let overrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data) {
+                customProviderId = overrides.customProviderId
+                customModelId = overrides.customModelId
+            } else {
+                customProviderId = settings.selectedCustomProviderId
+                customModelId = settings.selectedCustomModelId
+            }
+
+            if let providerId = customProviderId,
+               let customProvider = settings.customProviders.first(where: { $0.id == providerId }) {
+                providerDisplayName = customProvider.providerName
+                customBaseUrl = customProvider.apiEndpoint
+
+                if let customModelId,
+                   let customModel = customProvider.models.first(where: { $0.id == customModelId }) {
+                    modelId = customModel.modelCode
+                }
+                if let key = try? apiKeys.getCustomProviderAPIKey(providerId: providerId), !key.isEmpty {
+                    customApiKey = key
+                }
             }
         }
 
@@ -233,7 +264,7 @@ struct SendMessageToConversationIntent: AppIntent {
             mistralKey: try? apiKeys.getAPIKey(for: .mistral),
             customBaseUrl: customBaseUrl,
             customApiKey: customApiKey,
-            modelParams: settings.modelGenerationSettings
+            modelParams: resolvedModelParams
         )
     }
 

@@ -1608,14 +1608,26 @@ struct ChatContainerView: View {
 
         // Get provider and model info - use ConversationModelResolver to respect conversation overrides
         let resolved = ConversationModelResolver.resolve(conversationId: conversationId, settings: settings)
-        let providerString = resolved.normalizedProvider  // This handles xai -> grok mapping
-        let modelId = resolved.modelId
-        let providerDisplayName = resolved.providerName
+        var providerString = resolved.normalizedProvider  // This handles xai -> grok mapping
+        var modelId = resolved.modelId
+        var providerDisplayName = resolved.providerName
+        let runtimeOverrides = ConversationRuntimeOverrideManager.shared.resolve(
+            conversationId: conversationId,
+            baseProvider: providerString,
+            baseModel: modelId,
+            baseProviderDisplayName: providerDisplayName,
+            baseModelParams: settings.modelGenerationSettings
+        )
+        providerString = runtimeOverrides.provider
+        modelId = runtimeOverrides.model
+        providerDisplayName = runtimeOverrides.providerDisplayName
+        let resolvedModelParams = runtimeOverrides.modelParams
 
         // Pre-flight check: Verify built-in providers (Apple Intelligence, MLX) are available
         // This prevents the "generating forever" issue when the provider can't actually respond
         // Only check for built-in providers that have availability requirements
-        let resolvedBuiltInProvider = AIProvider(rawValue: resolved.provider)
+        let availabilityProviderRaw = providerString == "grok" ? "xai" : providerString
+        let resolvedBuiltInProvider = AIProvider(rawValue: availabilityProviderRaw)
         if let builtInProvider = resolvedBuiltInProvider, !builtInProvider.isAvailable {
             let reason = builtInProvider.unavailableReason ?? "Provider is not available on this device"
             let guidance: String
@@ -1732,7 +1744,7 @@ struct ChatContainerView: View {
             mistralKey: mistralKey,
             customBaseUrl: customBaseUrl,
             customApiKey: customApiKey,
-            modelParams: settings.modelGenerationSettings
+            modelParams: resolvedModelParams
         )
 
         // Get all messages for context
@@ -1874,6 +1886,11 @@ struct ChatContainerView: View {
             return
         }
 
+        let shouldConsumeTurnLease = !didReceiveProviderError && (
+            !finalContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            !finalReasoning.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        )
+
         // Finalize the message
         await MainActor.run {
             finalizeStreamingMessage(
@@ -1887,6 +1904,9 @@ struct ChatContainerView: View {
                 modelName: config.model,
                 providerName: config.providerName
             )
+            if shouldConsumeTurnLease {
+                ConversationRuntimeOverrideManager.shared.consumeTurnLeaseOnSuccessfulReply(conversationId: conversationId)
+            }
             // Clear first-message flag after streaming completes
             isFirstMessageSending = false
         }

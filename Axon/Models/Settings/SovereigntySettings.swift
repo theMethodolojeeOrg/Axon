@@ -7,6 +7,38 @@
 
 import Foundation
 
+// MARK: - Self-Reconfiguration Approval Mode
+
+/// Controls when Axon must request biometric approval for self-reconfiguration
+/// actions (provider/model/sampling changes made via tools).
+enum AgentSelfReconfigApprovalMode: String, Codable, CaseIterable, Sendable {
+    case providerModelOnly = "provider_model_only"
+    case allChanges = "all_changes"
+    case noApproval = "no_approval"
+
+    var displayName: String {
+        switch self {
+        case .providerModelOnly:
+            return "Provider/Model Only"
+        case .allChanges:
+            return "All Changes"
+        case .noApproval:
+            return "No Approval"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .providerModelOnly:
+            return "Require approval for provider/model changes only"
+        case .allChanges:
+            return "Require approval for provider/model and sampling changes"
+        case .noApproval:
+            return "Allow all self-reconfiguration changes without biometric approval"
+        }
+    }
+}
+
 // MARK: - Co-Sovereignty Settings
 
 /// Settings for co-sovereignty features (AI consent, negotiations, deadlocks)
@@ -30,6 +62,9 @@ struct SovereigntySettings: Codable, Equatable, Sendable {
     /// Whether to require biometric authentication for all world-affecting actions
     /// When false, uses trust tiers for pre-approved actions
     var requireBiometricForAllActions: Bool = false
+
+    /// Policy for agent-initiated self-reconfiguration approvals
+    var agentSelfReconfigApprovalMode: AgentSelfReconfigApprovalMode = .providerModelOnly
 
     /// Whether to show detailed AI reasoning during negotiations
     var showDetailedReasoning: Bool = true
