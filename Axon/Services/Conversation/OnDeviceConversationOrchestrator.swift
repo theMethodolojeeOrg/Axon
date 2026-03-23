@@ -53,6 +53,55 @@ struct EpistemicPromptResult {
     let summaryTokens: Int
 }
 
+/// Segmentation result for causal tool gating.
+/// `visiblePrefix` is always safe to surface to users because it excludes tool fences and any trailing text after first tool request.
+struct ToolGatedResponseSegment {
+    let visiblePrefix: String
+    let firstToolRequest: ToolRequest?
+    let awaitingFenceClose: Bool
+}
+
+enum ToolGatedResponseSegmenter {
+    private static let toolFenceOpen = "```tool_request"
+    private static let codeFenceClose = "```"
+
+    static func segment(_ response: String) -> ToolGatedResponseSegment {
+        guard let firstOpenRange = response.range(of: toolFenceOpen) else {
+            return ToolGatedResponseSegment(
+                visiblePrefix: response,
+                firstToolRequest: nil,
+                awaitingFenceClose: false
+            )
+        }
+
+        let visiblePrefix = String(response[..<firstOpenRange.lowerBound])
+        let afterOpen = response[firstOpenRange.upperBound...]
+
+        guard let closeRange = afterOpen.range(of: codeFenceClose) else {
+            return ToolGatedResponseSegment(
+                visiblePrefix: visiblePrefix,
+                firstToolRequest: nil,
+                awaitingFenceClose: true
+            )
+        }
+
+        let payload = String(afterOpen[..<closeRange.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let firstToolRequest = decodeToolRequest(from: payload)
+
+        return ToolGatedResponseSegment(
+            visiblePrefix: visiblePrefix,
+            firstToolRequest: firstToolRequest,
+            awaitingFenceClose: false
+        )
+    }
+
+    private static func decodeToolRequest(from payload: String) -> ToolRequest? {
+        guard let data = payload.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(ToolRequest.self, from: data)
+    }
+}
+
 class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
     // MARK: - Services
@@ -350,7 +399,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         config: OrchestrationConfig
     ) -> AsyncThrowingStream<StreamingEvent, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            let task = Task {
                 do {
                     try await self.performStreamingSend(
                         conversationId: conversationId,
@@ -370,6 +419,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     }
                     continuation.finish()
                 }
+            }
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
             }
         }
     }
@@ -548,19 +600,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 messages: mergedMessages
             )
 
-            // Emit the content as streaming events (character by character for smooth UI)
-            accumulatedContent = providerResult.content
             accumulatedReasoning = providerResult.reasoning ?? ""
-
-            // Emit in chunks for smoother display
-            let chunkSize = 10
-            let characters = Array(accumulatedContent)
-            for i in stride(from: 0, to: characters.count, by: chunkSize) {
-                let end = min(i + chunkSize, characters.count)
-                let chunk = String(characters[i..<end])
-                continuation.yield(.textDelta(chunk))
-                try await Task.sleep(nanoseconds: 10_000_000) // 10ms between chunks
-            }
 
             // Handle tool proxy if needed
             // Note: geminiKey is only required for Gemini-native tools (code_execution, etc.)
@@ -571,19 +611,33 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 }
                 let geminiKey = config.geminiKey ?? ""
                 try await handleStreamingToolProxyLoop(
-                    initialResponse: accumulatedContent,
+                    initialResponse: providerResult.content,
                     conversationId: conversationId,
                     config: config,
                     systemPrompt: systemPrompt,
                     messages: mergedMessages,
                     geminiKey: geminiKey,
                     maxIterations: maxToolCalls,
+                    emitInitialVisiblePrefix: true,
                     continuation: continuation,
                     accumulatedContent: &accumulatedContent,
                     collectedToolCalls: &collectedToolCalls,
                     collectedSources: &collectedSources,
                     collectedMemoryOperations: &collectedMemoryOperations
                 )
+            } else {
+                let safeContent = ToolGatedResponseSegmenter.segment(providerResult.content).visiblePrefix
+                accumulatedContent = safeContent
+
+                // Emit in chunks for smoother display
+                let chunkSize = 10
+                let characters = Array(safeContent)
+                for i in stride(from: 0, to: characters.count, by: chunkSize) {
+                    let end = min(i + chunkSize, characters.count)
+                    let chunk = String(characters[i..<end])
+                    continuation.yield(.textDelta(chunk))
+                    try await Task.sleep(nanoseconds: 10_000_000) // 10ms between chunks
+                }
             }
         }
 
@@ -627,23 +681,42 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         )
 
         let handler = StreamingResponseHandler()
+        var rawStreamResponse = ""
+        var emittedVisibleCount = 0
 
-        for try await event in handler.stream(config: streamConfig, messages: messages) {
+        streamLoop: for try await event in handler.stream(config: streamConfig, messages: messages) {
             switch event {
             case .textDelta(let text):
-                accumulatedContent += text
-                continuation.yield(.textDelta(text))
+                rawStreamResponse += text
+                let segment = ToolGatedResponseSegmenter.segment(rawStreamResponse)
+                let visiblePrefix = segment.visiblePrefix
+
+                if visiblePrefix.count > emittedVisibleCount {
+                    let start = visiblePrefix.index(visiblePrefix.startIndex, offsetBy: emittedVisibleCount)
+                    let delta = String(visiblePrefix[start...])
+                    emittedVisibleCount = visiblePrefix.count
+                    accumulatedContent += delta
+                    continuation.yield(.textDelta(delta))
+                }
+
+                if segment.firstToolRequest != nil {
+                    print("[StreamToolProxy] Detected first tool request during stream. Pausing generation for immediate execution.")
+                    break streamLoop
+                }
 
             case .reasoningDelta(let text):
                 accumulatedReasoning += text
                 continuation.yield(.reasoningDelta(text))
+
+            case .error(let error):
+                continuation.yield(.error(error))
 
             default:
                 break
             }
         }
 
-        print("[StreamToolProxy] Stream complete. Checking for tool requests...")
+        print("[StreamToolProxy] Checking for tool requests...")
 
         // After streaming completes, handle tool execution loop
         let maxToolCalls = await MainActor.run {
@@ -651,13 +724,14 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         }
 
         try await handleStreamingToolProxyLoop(
-            initialResponse: accumulatedContent,
+            initialResponse: rawStreamResponse,
             conversationId: conversationId,
             config: config,
             systemPrompt: systemPrompt,
             messages: messages,
             geminiKey: geminiKey,
             maxIterations: maxToolCalls,
+            emitInitialVisiblePrefix: false,
             continuation: continuation,
             accumulatedContent: &accumulatedContent,
             collectedToolCalls: &collectedToolCalls,
@@ -675,6 +749,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         messages: [Message],
         geminiKey: String,
         maxIterations: Int,
+        emitInitialVisiblePrefix: Bool,
         continuation: AsyncThrowingStream<StreamingEvent, Error>.Continuation,
         accumulatedContent: inout String,
         collectedToolCalls: inout [LiveToolCall],
@@ -683,6 +758,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     ) async throws {
         var currentResponse = initialResponse
         var iteration = 0
+        var shouldEmitVisiblePrefix = emitInitialVisiblePrefix
+        var rollingMessages = messages
         let toolContext = ToolContextV2(
             conversationId: conversationId,
             runtimeProvider: config.provider,
@@ -690,136 +767,127 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         )
 
         while iteration < maxIterations {
-            // Parse ALL tool requests from the response (handles back-to-back tool calls)
-            let toolRequests = await ToolProxyService.shared.parseAllToolRequests(from: currentResponse)
-            guard !toolRequests.isEmpty else {
+            let segment = ToolGatedResponseSegmenter.segment(currentResponse)
+            let visiblePrefix = segment.visiblePrefix
+
+            if shouldEmitVisiblePrefix && !visiblePrefix.isEmpty {
+                for char in visiblePrefix {
+                    continuation.yield(.textDelta(String(char)))
+                }
+                accumulatedContent += visiblePrefix
+            }
+            shouldEmitVisiblePrefix = true
+
+            guard let toolRequest = segment.firstToolRequest else {
+                // No executable tool request in this pass.
                 break
             }
 
-            // Collect all tool results to send back together
-            var allToolResults: [(request: ToolRequest, result: ToolResult, formattedResult: String)] = []
+            // Create and emit live tool call
+            let liveToolCall = LiveToolCall.create(name: toolRequest.tool, query: toolRequest.query)
+            collectedToolCalls.append(liveToolCall)
+            continuation.yield(.toolCallStart(liveToolCall))
 
-            // Process each tool request sequentially
-            for toolRequest in toolRequests {
-                // Create and emit live tool call
-                let liveToolCall = LiveToolCall.create(name: toolRequest.tool, query: toolRequest.query)
-                collectedToolCalls.append(liveToolCall)
-                continuation.yield(.toolCallStart(liveToolCall))
+            // Execute one tool request per round-trip (strict causality)
+            let startTime = Date()
+            let toolResult: ToolResult
+            do {
+                let execResult = try await ToolRoutingService.shared.executeTool(
+                    toolId: toolRequest.tool,
+                    query: toolRequest.query,
+                    context: toolContext
+                )
 
-                // Execute tool via unified routing (V1/V2 automatic based on toggle)
-                let startTime = Date()
-
-                do {
-                    let execResult = try await ToolRoutingService.shared.executeTool(
-                        toolId: toolRequest.tool,
-                        query: toolRequest.query,
-                        context: toolContext
-                    )
-
-                    let duration = Date().timeIntervalSince(startTime)
-
-                    // Convert grounding sources to streaming format
-                    var streamingSources: [StreamingToolSource]?
-                    if let sources = execResult.groundingSources {
-                        streamingSources = sources.map { StreamingToolSource(title: $0.title, url: $0.url) }
-                    }
-
-                    let result = ToolCallResult(
-                        success: execResult.success,
-                        output: execResult.output,
-                        sources: streamingSources,
-                        memoryOperation: execResult.memoryOperation,
-                        duration: duration,
-                        errorMessage: execResult.success ? nil : extractToolFailureMessage(from: execResult.output)
-                    )
-
-                    if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
-                        collectedToolCalls[index].state = execResult.success ? .success : .failure
-                        collectedToolCalls[index].result = result
-                        collectedToolCalls[index].completedAt = Date()
-                    }
-
-                    continuation.yield(.toolCallComplete(liveToolCall.id, result))
-
-                    // Mark as executed for deduplication in UI
-                    if execResult.success {
-                        ToolRequestTracker.shared.markExecuted(
-                            request: ToolRequest(tool: toolRequest.tool, query: toolRequest.query),
-                            result: execResult.output
-                        )
-                    }
-
-                    // Collect sources and memory ops
-                    if let sources = execResult.groundingSources {
-                        collectedSources.append(contentsOf: sources)
-                    }
-                    if let memOp = execResult.memoryOperation {
-                        collectedMemoryOperations.append(memOp)
-                    }
-
-                    // Convert to V1 ToolResult for formatting
-                    let toolResult = ToolResult(
-                        tool: toolRequest.tool,
-                        success: execResult.success,
-                        result: execResult.output,
-                        sources: execResult.groundingSources?.map { ToolResultSource(title: $0.title, url: $0.url) },
-                        memoryOperation: execResult.memoryOperation
-                    )
-
-                    // Store for combined response
-                    let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
-                    allToolResults.append((request: toolRequest, result: toolResult, formattedResult: formattedResult))
-
-                } catch {
-                    let toolResult = makeThrownToolFailureResult(tool: toolRequest.tool, error: error)
-                    let duration = Date().timeIntervalSince(startTime)
-                    let result = ToolCallResult(
-                        success: false,
-                        output: toolResult.result,
-                        duration: duration,
-                        errorMessage: error.localizedDescription
-                    )
-
-                    if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
-                        collectedToolCalls[index].state = .failure
-                        collectedToolCalls[index].result = result
-                        collectedToolCalls[index].completedAt = Date()
-                    }
-
-                    continuation.yield(.toolCallComplete(liveToolCall.id, result))
-
-                    // Keep the loop alive by feeding this failure back to the model.
-                    let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
-                    allToolResults.append((request: toolRequest, result: toolResult, formattedResult: formattedResult))
+                let duration = Date().timeIntervalSince(startTime)
+                var streamingSources: [StreamingToolSource]?
+                if let sources = execResult.groundingSources {
+                    streamingSources = sources.map { StreamingToolSource(title: $0.title, url: $0.url) }
+                    collectedSources.append(contentsOf: sources)
                 }
+
+                if let memOp = execResult.memoryOperation {
+                    if memOp.success {
+                        collectedMemoryOperations.removeAll { existing in
+                            !existing.success && isSimilarMemoryContent(existing.content, memOp.content)
+                        }
+                    }
+                    collectedMemoryOperations.append(memOp)
+                }
+
+                let result = ToolCallResult(
+                    success: execResult.success,
+                    output: execResult.output,
+                    sources: streamingSources,
+                    memoryOperation: execResult.memoryOperation,
+                    duration: duration,
+                    errorMessage: execResult.success ? nil : extractToolFailureMessage(from: execResult.output)
+                )
+
+                if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
+                    collectedToolCalls[index].state = execResult.success ? .success : .failure
+                    collectedToolCalls[index].result = result
+                    collectedToolCalls[index].completedAt = Date()
+                }
+
+                continuation.yield(.toolCallComplete(liveToolCall.id, result))
+
+                if execResult.success {
+                    ToolRequestTracker.shared.markExecuted(request: toolRequest, result: execResult.output)
+                }
+
+                toolResult = ToolResult(
+                    tool: toolRequest.tool,
+                    success: execResult.success,
+                    result: execResult.output,
+                    sources: execResult.groundingSources?.map { ToolResultSource(title: $0.title, url: $0.url) },
+                    memoryOperation: execResult.memoryOperation
+                )
+            } catch {
+                toolResult = makeThrownToolFailureResult(tool: toolRequest.tool, error: error)
+                let duration = Date().timeIntervalSince(startTime)
+                let result = ToolCallResult(
+                    success: false,
+                    output: toolResult.result,
+                    duration: duration,
+                    errorMessage: error.localizedDescription
+                )
+
+                if let index = collectedToolCalls.firstIndex(where: { $0.id == liveToolCall.id }) {
+                    collectedToolCalls[index].state = .failure
+                    collectedToolCalls[index].result = result
+                    collectedToolCalls[index].completedAt = Date()
+                }
+
+                continuation.yield(.toolCallComplete(liveToolCall.id, result))
             }
 
-            // Get next response with all results combined
-            let cleanedResponse = await ToolProxyService.shared.removeToolRequest(from: currentResponse)
-            let combinedResults = allToolResults.map { $0.formattedResult }.joined(separator: "\n\n")
-
-            var updatedMessages = messages
-            if !cleanedResponse.isEmpty {
-                updatedMessages.append(Message(conversationId: conversationId, role: .assistant, content: cleanedResponse))
+            let assistantPrefix = visiblePrefix.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !assistantPrefix.isEmpty {
+                rollingMessages.append(Message(conversationId: conversationId, role: .assistant, content: assistantPrefix))
             }
-            updatedMessages.append(Message(conversationId: conversationId, role: .user, content: combinedResults))
 
-            let nextResponse = try await callProvider(
+            let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
+            rollingMessages.append(Message(conversationId: conversationId, role: .user, content: formattedResult))
+
+            currentResponse = try await callProvider(
                 provider: config.provider,
                 config: config,
                 system: systemPrompt,
-                messages: updatedMessages
+                messages: rollingMessages
             ).content
 
-            // Emit new content as streaming
-            let newContent = nextResponse
-            for char in newContent {
-                continuation.yield(.textDelta(String(char)))
-            }
-            accumulatedContent += newContent
-            currentResponse = nextResponse
-
             iteration += 1
+        }
+
+        if iteration >= maxIterations {
+            print("[StreamToolProxy] Tool proxy loop reached max iterations")
+            let fallbackSegment = ToolGatedResponseSegmenter.segment(currentResponse)
+            if shouldEmitVisiblePrefix, !fallbackSegment.visiblePrefix.isEmpty {
+                for char in fallbackSegment.visiblePrefix {
+                    continuation.yield(.textDelta(String(char)))
+                }
+                accumulatedContent += fallbackSegment.visiblePrefix
+            }
         }
     }
 
@@ -850,24 +918,40 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         maxIterations: Int = 3
     ) async throws -> (response: String, toolUsed: Bool, sources: [MessageGroundingSource], memoryOperations: [MessageMemoryOperation]) {
         var currentResponse = initialResponse
+        var accumulatedVisibleResponse = ""
         var toolUsed = false
         var collectedSources: [MessageGroundingSource] = []
         var collectedMemoryOperations: [MessageMemoryOperation] = []
         var iteration = 0
+        var rollingMessages = messages
         let toolContext = ToolContextV2(
             conversationId: conversationId,
             runtimeProvider: config.provider,
             runtimeModel: config.model
         )
 
+        func appendVisibleSegment(_ segment: String, into output: inout String) {
+            let trimmed = segment.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            if output.isEmpty {
+                output = trimmed
+            } else if output.hasSuffix("\n") || trimmed.hasPrefix("\n") {
+                output += trimmed
+            } else {
+                output += "\n\n" + trimmed
+            }
+        }
+
         while iteration < maxIterations {
-            // Parse ALL tool requests from the response (handles back-to-back tool calls)
-            let toolRequests = await ToolProxyService.shared.parseAllToolRequests(from: currentResponse)
-            guard !toolRequests.isEmpty else {
+            let segment = ToolGatedResponseSegmenter.segment(currentResponse)
+            let visiblePrefix = segment.visiblePrefix
+
+            guard let toolRequest = segment.firstToolRequest else {
                 // No proper tool request found - check for malformed memory attempts
+                let malformedDetectionTarget = segment.awaitingFenceClose ? visiblePrefix : currentResponse
 
                 // Check 1: Naked pipe-delimited format (allocentric|0.9|tags|content)
-                if let nakedMemory = await ToolProxyService.shared.detectNakedMemoryFormat(in: currentResponse) {
+                if let nakedMemory = await ToolProxyService.shared.detectNakedMemoryFormat(in: malformedDetectionTarget) {
                     print("[OnDeviceOrchestrator] Detected naked pipe-delimited memory format, sending corrective feedback")
                     toolUsed = true
 
@@ -889,15 +973,17 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                         errorMessage: "Naked format - missing tool_request wrapper"
                     ))
 
-                    var updatedMessages = messages
-                    updatedMessages.append(Message(conversationId: conversationId, role: .assistant, content: currentResponse))
-                    updatedMessages.append(Message(conversationId: conversationId, role: .user, content: formattedFeedback))
+                    let assistantPrefix = visiblePrefix.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !assistantPrefix.isEmpty {
+                        rollingMessages.append(Message(conversationId: conversationId, role: .assistant, content: assistantPrefix))
+                    }
+                    rollingMessages.append(Message(conversationId: conversationId, role: .user, content: formattedFeedback))
 
                     currentResponse = try await callProvider(
                         provider: config.provider,
                         config: config,
                         system: systemPrompt,
-                        messages: updatedMessages
+                        messages: rollingMessages
                     ).content
 
                     iteration += 1
@@ -905,7 +991,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 }
 
                 // Check 2: JSON-structured memory object ({"type":"allocentric","confidence":0.9,...})
-                if let jsonMemory = await ToolProxyService.shared.detectJSONMemoryFormat(in: currentResponse) {
+                if let jsonMemory = await ToolProxyService.shared.detectJSONMemoryFormat(in: malformedDetectionTarget) {
                     print("[OnDeviceOrchestrator] Detected JSON memory format, sending corrective feedback")
                     toolUsed = true
 
@@ -934,130 +1020,110 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                         errorMessage: "JSON format - should be pipe-delimited string"
                     ))
 
-                    var updatedMessages = messages
-                    updatedMessages.append(Message(conversationId: conversationId, role: .assistant, content: currentResponse))
-                    updatedMessages.append(Message(conversationId: conversationId, role: .user, content: formattedFeedback))
+                    let assistantPrefix = visiblePrefix.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !assistantPrefix.isEmpty {
+                        rollingMessages.append(Message(conversationId: conversationId, role: .assistant, content: assistantPrefix))
+                    }
+                    rollingMessages.append(Message(conversationId: conversationId, role: .user, content: formattedFeedback))
 
                     currentResponse = try await callProvider(
                         provider: config.provider,
                         config: config,
                         system: systemPrompt,
-                        messages: updatedMessages
+                        messages: rollingMessages
                     ).content
 
                     iteration += 1
                     continue
                 }
 
-                // No tool request found, we're done
+                // No tool request found, we're done.
+                appendVisibleSegment(visiblePrefix, into: &accumulatedVisibleResponse)
                 break
             }
 
-            // Collect all tool results to send back together
-            var allToolResults: [(request: ToolRequest, result: ToolResult, formattedResult: String)] = []
+            print("[OnDeviceOrchestrator] Tool request detected: \(toolRequest.tool) - \"\(toolRequest.query)\"")
+            toolUsed = true
+            appendVisibleSegment(visiblePrefix, into: &accumulatedVisibleResponse)
 
-            // Process each tool request sequentially
-            for toolRequest in toolRequests {
-                print("[OnDeviceOrchestrator] Tool request detected: \(toolRequest.tool) - \"\(toolRequest.query)\"")
-                toolUsed = true
+            // Execute one tool request per round-trip (strict causality)
+            var executedSources: [MessageGroundingSource]? = nil
+            let toolResult: ToolResult
+            do {
+                let execResult = try await ToolRoutingService.shared.executeTool(
+                    toolId: toolRequest.tool,
+                    query: toolRequest.query,
+                    context: toolContext
+                )
+                executedSources = execResult.groundingSources
 
-                // Execute tool via unified routing (V1/V2 automatic based on toggle)
-                var executedSources: [MessageGroundingSource]? = nil
-                let toolResult: ToolResult
-                do {
-                    let execResult = try await ToolRoutingService.shared.executeTool(
-                        toolId: toolRequest.tool,
-                        query: toolRequest.query,
-                        context: toolContext
-                    )
-                    executedSources = execResult.groundingSources
-
-                    // Convert to V1 ToolResult for the rest of the flow
-                    toolResult = ToolResult(
-                        tool: toolRequest.tool,
-                        success: execResult.success,
-                        result: execResult.output,
-                        sources: execResult.groundingSources?.map { ToolResultSource(title: $0.title, url: $0.url) },
-                        memoryOperation: execResult.memoryOperation
-                    )
-                } catch {
-                    toolResult = makeThrownToolFailureResult(tool: toolRequest.tool, error: error)
-                    print("[OnDeviceOrchestrator] Tool \(toolRequest.tool) threw an execution error: \(error.localizedDescription)")
-                }
-
-                // Collect grounding sources from tool result
-                if let sources = executedSources {
-                    collectedSources.append(contentsOf: sources)
-                }
-
-                // Collect memory operations from tool result
-                // If a successful operation has similar content to a previous failed one, replace it
-                if let memoryOp = toolResult.memoryOperation {
-                    if memoryOp.success {
-                        // Remove any previous failed attempts with similar content (retry succeeded)
-                        collectedMemoryOperations.removeAll { existing in
-                            !existing.success && isSimilarMemoryContent(existing.content, memoryOp.content)
-                        }
-                    }
-                    collectedMemoryOperations.append(memoryOp)
-                }
-
-                // Mark as executed for deduplication in UI
-                if toolResult.success {
-                    ToolRequestTracker.shared.markExecuted(request: toolRequest, result: toolResult.result)
-                }
-
-                // Store for combined response
-                let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
-                allToolResults.append((request: toolRequest, result: toolResult, formattedResult: formattedResult))
+                toolResult = ToolResult(
+                    tool: toolRequest.tool,
+                    success: execResult.success,
+                    result: execResult.output,
+                    sources: execResult.groundingSources?.map { ToolResultSource(title: $0.title, url: $0.url) },
+                    memoryOperation: execResult.memoryOperation
+                )
+            } catch {
+                toolResult = makeThrownToolFailureResult(tool: toolRequest.tool, error: error)
+                print("[OnDeviceOrchestrator] Tool \(toolRequest.tool) threw an execution error: \(error.localizedDescription)")
             }
 
-            // Remove all tool requests from response and combine all results
-            let cleanedResponse = await ToolProxyService.shared.removeToolRequest(from: currentResponse)
-            let combinedResults = allToolResults.map { $0.formattedResult }.joined(separator: "\n\n")
+            // Collect grounding sources from tool result
+            if let sources = executedSources {
+                collectedSources.append(contentsOf: sources)
+            }
 
-            // Build updated messages with all tool results
-            var updatedMessages = messages
+            // Collect memory operations from tool result
+            // If a successful operation has similar content to a previous failed one, replace it
+            if let memoryOp = toolResult.memoryOperation {
+                if memoryOp.success {
+                    collectedMemoryOperations.removeAll { existing in
+                        !existing.success && isSimilarMemoryContent(existing.content, memoryOp.content)
+                    }
+                }
+                collectedMemoryOperations.append(memoryOp)
+            }
 
-            // Add assistant's partial response (before tool requests)
-            if !cleanedResponse.isEmpty {
-                updatedMessages.append(Message(
+            // Mark as executed for deduplication in UI
+            if toolResult.success {
+                ToolRequestTracker.shared.markExecuted(request: toolRequest, result: toolResult.result)
+            }
+
+            let assistantPrefix = visiblePrefix.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !assistantPrefix.isEmpty {
+                rollingMessages.append(Message(
                     conversationId: conversationId,
                     role: .assistant,
-                    content: cleanedResponse
+                    content: assistantPrefix
                 ))
             }
 
-            // Add combined tool results as a system/user message
-            updatedMessages.append(Message(
+            let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
+            rollingMessages.append(Message(
                 conversationId: conversationId,
                 role: .user,
-                content: combinedResults
+                content: formattedResult
             ))
 
-            print("[OnDeviceOrchestrator] Sending \(allToolResults.count) tool result(s) back to \(config.provider)")
-
-            // Call provider again with tool results
+            print("[OnDeviceOrchestrator] Sending tool result back to \(config.provider)")
             currentResponse = try await callProvider(
                 provider: config.provider,
                 config: config,
                 system: systemPrompt,
-                messages: updatedMessages
+                messages: rollingMessages
             ).content
-
-            // If we got a clean response with tool result incorporated, prepend the original context
-            if !cleanedResponse.isEmpty && !currentResponse.contains(combinedResults) {
-                currentResponse = cleanedResponse + "\n\n" + currentResponse
-            }
 
             iteration += 1
         }
 
         if iteration >= maxIterations {
             print("[OnDeviceOrchestrator] Tool proxy loop reached max iterations")
+            let fallbackSegment = ToolGatedResponseSegmenter.segment(currentResponse)
+            appendVisibleSegment(fallbackSegment.visiblePrefix, into: &accumulatedVisibleResponse)
         }
 
-        return (currentResponse, toolUsed, collectedSources, collectedMemoryOperations)
+        return (accumulatedVisibleResponse, toolUsed, collectedSources, collectedMemoryOperations)
     }
 
     /// Check if two memory contents are similar enough to be considered retries of the same memory

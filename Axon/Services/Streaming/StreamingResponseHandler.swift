@@ -94,7 +94,7 @@ class StreamingResponseHandler {
         messages: [Message]
     ) -> AsyncThrowingStream<StreamingEvent, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            let task = Task {
                 do {
                     switch config.provider.lowercased() {
                     case "anthropic":
@@ -121,6 +121,9 @@ class StreamingResponseHandler {
                     }
                     continuation.finish()
                 }
+            }
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
             }
         }
     }

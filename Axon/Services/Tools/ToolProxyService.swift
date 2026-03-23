@@ -62,6 +62,8 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         {"tool": "tool_name", "query": "your query or request"}
         ```
 
+        When invoking a tool, output ONLY the single `tool_request` block with no additional prose before or after it.
+
         Available tools:
 
         """
@@ -987,6 +989,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         **Workflow:** Use `list_tools` first to discover what's available, then use `get_tool_details` to get full usage instructions for any tool you want to use.
 
         **Important:** Only request ONE tool at a time. Wait for results before continuing.
+        **Output Rule:** When invoking a tool, output ONLY the single `tool_request` block with no additional prose before or after it.
 
         """
 
