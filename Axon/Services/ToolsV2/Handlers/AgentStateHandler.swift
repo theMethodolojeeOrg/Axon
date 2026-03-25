@@ -73,7 +73,7 @@ final class AgentStateHandler: ToolHandlerV2 {
         // Extract parameters
         let kindStr = (parsedInputs["kind"] as? String) ?? "note"
         let content = (parsedInputs["content"] as? String) ?? ""
-        let tags = (parsedInputs["tags"] as? [String]) ?? []
+        let tags = ToolInputNormalizationV2.parseNormalizedStringArray(parsedInputs["tags"])
         let visibilityStr = (parsedInputs["visibility"] as? String) ?? "userVisible"
         
         guard !content.isEmpty else {
@@ -136,7 +136,7 @@ final class AgentStateHandler: ToolHandlerV2 {
         // Extract parameters
         let limit = (parsedInputs["limit"] as? Int) ?? 10
         let kindStr = parsedInputs["kind"] as? String
-        let tags = (parsedInputs["tags"] as? [String]) ?? []
+        let tags = ToolInputNormalizationV2.parseNormalizedStringArray(parsedInputs["tags"])
         let searchText = parsedInputs["search"] as? String
         let includeAIOnly = (parsedInputs["include_ai_only"] as? Bool) ?? false
         

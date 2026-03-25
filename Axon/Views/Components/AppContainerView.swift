@@ -1337,7 +1337,33 @@ struct ChatContainerView: View {
         guard !selectedAttachments.isEmpty else { return true }
 
         let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
-        let policy = AttachmentMimePolicyService.resolvePolicy(conversationId: conversation?.id, settings: settings)
+        let policy: AttachmentMimePolicy
+        if let conversationId = conversation?.id {
+            let resolved = ConversationModelResolver.resolve(conversationId: conversationId, settings: settings)
+            let runtime = ConversationRuntimeOverrideManager.shared.resolve(
+                conversationId: conversationId,
+                baseProvider: resolved.normalizedProvider,
+                baseModel: resolved.modelId,
+                baseProviderDisplayName: resolved.providerName,
+                baseModelParams: settings.modelGenerationSettings
+            )
+            policy = AttachmentMimePolicyService.resolvePolicy(
+                provider: runtime.provider,
+                modelId: runtime.model,
+                providerName: runtime.providerDisplayName,
+                conversationId: conversationId,
+                settings: settings
+            )
+        } else {
+            let resolved = ConversationModelResolver.resolveGlobal(settings: settings)
+            policy = AttachmentMimePolicyService.resolvePolicy(
+                provider: resolved.normalizedProvider,
+                modelId: resolved.modelId,
+                providerName: resolved.providerName,
+                conversationId: nil,
+                settings: settings
+            )
+        }
         let result = AttachmentMimePolicyService.validate(attachments: selectedAttachments, policy: policy)
 
         switch result {

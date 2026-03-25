@@ -215,3 +215,154 @@ class BaseToolHandlerV2: ToolHandlerV2 {
         )
     }
 }
+
+// MARK: - Shared V2 Input Normalization
+
+/// Shared parser/normalizer for V2 handlers that accept tag-like string arrays.
+enum ToolInputNormalizationV2 {
+    /// Parse tag-like input from [String], [Any], CSV string, or JSON-array string.
+    /// Output is normalized to lowercase/trimmed values with leading # removed.
+    static func parseNormalizedStringArray(_ value: Any?) -> [String] {
+        let rawValues = parseRawStringValues(from: value)
+        return dedupePreservingOrder(rawValues.compactMap(normalizeTag))
+    }
+
+    /// Normalize a single tag-like value.
+    static func normalizeTag(_ raw: String) -> String? {
+        var value = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        while value.hasPrefix("#") {
+            value.removeFirst()
+        }
+        value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    /// Heuristic check for temporal tags (relative labels + year tags).
+    static func isTemporalLikeTag(_ value: String) -> Bool {
+        guard let normalized = normalizeTag(value) else { return false }
+        if temporalLikeTags.contains(normalized) {
+            return true
+        }
+        if let year = Int(normalized), (1900...2100).contains(year) {
+            return true
+        }
+        return false
+    }
+
+    /// Generate simple semantic tags from content when explicit non-temporal tags are absent.
+    /// Returns at most `maxCount` normalized tags.
+    static func generateSemanticTags(
+        from content: String,
+        maxCount: Int = 4,
+        excluding existingValues: [String] = []
+    ) -> [String] {
+        guard maxCount > 0 else { return [] }
+
+        let excluded = Set(parseNormalizedStringArray(existingValues))
+        let tokens = content
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+
+        var frequencies: [String: Int] = [:]
+        for token in tokens {
+            guard token.count >= 3 && token.count <= 32 else { continue }
+            guard Int(token) == nil else { continue }
+            guard !semanticStopWords.contains(token) else { continue }
+            guard !temporalNoiseWords.contains(token) else { continue }
+            frequencies[token, default: 0] += 1
+        }
+
+        let sorted = frequencies.sorted { lhs, rhs in
+            if lhs.value != rhs.value {
+                return lhs.value > rhs.value
+            }
+            return lhs.key < rhs.key
+        }
+
+        var suggestions: [String] = []
+        for (candidate, _) in sorted {
+            guard !excluded.contains(candidate) else { continue }
+            suggestions.append(candidate)
+            if suggestions.count >= maxCount {
+                break
+            }
+        }
+
+        return suggestions
+    }
+
+    // MARK: - Internals
+
+    private static func parseRawStringValues(from value: Any?) -> [String] {
+        guard let value else { return [] }
+
+        if let stringValue = value as? String {
+            return parseStringValue(stringValue)
+        }
+
+        if let stringArray = value as? [String] {
+            return stringArray.flatMap(parseStringValue)
+        }
+
+        if let anyArray = value as? [Any] {
+            return anyArray.flatMap(parseRawStringValues(from:))
+        }
+
+        return parseStringValue(String(describing: value))
+    }
+
+    private static func parseStringValue(_ value: String) -> [String] {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        if trimmed.hasPrefix("["),
+           trimmed.hasSuffix("]"),
+           let data = trimmed.data(using: .utf8),
+           let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [Any] {
+            return parseRawStringValues(from: jsonArray)
+        }
+
+        return trimmed
+            .split(separator: ",")
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private static func dedupePreservingOrder(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for value in values where !seen.contains(value) {
+            seen.insert(value)
+            ordered.append(value)
+        }
+        return ordered
+    }
+
+    private static let temporalLikeTags: Set<String> = [
+        "today", "yesterday", "tomorrow",
+        "this_week", "this_month", "recent_months", "older",
+        "spring", "summer", "fall", "autumn", "winter",
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"
+    ]
+
+    private static let temporalNoiseWords: Set<String> = [
+        "today", "yesterday", "tomorrow",
+        "week", "weeks", "month", "months", "year", "years",
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+        "spring", "summer", "fall", "autumn", "winter"
+    ]
+
+    private static let semanticStopWords: Set<String> = [
+        "about", "above", "after", "again", "against", "also", "always", "among", "around",
+        "because", "before", "being", "below", "between", "both", "could", "doing", "during",
+        "each", "either", "else", "ever", "from", "have", "having", "here", "hers", "himself",
+        "into", "itself", "just", "like", "make", "many", "maybe", "might", "more", "most",
+        "much", "must", "need", "needed", "never", "only", "other", "ours", "ourselves",
+        "over", "please", "really", "same", "should", "since", "some", "such", "than", "that",
+        "their", "theirs", "them", "themselves", "then", "there", "these", "they", "this",
+        "those", "through", "under", "until", "very", "want", "wants", "what", "when",
+        "where", "which", "while", "with", "would", "your", "yours", "yourself", "yourselves",
+        "user", "users", "assistant", "axon"
+    ]
+}

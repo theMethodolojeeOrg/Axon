@@ -840,9 +840,12 @@ class StreamingResponseHandler {
                             "format": format
                         ]
                     ])
+                } else if attachment.url != nil {
+                    print("[StreamingHTTP] OpenAI-compatible payload dropped audio URL attachment '\(attachment.name ?? attachment.id)' (\(mimeType)); input_audio requires inline/base64 data.")
                 }
 
             case .document, .video:
+                print("[StreamingHTTP] OpenAI-compatible payload dropped unsupported \(attachment.type.rawValue) attachment '\(attachment.name ?? attachment.id)' (\(mimeType)).")
                 continue
             }
         }

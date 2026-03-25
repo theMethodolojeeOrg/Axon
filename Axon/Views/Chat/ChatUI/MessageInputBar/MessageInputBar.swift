@@ -287,6 +287,7 @@ struct MessageInputBar: View {
     @Binding var text: String
     @Binding var attachments: [MessageAttachment]
     let isLoading: Bool
+    private let conversationId: String?
     let onSend: () -> Void
     let onStop: (() -> Void)?
     let focus: FocusState<Bool>.Binding?
@@ -324,6 +325,7 @@ struct MessageInputBar: View {
         self._text = text
         self._attachments = attachments
         self.isLoading = isLoading
+        self.conversationId = conversationId
         self.onSend = onSend
         self.onStop = onStop
         self.focus = focus
@@ -399,6 +401,12 @@ struct MessageInputBar: View {
             }
             viewModel.updateSlashMenuState(for: newText)
         }
+        .onAppear {
+            viewModel.updateConversationId(conversationId)
+        }
+        .onChange(of: conversationId) { _, newConversationId in
+            viewModel.updateConversationId(newConversationId)
+        }
         .onChange(of: selectedItem) { _, newItem in
             handlePhotoSelection(newItem)
         }
@@ -462,7 +470,7 @@ struct MessageInputBar: View {
             Text(attachmentCapability.description)
         }
         #endif
-        .alert("Attachment Not Supported", isPresented: Binding(
+        .alert("Attachment Error", isPresented: Binding(
             get: { attachmentValidationMessage != nil },
             set: { shown in
                 if !shown {
@@ -887,12 +895,16 @@ struct MessageInputBar: View {
                 return
             }
             debugLog(.attachments, "Attempting to access security-scoped resource: \(url.lastPathComponent)")
-            guard url.startAccessingSecurityScopedResource() else {
+            let hasSecurityScopedAccess = url.startAccessingSecurityScopedResource()
+            let stopSecurityScopedAccess: (() -> Void)? = hasSecurityScopedAccess
+                ? { url.stopAccessingSecurityScopedResource() }
+                : nil
+            defer { stopSecurityScopedAccess?() }
+            if !hasSecurityScopedAccess {
                 debugLog(.attachments, "Failed to access security-scoped resource: \(url.lastPathComponent)")
-                return
+            } else {
+                debugLog(.attachments, "Security-scoped resource access granted for: \(url.lastPathComponent)")
             }
-            defer { url.stopAccessingSecurityScopedResource() }
-            debugLog(.attachments, "Security-scoped resource access granted for: \(url.lastPathComponent)")
 
             do {
                 let data = try Data(contentsOf: url)
@@ -916,9 +928,13 @@ struct MessageInputBar: View {
                 debugLog(.attachments, "Processed \(String(describing: type)): \(url.lastPathComponent) (\(data.count) bytes)")
             } catch {
                 debugLog(.attachments, "Failed to read file data: \(error.localizedDescription)")
+                presentAttachmentImportError(fileName: url.lastPathComponent, error: error)
             }
         case .failure(let error):
             debugLog(.attachments, "File import FAILED: \(error.localizedDescription)")
+            if !isUserCancelled(error) {
+                presentAttachmentImportError(fileName: nil, error: error)
+            }
         }
     }
 
@@ -931,12 +947,16 @@ struct MessageInputBar: View {
                 debugLog(.attachments, "Any file import: No URL returned")
                 return
             }
-            guard url.startAccessingSecurityScopedResource() else {
+            let hasSecurityScopedAccess = url.startAccessingSecurityScopedResource()
+            let stopSecurityScopedAccess: (() -> Void)? = hasSecurityScopedAccess
+                ? { url.stopAccessingSecurityScopedResource() }
+                : nil
+            defer { stopSecurityScopedAccess?() }
+            if !hasSecurityScopedAccess {
                 debugLog(.attachments, "Failed to access security-scoped resource: \(url.lastPathComponent)")
-                return
+            } else {
+                debugLog(.attachments, "Security-scoped access granted for: \(url.lastPathComponent)")
             }
-            defer { url.stopAccessingSecurityScopedResource() }
-            debugLog(.attachments, "Security-scoped access granted for: \(url.lastPathComponent)")
 
             do {
                 let data = try Data(contentsOf: url)
@@ -952,9 +972,13 @@ struct MessageInputBar: View {
                 debugLog(.attachments, "Processed file: \(url.lastPathComponent) (\(data.count) bytes, type: \(url.attachmentType))")
             } catch {
                 debugLog(.attachments, "Failed to read file data: \(error.localizedDescription)")
+                presentAttachmentImportError(fileName: url.lastPathComponent, error: error)
             }
         case .failure(let error):
             debugLog(.attachments, "Any file import FAILED: \(error.localizedDescription)")
+            if !isUserCancelled(error) {
+                presentAttachmentImportError(fileName: nil, error: error)
+            }
         }
     }
 
@@ -1021,5 +1045,18 @@ struct MessageInputBar: View {
         }
 
         return types.isEmpty ? [.item] : types
+    }
+
+    private func isUserCancelled(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == NSCocoaErrorDomain && nsError.code == NSUserCancelledError
+    }
+
+    private func presentAttachmentImportError(fileName: String?, error: Error) {
+        if let fileName {
+            attachmentValidationMessage = "Couldn't import '\(fileName)'. Check file permissions/location and try again.\n\n\(error.localizedDescription)"
+        } else {
+            attachmentValidationMessage = "Couldn't import the selected file.\n\n\(error.localizedDescription)"
+        }
     }
 }

@@ -85,7 +85,7 @@ final class SubAgentHandler: ToolHandlerV2 {
             )
         }
         
-        let contextTags = (parsedInputs["context_tags"] as? [String]) ?? []
+        let contextTags = ToolInputNormalizationV2.parseNormalizedStringArray(parsedInputs["context_tags"])
         let modelTier = (parsedInputs["model_tier"] as? String) ?? (type == .designer ? "capable" : "fast")
         
         logger.info("Spawning \(type.displayName): task=\(task.prefix(50))..., tier=\(modelTier)")

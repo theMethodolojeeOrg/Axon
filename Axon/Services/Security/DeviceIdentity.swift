@@ -93,7 +93,12 @@ class DeviceIdentity {
 
     /// Generate a signature for this device (useful for API auth)
     func generateDeviceSignature(data: String) -> String {
-        let key = SymmetricKey(data: Data(getDeviceId().utf8))
+        generateDeviceSignature(data: data, usingDeviceId: getDeviceId())
+    }
+
+    /// Generate a deterministic signature using an explicit device ID context.
+    func generateDeviceSignature(data: String, usingDeviceId deviceId: String) -> String {
+        let key = SymmetricKey(data: Data(deviceId.utf8))
         let signature = HMAC<SHA256>.authenticationCode(for: Data(data.utf8), using: key)
         return Data(signature).base64EncodedString()
     }

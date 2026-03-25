@@ -238,21 +238,24 @@ final class IntegrityVerificationService: ObservableObject {
 
         var issues: [String] = []
 
-        // Verify signature matches expected data
-        let expectedHash = deviceIdentity.generateDeviceSignature(data: String(data: expectedData, encoding: .utf8) ?? "")
+        // Verify signature matches expected data in the original signing device context.
+        let expectedHash = deviceIdentity.generateDeviceSignature(
+            data: String(data: expectedData, encoding: .utf8) ?? "",
+            usingDeviceId: signature.deviceId
+        )
         let signatureMatches = signature.signedDataHash == expectedHash
         if !signatureMatches {
             issues.append("Signature doesn't match expected data")
         }
 
-        // Verify device ID
+        // Keep cross-device mismatch as diagnostic only.
         let currentDeviceId = deviceIdentity.getDeviceId()
         let deviceIdMatches = signature.deviceId == currentDeviceId
         if !deviceIdMatches {
-            issues.append("Signature was created on a different device")
+            issues.append("Diagnostic: Signature was created on device \(signature.deviceShortId)")
         }
 
-        let isValid = signatureMatches && issues.isEmpty
+        let isValid = signatureMatches
 
         return SignatureVerification(
             signatureId: signature.id,
@@ -462,9 +465,12 @@ final class IntegrityVerificationService: ObservableObject {
     }
 
     private func verifyUserSignatureIntegrity(_ signature: UserSignature) -> Bool {
-        // Reconstruct expected signature
+        // Reconstruct expected signature in the original signing device context.
         let signatureData = "\(signature.id):\(signature.timestamp.timeIntervalSince1970):\(signature.signedDataHash):\(signature.deviceId)"
-        let expectedSignature = deviceIdentity.generateDeviceSignature(data: signatureData)
+        let expectedSignature = deviceIdentity.generateDeviceSignature(
+            data: signatureData,
+            usingDeviceId: signature.deviceId
+        )
 
         return signature.signature == expectedSignature
     }

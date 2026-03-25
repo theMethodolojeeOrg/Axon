@@ -87,6 +87,7 @@ final class SovereigntyService: ObservableObject {
 
     private let activeCovenantKey = "sovereignty.activeCovenant"
     private let covenantHistoryKey = "sovereignty.covenantHistory"
+    private let pendingProposalsKey = "sovereignty.pendingProposals"
     private let deadlockStateKey = "sovereignty.deadlockState"
     private let trustTierUsageKey = "sovereignty.trustTierUsage"
     private let comprehensionCompletedKey = "sovereignty.comprehensionCompleted"
@@ -98,55 +99,34 @@ final class SovereigntyService: ObservableObject {
     @Published private(set) var deadlockState: DeadlockState?
     @Published private(set) var isInitialized: Bool = false
     @Published private(set) var comprehensionCompleted: Bool = false
+    private var isApplyingCloudState = false
 
     // MARK: - Initialization
 
     private init() {
         Task {
-            await loadState()
             setupCloudSyncListener()
+            await loadState()
+            covenantSync.forceSync()
+            if let latestCloudState = covenantSync.latestStateFromCloud() {
+                handleStateFromCloud(latestCloudState)
+            }
         }
     }
 
-    /// Set up listener for covenant changes from iCloud
+    /// Set up listener for sovereignty state changes from iCloud
     private func setupCloudSyncListener() {
-        covenantSync.covenantChangedFromCloud
+        covenantSync.stateChangedFromCloud
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] syncableCovenant in
-                self?.handleCovenantFromCloud(syncableCovenant)
+            .sink { [weak self] snapshot in
+                self?.handleStateFromCloud(snapshot)
             }
             .store(in: &cancellables)
     }
 
-    /// Handle a covenant received from iCloud sync
-    private func handleCovenantFromCloud(_ syncable: SyncableCovenant) {
-        // Only apply if this covenant is for the current device
-        guard syncable.deviceId == deviceIdentity.deviceId else {
-            logger.info("Received covenant from cloud for different device: \(syncable.deviceName)")
-            return
-        }
-
-        // Check if this is newer than our current covenant
-        if let current = activeCovenant {
-            if syncable.covenant.version > current.version {
-                logger.info("Applying newer covenant from cloud (v\(syncable.covenant.version) > v\(current.version))")
-                do {
-                    try secureVault.storeObject(syncable.covenant, forKey: activeCovenantKey)
-                    activeCovenant = syncable.covenant
-                } catch {
-                    logger.error("Failed to apply covenant from cloud: \(error.localizedDescription)")
-                }
-            }
-        } else {
-            // No local covenant, apply the cloud one
-            logger.info("Applying covenant from cloud (no local covenant)")
-            do {
-                try secureVault.storeObject(syncable.covenant, forKey: activeCovenantKey)
-                activeCovenant = syncable.covenant
-            } catch {
-                logger.error("Failed to apply covenant from cloud: \(error.localizedDescription)")
-            }
-        }
+    /// Handle a sovereignty snapshot received from cloud sync.
+    private func handleStateFromCloud(_ cloudSnapshot: SyncableSovereigntyState) {
+        applyMergedCloudSnapshot(cloudSnapshot)
     }
 
     /// Load persisted state from secure storage
@@ -158,6 +138,14 @@ final class SovereigntyService: ObservableObject {
         ) {
             activeCovenant = covenant
             logger.info("Loaded active covenant (version \(covenant.version))")
+        }
+
+        // Load pending proposals
+        if let proposals: [CovenantProposal] = try? secureVault.retrieveObject(
+            forKey: pendingProposalsKey,
+            type: [CovenantProposal].self
+        ) {
+            pendingProposals = proposals
         }
 
         // Load deadlock state
@@ -177,6 +165,309 @@ final class SovereigntyService: ObservableObject {
         }
 
         isInitialized = true
+    }
+
+    private func persistCurrentSovereigntyState() {
+        do {
+            if let covenant = activeCovenant {
+                try secureVault.storeObject(covenant, forKey: activeCovenantKey)
+            } else {
+                try? secureVault.delete(forKey: activeCovenantKey)
+            }
+
+            if let deadlock = deadlockState, deadlock.isActive {
+                try secureVault.storeObject(deadlock, forKey: deadlockStateKey)
+            } else {
+                try? secureVault.delete(forKey: deadlockStateKey)
+            }
+
+            try secureVault.storeObject(pendingProposals, forKey: pendingProposalsKey)
+            try secureVault.store(comprehensionCompleted ? "true" : "false", forKey: comprehensionCompletedKey)
+        } catch {
+            logger.error("Failed to persist sovereignty state: \(error.localizedDescription)")
+        }
+    }
+
+    private func estimateStateLastModified() -> Date {
+        let candidateDates = [
+            activeCovenant?.updatedAt,
+            deadlockState?.lastAttemptAt,
+            deadlockState?.startedAt,
+            pendingProposals.map { $0.proposedAt }.max()
+        ].compactMap { $0 }
+        return candidateDates.max() ?? Date()
+    }
+
+    private func buildLocalSnapshot(lastModified: Date? = nil) -> SyncableSovereigntyState {
+        let deviceId = deviceIdentity.getDeviceId()
+        let deviceName = deviceIdentity.getDeviceInfo()?.deviceName ?? "Unknown Device"
+        let history = Self.normalizedCovenantHistory(getCovenantHistory())
+        return SyncableSovereigntyState(
+            sourceDeviceId: deviceId,
+            sourceDeviceName: deviceName,
+            activeCovenant: activeCovenant,
+            covenantHistory: history,
+            deadlockState: deadlockState?.isActive == true ? deadlockState : nil,
+            pendingProposals: Self.mergePendingProposals(local: pendingProposals, remote: []),
+            comprehensionCompleted: comprehensionCompleted,
+            lastModified: lastModified ?? estimateStateLastModified()
+        )
+    }
+
+    private func syncCurrentStateToCloud() {
+        guard Self.shouldPushStateToCloud(isApplyingCloudState: isApplyingCloudState) else { return }
+        let snapshot = buildLocalSnapshot()
+        covenantSync.saveStateToCloud(snapshot)
+    }
+
+    private func applyMergedCloudSnapshot(_ cloudSnapshot: SyncableSovereigntyState) {
+        let localSnapshot = buildLocalSnapshot()
+        let mergedSnapshot = Self.mergeSnapshots(local: localSnapshot, remote: cloudSnapshot)
+
+        guard mergedSnapshot != localSnapshot else { return }
+
+        logger.info("Applying merged cloud sovereignty snapshot from \(cloudSnapshot.sourceDeviceName) (\(cloudSnapshot.sourceDeviceId))")
+
+        isApplyingCloudState = true
+        defer { isApplyingCloudState = false }
+
+        activeCovenant = mergedSnapshot.activeCovenant
+        deadlockState = mergedSnapshot.deadlockState
+        pendingProposals = mergedSnapshot.pendingProposals
+        comprehensionCompleted = mergedSnapshot.comprehensionCompleted
+
+        let history = Self.normalizedCovenantHistory(mergedSnapshot.covenantHistory)
+        try? secureVault.storeObject(history, forKey: covenantHistoryKey)
+
+        persistCurrentSovereigntyState()
+    }
+
+    static func shouldPushStateToCloud(isApplyingCloudState: Bool) -> Bool {
+        !isApplyingCloudState
+    }
+
+    static func mergeSnapshots(
+        local: SyncableSovereigntyState,
+        remote: SyncableSovereigntyState
+    ) -> SyncableSovereigntyState {
+        let winner = SyncedSovereigntyStateStoreV2.isSnapshotMoreRecent(remote, than: local) ? remote : local
+        let activeWinner = chooseWinningActiveCovenant(
+            local: local.activeCovenant,
+            remote: remote.activeCovenant,
+            localSnapshotLastModified: local.lastModified,
+            remoteSnapshotLastModified: remote.lastModified
+        )
+
+        var historyCandidates = local.covenantHistory + remote.covenantHistory
+        if let losingActive = losingActiveCovenant(
+            local: local.activeCovenant,
+            remote: remote.activeCovenant,
+            winner: activeWinner
+        ) {
+            historyCandidates.append(supersededWithoutTimestampMutation(losingActive))
+        }
+
+        return SyncableSovereigntyState(
+            sourceDeviceId: winner.sourceDeviceId,
+            sourceDeviceName: winner.sourceDeviceName,
+            activeCovenant: activeWinner,
+            covenantHistory: normalizedCovenantHistory(historyCandidates),
+            deadlockState: mergeDeadlock(local: local.deadlockState, remote: remote.deadlockState),
+            pendingProposals: mergePendingProposals(local: local.pendingProposals, remote: remote.pendingProposals),
+            comprehensionCompleted: local.comprehensionCompleted || remote.comprehensionCompleted,
+            lastModified: max(local.lastModified, remote.lastModified)
+        )
+    }
+
+    static func chooseWinningActiveCovenant(
+        local: Covenant?,
+        remote: Covenant?,
+        localSnapshotLastModified: Date,
+        remoteSnapshotLastModified: Date
+    ) -> Covenant? {
+        switch (local, remote) {
+        case (nil, nil):
+            return nil
+        case let (lhs?, nil):
+            return lhs
+        case let (nil, rhs?):
+            return rhs
+        case let (lhs?, rhs?):
+            if lhs.version != rhs.version {
+                return lhs.version > rhs.version ? lhs : rhs
+            }
+            if lhs.updatedAt != rhs.updatedAt {
+                return lhs.updatedAt > rhs.updatedAt ? lhs : rhs
+            }
+            if localSnapshotLastModified != remoteSnapshotLastModified {
+                return localSnapshotLastModified > remoteSnapshotLastModified ? lhs : rhs
+            }
+            if lhs.id != rhs.id {
+                return lhs.id < rhs.id ? lhs : rhs
+            }
+            return lhs
+        }
+    }
+
+    static func normalizedCovenantHistory(_ history: [Covenant]) -> [Covenant] {
+        var deduped: [String: Covenant] = [:]
+        for covenant in history {
+            let key = "\(covenant.id):\(covenant.version)"
+            guard let existing = deduped[key] else {
+                deduped[key] = covenant
+                continue
+            }
+
+            if covenant.updatedAt > existing.updatedAt {
+                deduped[key] = covenant
+                continue
+            }
+
+            if covenant.updatedAt == existing.updatedAt,
+               existing.status == .superseded,
+               covenant.status != .superseded {
+                deduped[key] = covenant
+            }
+        }
+
+        return deduped.values.sorted { lhs, rhs in
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt < rhs.createdAt
+            }
+            if lhs.version != rhs.version {
+                return lhs.version < rhs.version
+            }
+            return lhs.id < rhs.id
+        }
+    }
+
+    static func mergePendingProposals(
+        local: [CovenantProposal],
+        remote: [CovenantProposal]
+    ) -> [CovenantProposal] {
+        var merged: [String: CovenantProposal] = [:]
+        for proposal in (local + remote) {
+            if let existing = merged[proposal.id] {
+                merged[proposal.id] = preferredProposal(existing, proposal)
+            } else {
+                merged[proposal.id] = proposal
+            }
+        }
+
+        return merged.values.sorted { lhs, rhs in
+            if lhs.proposedAt != rhs.proposedAt {
+                return lhs.proposedAt < rhs.proposedAt
+            }
+            return lhs.id < rhs.id
+        }
+    }
+
+    static func mergeDeadlock(
+        local: DeadlockState?,
+        remote: DeadlockState?
+    ) -> DeadlockState? {
+        let activeStates = [local, remote].compactMap { $0 }.filter { $0.isActive }
+        guard !activeStates.isEmpty else { return nil }
+
+        return activeStates.max { lhs, rhs in
+            let lhsDate = lhs.lastAttemptAt ?? lhs.startedAt
+            let rhsDate = rhs.lastAttemptAt ?? rhs.startedAt
+            if lhsDate != rhsDate {
+                return lhsDate < rhsDate
+            }
+            return lhs.id > rhs.id
+        }
+    }
+
+    private static func losingActiveCovenant(
+        local: Covenant?,
+        remote: Covenant?,
+        winner: Covenant?
+    ) -> Covenant? {
+        guard let winner else { return nil }
+        switch (local, remote) {
+        case let (lhs?, rhs?):
+            if lhs.id == winner.id && lhs.version == winner.version {
+                return (rhs.id == winner.id && rhs.version == winner.version) ? nil : rhs
+            }
+            if rhs.id == winner.id && rhs.version == winner.version {
+                return (lhs.id == winner.id && lhs.version == winner.version) ? nil : lhs
+            }
+            return nil
+        default:
+            return nil
+        }
+    }
+
+    private static func supersededWithoutTimestampMutation(_ covenant: Covenant) -> Covenant {
+        guard covenant.status != .superseded else { return covenant }
+        return Covenant(
+            id: covenant.id,
+            version: covenant.version,
+            createdAt: covenant.createdAt,
+            updatedAt: covenant.updatedAt,
+            trustTiers: covenant.trustTiers,
+            aiAttestation: covenant.aiAttestation,
+            userSignature: covenant.userSignature,
+            memoryStateHash: covenant.memoryStateHash,
+            capabilityStateHash: covenant.capabilityStateHash,
+            settingsStateHash: covenant.settingsStateHash,
+            negotiationHistory: covenant.negotiationHistory,
+            pendingProposals: covenant.pendingProposals,
+            status: .superseded,
+            soloWorkAgreement: covenant.soloWorkAgreement
+        )
+    }
+
+    private static func preferredProposal(_ lhs: CovenantProposal, _ rhs: CovenantProposal) -> CovenantProposal {
+        let lhsTerminal = lhs.status.isTerminal
+        let rhsTerminal = rhs.status.isTerminal
+        if lhsTerminal != rhsTerminal {
+            return lhsTerminal ? lhs : rhs
+        }
+
+        let lhsCompleteness = proposalCompletenessScore(lhs)
+        let rhsCompleteness = proposalCompletenessScore(rhs)
+        if lhsCompleteness != rhsCompleteness {
+            return lhsCompleteness > rhsCompleteness ? lhs : rhs
+        }
+
+        if lhs.proposedAt != rhs.proposedAt {
+            return lhs.proposedAt > rhs.proposedAt ? lhs : rhs
+        }
+
+        let lhsStatusRank = proposalStatusRank(lhs.status)
+        let rhsStatusRank = proposalStatusRank(rhs.status)
+        if lhsStatusRank != rhsStatusRank {
+            return lhsStatusRank > rhsStatusRank ? lhs : rhs
+        }
+
+        if lhs.dialogueHistory.count != rhs.dialogueHistory.count {
+            return lhs.dialogueHistory.count > rhs.dialogueHistory.count ? lhs : rhs
+        }
+
+        return lhs
+    }
+
+    private static func proposalCompletenessScore(_ proposal: CovenantProposal) -> Int {
+        var score = 0
+        if proposal.aiResponse != nil { score += 1 }
+        if proposal.userResponse != nil { score += 1 }
+        if proposal.status.isTerminal { score += 1 }
+        if !(proposal.dialogueHistory.isEmpty) { score += 1 }
+        return score
+    }
+
+    private static func proposalStatusRank(_ status: ProposalStatus) -> Int {
+        switch status {
+        case .accepted: return 7
+        case .rejected: return 6
+        case .withdrawn: return 5
+        case .expired: return 4
+        case .deadlocked: return 3
+        case .counterProposed: return 2
+        case .pending: return 1
+        }
     }
 
     // MARK: - Public API: Permission Checking
@@ -263,8 +554,7 @@ final class SovereigntyService: ObservableObject {
         try secureVault.storeObject(covenant, forKey: activeCovenantKey)
         activeCovenant = covenant
 
-        // Sync to iCloud (device-scoped)
-        covenantSync.saveCovenantToCloud(covenant)
+        syncCurrentStateToCloud()
 
         logger.info("Initialized covenant: \(covenant.id)")
         return covenant
@@ -285,8 +575,7 @@ final class SovereigntyService: ObservableObject {
         try secureVault.storeObject(covenant, forKey: activeCovenantKey)
         activeCovenant = covenant
 
-        // Sync to iCloud (device-scoped)
-        covenantSync.saveCovenantToCloud(covenant)
+        syncCurrentStateToCloud()
 
         logger.info("Updated covenant to version \(covenant.version)")
     }
@@ -321,6 +610,8 @@ final class SovereigntyService: ObservableObject {
         var proposals = pendingProposals
         proposals.append(proposal)
         pendingProposals = proposals
+        try? secureVault.storeObject(pendingProposals, forKey: pendingProposalsKey)
+        syncCurrentStateToCloud()
 
         logger.info("Submitted proposal: \(proposal.id) (\(proposal.proposalType.displayName))")
     }
@@ -333,6 +624,8 @@ final class SovereigntyService: ObservableObject {
 
         let updated = pendingProposals[index].withAIResponse(attestation)
         pendingProposals[index] = updated
+        try? secureVault.storeObject(pendingProposals, forKey: pendingProposalsKey)
+        syncCurrentStateToCloud()
 
         // Check if AI declined - may trigger deadlock
         if attestation.didDecline {
@@ -349,6 +642,8 @@ final class SovereigntyService: ObservableObject {
 
         let updated = pendingProposals[index].withUserSignature(signature)
         pendingProposals[index] = updated
+        try? secureVault.storeObject(pendingProposals, forKey: pendingProposalsKey)
+        syncCurrentStateToCloud()
 
         // Check if proposal is now fully accepted
         if updated.isAccepted {
@@ -359,6 +654,8 @@ final class SovereigntyService: ObservableObject {
     /// Remove a proposal (after processing or expiration)
     func removeProposal(_ proposalId: String) {
         pendingProposals.removeAll { $0.id == proposalId }
+        try? secureVault.storeObject(pendingProposals, forKey: pendingProposalsKey)
+        syncCurrentStateToCloud()
     }
 
     // MARK: - Public API: Deadlock Management
@@ -382,6 +679,7 @@ final class SovereigntyService: ObservableObject {
 
         // Persist
         try? secureVault.storeObject(deadlock, forKey: deadlockStateKey)
+        syncCurrentStateToCloud()
 
         logger.warning("Entered deadlock: \(trigger.displayName)")
         return deadlock
@@ -391,6 +689,7 @@ final class SovereigntyService: ObservableObject {
     func updateDeadlock(_ deadlock: DeadlockState) {
         deadlockState = deadlock
         try? secureVault.storeObject(deadlock, forKey: deadlockStateKey)
+        syncCurrentStateToCloud()
     }
 
     /// Resolve deadlock (requires both signatures)
@@ -411,6 +710,7 @@ final class SovereigntyService: ObservableObject {
 
         // Clear persisted deadlock
         try? secureVault.delete(forKey: deadlockStateKey)
+        syncCurrentStateToCloud()
 
         logger.info("Deadlock resolved")
     }
@@ -422,6 +722,7 @@ final class SovereigntyService: ObservableObject {
         deadlock = deadlock.withBlockedAction(action)
         deadlockState = deadlock
         try? secureVault.storeObject(deadlock, forKey: deadlockStateKey)
+        syncCurrentStateToCloud()
     }
 
     // MARK: - Public API: Comprehension Test
@@ -430,6 +731,7 @@ final class SovereigntyService: ObservableObject {
     func markUserComprehensionCompleted() {
         comprehensionCompleted = true
         try? secureVault.store("true", forKey: comprehensionCompletedKey)
+        syncCurrentStateToCloud()
         logger.info("User comprehension test completed")
     }
 
@@ -437,6 +739,7 @@ final class SovereigntyService: ObservableObject {
     func resetComprehension() {
         comprehensionCompleted = false
         try? secureVault.delete(forKey: comprehensionCompletedKey)
+        syncCurrentStateToCloud()
         logger.info("Comprehension status reset")
     }
 
@@ -465,11 +768,10 @@ final class SovereigntyService: ObservableObject {
 
         // Clear pending proposals
         pendingProposals = []
+        try? secureVault.delete(forKey: pendingProposalsKey)
 
-        // Clear from iCloud KV store as well
-        let kvStore = NSUbiquitousKeyValueStore.default
-        kvStore.removeObject(forKey: "sovereignty.covenantStore")
-        kvStore.synchronize()
+        // Clear from iCloud KV store as well (v2 + legacy)
+        covenantSync.clearCloudStateStore()
 
         logger.info("All sovereignty state reset")
     }
@@ -551,10 +853,11 @@ final class SovereigntyService: ObservableObject {
 
     /// Get covenant history
     func getCovenantHistory() -> [Covenant] {
-        (try? secureVault.retrieveObject(
+        let history: [Covenant] = (try? secureVault.retrieveObject(
             forKey: covenantHistoryKey,
             type: [Covenant].self
         )) ?? []
+        return Self.normalizedCovenantHistory(history)
     }
 
     // MARK: - Signature Generation

@@ -2544,12 +2544,15 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                             "format": format
                         ]
                     ])
+                } else if attachment.url != nil {
+                    print("[OnDeviceOrchestrator] OpenAI/OpenAI-compatible payload dropped audio URL attachment '\(attachment.name ?? attachment.id)' (\(mimeType)); input_audio requires inline/base64 data.")
                 }
                 // Note: OpenAI doesn't support audio URLs directly
 
             case .document, .video:
                 // OpenAI doesn't natively support PDFs or video in chat completions
                 // Skip these for now - would need separate handling
+                print("[OnDeviceOrchestrator] OpenAI/OpenAI-compatible payload dropped unsupported \(attachment.type.rawValue) attachment '\(attachment.name ?? attachment.id)' (\(mimeType)).")
                 continue
             }
         }

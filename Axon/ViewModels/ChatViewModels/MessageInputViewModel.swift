@@ -82,13 +82,13 @@ final class MessageInputViewModel: ObservableObject {
     /// This determines what file types can be attached based on the active provider and model.
     func resolveAttachmentCapability() -> AttachmentCapability {
         let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
-        let policy = AttachmentMimePolicyService.resolvePolicy(conversationId: conversationId, settings: settings)
+        let policy = resolveEffectiveAttachmentPolicy(settings: settings)
         return capability(from: policy)
     }
 
     func resolveAttachmentPolicy() -> AttachmentMimePolicy {
         let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
-        return AttachmentMimePolicyService.resolvePolicy(conversationId: conversationId, settings: settings)
+        return resolveEffectiveAttachmentPolicy(settings: settings)
     }
 
     private func capability(from policy: AttachmentMimePolicy) -> AttachmentCapability {
@@ -104,6 +104,36 @@ final class MessageInputViewModel: ObservableObject {
             audio: audio,
             mimePatternsByType: policy.allowedPatternsByType,
             description: AttachmentMimePolicyService.capabilityDescription(policy: policy)
+        )
+    }
+
+    private func resolveEffectiveAttachmentPolicy(settings: AppSettings) -> AttachmentMimePolicy {
+        guard let conversationId else {
+            let resolved = ConversationModelResolver.resolveGlobal(settings: settings)
+            return AttachmentMimePolicyService.resolvePolicy(
+                provider: resolved.normalizedProvider,
+                modelId: resolved.modelId,
+                providerName: resolved.providerName,
+                conversationId: nil,
+                settings: settings
+            )
+        }
+
+        let resolved = ConversationModelResolver.resolve(conversationId: conversationId, settings: settings)
+        let runtime = ConversationRuntimeOverrideManager.shared.resolve(
+            conversationId: conversationId,
+            baseProvider: resolved.normalizedProvider,
+            baseModel: resolved.modelId,
+            baseProviderDisplayName: resolved.providerName,
+            baseModelParams: settings.modelGenerationSettings
+        )
+
+        return AttachmentMimePolicyService.resolvePolicy(
+            provider: runtime.provider,
+            modelId: runtime.model,
+            providerName: runtime.providerDisplayName,
+            conversationId: conversationId,
+            settings: settings
         )
     }
 

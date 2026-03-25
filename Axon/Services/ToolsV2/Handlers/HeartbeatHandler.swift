@@ -223,7 +223,8 @@ final class HeartbeatHandler: ToolHandlerV2 {
             settings.heartbeatSettings.deliveryProfiles[index].description = description
         }
         
-        if let inputModuleIds = parsedInputs["modules"] as? [String] {
+        let inputModuleIds = ToolInputNormalizationV2.parseNormalizedStringArray(parsedInputs["modules"])
+        if !inputModuleIds.isEmpty {
             let moduleIdsToSet = inputModuleIds.compactMap { HeartbeatModuleId(rawValue: $0) }
             settings.heartbeatSettings.deliveryProfiles[index].moduleIds = moduleIdsToSet
         }

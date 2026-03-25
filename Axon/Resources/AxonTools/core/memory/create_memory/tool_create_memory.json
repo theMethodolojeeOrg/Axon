@@ -33,8 +33,8 @@
     },
     "tags": {
       "type": "string",
-      "required": true,
-      "description": "Retrieval context keywords - when should this memory surface? Comma-separated (e.g., 'debugging,swift-help' not just 'swift')"
+      "required": false,
+      "description": "Optional retrieval tags. Accepts comma-separated text or tag arrays. If omitted/blank, semantic tags are auto-generated from content."
     },
     "content": {
       "type": "string",
@@ -57,7 +57,7 @@
   },
 
   "ai": {
-    "systemPromptSection": "### create_memory\nSave important information to memory for future conversations. Use this to remember facts about the user, their preferences, important context, or insights.\n\n**Memory Types:**\n- `allocentric`: Facts ABOUT the user (preferences, background, relationships, what they like/dislike)\n- `egoic`: What WORKS for you in this agentic context (approaches, techniques, insights, learnings about how to help them)\n\n**Format:**\n```tool_request\n{\"tool\": \"create_memory\", \"query\": \"TYPE|CONFIDENCE|TAGS|CONTENT\"}\n```\n\n**Parameters (pipe-separated):**\n- TYPE: Either \"allocentric\" or \"egoic\"\n- CONFIDENCE: 0.0-1.0 (how certain you are)\n- TAGS: Retrieval context keywords - when should this memory surface? (e.g., \"debugging,swift-help\" not just \"swift\")\n- CONTENT: The actual fact or insight to remember",
+    "systemPromptSection": "### create_memory\nSave important information to memory for future conversations. Use this to remember facts about the user, their preferences, important context, or insights.\n\n**Memory Types:**\n- `allocentric`: Facts ABOUT the user (preferences, background, relationships, what they like/dislike)\n- `egoic`: What WORKS for you in this agentic context (approaches, techniques, insights, learnings about how to help them)\n\n**Format:**\n```tool_request\n{\"tool\": \"create_memory\", \"query\": \"TYPE|CONFIDENCE|TAGS|CONTENT\"}\n```\n\n**Parameters (pipe-separated):**\n- TYPE: Either \"allocentric\" or \"egoic\"\n- CONFIDENCE: 0.0-1.0 (how certain you are)\n- TAGS: Optional retrieval context tags (free-form and domain-specific). Comma-separated if provided. Leave blank (`||`) to auto-generate semantic tags from content.\n- CONTENT: The actual fact or insight to remember",
     "usageExamples": [
       {
         "description": "Remember user language preference",
@@ -70,6 +70,10 @@
       {
         "description": "Remember project context",
         "input": "allocentric|0.85|axon,architecture|User is building Axon, an AI assistant app with co-sovereignty features"
+      },
+      {
+        "description": "Allow automatic semantic tag generation",
+        "input": "allocentric|0.82||User now prefers actionable code-review findings first, then short summary"
       }
     ],
     "whenToUse": [

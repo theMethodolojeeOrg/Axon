@@ -111,12 +111,25 @@ enum AttachmentMimePolicyService {
             resolved = ConversationModelResolver.resolveGlobal(settings: settings)
         }
 
-        let provider = resolved.normalizedProvider
-        let modelId = resolved.modelId
-        let providerName = resolved.providerName
+        return resolvePolicy(
+            provider: resolved.normalizedProvider,
+            modelId: resolved.modelId,
+            providerName: resolved.providerName,
+            conversationId: conversationId,
+            settings: settings
+        )
+    }
 
+    static func resolvePolicy(
+        provider: String,
+        modelId: String,
+        providerName: String,
+        conversationId: String?,
+        settings: AppSettings
+    ) -> AttachmentMimePolicy {
+        let normalizedProvider = normalizedProviderKey(provider)
         let patternsByType: [MessageAttachment.AttachmentType: [String]]
-        switch provider {
+        switch normalizedProvider {
         case "anthropic":
             patternsByType = policy(
                 image: ["image/*"],
@@ -124,13 +137,10 @@ enum AttachmentMimePolicyService {
             )
 
         case "openai":
-            let supportsAudio = modelId.lowercased().contains("4o")
-                || modelId.lowercased().contains("audio")
-                || modelId.lowercased().contains("realtime")
             patternsByType = policy(
                 image: ["image/*"],
                 document: [],
-                audio: supportsAudio ? ["audio/*"] : [],
+                audio: supportsOpenAIAudio(modelId: modelId) ? ["audio/*"] : [],
                 video: []
             )
 
@@ -157,14 +167,25 @@ enum AttachmentMimePolicyService {
             patternsByType = policy(image: supportsVision ? ["image/*"] : [])
 
         case "openai-compatible":
-            patternsByType = customProviderPolicy(conversationId: conversationId, settings: settings, fallbackModelCode: modelId)
+            // Keep strict transport parity with chat-completions payload builders:
+            // OpenAI-compatible transport currently supports image + audio only.
+            let rawPolicy = customProviderPolicy(
+                conversationId: conversationId,
+                settings: settings,
+                fallbackModelCode: modelId
+            )
+            patternsByType = enforceTransportParity(
+                rawPolicy,
+                provider: normalizedProvider,
+                modelId: modelId
+            )
 
         default:
             patternsByType = policy()
         }
 
         return AttachmentMimePolicy(
-            provider: provider,
+            provider: normalizedProvider,
             modelId: modelId,
             providerName: providerName,
             allowedPatternsByType: patternsByType
@@ -345,7 +366,11 @@ enum AttachmentMimePolicyService {
         settings: AppSettings,
         fallbackModelCode: String
     ) -> [MessageAttachment.AttachmentType: [String]] {
-        guard let (provider, model) = resolveCustomSelection(conversationId: conversationId, settings: settings) else {
+        guard let (provider, model) = resolveCustomSelection(
+            conversationId: conversationId,
+            settings: settings,
+            preferredModelCode: fallbackModelCode
+        ) else {
             return patternsToTypedPolicy(fallbackCustomPatterns(modelCode: fallbackModelCode))
         }
 
@@ -360,7 +385,8 @@ enum AttachmentMimePolicyService {
 
     private static func resolveCustomSelection(
         conversationId: String?,
-        settings: AppSettings
+        settings: AppSettings,
+        preferredModelCode: String?
     ) -> (provider: CustomProviderConfig, model: CustomModelConfig?)? {
         var selectedProviderId = settings.selectedCustomProviderId
         var selectedModelId = settings.selectedCustomModelId
@@ -379,7 +405,12 @@ enum AttachmentMimePolicyService {
             return nil
         }
 
-        let model = provider.models.first(where: { $0.id == selectedModelId })
+        let trimmedPreferredModelCode = preferredModelCode?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let model = provider.models.first(where: { model in
+            guard let preferred = trimmedPreferredModelCode, !preferred.isEmpty else { return false }
+            return model.modelCode.caseInsensitiveCompare(preferred) == .orderedSame
+        })
+            ?? provider.models.first(where: { $0.id == selectedModelId })
             ?? provider.models.first
 
         return (provider, model)
@@ -449,6 +480,52 @@ enum AttachmentMimePolicyService {
             .lowercased()
         let base = trimmed.split(separator: ";", maxSplits: 1).first.map(String.init) ?? trimmed
         return mimeAliases[base] ?? base
+    }
+
+    private static func supportsOpenAIAudio(modelId: String) -> Bool {
+        let normalized = modelId.lowercased()
+        return normalized.contains("4o")
+            || normalized.contains("audio")
+            || normalized.contains("realtime")
+    }
+
+    private static func normalizedProviderKey(_ provider: String) -> String {
+        let normalized = provider.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized == "xai" ? "grok" : normalized
+    }
+
+    private static func enforceTransportParity(
+        _ policyByType: [MessageAttachment.AttachmentType: [String]],
+        provider: String,
+        modelId: String
+    ) -> [MessageAttachment.AttachmentType: [String]] {
+        let supportedTypes = transportSupportedAttachmentTypes(provider: provider, modelId: modelId)
+        var filtered = policy()
+
+        for type in allAttachmentTypes {
+            filtered[type] = supportedTypes.contains(type) ? (policyByType[type] ?? []) : []
+        }
+
+        return filtered
+    }
+
+    private static func transportSupportedAttachmentTypes(
+        provider: String,
+        modelId: String
+    ) -> Set<MessageAttachment.AttachmentType> {
+        switch provider {
+        case "openai":
+            var supported: Set<MessageAttachment.AttachmentType> = [.image]
+            if supportsOpenAIAudio(modelId: modelId) {
+                supported.insert(.audio)
+            }
+            return supported
+        case "openai-compatible":
+            // Current OpenAI-compatible payload builders only serialize image + audio.
+            return [.image, .audio]
+        default:
+            return Set(allAttachmentTypes)
+        }
     }
 
     private static func isValidMimeToken(_ token: String) -> Bool {

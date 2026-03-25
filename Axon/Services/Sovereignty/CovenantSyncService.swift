@@ -2,60 +2,100 @@
 //  CovenantSyncService.swift
 //  Axon
 //
-//  iCloud sync for covenants with device-scoping.
-//  Syncs all covenants across devices but only applies covenants
-//  that pertain to the current device.
+//  iCloud sync for sovereignty state snapshots.
+//  Account-scoped sync: snapshots from any of the user's devices can be
+//  merged and applied locally by SovereigntyService.
 //
 
 import Foundation
 import Combine
 import os.log
 
-// MARK: - Syncable Covenant
+// MARK: - V2 Snapshot Models
 
-/// A covenant wrapper that includes device information for scoping
-struct SyncableCovenant: Codable, Identifiable {
+/// Full sovereignty snapshot synced per device.
+struct SyncableSovereigntyState: Codable, Identifiable, Equatable {
+    let id: String
+    let sourceDeviceId: String
+    let sourceDeviceName: String
+    let activeCovenant: Covenant?
+    let covenantHistory: [Covenant]
+    let deadlockState: DeadlockState?
+    let pendingProposals: [CovenantProposal]
+    let comprehensionCompleted: Bool
+    let lastModified: Date
+
+    init(
+        sourceDeviceId: String,
+        sourceDeviceName: String,
+        activeCovenant: Covenant?,
+        covenantHistory: [Covenant],
+        deadlockState: DeadlockState?,
+        pendingProposals: [CovenantProposal],
+        comprehensionCompleted: Bool,
+        lastModified: Date
+    ) {
+        self.id = sourceDeviceId
+        self.sourceDeviceId = sourceDeviceId
+        self.sourceDeviceName = sourceDeviceName
+        self.activeCovenant = activeCovenant
+        self.covenantHistory = covenantHistory
+        self.deadlockState = deadlockState
+        self.pendingProposals = pendingProposals
+        self.comprehensionCompleted = comprehensionCompleted
+        self.lastModified = lastModified
+    }
+}
+
+/// Container for per-device sovereignty snapshots.
+struct SyncedSovereigntyStateStoreV2: Codable, Equatable {
+    var snapshots: [String: SyncableSovereigntyState] // keyed by sourceDeviceId
+    var lastSyncTime: Date
+
+    init() {
+        self.snapshots = [:]
+        self.lastSyncTime = Date()
+    }
+
+    init(snapshots: [String: SyncableSovereigntyState], lastSyncTime: Date) {
+        self.snapshots = snapshots
+        self.lastSyncTime = lastSyncTime
+    }
+
+    static func isSnapshotMoreRecent(
+        _ lhs: SyncableSovereigntyState,
+        than rhs: SyncableSovereigntyState
+    ) -> Bool {
+        if lhs.lastModified != rhs.lastModified {
+            return lhs.lastModified > rhs.lastModified
+        }
+        return lhs.sourceDeviceId < rhs.sourceDeviceId
+    }
+
+    func sortedSnapshotsByRecency() -> [SyncableSovereigntyState] {
+        snapshots.values.sorted { lhs, rhs in
+            Self.isSnapshotMoreRecent(lhs, than: rhs)
+        }
+    }
+
+    var latestSnapshot: SyncableSovereigntyState? {
+        sortedSnapshotsByRecency().first
+    }
+}
+
+// MARK: - Legacy Models (v1 migration)
+
+struct LegacySyncableCovenant: Codable, Identifiable {
     let id: String
     let deviceId: String
     let deviceName: String
     let covenant: Covenant
     let lastModified: Date
-
-    init(covenant: Covenant, deviceId: String, deviceName: String) {
-        self.id = covenant.id
-        self.deviceId = deviceId
-        self.deviceName = deviceName
-        self.covenant = covenant
-        self.lastModified = Date()
-    }
 }
 
-/// Container for all synced covenants across devices
-struct SyncedCovenantStore: Codable {
-    var covenants: [String: SyncableCovenant] // keyed by covenant ID
+struct LegacySyncedCovenantStore: Codable {
+    var covenants: [String: LegacySyncableCovenant]
     var lastSyncTime: Date
-
-    init() {
-        self.covenants = [:]
-        self.lastSyncTime = Date()
-    }
-
-    /// Get covenants for a specific device
-    func covenants(forDevice deviceId: String) -> [SyncableCovenant] {
-        covenants.values.filter { $0.deviceId == deviceId }
-    }
-
-    /// Get all covenants grouped by device
-    func covenantsByDevice() -> [String: [SyncableCovenant]] {
-        Dictionary(grouping: covenants.values, by: { $0.deviceId })
-    }
-
-    /// Get the most recent covenant for a device
-    func latestCovenant(forDevice deviceId: String) -> SyncableCovenant? {
-        covenants(forDevice: deviceId)
-            .sorted { $0.lastModified > $1.lastModified }
-            .first
-    }
 }
 
 // MARK: - Covenant Sync Service
@@ -70,16 +110,18 @@ final class CovenantSyncService: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     // Storage keys
-    private let covenantStoreKey = "sovereignty.covenantStore"
+    private let sovereigntyStateStoreV2Key = "sovereignty.stateStore.v2"
+    private let legacyCovenantStoreKey = "sovereignty.covenantStore"
 
     // Published state
     @Published private(set) var isAvailable = false
     @Published private(set) var lastSyncTime: Date?
     @Published private(set) var syncError: String?
-    @Published private(set) var allDeviceCovenants: [String: [SyncableCovenant]] = [:]
+    @Published private(set) var allDeviceSnapshots: [String: SyncableSovereigntyState] = [:]
+    @Published private(set) var latestCloudState: SyncableSovereigntyState?
 
-    // Notification for covenant changes from other devices
-    let covenantChangedFromCloud = PassthroughSubject<SyncableCovenant, Never>()
+    // Notification for sovereignty state changes from cloud
+    let stateChangedFromCloud = PassthroughSubject<SyncableSovereigntyState, Never>()
 
     private init() {
         checkAvailability()
@@ -119,7 +161,7 @@ final class CovenantSyncService: ObservableObject {
         case NSUbiquitousKeyValueStoreServerChange,
              NSUbiquitousKeyValueStoreInitialSyncChange:
             logger.info("Covenant sync: external change detected for keys: \(changedKeys)")
-            if changedKeys.contains(covenantStoreKey) {
+            if changedKeys.contains(sovereigntyStateStoreV2Key) || changedKeys.contains(legacyCovenantStoreKey) {
                 loadFromCloud()
             }
 
@@ -136,109 +178,194 @@ final class CovenantSyncService: ObservableObject {
         }
     }
 
-    // MARK: - Save Covenant to Cloud
+    // MARK: - Save State to Cloud
 
-    /// Save a covenant to iCloud, scoped to the current device
-    func saveCovenantToCloud(_ covenant: Covenant) {
+    /// Save a full sovereignty snapshot to iCloud.
+    func saveStateToCloud(_ snapshot: SyncableSovereigntyState) {
         guard isAvailable else {
             logger.warning("Covenant sync not available - skipping cloud save")
             return
         }
 
-        let deviceId = deviceIdentity.getDeviceId()
-        let deviceName = deviceIdentity.getDeviceInfo()?.deviceName ?? "Unknown Device"
-
-        let syncable = SyncableCovenant(
-            covenant: covenant,
-            deviceId: deviceId,
-            deviceName: deviceName
-        )
-
-        // Load existing store
-        var store = loadCovenantStore() ?? SyncedCovenantStore()
-
-        // Update or add the covenant
-        store.covenants[covenant.id] = syncable
+        var store = loadSovereigntyStore() ?? SyncedSovereigntyStateStoreV2()
+        store.snapshots[snapshot.sourceDeviceId] = snapshot
         store.lastSyncTime = Date()
 
-        // Save back to cloud
-        saveCovenantStore(store)
-
-        logger.info("Covenant \(covenant.id) saved to iCloud for device \(deviceName)")
+        saveSovereigntyStore(store)
+        logger.info("Saved sovereignty snapshot to iCloud for device \(snapshot.sourceDeviceName)")
     }
 
-    /// Remove a covenant from iCloud
-    func removeCovenantFromCloud(_ covenantId: String) {
+    /// Convenience for writing current-device snapshot.
+    func saveCurrentDeviceState(
+        activeCovenant: Covenant?,
+        covenantHistory: [Covenant],
+        deadlockState: DeadlockState?,
+        pendingProposals: [CovenantProposal],
+        comprehensionCompleted: Bool,
+        lastModified: Date
+    ) {
+        let deviceId = deviceIdentity.getDeviceId()
+        let deviceName = deviceIdentity.getDeviceInfo()?.deviceName ?? "Unknown Device"
+        let snapshot = SyncableSovereigntyState(
+            sourceDeviceId: deviceId,
+            sourceDeviceName: deviceName,
+            activeCovenant: activeCovenant,
+            covenantHistory: covenantHistory,
+            deadlockState: deadlockState,
+            pendingProposals: pendingProposals,
+            comprehensionCompleted: comprehensionCompleted,
+            lastModified: lastModified
+        )
+        saveStateToCloud(snapshot)
+    }
+
+    /// Remove the current device snapshot from iCloud.
+    func removeCurrentDeviceStateFromCloud() {
         guard isAvailable else { return }
 
-        var store = loadCovenantStore() ?? SyncedCovenantStore()
-        store.covenants.removeValue(forKey: covenantId)
+        let deviceId = deviceIdentity.getDeviceId()
+        var store = loadSovereigntyStore() ?? SyncedSovereigntyStateStoreV2()
+        store.snapshots.removeValue(forKey: deviceId)
         store.lastSyncTime = Date()
 
-        saveCovenantStore(store)
+        saveSovereigntyStore(store)
+        logger.info("Removed sovereignty snapshot from iCloud for device \(deviceId)")
+    }
 
-        logger.info("Covenant \(covenantId) removed from iCloud")
+    /// Clear both v2 and legacy covenant sync keys from iCloud KV.
+    func clearCloudStateStore() {
+        kvStore.removeObject(forKey: sovereigntyStateStoreV2Key)
+        kvStore.removeObject(forKey: legacyCovenantStoreKey)
+        kvStore.synchronize()
+        allDeviceSnapshots = [:]
+        latestCloudState = nil
+        lastSyncTime = nil
     }
 
     // MARK: - Load from Cloud
 
     private func loadFromCloud() {
-        guard let store = loadCovenantStore() else {
-            logger.info("No covenant store found in iCloud")
+        guard let store = loadSovereigntyStore() else {
+            logger.info("No sovereignty state store found in iCloud")
             return
         }
 
         lastSyncTime = store.lastSyncTime
-        allDeviceCovenants = store.covenantsByDevice()
+        allDeviceSnapshots = store.snapshots
 
-        // Check if there's a newer covenant for this device from another sync
-        let currentDeviceId = deviceIdentity.getDeviceId()
-        if let latestForDevice = store.latestCovenant(forDevice: currentDeviceId) {
-            // Notify that a covenant was received from cloud
-            covenantChangedFromCloud.send(latestForDevice)
+        if let latestSnapshot = store.latestSnapshot {
+            latestCloudState = latestSnapshot
+            stateChangedFromCloud.send(latestSnapshot)
         }
 
         syncError = nil
-        logger.info("Loaded \(store.covenants.count) covenants from iCloud")
+        logger.info("Loaded \(store.snapshots.count) sovereignty snapshots from iCloud")
     }
 
     // MARK: - Storage Helpers
 
-    private func loadCovenantStore() -> SyncedCovenantStore? {
-        guard let data = kvStore.data(forKey: covenantStoreKey) else {
-            return nil
+    private func loadSovereigntyStore() -> SyncedSovereigntyStateStoreV2? {
+        if let store = loadV2Store() {
+            return store
         }
+        if let migrated = migrateLegacyStoreIfNeeded() {
+            saveSovereigntyStore(migrated)
+            return migrated
+        }
+        return nil
+    }
+
+    private func loadV2Store() -> SyncedSovereigntyStateStoreV2? {
+        guard let data = kvStore.data(forKey: sovereigntyStateStoreV2Key) else { return nil }
 
         do {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .secondsSince1970
-            return try decoder.decode(SyncedCovenantStore.self, from: data)
+            return try decoder.decode(SyncedSovereigntyStateStoreV2.self, from: data)
         } catch {
-            logger.error("Failed to decode covenant store: \(error.localizedDescription)")
-            syncError = "Failed to load covenants: \(error.localizedDescription)"
+            logger.error("Failed to decode sovereignty state store v2: \(error.localizedDescription)")
+            syncError = "Failed to load sovereignty sync data: \(error.localizedDescription)"
             return nil
         }
     }
 
-    private func saveCovenantStore(_ store: SyncedCovenantStore) {
+    private func migrateLegacyStoreIfNeeded() -> SyncedSovereigntyStateStoreV2? {
+        guard let data = kvStore.data(forKey: legacyCovenantStoreKey) else { return nil }
+        do {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .secondsSince1970
+            let legacyStore = try decoder.decode(LegacySyncedCovenantStore.self, from: data)
+            logger.info("Migrating legacy covenant store with \(legacyStore.covenants.count) entries")
+            return Self.migrateLegacyStoreToV2(legacyStore)
+        } catch {
+            logger.error("Failed to decode legacy covenant store: \(error.localizedDescription)")
+            syncError = "Failed to migrate legacy covenant sync data: \(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    static func migrateLegacyStoreToV2(_ legacyStore: LegacySyncedCovenantStore) -> SyncedSovereigntyStateStoreV2 {
+        var snapshots: [String: SyncableSovereigntyState] = [:]
+        let grouped = Dictionary(grouping: legacyStore.covenants.values, by: { $0.deviceId })
+
+        for (deviceId, covenantsForDevice) in grouped {
+            let sorted = covenantsForDevice.sorted { lhs, rhs in
+                if lhs.lastModified != rhs.lastModified {
+                    return lhs.lastModified > rhs.lastModified
+                }
+                return lhs.id < rhs.id
+            }
+
+            guard let latest = sorted.first else { continue }
+
+            let history = Array(sorted.dropFirst()).map { $0.covenant }.sorted { lhs, rhs in
+                if lhs.createdAt != rhs.createdAt {
+                    return lhs.createdAt < rhs.createdAt
+                }
+                if lhs.version != rhs.version {
+                    return lhs.version < rhs.version
+                }
+                return lhs.id < rhs.id
+            }
+
+            snapshots[deviceId] = SyncableSovereigntyState(
+                sourceDeviceId: deviceId,
+                sourceDeviceName: latest.deviceName,
+                activeCovenant: latest.covenant,
+                covenantHistory: history,
+                deadlockState: nil,
+                pendingProposals: [],
+                comprehensionCompleted: false,
+                lastModified: latest.lastModified
+            )
+        }
+
+        return SyncedSovereigntyStateStoreV2(
+            snapshots: snapshots,
+            lastSyncTime: legacyStore.lastSyncTime
+        )
+    }
+
+    private func saveSovereigntyStore(_ store: SyncedSovereigntyStateStoreV2) {
         do {
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .secondsSince1970
             let data = try encoder.encode(store)
 
-            kvStore.set(data, forKey: covenantStoreKey)
+            kvStore.set(data, forKey: sovereigntyStateStoreV2Key)
             kvStore.synchronize()
 
             lastSyncTime = store.lastSyncTime
-            allDeviceCovenants = store.covenantsByDevice()
+            allDeviceSnapshots = store.snapshots
+            latestCloudState = store.latestSnapshot
             syncError = nil
         } catch {
-            logger.error("Failed to save covenant store: \(error.localizedDescription)")
-            syncError = "Failed to save covenants: \(error.localizedDescription)"
+            logger.error("Failed to save sovereignty state store: \(error.localizedDescription)")
+            syncError = "Failed to save sovereignty sync data: \(error.localizedDescription)"
         }
     }
 
-    // MARK: - Manual Sync
+    // MARK: - Manual Sync / Query
 
     func forceSync() {
         kvStore.synchronize()
@@ -249,30 +376,8 @@ final class CovenantSyncService: ObservableObject {
         }
     }
 
-    // MARK: - Device Info
-
-    /// Get all devices that have covenants
-    func devicesWithCovenants() -> [(deviceId: String, deviceName: String, covenantCount: Int)] {
-        var result: [(String, String, Int)] = []
-
-        for (deviceId, covenants) in allDeviceCovenants {
-            let deviceName = covenants.first?.deviceName ?? "Unknown Device"
-            result.append((deviceId, deviceName, covenants.count))
-        }
-
-        return result.sorted { $0.1 < $1.1 }
-    }
-
-    /// Check if the current device has a synced covenant
-    func hasCovenantForCurrentDevice() -> Bool {
-        let currentDeviceId = deviceIdentity.getDeviceId()
-        return allDeviceCovenants[currentDeviceId]?.isEmpty == false
-    }
-
-    /// Get the latest covenant for the current device from cloud
-    func latestCovenantForCurrentDevice() -> Covenant? {
-        let currentDeviceId = deviceIdentity.getDeviceId()
-        guard let store = loadCovenantStore() else { return nil }
-        return store.latestCovenant(forDevice: currentDeviceId)?.covenant
+    func latestStateFromCloud() -> SyncableSovereigntyState? {
+        guard let store = loadSovereigntyStore() else { return nil }
+        return store.latestSnapshot
     }
 }
