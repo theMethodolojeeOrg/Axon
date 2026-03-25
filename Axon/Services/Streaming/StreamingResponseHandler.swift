@@ -23,6 +23,7 @@ class StreamingResponseHandler {
         let system: String?
         let maxTokens: Int
         let modelParams: ModelGenerationSettings?
+        let stopSequences: [String]?
 
         init(
             provider: String,
@@ -31,7 +32,8 @@ class StreamingResponseHandler {
             baseUrl: String? = nil,
             system: String? = nil,
             maxTokens: Int = 4096,
-            modelParams: ModelGenerationSettings? = nil
+            modelParams: ModelGenerationSettings? = nil,
+            stopSequences: [String]? = nil
         ) {
             self.provider = provider
             self.apiKey = apiKey
@@ -40,6 +42,7 @@ class StreamingResponseHandler {
             self.system = system
             self.maxTokens = maxTokens
             self.modelParams = modelParams
+            self.stopSequences = stopSequences
         }
     }
 
@@ -159,6 +162,9 @@ class StreamingResponseHandler {
 
         if let system = config.system, !system.isEmpty {
             body["system"] = system
+        }
+        if let stops = config.stopSequences, !stops.isEmpty {
+            body["stop_sequences"] = stops
         }
         body.merge(openAIStyleSamplingParameters(from: config.modelParams, provider: "anthropic")) { _, new in new }
 
@@ -326,6 +332,9 @@ class StreamingResponseHandler {
             "messages": apiMessages,
             "stream": true
         ]
+        if let stops = config.stopSequences, !stops.isEmpty {
+            body["stop"] = stops
+        }
         body.merge(openAIStyleSamplingParameters(from: config.modelParams, provider: config.provider)) { _, new in new }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -508,6 +517,9 @@ class StreamingResponseHandler {
         var generationConfig: [String: Any] = [
             "maxOutputTokens": config.maxTokens
         ]
+        if let stops = config.stopSequences, !stops.isEmpty {
+            generationConfig["stopSequences"] = stops
+        }
         generationConfig.merge(geminiGenerationConfig(from: config.modelParams)) { _, new in new }
         body["generationConfig"] = generationConfig
 
@@ -647,6 +659,9 @@ class StreamingResponseHandler {
             "messages": apiMessages,
             "stream": true
         ]
+        if let stops = config.stopSequences, !stops.isEmpty {
+            body["stop"] = stops
+        }
         body.merge(openAIStyleSamplingParameters(from: config.modelParams, provider: "deepseek")) { _, new in new }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

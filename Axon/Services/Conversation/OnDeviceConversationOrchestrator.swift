@@ -18,10 +18,13 @@ import FoundationModels
 struct ProviderResponse {
     let content: String
     let reasoning: String?
+    /// True when generation stopped due to a stop sequence rather than natural completion.
+    let stoppedByStopSequence: Bool
 
-    init(content: String, reasoning: String? = nil) {
+    init(content: String, reasoning: String? = nil, stoppedByStopSequence: Bool = false) {
         self.content = content
         self.reasoning = reasoning
+        self.stoppedByStopSequence = stoppedByStopSequence
     }
 }
 
@@ -100,7 +103,11 @@ enum ToolGatedResponseSegmenter {
         guard let data = payload.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(ToolRequest.self, from: data)
     }
+
+    /// System injection to elicit the tool_request block after a stop sequence fires.
+    static let toolBlockFollowUp = "You were about to use a tool. Output only the ```tool_request block now, nothing else."
 }
+
 
 class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
@@ -678,21 +685,43 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             baseUrl: config.customBaseUrl,
             system: systemPrompt,
             maxTokens: 4096,
-            modelParams: config.modelParams
+            modelParams: config.modelParams,
+            stopSequences: ["```tool_request"]
         )
 
         let handler = StreamingResponseHandler()
         var rawStreamResponse = ""
+        var streamedToUserCount = 0
+        var detectedToolDuringStream = false
 
         streamLoop: for try await event in handler.stream(config: streamConfig, messages: messages) {
             switch event {
             case .textDelta(let text):
                 rawStreamResponse += text
+
+                // With stop sequences: text flows directly to user until stream ends.
+                // Without stop sequences (fallback): detect fence and break.
                 let segment = ToolGatedResponseSegmenter.segment(rawStreamResponse)
 
                 if segment.firstToolRequest != nil {
-                    print("[StreamToolProxy] Detected first tool request during stream. Pausing generation for immediate execution.")
+                    // Fallback: fence completed in-stream (stop sequence didn't fire)
+                    print("[StreamToolProxy] Detected tool request during stream (fallback fence parse).")
+                    detectedToolDuringStream = true
                     break streamLoop
+                }
+
+                if segment.awaitingFenceClose {
+                    // Fence opened but not closed — hold tokens, don't emit
+                    continue
+                }
+
+                // No fence activity — emit new visible text directly to user
+                let visibleNow = segment.visiblePrefix
+                if visibleNow.count > streamedToUserCount {
+                    let newText = String(visibleNow.dropFirst(streamedToUserCount))
+                    continuation.yield(.textDelta(newText))
+                    accumulatedContent += newText
+                    streamedToUserCount = visibleNow.count
                 }
 
             case .reasoningDelta(let text):
@@ -706,12 +735,25 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             }
         }
 
-        print("[StreamToolProxy] Checking for tool requests...")
+        print("[StreamToolProxy] Stream ended. Checking for tool requests...")
 
-        // After streaming completes, handle tool execution loop
+        // After streaming completes, handle tool execution loop.
+        // If stop sequence fired, rawStreamResponse is the pre-fence visible text.
+        // The tool proxy loop will detect stoppedByStopSequence and do a two-phase call.
         let maxToolCalls = await MainActor.run {
             SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
         }
+
+        // Text already streamed to user — don't re-emit the initial visible prefix
+        let alreadyEmitted = streamedToUserCount > 0
+
+        // Determine if the stream ended due to a stop sequence (no fence in response
+        // despite tools being active and no natural tool fence detection).
+        let segment = ToolGatedResponseSegmenter.segment(rawStreamResponse)
+        let initialStoppedByStop = !detectedToolDuringStream
+            && segment.firstToolRequest == nil
+            && !segment.awaitingFenceClose
+            && !rawStreamResponse.isEmpty
 
         try await handleStreamingToolProxyLoop(
             initialResponse: rawStreamResponse,
@@ -721,8 +763,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             messages: messages,
             geminiKey: geminiKey,
             maxIterations: maxToolCalls,
-            emitInitialVisiblePrefix: true,
+            emitInitialVisiblePrefix: !alreadyEmitted,
             suppressVisiblePrefixOnToolTurn: true,
+            initialStoppedByStopSequence: initialStoppedByStop,
             continuation: continuation,
             accumulatedContent: &accumulatedContent,
             collectedToolCalls: &collectedToolCalls,
@@ -742,6 +785,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         maxIterations: Int,
         emitInitialVisiblePrefix: Bool,
         suppressVisiblePrefixOnToolTurn: Bool,
+        initialStoppedByStopSequence: Bool = false,
         continuation: AsyncThrowingStream<StreamingEvent, Error>.Continuation,
         accumulatedContent: inout String,
         collectedToolCalls: inout [LiveToolCall],
@@ -752,6 +796,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var iteration = 0
         var shouldEmitVisiblePrefix = emitInitialVisiblePrefix
         var rollingMessages = messages
+        var stoppedByStopSequence = initialStoppedByStopSequence
         let toolContext = ToolContextV2(
             conversationId: conversationId,
             runtimeProvider: config.provider,
@@ -759,7 +804,25 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         )
 
         while iteration < maxIterations {
-            let segment = ToolGatedResponseSegmenter.segment(currentResponse)
+            var segment = ToolGatedResponseSegmenter.segment(currentResponse)
+
+            // Two-phase: if stop sequence fired and no fence in response, get the tool block
+            if segment.firstToolRequest == nil && stoppedByStopSequence {
+                print("[StreamToolProxy] Stop sequence fired — issuing follow-up for tool block.")
+                var phase2Messages = rollingMessages
+                phase2Messages.append(Message(conversationId: conversationId, role: .assistant, content: currentResponse))
+                phase2Messages.append(Message(conversationId: conversationId, role: .user, content: ToolGatedResponseSegmenter.toolBlockFollowUp))
+                let toolBlock = try await callProvider(
+                    provider: config.provider,
+                    config: config,
+                    system: systemPrompt,
+                    messages: phase2Messages
+                ).content
+                currentResponse = currentResponse + "\n" + toolBlock
+                segment = ToolGatedResponseSegmenter.segment(currentResponse)
+                stoppedByStopSequence = false  // Only do this once per iteration
+            }
+
             let visiblePrefix = segment.visiblePrefix
             let hasToolRequest = segment.firstToolRequest != nil
             let shouldEmitThisPass = shouldEmitVisiblePrefix && !(suppressVisiblePrefixOnToolTurn && hasToolRequest)
@@ -855,22 +918,39 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 continuation.yield(.toolCallComplete(liveToolCall.id, result))
             }
 
-            if !suppressVisiblePrefixOnToolTurn {
-                let assistantPrefix = visiblePrefix.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !assistantPrefix.isEmpty {
-                    rollingMessages.append(Message(conversationId: conversationId, role: .assistant, content: assistantPrefix))
-                }
+            // Always store the model's full output (including tool fence) so it retains
+            // memory of what it said and what tool it requested — prevents context drift.
+            let trimmedResponse = currentResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedResponse.isEmpty {
+                rollingMessages.append(Message(conversationId: conversationId, role: .assistant, content: trimmedResponse))
             }
 
             let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
             rollingMessages.append(Message(conversationId: conversationId, role: .user, content: formattedResult))
 
-            currentResponse = try await callProvider(
+            let providerResult = try await callProvider(
                 provider: config.provider,
                 config: config,
                 system: systemPrompt,
-                messages: rollingMessages
-            ).content
+                messages: rollingMessages,
+                stopSequences: ["```tool_request"]
+            )
+
+            if providerResult.stoppedByStopSequence {
+                // Two-phase: model stopped before the fence. Get the tool block.
+                var phase2Messages = rollingMessages
+                phase2Messages.append(Message(conversationId: conversationId, role: .assistant, content: providerResult.content))
+                phase2Messages.append(Message(conversationId: conversationId, role: .user, content: ToolGatedResponseSegmenter.toolBlockFollowUp))
+                let toolBlock = try await callProvider(
+                    provider: config.provider,
+                    config: config,
+                    system: systemPrompt,
+                    messages: phase2Messages
+                ).content
+                currentResponse = providerResult.content + "\n" + toolBlock
+            } else {
+                currentResponse = providerResult.content
+            }
 
             iteration += 1
         }
@@ -980,7 +1060,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                         provider: config.provider,
                         config: config,
                         system: systemPrompt,
-                        messages: rollingMessages
+                        messages: rollingMessages,
+                        stopSequences: ["```tool_request"]
                     ).content
 
                     iteration += 1
@@ -1027,7 +1108,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                         provider: config.provider,
                         config: config,
                         system: systemPrompt,
-                        messages: rollingMessages
+                        messages: rollingMessages,
+                        stopSequences: ["```tool_request"]
                     ).content
 
                     iteration += 1
@@ -1086,6 +1168,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 ToolRequestTracker.shared.markExecuted(request: toolRequest, result: toolResult.result)
             }
 
+            // Store the model's full output (including tool fence) so it retains
+            // memory of what it said and what tool it requested — prevents context drift.
+            let trimmedResponse = currentResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedResponse.isEmpty {
+                rollingMessages.append(Message(conversationId: conversationId, role: .assistant, content: trimmedResponse))
+            }
+
             let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
             rollingMessages.append(Message(
                 conversationId: conversationId,
@@ -1094,12 +1183,29 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             ))
 
             print("[OnDeviceOrchestrator] Sending tool result back to \(config.provider)")
-            currentResponse = try await callProvider(
+            let providerResult = try await callProvider(
                 provider: config.provider,
                 config: config,
                 system: systemPrompt,
-                messages: rollingMessages
-            ).content
+                messages: rollingMessages,
+                stopSequences: ["```tool_request"]
+            )
+
+            if providerResult.stoppedByStopSequence {
+                // Two-phase: model stopped before the fence. Get the tool block.
+                var phase2Messages = rollingMessages
+                phase2Messages.append(Message(conversationId: conversationId, role: .assistant, content: providerResult.content))
+                phase2Messages.append(Message(conversationId: conversationId, role: .user, content: ToolGatedResponseSegmenter.toolBlockFollowUp))
+                let toolBlock = try await callProvider(
+                    provider: config.provider,
+                    config: config,
+                    system: systemPrompt,
+                    messages: phase2Messages
+                ).content
+                currentResponse = providerResult.content + "\n" + toolBlock
+            } else {
+                currentResponse = providerResult.content
+            }
 
             iteration += 1
         }
@@ -1208,52 +1314,53 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         provider: String,
         config: OrchestrationConfig,
         system: String?,
-        messages: [Message]
+        messages: [Message],
+        stopSequences: [String]? = nil
     ) async throws -> ProviderResponse {
         switch provider {
         case "anthropic":
             guard let apiKey = config.anthropicKey else { throw APIError.unauthorized }
-            let content = try await callAnthropic(
+            return try await callAnthropic(
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
                 messages: messages,
-                modelParams: config.modelParams
+                modelParams: config.modelParams,
+                stopSequences: stopSequences
             )
-            return ProviderResponse(content: content)
 
         case "openai":
             guard let apiKey = config.openaiKey else { throw APIError.unauthorized }
-            let content = try await callOpenAI(
+            return try await callOpenAI(
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
                 messages: messages,
-                modelParams: config.modelParams
+                modelParams: config.modelParams,
+                stopSequences: stopSequences
             )
-            return ProviderResponse(content: content)
 
         case "gemini":
             guard let apiKey = config.geminiKey else { throw APIError.unauthorized }
-            let content = try await callGemini(
+            return try await callGemini(
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
                 messages: messages,
-                modelParams: config.modelParams
+                modelParams: config.modelParams,
+                stopSequences: stopSequences
             )
-            return ProviderResponse(content: content)
 
         case "grok":
             guard let apiKey = config.grokKey else { throw APIError.unauthorized }
-            let content = try await callGrok(
+            return try await callGrok(
                 apiKey: apiKey,
                 model: config.model,
                 system: system,
                 messages: messages,
-                modelParams: config.modelParams
+                modelParams: config.modelParams,
+                stopSequences: stopSequences
             )
-            return ProviderResponse(content: content)
 
         case "perplexity":
             guard let apiKey = config.perplexityKey else { throw APIError.unauthorized }
@@ -1263,7 +1370,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 model: config.model,
                 system: system,
                 messages: messages,
-                modelParams: config.modelParams
+                modelParams: config.modelParams,
+                stopSequences: stopSequences
             )
             let result = ReasoningExtractor.extract(from: rawContent, provider: provider, model: config.model)
             return ProviderResponse(content: result.content, reasoning: result.reasoning)
@@ -1276,7 +1384,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 model: config.model,
                 system: system,
                 messages: messages,
-                modelParams: config.modelParams
+                modelParams: config.modelParams,
+                stopSequences: stopSequences
             )
 
         case "zai":
@@ -1287,7 +1396,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 model: config.model,
                 system: system,
                 messages: messages,
-                modelParams: config.modelParams
+                modelParams: config.modelParams,
+                stopSequences: stopSequences
             )
             let result = ReasoningExtractor.extract(from: rawContent, provider: provider, model: config.model)
             return ProviderResponse(content: result.content, reasoning: result.reasoning)
@@ -1299,7 +1409,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 model: config.model,
                 system: system,
                 messages: messages,
-                modelParams: config.modelParams
+                modelParams: config.modelParams,
+                stopSequences: stopSequences
             )
             return ProviderResponse(content: content)
 
@@ -1310,21 +1421,22 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 model: config.model,
                 system: system,
                 messages: messages,
-                modelParams: config.modelParams
+                modelParams: config.modelParams,
+                stopSequences: stopSequences
             )
             return ProviderResponse(content: content)
 
         case "openai-compatible":
             guard let apiKey = config.customApiKey, let baseUrl = config.customBaseUrl else { throw APIError.unauthorized }
-            let content = try await callOpenAICompatible(
+            return try await callOpenAICompatible(
                 apiKey: apiKey,
                 baseUrl: baseUrl,
                 model: config.model,
                 system: system,
                 messages: messages,
-                modelParams: config.modelParams
+                modelParams: config.modelParams,
+                stopSequences: stopSequences
             )
-            return ProviderResponse(content: content)
 
         case "appleFoundation":
             let content = try await callAppleFoundation(
@@ -1796,15 +1908,16 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         model: String,
         system: String?,
         messages: [Message],
-        modelParams: ModelGenerationSettings?
-    ) async throws -> String {
+        modelParams: ModelGenerationSettings?,
+        stopSequences: [String]? = nil
+    ) async throws -> ProviderResponse {
         let url = URL(string: "https://api.anthropic.com/v1/messages")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.addValue("application/json", forHTTPHeaderField: "content-type")
-        
+
         // Convert messages
         var apiMessages: [[String: Any]] = []
         for msg in messages where msg.role != .system {
@@ -1812,12 +1925,15 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             let contentBlocks = anthropicContentBlocks(for: msg)
             apiMessages.append(["role": role, "content": contentBlocks])
         }
-        
+
         var body: [String: Any] = [
             "model": model,
             "max_tokens": 4096,
             "messages": apiMessages
         ].merging(system.flatMap { ["system": $0] } ?? [:]) { $1 }
+        if let stops = stopSequences, !stops.isEmpty {
+            body["stop_sequences"] = stops
+        }
         body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "anthropic")) { _, new in new }
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -1837,10 +1953,18 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 let text: String
             }
             let content: [Content]
+            let stopReason: String?
+
+            enum CodingKeys: String, CodingKey {
+                case content
+                case stopReason = "stop_reason"
+            }
         }
-        
+
         let decoded = try JSONDecoder().decode(AnthropicResponse.self, from: data)
-        return decoded.content.first?.text ?? ""
+        let text = decoded.content.first?.text ?? ""
+        let stoppedByStop = decoded.stopReason == "stop_sequence"
+        return ProviderResponse(content: text, stoppedByStopSequence: stoppedByStop)
     }
     
     private func callOpenAI(
@@ -1848,15 +1972,17 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         model: String,
         system: String?,
         messages: [Message],
-        modelParams: ModelGenerationSettings?
-    ) async throws -> String {
+        modelParams: ModelGenerationSettings?,
+        stopSequences: [String]? = nil
+    ) async throws -> ProviderResponse {
         return try await callOpenAICompatible(
             apiKey: apiKey,
             baseUrl: "https://api.openai.com/v1",
             model: model,
             system: system,
             messages: messages,
-            modelParams: modelParams
+            modelParams: modelParams,
+            stopSequences: stopSequences
         )
     }
     
@@ -1866,14 +1992,15 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         model: String,
         system: String?,
         messages: [Message],
-        modelParams: ModelGenerationSettings?
-    ) async throws -> String {
+        modelParams: ModelGenerationSettings?,
+        stopSequences: [String]? = nil
+    ) async throws -> ProviderResponse {
         let url = URL(string: "\(baseUrl)/chat/completions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         var apiMessages: [[String: Any]] = []
         if let system = system, !system.isEmpty {
             apiMessages.append(["role": "system", "content": system])
@@ -1882,11 +2009,14 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             let content = openAIContent(for: msg)
             apiMessages.append(["role": msg.role.rawValue, "content": content])
         }
-        
+
         var body: [String: Any] = [
             "model": model,
             "messages": apiMessages
         ]
+        if let stops = stopSequences, !stops.isEmpty {
+            body["stop"] = stops
+        }
         body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "openai")) { _, new in new }
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -1906,12 +2036,21 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     let content: String
                 }
                 let message: Message
+                let finishReason: String?
+
+                enum CodingKeys: String, CodingKey {
+                    case message
+                    case finishReason = "finish_reason"
+                }
             }
             let choices: [Choice]
         }
-        
+
         let decoded = try JSONDecoder().decode(OpenAIResponse.self, from: data)
-        return decoded.choices.first?.message.content ?? ""
+        let text = decoded.choices.first?.message.content ?? ""
+        let stoppedByStop = decoded.choices.first?.finishReason == "stop"
+            && stopSequences != nil && !stopSequences!.isEmpty
+        return ProviderResponse(content: text, stoppedByStopSequence: stoppedByStop)
     }
 
     private func callGrok(
@@ -1919,8 +2058,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         model: String,
         system: String?,
         messages: [Message],
-        modelParams: ModelGenerationSettings?
-    ) async throws -> String {
+        modelParams: ModelGenerationSettings?,
+        stopSequences: [String]? = nil
+    ) async throws -> ProviderResponse {
         // Grok uses OpenAI-compatible API but with xAI endpoint
         // Supports: images (JPEG, PNG) via image_url
         // Does NOT support: audio, video, PDFs
@@ -1943,6 +2083,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             "model": model,
             "messages": apiMessages
         ]
+        if let stops = stopSequences, !stops.isEmpty {
+            body["stop"] = stops
+        }
         body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "grok")) { _, new in new }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -1962,12 +2105,21 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     let content: String
                 }
                 let message: Message
+                let finishReason: String?
+
+                enum CodingKeys: String, CodingKey {
+                    case message
+                    case finishReason = "finish_reason"
+                }
             }
             let choices: [Choice]
         }
 
         let decoded = try JSONDecoder().decode(GrokResponse.self, from: data)
-        return decoded.choices.first?.message.content ?? ""
+        let text = decoded.choices.first?.message.content ?? ""
+        let stoppedByStop = decoded.choices.first?.finishReason == "stop"
+            && stopSequences != nil && !stopSequences!.isEmpty
+        return ProviderResponse(content: text, stoppedByStopSequence: stoppedByStop)
     }
 
     private func callPerplexity(
@@ -1975,7 +2127,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         model: String,
         system: String?,
         messages: [Message],
-        modelParams: ModelGenerationSettings?
+        modelParams: ModelGenerationSettings?,
+        stopSequences: [String]? = nil
     ) async throws -> String {
         // Perplexity uses OpenAI-compatible API
         // Base URL: https://api.perplexity.ai
@@ -2000,6 +2153,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             "model": model,
             "messages": apiMessages
         ]
+        if let stops = stopSequences, !stops.isEmpty {
+            body["stop"] = stops
+        }
         body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "perplexity")) { _, new in new }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -2043,7 +2199,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         model: String,
         system: String?,
         messages: [Message],
-        modelParams: ModelGenerationSettings?
+        modelParams: ModelGenerationSettings?,
+        stopSequences: [String]? = nil
     ) async throws -> ProviderResponse {
         // DeepSeek uses OpenAI-compatible API
         // Base URL: https://api.deepseek.com
@@ -2068,6 +2225,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             "model": model,
             "messages": apiMessages
         ]
+        if let stops = stopSequences, !stops.isEmpty {
+            body["stop"] = stops
+        }
         body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "deepseek")) { _, new in new }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -2110,7 +2270,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         model: String,
         system: String?,
         messages: [Message],
-        modelParams: ModelGenerationSettings?
+        modelParams: ModelGenerationSettings?,
+        stopSequences: [String]? = nil
     ) async throws -> String {
         // Z.ai (Zhipu AI) uses OpenAI-compatible API
         // Base URL: https://api.z.ai/api/paas/v4
@@ -2140,6 +2301,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             "model": model,
             "messages": apiMessages
         ]
+        if let stops = stopSequences, !stops.isEmpty {
+            body["stop"] = stops
+        }
         body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "zai")) { _, new in new }
 
         // Enable thinking mode for enhanced reasoning on flagship models
@@ -2205,7 +2369,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         model: String,
         system: String?,
         messages: [Message],
-        modelParams: ModelGenerationSettings?
+        modelParams: ModelGenerationSettings?,
+        stopSequences: [String]? = nil
     ) async throws -> String {
         // MiniMax uses a custom API format
         // Base URL: https://api.minimax.io/v1
@@ -2241,6 +2406,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             "messages": apiMessages,
             "temperature": 0.7
         ]
+        if let stops = stopSequences, !stops.isEmpty {
+            body["stop"] = stops
+        }
         let minimaxParams = openAIStyleSamplingParameters(from: modelParams, provider: "minimax")
         if let temperature = minimaxParams["temperature"] {
             body["temperature"] = temperature
@@ -2280,7 +2448,8 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         model: String,
         system: String?,
         messages: [Message],
-        modelParams: ModelGenerationSettings?
+        modelParams: ModelGenerationSettings?,
+        stopSequences: [String]? = nil
     ) async throws -> String {
         // Mistral uses OpenAI-compatible API
         // Base URL: https://api.mistral.ai/v1
@@ -2309,6 +2478,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             "model": model,
             "messages": apiMessages
         ]
+        if let stops = stopSequences, !stops.isEmpty {
+            body["stop"] = stops
+        }
         body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "mistral")) { _, new in new }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -2369,23 +2541,24 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         model: String,
         system: String?,
         messages: [Message],
-        modelParams: ModelGenerationSettings?
-    ) async throws -> String {
+        modelParams: ModelGenerationSettings?,
+        stopSequences: [String]? = nil
+    ) async throws -> ProviderResponse {
         // Gemini API: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
         // Model name usually needs "models/" prefix or just the ID.
         // The app uses "gemini-2.5-flash" etc.
-        
+
         let modelId = model.starts(with: "models/") ? model : "models/\(model)"
         let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/\(modelId):generateContent?key=\(apiKey)")!
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         // Convert messages to Gemini format (contents: [{role, parts: [{text}]}])
         // Gemini roles: "user", "model" (not "assistant")
         var contents: [[String: Any]] = []
-        
+
         for msg in messages where msg.role != .system {
             let role = msg.role == .user ? "user" : "model"
             let parts = geminiParts(for: msg)
@@ -2394,11 +2567,14 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 "parts": parts
             ])
         }
-        
+
         var body: [String: Any] = [
             "contents": contents
         ].merging(system.flatMap { ["system_instruction": ["parts": [["text": $0]]]] } ?? [:]) { $1 }
-        let generationConfig = geminiGenerationConfig(from: modelParams)
+        var generationConfig = geminiGenerationConfig(from: modelParams)
+        if let stops = stopSequences, !stops.isEmpty {
+            generationConfig["stopSequences"] = stops
+        }
         if !generationConfig.isEmpty {
             body["generationConfig"] = generationConfig
         }
@@ -2423,12 +2599,17 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     let parts: [Part]
                 }
                 let content: Content
+                let finishReason: String?
             }
             let candidates: [Candidate]?
         }
-        
+
         let decoded = try JSONDecoder().decode(GeminiResponse.self, from: data)
-        return decoded.candidates?.first?.content.parts.first?.text ?? ""
+        let text = decoded.candidates?.first?.content.parts.first?.text ?? ""
+        // Gemini uses "STOP" for stop sequences
+        let stoppedByStop = decoded.candidates?.first?.finishReason == "STOP"
+            && stopSequences != nil && !stopSequences!.isEmpty
+        return ProviderResponse(content: text, stoppedByStopSequence: stoppedByStop)
     }
     
     // MARK: - Helpers

@@ -62,7 +62,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         {"tool": "tool_name", "query": "your query or request"}
         ```
 
-        When invoking a tool, output ONLY the single `tool_request` block with no additional prose before or after it.
+        When invoking a tool, place the `tool_request` block at the END of your message. You may include brief reasoning before it. Do not write text after the tool_request block — execution pauses until the result arrives. The result will appear in a `tool_result` block. Continue your response naturally after reviewing the result.
 
         Available tools:
 
@@ -989,7 +989,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         **Workflow:** Use `list_tools` first to discover what's available, then use `get_tool_details` to get full usage instructions for any tool you want to use.
 
         **Important:** Only request ONE tool at a time. Wait for results before continuing.
-        **Output Rule:** When invoking a tool, output ONLY the single `tool_request` block with no additional prose before or after it.
+        **Output Rule:** When invoking a tool, place the `tool_request` block at the END of your message. You may include brief reasoning before it. Do not write text after the block — execution pauses until the result arrives in a `tool_result` block.
 
         """
 
@@ -4829,34 +4829,20 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     /// Format tool results for injection into conversation
     func formatToolResult(_ result: ToolResult) -> String {
-        let status = result.success ? "success" : "failure"
-        let failureSummary = result.success ? nil : summarizeFailureForModel(result.result)
+        // Compact fence-based format that mirrors the tool_request structure.
+        // The model sees a symmetric request/response pattern which aids coherence.
         var statusJSON = "{\"tool\":\"\(jsonEscape(result.tool))\",\"success\":\(result.success ? "true" : "false")"
-        if let failureSummary {
+        if !result.success {
+            let failureSummary = summarizeFailureForModel(result.result)
             statusJSON += ",\"error\":\"\(jsonEscape(failureSummary))\""
         }
-        statusJSON += "}"
+        statusJSON += ",\"result\":\"\(jsonEscape(result.result))\"}"
 
-        var formatted = """
-
-        ---
-        ```tool_result
-        \(statusJSON)
-        ```
-        **Tool Result** (\(result.tool)):
-        **Status:** \(status)
-
-        \(result.result)
-        """
+        var formatted = "```tool_result\n\(statusJSON)\n```"
 
         if let sources = result.sources, !sources.isEmpty {
-            formatted += "\n\n**Sources:**\n"
-            for source in sources {
-                formatted += "- [\(source.title)](\(source.url))\n"
-            }
+            formatted += "\nSources: " + sources.map { "[\($0.title)](\($0.url))" }.joined(separator: ", ")
         }
-
-        formatted += "\n---\n"
 
         return formatted
     }
