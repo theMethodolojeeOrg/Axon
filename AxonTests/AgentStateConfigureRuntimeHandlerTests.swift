@@ -192,3 +192,91 @@ final class AgentStateConfigureRuntimeHandlerTests: XCTestCase {
         runtimeManager.clearTurnLease(conversationId: conversationId)
     }
 }
+
+final class ToolInputNormalizationV2Tests: XCTestCase {
+    func testParseCSVStringNormalizesAndDedupes() {
+        let parsed = ToolInputNormalizationV2.parseNormalizedStringArray(" Preferences, #Workflow ,preferences ")
+        XCTAssertEqual(parsed, ["preferences", "workflow"])
+    }
+
+    func testParseJSONArrayString() {
+        let parsed = ToolInputNormalizationV2.parseNormalizedStringArray("[\"Auth\", \"#Security\", \"auth\"]")
+        XCTAssertEqual(parsed, ["auth", "security"])
+    }
+
+    func testParseRawAnyArrayWithMixedTypes() {
+        let parsed = ToolInputNormalizationV2.parseNormalizedStringArray(["#iOS", "Swift", 42, "swift"])
+        XCTAssertEqual(parsed, ["ios", "swift", "42"])
+    }
+
+    func testParseDropsEmptyValues() {
+        let parsed = ToolInputNormalizationV2.parseNormalizedStringArray(" , ,# , project ,, ")
+        XCTAssertEqual(parsed, ["project"])
+    }
+
+    func testAgentStateTagsInputStyleParses() {
+        let parsed = ToolInputNormalizationV2.parseNormalizedStringArray("preferences, #workflow, preferences")
+        XCTAssertEqual(parsed, ["preferences", "workflow"])
+    }
+
+    func testSubAgentContextTagsInputStyleParses() {
+        let parsed = ToolInputNormalizationV2.parseNormalizedStringArray("[\"Auth\", \"Security\", \"auth\"]")
+        XCTAssertEqual(parsed, ["auth", "security"])
+    }
+
+    func testHeartbeatModulesInputStyleParses() {
+        let parsed = ToolInputNormalizationV2.parseNormalizedStringArray(["Calendar", " weather ", "calendar"])
+        XCTAssertEqual(parsed, ["calendar", "weather"])
+    }
+
+    func testTemporalTagDetectionRecognizesYears() {
+        XCTAssertTrue(ToolInputNormalizationV2.isTemporalLikeTag("today"))
+        XCTAssertTrue(ToolInputNormalizationV2.isTemporalLikeTag("2026"))
+        XCTAssertFalse(ToolInputNormalizationV2.isTemporalLikeTag("swift"))
+    }
+
+    func testGenerateSemanticTagsExcludesTemporalNoiseAndStopwords() {
+        let content = "Today we should really discuss swift concurrency and payment retry logic in checkout."
+        let tags = ToolInputNormalizationV2.generateSemanticTags(from: content, maxCount: 4)
+        XCTAssertLessThanOrEqual(tags.count, 4)
+        XCTAssertFalse(tags.contains("today"))
+        XCTAssertFalse(tags.contains("should"))
+    }
+}
+
+@MainActor
+final class MemoryHandlerTagCompositionTests: XCTestCase {
+    private let handler = MemoryHandler()
+
+    func testExplicitNonTemporalTagsArePreservedWithoutSemanticAugment() {
+        let tags = handler.composeCreateMemoryTags(
+            content: "This content mentions database migration and telemetry.",
+            rawTags: " #Swift , ios , swift "
+        )
+
+        XCTAssertEqual(tags, ["swift", "ios"])
+    }
+
+    func testEmptyTagsGenerateSemanticTags() {
+        let tags = handler.composeCreateMemoryTags(
+            content: "Refactor checkout retry logic and improve telemetry dashboards for payment failures.",
+            rawTags: ""
+        )
+
+        XCTAssertFalse(tags.isEmpty)
+        XCTAssertLessThanOrEqual(tags.count, 4)
+        XCTAssertTrue(tags.allSatisfy { !ToolInputNormalizationV2.isTemporalLikeTag($0) })
+    }
+
+    func testTemporalOnlyTagsGenerateSemanticTagsAndKeepTemporalTags() {
+        let tags = handler.composeCreateMemoryTags(
+            content: "Investigated race conditions in swift concurrency task cancellation for sync engine.",
+            rawTags: "today, this_week, 2026"
+        )
+
+        XCTAssertTrue(tags.contains("today"))
+        XCTAssertTrue(tags.contains("this_week"))
+        XCTAssertTrue(tags.contains("2026"))
+        XCTAssertTrue(tags.contains { !ToolInputNormalizationV2.isTemporalLikeTag($0) })
+    }
+}

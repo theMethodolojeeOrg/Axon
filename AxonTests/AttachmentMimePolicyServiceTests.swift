@@ -83,7 +83,7 @@ final class AttachmentMimePolicyServiceTests: XCTestCase {
         XCTAssertTrue(policy.patterns(for: .audio).isEmpty)
     }
 
-    func testCustomModelConfiguredPatternsOverrideFallback() {
+    func testOpenAICompatibleConfiguredDocumentMimeIsFilteredByTransportParity() {
         let providerId = UUID()
         let modelId = UUID()
 
@@ -99,14 +99,35 @@ final class AttachmentMimePolicyServiceTests: XCTestCase {
                     CustomModelConfig(
                         id: modelId,
                         modelCode: "model-with-audio-signature",
-                        acceptedAttachmentMimeTypes: ["application/pdf"]
+                        acceptedAttachmentMimeTypes: ["application/pdf", "image/*"]
                     )
                 ]
             )
         ]
 
         let policy = AttachmentMimePolicyService.resolvePolicy(conversationId: nil, settings: settings)
-        XCTAssertEqual(policy.patterns(for: .document), ["application/pdf"])
+        XCTAssertEqual(policy.patterns(for: .image), ["image/*"])
+        XCTAssertTrue(policy.patterns(for: .document).isEmpty)
         XCTAssertTrue(policy.patterns(for: .audio).isEmpty)
+        XCTAssertTrue(policy.patterns(for: .video).isEmpty)
+    }
+
+    func testResolvePolicyForEffectiveProviderSupportsRuntimeOverrideAlignment() {
+        var settings = AppSettings()
+        settings.defaultProvider = .anthropic
+        settings.defaultModel = "claude-sonnet-4-5-20250929"
+
+        let policy = AttachmentMimePolicyService.resolvePolicy(
+            provider: "openai",
+            modelId: "gpt-5.2",
+            providerName: "OpenAI (GPT)",
+            conversationId: nil,
+            settings: settings
+        )
+
+        XCTAssertEqual(policy.provider, "openai")
+        XCTAssertTrue(policy.patterns(for: .document).isEmpty)
+        XCTAssertTrue(policy.patterns(for: .video).isEmpty)
+        XCTAssertEqual(policy.patterns(for: .image), ["image/*"])
     }
 }

@@ -630,7 +630,13 @@ class ConversationService: ObservableObject {
         let resolvedModelParams = runtimeOverrides.modelParams
 
         if !attachments.isEmpty {
-            let policy = AttachmentMimePolicyService.resolvePolicy(conversationId: conversationId, settings: settings)
+            let policy = AttachmentMimePolicyService.resolvePolicy(
+                provider: providerString,
+                modelId: modelId,
+                providerName: providerDisplayName,
+                conversationId: conversationId,
+                settings: settings
+            )
             let validation = AttachmentMimePolicyService.validate(attachments: attachments, policy: policy)
             if case .rejected(let failures) = validation {
                 throw APIError.networkError(

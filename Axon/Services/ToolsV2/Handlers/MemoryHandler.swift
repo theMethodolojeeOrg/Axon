@@ -58,15 +58,18 @@ final class MemoryHandler: ToolHandlerV2 {
         // Extract parameters - either from parsed inputs or from raw query
         let type: MemoryType
         let confidence: Double
-        let tags: [String]
+        let normalizedTags: [String]
         let content: String
         
         if let typeStr = inputs["type"] as? String {
             // Structured inputs (already parsed)
-            type = MemoryType(rawValue: typeStr) ?? .allocentric
-            confidence = (inputs["confidence"] as? Double) ?? 0.8
-            tags = (inputs["tags"] as? [String]) ?? []
-            content = (inputs["content"] as? String) ?? ""
+            type = MemoryType(rawValue: typeStr.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) ?? .allocentric
+            confidence = parseConfidence(inputs["confidence"]) ?? 0.8
+            content = (inputs["content"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            normalizedTags = composeCreateMemoryTags(
+                content: content,
+                rawTags: inputs["tags"]
+            )
         } else if let query = inputs["query"] as? String {
             // Parse pipe-delimited format: TYPE|CONFIDENCE|TAGS|CONTENT
             let parts = query.components(separatedBy: "|")
@@ -77,10 +80,13 @@ final class MemoryHandler: ToolHandlerV2 {
                 )
             }
             
-            type = MemoryType(rawValue: parts[0].trimmingCharacters(in: .whitespaces)) ?? .allocentric
-            confidence = Double(parts[1].trimmingCharacters(in: .whitespaces)) ?? 0.8
-            tags = parts[2].components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            type = MemoryType(rawValue: parts[0].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) ?? .allocentric
+            confidence = Double(parts[1].trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0.8
             content = parts[3...].joined(separator: "|").trimmingCharacters(in: .whitespaces)
+            normalizedTags = composeCreateMemoryTags(
+                content: content,
+                rawTags: parts[2]
+            )
         } else {
             return ToolResultV2.failure(
                 toolId: "create_memory",
@@ -96,14 +102,14 @@ final class MemoryHandler: ToolHandlerV2 {
             )
         }
         
-        logger.info("Creating memory: type=\(type.rawValue), confidence=\(confidence), tags=\(tags.joined(separator: ","))")
+        logger.info("Creating memory: type=\(type.rawValue), confidence=\(confidence), tags=\(normalizedTags.joined(separator: ","))")
         
         do {
             let memory = try await memoryService.createMemory(
                 content: content,
                 type: type,
                 confidence: confidence,
-                tags: tags
+                tags: normalizedTags
             )
             
             return ToolResultV2.success(
@@ -124,6 +130,43 @@ final class MemoryHandler: ToolHandlerV2 {
                 error: "Failed to create memory: \(error.localizedDescription)"
             )
         }
+    }
+
+    // MARK: - Shared Tag Composition
+
+    /// Build normalized tags for `create_memory`.
+    ///
+    /// Behavior:
+    /// - Parse tag-like input from arrays/csv/json-array-string.
+    /// - If no non-temporal tags are present, generate semantic tags from content (up to 4).
+    func composeCreateMemoryTags(content: String, rawTags: Any?) -> [String] {
+        var normalized = ToolInputNormalizationV2.parseNormalizedStringArray(rawTags)
+        let hasNonTemporalTag = normalized.contains { !ToolInputNormalizationV2.isTemporalLikeTag($0) }
+
+        if !hasNonTemporalTag {
+            let semanticTags = ToolInputNormalizationV2.generateSemanticTags(
+                from: content,
+                maxCount: 4,
+                excluding: normalized
+            )
+            normalized.append(contentsOf: semanticTags)
+            normalized = ToolInputNormalizationV2.parseNormalizedStringArray(normalized)
+        }
+
+        return normalized
+    }
+
+    private func parseConfidence(_ rawValue: Any?) -> Double? {
+        if let value = rawValue as? Double {
+            return value
+        }
+        if let value = rawValue as? Int {
+            return Double(value)
+        }
+        if let value = rawValue as? String {
+            return Double(value.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return nil
     }
     
     // MARK: - conversation_search
