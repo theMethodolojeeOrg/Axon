@@ -2211,6 +2211,8 @@ struct ToolRequestCodeBlockView: View {
     @State private var executionState: ToolExecutionState = .notExecuted
     @State private var executionResult: String?
     @State private var isExpanded: Bool = false
+    @State private var assertionOutcome: ToolTestAssertionOutcome = .unavailable
+    @State private var executionDurationMs: Int?
 
     private enum ToolExecutionState {
         case notExecuted
@@ -2219,37 +2221,22 @@ struct ToolRequestCodeBlockView: View {
         case failure
     }
 
-    /// Parse the JSON to extract tool name and query (query is optional for parameter-less tools)
-    private var parsedRequest: (tool: String, query: String)? {
-        guard let data = code.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tool = json["tool"] as? String else {
-            return nil
-        }
-        // Query is optional - default to empty string for parameter-less tools
-        let query = json["query"] as? String ?? ""
-        return (tool, query)
+    private var requestParseResult: ToolRequestParseResult {
+        ToolTestRequestParser.parse(code)
     }
-    
-    /// Get detailed error info for display when parsing fails
+
+    private var parsedRequest: ParsedToolRequestWithMetadata? {
+        if case .success(let parsed) = requestParseResult {
+            return parsed
+        }
+        return nil
+    }
+
     private var parseError: String? {
-        guard let data = code.data(using: .utf8) else {
-            return "Invalid UTF-8 encoding"
+        if case .failure(let message) = requestParseResult {
+            return message
         }
-        
-        do {
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                return "Not a valid JSON object"
-            }
-            
-            if json["tool"] == nil {
-                return "Missing 'tool' field in JSON"
-            }
-            
-            return nil // No error
-        } catch {
-            return "JSON parse error: \(error.localizedDescription)"
-        }
+        return nil
     }
 
     /// Generate a hash for deduplication
@@ -2281,7 +2268,11 @@ struct ToolRequestCodeBlockView: View {
         switch executionState {
         case .notExecuted: return AppColors.glassBorder
         case .executing: return AppColors.signalMercury
-        case .success: return AppColors.signalLichen
+        case .success:
+            if assertionOutcome.status == .fail {
+                return AppColors.signalHematite
+            }
+            return AppColors.signalLichen
         case .failure: return AppColors.signalHematite
         }
     }
@@ -2294,9 +2285,17 @@ struct ToolRequestCodeBlockView: View {
                     .font(.system(size: 14))
                     .foregroundColor(stateColor)
 
-                Text(LiveToolCall.displayName(for: parsed.tool))
-                    .font(AppTypography.bodySmall(.medium))
-                    .foregroundColor(AppColors.textPrimary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(LiveToolCall.displayName(for: parsed.tool))
+                        .font(AppTypography.bodySmall(.medium))
+                        .foregroundColor(AppColors.textPrimary)
+
+                    if let caseId = parsed.toolTestMetadata?.caseId {
+                        Text(caseId)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(AppColors.textTertiary)
+                    }
+                }
             } else {
                 Text("tool_request")
                     .font(AppTypography.labelSmall())
@@ -2350,13 +2349,31 @@ struct ToolRequestCodeBlockView: View {
             }
 
         case .success:
-            HStack(spacing: 4) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 14))
-                Text("Applied")
-                    .font(AppTypography.labelSmall())
+            if assertionOutcome.status == .fail {
+                HStack(spacing: 4) {
+                    Image(systemName: "xmark.octagon.fill")
+                        .font(.system(size: 14))
+                    Text("FAIL")
+                        .font(AppTypography.labelSmall())
+                }
+                .foregroundColor(AppColors.signalHematite)
+            } else if assertionOutcome.status == .pass {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 14))
+                    Text("PASS")
+                        .font(AppTypography.labelSmall())
+                }
+                .foregroundColor(AppColors.signalLichen)
+            } else {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 14))
+                    Text("Applied")
+                        .font(AppTypography.labelSmall())
+                }
+                .foregroundColor(AppColors.signalLichen)
             }
-            .foregroundColor(AppColors.signalLichen)
 
         case .failure:
             Button {
@@ -2382,7 +2399,11 @@ struct ToolRequestCodeBlockView: View {
         switch executionState {
         case .notExecuted: return AppColors.signalMercury
         case .executing: return AppColors.signalMercury
-        case .success: return AppColors.signalLichen
+        case .success:
+            if assertionOutcome.status == .fail {
+                return AppColors.signalHematite
+            }
+            return AppColors.signalLichen
         case .failure: return AppColors.signalHematite
         }
     }
@@ -2423,6 +2444,52 @@ struct ToolRequestCodeBlockView: View {
                 .padding(.top, 8)
             }
 
+            if let parsed = parsedRequest,
+               parsed.toolTestMetadata != nil || parsed.metadataWarning != nil {
+                Divider()
+                    .overlay(AppColors.glassBorder.opacity(0.5))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    if let metadata = parsed.toolTestMetadata {
+                        Text("ToolTest run: \(metadata.runId)")
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundColor(AppColors.textTertiary)
+
+                        if executionState == .notExecuted {
+                            Text("Assertions pending execution.")
+                                .font(.system(.caption2))
+                                .foregroundColor(AppColors.textTertiary)
+                        } else {
+                            Text(assertionStatusTitle)
+                                .font(.system(.caption2, weight: .semibold))
+                                .foregroundColor(assertionStatusColor)
+                        }
+                    }
+
+                    if let warning = parsed.metadataWarning {
+                        Text("Metadata warning: \(warning)")
+                            .font(.system(.caption2))
+                            .foregroundColor(AppColors.signalMercury)
+                    }
+
+                    if executionState != .notExecuted {
+                        ForEach(Array(assertionOutcome.failureReasons.enumerated()), id: \.offset) { _, reason in
+                            Text("• \(reason)")
+                                .font(.system(.caption2))
+                                .foregroundColor(AppColors.signalHematite)
+                        }
+
+                        ForEach(Array(assertionOutcome.notes.enumerated()), id: \.offset) { _, note in
+                            Text("• \(note)")
+                                .font(.system(.caption2))
+                                .foregroundColor(AppColors.textTertiary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            }
+
             // Result if available
             if let result = executionResult {
                 Divider()
@@ -2440,6 +2507,31 @@ struct ToolRequestCodeBlockView: View {
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
+    private var assertionStatusTitle: String {
+        switch assertionOutcome.status {
+        case .unavailable:
+            return "Assertion status: unavailable"
+        case .pass:
+            if let executionDurationMs {
+                return "Assertion status: PASS (\(executionDurationMs)ms)"
+            }
+            return "Assertion status: PASS"
+        case .fail:
+            if let executionDurationMs {
+                return "Assertion status: FAIL (\(executionDurationMs)ms)"
+            }
+            return "Assertion status: FAIL"
+        }
+    }
+
+    private var assertionStatusColor: Color {
+        switch assertionOutcome.status {
+        case .unavailable: return AppColors.textTertiary
+        case .pass: return AppColors.signalLichen
+        case .fail: return AppColors.signalHematite
+        }
+    }
+
     /// Check if this exact tool request was already executed in this session
     /// If auto-execute is enabled and not yet executed, triggers execution automatically
     /// IMPORTANT: Tools loaded from history (isFromHistory=true) never auto-execute
@@ -2448,6 +2540,13 @@ struct ToolRequestCodeBlockView: View {
             // Tool was previously executed - show completed state with result
             executionState = .success
             executionResult = ToolRequestTracker.shared.getResult(hash: contentHash)
+            executionDurationMs = nil
+            assertionOutcome = ToolTestAssertionEvaluator.evaluate(
+                assertion: parsedRequest?.toolTestMetadata?.assertion,
+                success: true,
+                output: executionResult ?? "",
+                durationMs: nil
+            )
         } else if isFromHistory {
             // Tool is from conversation history but wasn't tracked as executed
             // Don't auto-execute - just show it as not executed (user can manually run if needed)
@@ -2467,23 +2566,36 @@ struct ToolRequestCodeBlockView: View {
             executionState = .failure
             // Show detailed parse error for debugging
             executionResult = parseError ?? "Failed to parse tool request (unknown error)"
+            assertionOutcome = .unavailable
             return
         }
 
         executionState = .executing
+        assertionOutcome = .unavailable
+        executionDurationMs = nil
 
         Task {
+            let startTime = Date()
             do {
                 // Use unified routing service for V1/V2 compatible execution
                 let result = try await ToolRoutingService.shared.executeTool(
                     toolId: parsed.tool,
                     query: parsed.query
                 )
+                let durationMs = Int(Date().timeIntervalSince(startTime) * 1000)
+                let outcome = ToolTestAssertionEvaluator.evaluate(
+                    assertion: parsed.toolTestMetadata?.assertion,
+                    success: result.success,
+                    output: result.output,
+                    durationMs: durationMs
+                )
 
                 await MainActor.run {
                     if result.success {
                         executionState = .success
                         executionResult = result.output
+                        executionDurationMs = durationMs
+                        assertionOutcome = outcome
                         ToolRequestTracker.shared.markExecuted(
                             hash: contentHash,
                             result: result.output
@@ -2491,12 +2603,24 @@ struct ToolRequestCodeBlockView: View {
                     } else {
                         executionState = .failure
                         executionResult = result.output
+                        executionDurationMs = durationMs
+                        assertionOutcome = outcome
                     }
                 }
             } catch {
+                let durationMs = Int(Date().timeIntervalSince(startTime) * 1000)
+                let errorOutput = error.localizedDescription
+                let outcome = ToolTestAssertionEvaluator.evaluate(
+                    assertion: parsed.toolTestMetadata?.assertion,
+                    success: false,
+                    output: errorOutput,
+                    durationMs: durationMs
+                )
                 await MainActor.run {
                     executionState = .failure
-                    executionResult = error.localizedDescription
+                    executionResult = errorOutput
+                    executionDurationMs = durationMs
+                    assertionOutcome = outcome
                 }
             }
         }

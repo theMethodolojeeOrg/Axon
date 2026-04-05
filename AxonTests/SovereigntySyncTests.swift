@@ -1,6 +1,7 @@
 import XCTest
 @testable import Axon
 
+@MainActor
 final class SovereigntySyncTests: XCTestCase {
 
     func testLegacyStoreMigrationToV2() {

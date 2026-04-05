@@ -717,6 +717,7 @@
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Axon provides a local API server to allow developer tools like Cline to access your conversations via OpenAI-compatible endpoints.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Axon needs access to your photos to attach images to messages.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -783,6 +784,7 @@
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Axon provides a local API server to allow developer tools like Cline to access your conversations via OpenAI-compatible endpoints.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Axon needs access to your photos to attach images to messages.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

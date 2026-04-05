@@ -14,6 +14,7 @@ import Foundation
 enum SlashCommand {
     case tool(toolId: String)      // Show tool definition to AI
     case use(toolId: String)       // User directly invokes a tool
+    case toolTest(suite: String?)  // Run chat-driven tool suite
     case listTools
     case help
     case privateThread             // Mark thread as private (no AI)
@@ -110,6 +111,13 @@ class SlashCommandParser {
             }
             return .use(toolId: toolId)
 
+        case "tooltest":
+            if let args {
+                let trimmedArgs = args.trimmingCharacters(in: .whitespacesAndNewlines)
+                return .toolTest(suite: trimmedArgs.isEmpty ? nil : trimmedArgs)
+            }
+            return .toolTest(suite: nil)
+
         case "tools", "listtools", "list_tools":
             return .listTools
 
@@ -151,6 +159,9 @@ class SlashCommandParser {
                 success: true
             )
 
+        case .toolTest(let suite):
+            return await executeToolTestCommand(suite: suite)
+
         case .listTools:
             return await executeListToolsCommand()
 
@@ -179,6 +190,7 @@ class SlashCommandParser {
                 **Available commands:**
                 - `/tool <tool_id>` - Show tool definition to AI
                 - `/use <tool_id>` - Directly invoke a tool yourself
+                - `/tooltest [suite|list]` - Run chat-driven V2 tool tests
                 - `/tools` - List all available tools
                 - `/private` - Start a private thread (no AI)
                 - `/sync` - Enable temporal symmetry (time + turns)
@@ -302,6 +314,10 @@ class SlashCommandParser {
 
         ### /tools
         List all available tools organized by category.
+
+        ### /tooltest [suite_id]
+        Run chat-driven V2 tool test suites through normal `tool_request` blocks.
+        Examples: `/tooltest`, `/tooltest core_v2_safe`, `/tooltest list`
 
         ### /private
         Start a private thread where Axon will not respond.
@@ -427,6 +443,103 @@ class SlashCommandParser {
             command: .status,
             displayText: "/status",
             resultText: report,
+            success: true
+        )
+    }
+
+    private func executeToolTestCommand(suite: String?) async -> SlashCommandResult {
+        let service = ToolTestSuiteService.shared
+        let normalized = suite?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        let requestedSuite = (normalized?.isEmpty ?? true) ? ToolTestSuiteService.defaultSuiteId : normalized!
+
+        if requestedSuite == "list" {
+            return SlashCommandResult(
+                command: .toolTest(suite: suite),
+                displayText: "/tooltest list",
+                resultText: service.renderSuiteListMarkdown(),
+                success: true
+            )
+        }
+
+        guard service.hasSuite(requestedSuite) else {
+            return SlashCommandResult(
+                command: .toolTest(suite: suite),
+                displayText: "/tooltest \(requestedSuite)",
+                resultText: """
+                Unknown tool test suite: `\(requestedSuite)`.
+
+                \(service.renderSuiteListMarkdown())
+                """,
+                success: false
+            )
+        }
+
+        guard ToolsV2Toggle.shared.isV2Active else {
+            return SlashCommandResult(
+                command: .toolTest(suite: suite),
+                displayText: suite == nil ? "/tooltest" : "/tooltest \(requestedSuite)",
+                resultText: """
+                Cannot run `\(requestedSuite)` while ToolsV2 is inactive.
+
+                Enable **Plugin-Based (V2)** in Settings > Tools, then retry:
+                - `/tooltest \(requestedSuite)`
+                """,
+                success: false
+            )
+        }
+
+        if ToolPluginLoader.shared.loadedTools.isEmpty {
+            await ToolPluginLoader.shared.loadAllTools()
+        }
+
+        let requiredTools = Set(service.requiredTools(for: requestedSuite))
+        let loadedById = Dictionary(uniqueKeysWithValues: ToolPluginLoader.shared.loadedTools.map { ($0.id, $0) })
+
+        let missingTools = requiredTools.filter { loadedById[$0] == nil }.sorted()
+        if !missingTools.isEmpty {
+            return SlashCommandResult(
+                command: .toolTest(suite: suite),
+                displayText: suite == nil ? "/tooltest" : "/tooltest \(requestedSuite)",
+                resultText: """
+                Cannot run `\(requestedSuite)` because required tools are not loaded:
+                \(missingTools.map { "- `\($0)`" }.joined(separator: "\n"))
+
+                Open Settings > Tools (V2) and reload tool manifests, then retry.
+                """,
+                success: false
+            )
+        }
+
+        let disabledTools = requiredTools.filter { loadedById[$0]?.isEnabled == false }.sorted()
+        if !disabledTools.isEmpty {
+            return SlashCommandResult(
+                command: .toolTest(suite: suite),
+                displayText: suite == nil ? "/tooltest" : "/tooltest \(requestedSuite)",
+                resultText: """
+                Cannot run `\(requestedSuite)` because required tools are disabled:
+                \(disabledTools.map { "- `\($0)`" }.joined(separator: "\n"))
+
+                Enable these tools in Settings > Tools (V2), then retry.
+                """,
+                success: false
+            )
+        }
+
+        guard let markdown = service.renderSuiteMarkdown(suiteId: requestedSuite) else {
+            return SlashCommandResult(
+                command: .toolTest(suite: suite),
+                displayText: suite == nil ? "/tooltest" : "/tooltest \(requestedSuite)",
+                resultText: "Failed to render suite `\(requestedSuite)`.",
+                success: false
+            )
+        }
+
+        return SlashCommandResult(
+            command: .toolTest(suite: suite),
+            displayText: suite == nil ? "/tooltest" : "/tooltest \(requestedSuite)",
+            resultText: markdown,
             success: true
         )
     }
@@ -561,6 +674,14 @@ class SlashCommandParser {
             displayName: "List Tools",
             description: "Show all available tools",
             icon: "list.bullet",
+            hasSubmenu: false
+        ),
+        SlashCommandSuggestion(
+            id: "tooltest",
+            command: "tooltest",
+            displayName: "Tool Test",
+            description: "Run chat-driven V2 tool suites",
+            icon: "checklist",
             hasSubmenu: false
         ),
         SlashCommandSuggestion(
