@@ -728,3 +728,9 @@ Axon/Config/PublicConfig.local.plist
 !Axon/Views/Settings/ProvidersSettingsViews/APIKeySettingsView/*.swift
 !Axon/Views/Settings/ProvidersSettingsViews/APIKeySettingsView/Components/*.swift
 !Axon/ViewModels/SettingsViewModels/APIKeysSettingsViewModel.swift
+
+Axon/Resources/BundleResources/Testing/Out of Flux - finallyfree.mp3
+.gitignore
+.gitignore
+Axon/Resources/BundleResources/Testing/TestImage.png
+Axon/Resources/BundleResources/Testing/TestVideo.mp4

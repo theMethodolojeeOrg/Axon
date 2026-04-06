@@ -463,7 +463,7 @@ class SlashCommandParser {
             )
         }
 
-        guard service.hasSuite(requestedSuite) else {
+        guard let suiteId = service.canonicalSuiteId(for: requestedSuite) else {
             return SlashCommandResult(
                 command: .toolTest(suite: suite),
                 displayText: "/tooltest \(requestedSuite)",
@@ -479,12 +479,12 @@ class SlashCommandParser {
         guard ToolsV2Toggle.shared.isV2Active else {
             return SlashCommandResult(
                 command: .toolTest(suite: suite),
-                displayText: suite == nil ? "/tooltest" : "/tooltest \(requestedSuite)",
+                displayText: suite == nil ? "/tooltest" : "/tooltest \(suiteId)",
                 resultText: """
-                Cannot run `\(requestedSuite)` while ToolsV2 is inactive.
+                Cannot run `\(suiteId)` while ToolsV2 is inactive.
 
                 Enable **Plugin-Based (V2)** in Settings > Tools, then retry:
-                - `/tooltest \(requestedSuite)`
+                - `/tooltest \(suiteId)`
                 """,
                 success: false
             )
@@ -494,16 +494,16 @@ class SlashCommandParser {
             await ToolPluginLoader.shared.loadAllTools()
         }
 
-        let requiredTools = Set(service.requiredTools(for: requestedSuite))
+        let requiredTools = Set(service.requiredTools(for: suiteId))
         let loadedById = Dictionary(uniqueKeysWithValues: ToolPluginLoader.shared.loadedTools.map { ($0.id, $0) })
 
         let missingTools = requiredTools.filter { loadedById[$0] == nil }.sorted()
         if !missingTools.isEmpty {
             return SlashCommandResult(
                 command: .toolTest(suite: suite),
-                displayText: suite == nil ? "/tooltest" : "/tooltest \(requestedSuite)",
+                displayText: suite == nil ? "/tooltest" : "/tooltest \(suiteId)",
                 resultText: """
-                Cannot run `\(requestedSuite)` because required tools are not loaded:
+                Cannot run `\(suiteId)` because required tools are not loaded:
                 \(missingTools.map { "- `\($0)`" }.joined(separator: "\n"))
 
                 Open Settings > Tools (V2) and reload tool manifests, then retry.
@@ -516,9 +516,9 @@ class SlashCommandParser {
         if !disabledTools.isEmpty {
             return SlashCommandResult(
                 command: .toolTest(suite: suite),
-                displayText: suite == nil ? "/tooltest" : "/tooltest \(requestedSuite)",
+                displayText: suite == nil ? "/tooltest" : "/tooltest \(suiteId)",
                 resultText: """
-                Cannot run `\(requestedSuite)` because required tools are disabled:
+                Cannot run `\(suiteId)` because required tools are disabled:
                 \(disabledTools.map { "- `\($0)`" }.joined(separator: "\n"))
 
                 Enable these tools in Settings > Tools (V2), then retry.
@@ -527,18 +527,18 @@ class SlashCommandParser {
             )
         }
 
-        guard let markdown = service.renderSuiteMarkdown(suiteId: requestedSuite) else {
+        guard let markdown = service.renderSuiteMarkdown(suiteId: suiteId) else {
             return SlashCommandResult(
                 command: .toolTest(suite: suite),
-                displayText: suite == nil ? "/tooltest" : "/tooltest \(requestedSuite)",
-                resultText: "Failed to render suite `\(requestedSuite)`.",
+                displayText: suite == nil ? "/tooltest" : "/tooltest \(suiteId)",
+                resultText: "Failed to render suite `\(suiteId)`.",
                 success: false
             )
         }
 
         return SlashCommandResult(
             command: .toolTest(suite: suite),
-            displayText: suite == nil ? "/tooltest" : "/tooltest \(requestedSuite)",
+            displayText: suite == nil ? "/tooltest" : "/tooltest \(suiteId)",
             resultText: markdown,
             success: true
         )

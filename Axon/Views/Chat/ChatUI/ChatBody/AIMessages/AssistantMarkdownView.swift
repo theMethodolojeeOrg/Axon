@@ -161,7 +161,12 @@ struct AssistantMarkdownView: View {
                             CompletedToolCallView(toolCall: executedCall)
                         } else {
                             // Pass isFromHistory to prevent auto-execution on app restart
-                            ToolRequestCodeBlockView(code: code, isFromHistory: isFromHistory)
+                            ToolRequestCodeBlockView(
+                                code: code,
+                                isFromHistory: isFromHistory,
+                                conversationId: conversationId,
+                                sourceMessageId: messageId
+                            )
                         }
                     } else {
                         CodeBlockView(

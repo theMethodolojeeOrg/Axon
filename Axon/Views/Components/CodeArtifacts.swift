@@ -2201,6 +2201,8 @@ struct ToolRequestCodeBlockView: View {
     /// When true, this tool request was loaded from conversation history (not newly streamed)
     /// Tools from history should NOT auto-execute - they should only show their persisted state
     var isFromHistory: Bool = false
+    var conversationId: String? = nil
+    var sourceMessageId: String? = nil
 
     /// Controls whether tool requests auto-execute when they appear
     /// Reads from global tool settings - .immediate = auto-execute, .deferred = manual apply
@@ -2213,6 +2215,11 @@ struct ToolRequestCodeBlockView: View {
     @State private var isExpanded: Bool = false
     @State private var assertionOutcome: ToolTestAssertionOutcome = .unavailable
     @State private var executionDurationMs: Int?
+    @State private var executionStartedAt: Date?
+    @State private var executionElapsedSeconds: Int = 0
+    @State private var didEmitResultMessage = false
+
+    private let executionTicker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private enum ToolExecutionState {
         case notExecuted
@@ -2261,6 +2268,10 @@ struct ToolRequestCodeBlockView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .onAppear {
             checkIfAlreadyExecuted()
+        }
+        .onReceive(executionTicker) { _ in
+            guard executionState == .executing, let executionStartedAt else { return }
+            executionElapsedSeconds = max(0, Int(Date().timeIntervalSince(executionStartedAt)))
         }
     }
 
@@ -2343,7 +2354,7 @@ struct ToolRequestCodeBlockView: View {
             HStack(spacing: 6) {
                 ProgressView()
                     .scaleEffect(0.7)
-                Text("Running...")
+                Text(runningStatusLabel)
                     .font(AppTypography.labelSmall())
                     .foregroundColor(AppColors.signalMercury)
             }
@@ -2406,6 +2417,13 @@ struct ToolRequestCodeBlockView: View {
             return AppColors.signalLichen
         case .failure: return AppColors.signalHematite
         }
+    }
+
+    private var runningStatusLabel: String {
+        if executionElapsedSeconds >= 10 {
+            return "Running \(executionElapsedSeconds)s (external calls may take longer)"
+        }
+        return "Running..."
     }
 
     @ViewBuilder
@@ -2488,6 +2506,13 @@ struct ToolRequestCodeBlockView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+            }
+
+            if executionState == .executing && executionElapsedSeconds >= 10 {
+                Text("Execution is still in progress (\(executionElapsedSeconds)s). External media tools can take longer to return.")
+                    .font(.system(.caption2))
+                    .foregroundColor(AppColors.textTertiary)
+                    .padding(.horizontal, 12)
             }
 
             // Result if available
@@ -2573,6 +2598,9 @@ struct ToolRequestCodeBlockView: View {
         executionState = .executing
         assertionOutcome = .unavailable
         executionDurationMs = nil
+        executionStartedAt = Date()
+        executionElapsedSeconds = 0
+        didEmitResultMessage = false
 
         Task {
             let startTime = Date()
@@ -2595,6 +2623,7 @@ struct ToolRequestCodeBlockView: View {
                         executionState = .success
                         executionResult = result.output
                         executionDurationMs = durationMs
+                        executionStartedAt = nil
                         assertionOutcome = outcome
                         ToolRequestTracker.shared.markExecuted(
                             hash: contentHash,
@@ -2604,8 +2633,16 @@ struct ToolRequestCodeBlockView: View {
                         executionState = .failure
                         executionResult = result.output
                         executionDurationMs = durationMs
+                        executionStartedAt = nil
                         assertionOutcome = outcome
                     }
+                    emitToolTestResultMessageIfNeeded(
+                        parsed: parsed,
+                        success: result.success,
+                        output: result.output,
+                        durationMs: durationMs,
+                        assertion: outcome
+                    )
                 }
             } catch {
                 let durationMs = Int(Date().timeIntervalSince(startTime) * 1000)
@@ -2620,10 +2657,85 @@ struct ToolRequestCodeBlockView: View {
                     executionState = .failure
                     executionResult = errorOutput
                     executionDurationMs = durationMs
+                    executionStartedAt = nil
                     assertionOutcome = outcome
+                    emitToolTestResultMessageIfNeeded(
+                        parsed: parsed,
+                        success: false,
+                        output: errorOutput,
+                        durationMs: durationMs,
+                        assertion: outcome
+                    )
                 }
             }
         }
+    }
+
+    private func emitToolTestResultMessageIfNeeded(
+        parsed: ParsedToolRequestWithMetadata,
+        success: Bool,
+        output: String,
+        durationMs: Int,
+        assertion: ToolTestAssertionOutcome
+    ) {
+        guard !didEmitResultMessage else { return }
+        guard let metadata = parsed.toolTestMetadata else { return }
+        didEmitResultMessage = true
+
+        let effectiveConversationId = conversationId
+            ?? ConversationService.shared.currentConversation?.id
+            ?? "temp"
+
+        let statusLabel = success ? "SUCCESS" : "FAILURE"
+        let assertionLabel: String
+        switch assertion.status {
+        case .pass: assertionLabel = "PASS"
+        case .fail: assertionLabel = "FAIL"
+        case .unavailable: assertionLabel = "UNAVAILABLE"
+        }
+
+        var lines: [String] = []
+        lines.append("### ToolTest Case Result")
+        lines.append("- Run: `\(metadata.runId)`")
+        lines.append("- Case: `\(metadata.caseId)`")
+        lines.append("- Tool: `\(parsed.tool)`")
+        lines.append("- Execution: `\(statusLabel)`")
+        lines.append("- Assertions: `\(assertionLabel)`")
+        lines.append("- Duration: `\(durationMs)ms`")
+
+        if let sourceMessageId, !sourceMessageId.isEmpty {
+            lines.append("- Source Message: `\(sourceMessageId)`")
+        }
+
+        if !assertion.failureReasons.isEmpty {
+            lines.append("")
+            lines.append("**Failure Reasons**")
+            for reason in assertion.failureReasons {
+                lines.append("- \(reason)")
+            }
+        }
+
+        if !assertion.notes.isEmpty {
+            lines.append("")
+            lines.append("**Notes**")
+            for note in assertion.notes {
+                lines.append("- \(note)")
+            }
+        }
+
+        lines.append("")
+        lines.append("```tool_result")
+        lines.append(output)
+        lines.append("```")
+
+        let message = Message(
+            conversationId: effectiveConversationId,
+            role: .assistant,
+            content: lines.joined(separator: "\n"),
+            modelName: "ToolTest",
+            providerName: "internal"
+        )
+        ConversationService.shared.messages.append(message)
     }
 }
 
