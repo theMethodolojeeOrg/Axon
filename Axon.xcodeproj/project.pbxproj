@@ -121,7 +121,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				Resources/MLXModels,
 			);
 			target = E254ED952EB21B76000CDD9D /* Axon */;
 		};
@@ -150,7 +149,6 @@
 			);
 			explicitFolders = (
 				Resources/AxonTools,
-				"Resources/gemma-4-E2B-it-MLX",
 				Resources/KokoroTTS,
 				Resources/MLXModels,
 			);

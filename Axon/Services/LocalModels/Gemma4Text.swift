@@ -93,7 +93,9 @@ public struct Gemma4TextConfiguration: Codable, Sendable {
         kvHeads = try container.decodeIfPresent(Int.self, forKey: .kvHeads) ?? 1
         maxPositionEmbeddings = try container.decodeIfPresent(Int.self, forKey: .maxPositionEmbeddings) ?? 131072
         slidingWindow = try container.decodeIfPresent(Int.self, forKey: .slidingWindow) ?? 512
-        slidingWindowPattern = try container.decodeIfPresent(Int.self, forKey: .slidingWindowPattern) ?? 5
+        let decodedSlidingWindowPattern =
+            try container.decodeIfPresent(Int.self, forKey: .slidingWindowPattern) ?? 5
+        slidingWindowPattern = decodedSlidingWindowPattern
         finalLogitSoftcapping = try container.decodeIfPresent(Float.self, forKey: .finalLogitSoftcapping) ?? 30.0
         tieWordEmbeddings = try container.decodeIfPresent(Bool.self, forKey: .tieWordEmbeddings) ?? true
         ropeParameters = try container.decodeIfPresent(RopeParameters.self, forKey: .ropeParameters)
@@ -112,7 +114,7 @@ public struct Gemma4TextConfiguration: Codable, Sendable {
             layerTypes = types
         } else {
             layerTypes = (0..<hiddenLayers).map { i in
-                (i + 1) % slidingWindowPattern == 0 ? "full_attention" : "sliding_attention"
+                (i + 1) % decodedSlidingWindowPattern == 0 ? "full_attention" : "sliding_attention"
             }
         }
     }
@@ -186,6 +188,10 @@ private class Gemma4Attention: Module {
     @ModuleInfo(key: "k_norm") var keyNorm: Gemma.RMSNorm
 
     let rope: RoPE
+
+    required nonisolated override init() {
+        fatalError("init() has not been implemented")
+    }
 
     init(_ config: Gemma4TextConfiguration, layerIdx: Int) {
         let dim = config.hiddenSize
@@ -274,6 +280,10 @@ private class Gemma4MLP: Module {
     @ModuleInfo(key: "down_proj") var downProj: Linear
     @ModuleInfo(key: "up_proj") var upProj: Linear
 
+    required nonisolated override init() {
+        fatalError("init() has not been implemented")
+    }
+
     init(dimensions: Int, hiddenDimensions: Int) {
         self._gateProj.wrappedValue = Linear(dimensions, hiddenDimensions, bias: false)
         self._downProj.wrappedValue = Linear(hiddenDimensions, dimensions, bias: false)
@@ -293,6 +303,10 @@ private class Gemma4TransformerBlock: Module {
     @ModuleInfo var mlp: Gemma4MLP
     @ModuleInfo(key: "input_layernorm") var inputLayerNorm: Gemma.RMSNorm
     @ModuleInfo(key: "post_attention_layernorm") var postAttentionLayerNorm: Gemma.RMSNorm
+
+    required nonisolated override init() {
+        fatalError("init() has not been implemented")
+    }
 
     init(_ config: Gemma4TextConfiguration, layerIdx: Int) {
         self._selfAttention.wrappedValue = Gemma4Attention(config, layerIdx: layerIdx)
@@ -329,6 +343,10 @@ private class Gemma4Model: Module {
     @ModuleInfo var norm: Gemma.RMSNorm
 
     let config: Gemma4TextConfiguration
+
+    required nonisolated override init() {
+        fatalError("init() has not been implemented")
+    }
 
     init(_ config: Gemma4TextConfiguration) {
         self.config = config
@@ -402,11 +420,15 @@ private class Gemma4Model: Module {
 
 public class Gemma4TextModel: Module, LLMModel {
 
-    @ModuleInfo var model: Gemma4Model
+    @ModuleInfo private var model: Gemma4Model
     @ModuleInfo(key: "lm_head") var lmHead: Linear
 
     public let config: Gemma4TextConfiguration
     public var vocabularySize: Int { config.vocabularySize }
+
+    public required nonisolated override init() {
+        fatalError("init() has not been implemented")
+    }
 
     public init(_ config: Gemma4TextConfiguration) {
         self.config = config
@@ -434,6 +456,14 @@ public class Gemma4TextModel: Module, LLMModel {
         let unflattened = ModuleParameters.unflattened(weights)
         if let lm = unflattened["language_model"] {
             processedWeights = Dictionary(uniqueKeysWithValues: lm.flattened())
+        }
+
+        // GGUF-converted weights are stored transposed (input, output) vs MLX convention (output, input).
+        // Transpose all 2D .weight tensors to fix this.
+        for (key, tensor) in processedWeights {
+            if key.hasSuffix(".weight") && tensor.ndim == 2 {
+                processedWeights[key] = tensor.transposed()
+            }
         }
 
         // Truncate embedding/lm_head if vocab size is larger than expected

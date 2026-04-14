@@ -55,10 +55,11 @@ enum MLXModelError: LocalizedError {
 }
 
 /// Available local MLX models
-/// The default bundled models (Qwen3-VL and Gemma3 270M) are included in the app bundle.
+/// The default bundled models (Gemma4 E2B, Qwen3-VL, and Gemma3 270M) are included in the app bundle.
 /// Other models are downloaded on demand from Hugging Face.
 enum LocalMLXModel: String, CaseIterable {
     // Bundled in app - ready immediately
+    case gemma4_E2B = "google/gemma-4-E2B-it-MLX"
     case qwen3VL = "mlx-community/Qwen3-VL-2B-Instruct-4bit"
     case gemma3_270m = "lmstudio-community/gemma-3-270m-it-MLX-8bit"
 
@@ -69,18 +70,19 @@ enum LocalMLXModel: String, CaseIterable {
     case llama32 = "mlx-community/Llama-3.2-1B-Instruct-4bit"
 
     /// The recommended default model - bundled in app
-    static var defaultModel: LocalMLXModel { .gemma3_270m }
+    static var defaultModel: LocalMLXModel { .gemma4_E2B }
 
     /// Whether this model is bundled in the app (no download required)
     var isBundled: Bool {
         switch self {
-        case .qwen3VL, .gemma3_270m: return true
+        case .gemma4_E2B, .qwen3VL, .gemma3_270m: return true
         default: return false
         }
     }
 
     var displayName: String {
         switch self {
+        case .gemma4_E2B: return "Gemma 4 E2B"
         case .qwen3VL: return "Qwen3 VL 2B"
         case .gemma3_270m: return "Gemma3 270M"
         case .smolLM: return "SmolLM2 1.7B"
@@ -92,6 +94,7 @@ enum LocalMLXModel: String, CaseIterable {
 
     var description: String {
         switch self {
+        case .gemma4_E2B: return "Google's Gemma 4 model. Most capable bundled option. Bundled in app - ready instantly."
         case .qwen3VL: return "Vision-language model. Bundled in app - ready instantly."
         case .gemma3_270m: return "Google's ultra-compact model. Fastest option. Bundled in app - ready instantly."
         case .smolLM: return "HuggingFace's efficient small model. ~1GB download."
@@ -104,6 +107,7 @@ enum LocalMLXModel: String, CaseIterable {
     /// Context window size for this model
     var contextWindow: Int {
         switch self {
+        case .gemma4_E2B: return 8_192
         case .qwen3VL: return 8_192
         case .gemma3_270m: return 8_192
         case .smolLM: return 8_192
@@ -202,6 +206,15 @@ final class MLXModelService: ObservableObject {
     @Published var downloadingModel: String? = nil
 
     private init() {
+        // Register custom model types not yet in upstream mlx-swift-examples
+        #if canImport(MLX) && canImport(MLXLLM) && canImport(MLXLMCommon)
+        LLMTypeRegistry.shared.registerModelType("gemma4") { url in
+            let config = try JSONDecoder().decode(
+                Gemma4TextConfiguration.self, from: Data(contentsOf: url))
+            return Gemma4TextModel(config)
+        }
+        #endif
+
         // Scan for already downloaded models
         updateDownloadedModels()
 

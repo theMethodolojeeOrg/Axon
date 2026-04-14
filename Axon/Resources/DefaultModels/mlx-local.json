@@ -13,6 +13,17 @@
   },
   "models": [
     {
+      "id": "google/gemma-4-E2B-it-MLX",
+      "displayName": "Gemma 4 E2B",
+      "contextWindow": 8192,
+      "modalities": ["text"],
+      "description": "Google's Gemma 4 model. Most capable bundled option. Bundled in app - ready instantly. Private, offline, free.",
+      "sizeBytes": 5368709120,
+      "isBuiltIn": true,
+      "downloadURL": null,
+      "huggingFaceRepoId": "google/gemma-4-E2B-it-MLX"
+    },
+    {
       "id": "lmstudio-community/gemma-3-270m-it-MLX-8bit",
       "displayName": "Gemma3 270M",
       "contextWindow": 8192,
