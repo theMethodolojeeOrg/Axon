@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "axon_get_state",
+    "name": "Get Axon State",
+    "description": "Read current Axon app-control state snapshot.",
+    "category": "system",
+    "icon": { "sfSymbol": "list.bullet.rectangle" },
+    "requiresApproval": false,
+    "tags": ["axon", "state", "bridge", "tools"]
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "axon_control"
+  },
+  "ai": {
+    "systemPromptSection": "### axon_get_state\nRead current Axon native control state.\n\n**Format:**\n```tool_request\n{\"tool\":\"axon_get_state\",\"query\":\"{}\"}\n```",
+    "usageExamples": [
+      { "description": "Fetch current state", "input": "{}" }
+    ],
+    "whenToUse": [
+      "Need current view/bridge/tools status before invoking actions."
+    ],
+    "whenNotToUse": [
+      "State is already known from immediate previous action result."
+    ]
+  },
+  "sovereignty": {
+    "actionCategory": "system_query",
+    "approvalDescription": "Query Axon state",
+    "scopes": ["axon.state.read"],
+    "riskLevel": "low"
+  }
+}

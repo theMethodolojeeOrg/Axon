@@ -16,6 +16,21 @@ enum MainView {
     case create     // Creative gallery for generated media and artifacts
 }
 
+extension MainView {
+    var agentViewRef: String {
+        switch self {
+        case .chat:
+            return "chat"
+        case .cognition:
+            return "cognition"
+        case .settings:
+            return "settings"
+        case .create:
+            return "create"
+        }
+    }
+}
+
 struct AppContainerView: View {
     @StateObject private var conversationService = ConversationService.shared
     @StateObject private var authService = AuthenticationService.shared
@@ -100,6 +115,12 @@ struct AppContainerView: View {
         .onAppear {
             // Ensure launch overlay is visible on first appearance
             showLaunchScreen = true
+            publishAgentActionUIState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .axonUIActionRequest)) { notification in
+            Task { @MainActor in
+                await handleAgentActionRequest(notification)
+            }
         }
         .task {
             // Eagerly load V2 tools at app startup so they're available immediately
@@ -377,6 +398,7 @@ struct AppContainerView: View {
 
         currentView = .chat
         showSidebar = false
+        publishAgentActionUIState()
     }
 
     private func selectConversation(_ conversation: Conversation) {
@@ -407,6 +429,7 @@ struct AppContainerView: View {
 
         // Update temporal context with the new conversation
         TemporalContextService.shared.setCurrentConversation(conversation.id)
+        publishAgentActionUIState()
     }
 
     private func navigateToView(_ view: MainView) {
@@ -418,6 +441,78 @@ struct AppContainerView: View {
 
         currentView = view
         showSidebar = false
+        publishAgentActionUIState()
+    }
+
+    private func publishAgentActionUIState() {
+        AgentActionRegistry.shared.updateUIState(
+            currentView: currentView.agentViewRef,
+            selectedConversation: selectedConversation
+        )
+    }
+
+    private func handleAgentActionRequest(_ notification: Notification) async {
+        guard let request = notification.userInfo?["request"] as? AgentActionUIRequest else {
+            return
+        }
+
+        let result = await processAgentActionRequest(request)
+        AgentActionRegistry.shared.completeUIRequest(requestId: request.requestId, result: result)
+    }
+
+    private func processAgentActionRequest(_ request: AgentActionUIRequest) async -> AgentActionResult {
+        switch request.actionId {
+        case "open_chat":
+            navigateToView(.chat)
+            return .success("Opened chat view")
+
+        case "open_cognition":
+            navigateToView(.cognition)
+            return .success("Opened cognition view")
+
+        case "open_settings":
+            navigateToView(.settings)
+            return .success("Opened settings view")
+
+        case "open_create":
+            navigateToView(.create)
+            return .success("Opened create view")
+
+        case "new_chat":
+            startNewChat()
+            return .success(
+                "Started new chat",
+                data: selectedConversation.map {
+                    ["conversation_id": .string($0.id)]
+                }
+            )
+
+        case "select_conversation":
+            guard let conversationId = request.params["conversation_id"]?.stringValue else {
+                return .failure("Missing required parameter: conversation_id", code: "invalid_params")
+            }
+
+            if let conversation = conversationService.conversations.first(where: { $0.id == conversationId }) {
+                selectConversation(conversation)
+                return .success("Selected conversation \(conversationId)")
+            }
+
+            do {
+                try await conversationService.listConversations(limit: 200, offset: 0)
+            } catch {
+                return .failure("Failed to refresh conversations: \(error.localizedDescription)", code: "refresh_failed")
+            }
+
+            guard let refreshed = conversationService.conversations.first(where: { $0.id == conversationId }) else {
+                return .failure("Conversation not found: \(conversationId)", code: "not_found")
+            }
+
+            selectConversation(refreshed)
+            return .success("Selected conversation \(conversationId)")
+
+        default:
+            return .failure("Unsupported UI action: \(request.actionId)", code: "unsupported_ui_action")
+        }
     }
 
 

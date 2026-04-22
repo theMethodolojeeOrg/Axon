@@ -665,6 +665,32 @@ struct WorkspaceFolder: Codable {
     let path: String
 }
 
+// MARK: - Axon Native Control Types
+
+struct AxonDiscoverActionsParams: Codable {
+    let filter: String?
+    let platform: String?
+    let view: String?
+}
+
+struct AxonDiscoverActionsResult: Codable {
+    let actions: [AgentActionDescriptor]
+}
+
+struct AxonInvokeActionParams: Codable {
+    let id: String
+    let params: [String: AnyCodable]?
+    let context: AgentActionContext?
+}
+
+struct AxonInvokeActionResult: Codable {
+    let result: AgentActionResult
+}
+
+struct AxonGetStateResult: Codable {
+    let state: AgentActionStateSnapshot
+}
+
 // MARK: - Pending Request Tracking
 
 /// Tracks an outgoing request waiting for a response
@@ -773,6 +799,11 @@ enum BridgeMethod: String, CaseIterable {
     case networkPing = "network/ping"
     case shellExecute = "shell/execute"
 
+    // Axon native action control
+    case axonDiscoverActions = "axon/discoverActions"
+    case axonInvokeAction = "axon/invokeAction"
+    case axonGetState = "axon/getState"
+
     /// Whether this method requires user approval
     var requiresApproval: Bool {
         switch self {
@@ -801,7 +832,10 @@ enum BridgeMethod: String, CaseIterable {
              .appList,
              .screenshot,
              .networkInfo,
-             .networkPing:
+             .networkPing,
+             .axonDiscoverActions,
+             .axonInvokeAction,
+             .axonGetState:
             return false
         }
     }
@@ -817,7 +851,8 @@ enum BridgeMethod: String, CaseIterable {
              .clipboardRead, .clipboardWrite, .notificationSend,
              .spotlightSearch, .fileFind, .fileMetadata,
              .appList, .appLaunch, .screenshot,
-             .networkInfo, .networkPing, .shellExecute:
+             .networkInfo, .networkPing, .shellExecute,
+             .axonDiscoverActions, .axonInvokeAction, .axonGetState:
             return false
         }
     }
@@ -882,6 +917,12 @@ enum BridgeMethod: String, CaseIterable {
             return "Ping a host"
         case .shellExecute:
             return "Execute a shell command"
+        case .axonDiscoverActions:
+            return "Discover Axon native control actions"
+        case .axonInvokeAction:
+            return "Invoke an Axon native control action"
+        case .axonGetState:
+            return "Get Axon native app state"
         }
     }
 

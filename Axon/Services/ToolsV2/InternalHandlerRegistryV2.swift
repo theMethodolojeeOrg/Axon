@@ -113,6 +113,7 @@ final class InternalHandlerRegistryV2: ObservableObject {
         registerHandler(DiscoveryHandler())
         registerHandler(DevicePresenceHandler())
         registerHandler(BridgeHandler())
+        registerHandler(AxonControlHandler())
 
         // Research & Discovery handlers
         registerHandler(CollapseEngineHandler())

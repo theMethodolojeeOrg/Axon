@@ -13,6 +13,7 @@
 		E217D4352EEA4BFF00D3DAB2 /* CryptoTokenKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D4342EEA4BFF00D3DAB2 /* CryptoTokenKit.framework */; };
 		E217D7B62EEDDD5C00D3DAB2 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D7B52EEDDD5C00D3DAB2 /* CoreLocation.framework */; };
 		E22498CA2ED5D1880053D459 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = E22498C92ED5D1880053D459 /* MarkdownUI */; };
+		E231DA642F98D51400E46904 /* DevPathKit in Frameworks */ = {isa = PBXBuildFile; productRef = E231DA632F98D51400E46904 /* DevPathKit */; };
 		E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9A2EB23493009B116D /* FirebaseAuth */; };
 		E23FFF9D2EB23493009B116D /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9C2EB23493009B116D /* FirebaseCore */; };
 		E23FFF9F2EB23493009B116D /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9E2EB23493009B116D /* FirebaseFirestore */; };
@@ -211,6 +212,7 @@
 				E273631A2EBD237F0031CFF7 /* FlyingFox in Frameworks */,
 				E23FFF9F2EB23493009B116D /* FirebaseFirestore in Frameworks */,
 				E23FFFA52EB23493009B116D /* FirebaseStorage in Frameworks */,
+				E231DA642F98D51400E46904 /* DevPathKit in Frameworks */,
 				E2403B032F03725C00CC9418 /* MLXLinalg in Frameworks */,
 				E254EDDC2EB222B3000CDD9D /* FirebaseAnalytics in Frameworks */,
 				E2E5FD802EFF401E00E4835C /* KokoroSwift in Frameworks */,
@@ -342,6 +344,7 @@
 				E2D7BD0A2F45A4E100A9FB38 /* Yams */,
 				E2C1DD8C2F4D0EA200DD6080 /* AxonArtifacts */,
 				E2118D6A2F5989BE0068E2C5 /* AxonArtifacts */,
+				E231DA632F98D51400E46904 /* DevPathKit */,
 			);
 			productName = Axon;
 			productReference = E254ED962EB21B76000CDD9D /* Axon.app */;
@@ -458,6 +461,7 @@
 				E2403B112F03739200CC9418 /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */,
 				E2D7BD092F45A4E100A9FB38 /* XCRemoteSwiftPackageReference "Yams" */,
 				E2118D692F5989BE0068E2C5 /* XCRemoteSwiftPackageReference "Axon-Artifacts" */,
+				E231DA622F98D51400E46904 /* XCLocalSwiftPackageReference "../DevPathKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E254ED972EB21B76000CDD9D /* Products */;
@@ -1019,6 +1023,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		E231DA622F98D51400E46904 /* XCLocalSwiftPackageReference "../DevPathKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../DevPathKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		E2118D692F5989BE0068E2C5 /* XCRemoteSwiftPackageReference "Axon-Artifacts" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -1120,6 +1131,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E22498C82ED5D1880053D459 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
 			productName = MarkdownUI;
+		};
+		E231DA632F98D51400E46904 /* DevPathKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DevPathKit;
 		};
 		E23FFF9A2EB23493009B116D /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;

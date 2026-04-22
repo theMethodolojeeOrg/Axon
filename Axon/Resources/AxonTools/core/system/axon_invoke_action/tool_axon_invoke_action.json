@@ -1,0 +1,49 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "axon_invoke_action",
+    "name": "Invoke Axon Action",
+    "description": "Invoke a curated Axon-native control action by ID.",
+    "category": "system",
+    "icon": { "sfSymbol": "play.circle" },
+    "requiresApproval": false,
+    "tags": ["axon", "actions", "invoke", "native-control"]
+  },
+  "parameters": {
+    "action_id": {
+      "type": "string",
+      "required": true,
+      "description": "Action ID to invoke (e.g. open_chat, send_message)."
+    },
+    "params": {
+      "type": "object",
+      "required": false,
+      "description": "Optional action-specific parameters."
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "axon_control"
+  },
+  "ai": {
+    "systemPromptSection": "### axon_invoke_action\nInvoke a curated Axon-native action.\n\n**Format:**\n```tool_request\n{\"tool\":\"axon_invoke_action\",\"query\":\"{\\\"action_id\\\":\\\"open_chat\\\",\\\"params\\\":{}}\"}\n```\n\nUse `axon_discover_actions` first when action IDs are unknown.",
+    "usageExamples": [
+      { "description": "Open chat view", "input": "{\"action_id\":\"open_chat\"}" },
+      { "description": "Send a message", "input": "{\"action_id\":\"send_message\",\"params\":{\"message\":\"Summarize this thread\"}}" }
+    ],
+    "whenToUse": [
+      "Need semantic control over native Axon surfaces.",
+      "Need deterministic non-pixel actions."
+    ],
+    "whenNotToUse": [
+      "Action ID is speculative or unvalidated."
+    ]
+  },
+  "sovereignty": {
+    "actionCategory": "system_execute",
+    "approvalDescription": "Invoke Axon-native action",
+    "scopes": ["axon.actions.invoke"],
+    "riskLevel": "medium"
+  }
+}

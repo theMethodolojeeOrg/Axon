@@ -590,6 +590,15 @@ class BridgeServer: ObservableObject {
         case .chatGetMessages:
             await handleChatGetMessages(request, on: connection)
 
+        case .axonDiscoverActions:
+            await handleAxonDiscoverActions(request, on: connection)
+
+        case .axonInvokeAction:
+            await handleAxonInvokeAction(request, on: connection)
+
+        case .axonGetState:
+            await handleAxonGetState(request, on: connection)
+
         // Mac System operations (iOS → Mac remote control)
         case .systemInfo:
             await handleSystemInfo(request, on: connection)
@@ -762,6 +771,84 @@ class BridgeServer: ObservableObject {
             sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
         } catch {
             let bridgeError = BridgeError(code: .internalError, message: "Failed to get messages: \(error.localizedDescription)")
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleAxonDiscoverActions(_ request: BridgeRequest, on connection: NWConnection) async {
+        do {
+            var filter: String?
+            var platform: String?
+            var view: String?
+
+            if let paramsAny = request.params {
+                let paramsData = try JSONEncoder().encode(paramsAny)
+                let decoded = try JSONDecoder().decode(AxonDiscoverActionsParams.self, from: paramsData)
+                filter = decoded.filter
+                platform = decoded.platform
+                view = decoded.view
+            }
+
+            let actions = AgentActionRegistry.shared.discoverActions(
+                filter: filter,
+                platform: platform,
+                view: view
+            )
+            let result = AxonDiscoverActionsResult(actions: actions)
+            let data = try JSONEncoder().encode(result)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(
+                code: .internalError,
+                message: "Failed to discover Axon actions: \(error.localizedDescription)"
+            )
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleAxonInvokeAction(_ request: BridgeRequest, on connection: NWConnection) async {
+        guard let paramsAny = request.params else {
+            let err = BridgeError(code: .invalidParams, message: "Missing params")
+            sendResponse(BridgeResponse.failure(id: request.id, error: err), on: connection)
+            return
+        }
+
+        do {
+            let paramsData = try JSONEncoder().encode(paramsAny)
+            let decoded = try JSONDecoder().decode(AxonInvokeActionParams.self, from: paramsData)
+
+            let result = await AgentActionRegistry.shared.invokeAction(
+                id: decoded.id,
+                params: decoded.params ?? [:],
+                context: decoded.context ?? AgentActionContext(source: "bridge")
+            )
+
+            let payload = AxonInvokeActionResult(result: result)
+            let data = try JSONEncoder().encode(payload)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(
+                code: .internalError,
+                message: "Failed to invoke Axon action: \(error.localizedDescription)"
+            )
+            sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
+        }
+    }
+
+    private func handleAxonGetState(_ request: BridgeRequest, on connection: NWConnection) async {
+        do {
+            let state = await AgentActionRegistry.shared.getState()
+            let payload = AxonGetStateResult(state: state)
+            let data = try JSONEncoder().encode(payload)
+            let any = try JSONDecoder().decode(AnyCodable.self, from: data)
+            sendResponse(BridgeResponse.success(id: request.id, result: any), on: connection)
+        } catch {
+            let bridgeError = BridgeError(
+                code: .internalError,
+                message: "Failed to query Axon state: \(error.localizedDescription)"
+            )
             sendResponse(BridgeResponse.failure(id: request.id, error: bridgeError), on: connection)
         }
     }

@@ -1,0 +1,54 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "axon_discover_actions",
+    "name": "Discover Axon Actions",
+    "description": "Discover curated native Axon control actions.",
+    "category": "discovery",
+    "icon": { "sfSymbol": "cursorarrow.click.2" },
+    "requiresApproval": false,
+    "tags": ["axon", "actions", "discovery", "native-control"]
+  },
+  "parameters": {
+    "filter": {
+      "type": "string",
+      "required": false,
+      "description": "Optional text filter for action IDs/tags."
+    },
+    "platform": {
+      "type": "string",
+      "required": false,
+      "description": "Optional platform filter (ios or macos)."
+    },
+    "view": {
+      "type": "string",
+      "required": false,
+      "description": "Optional view/handle filter."
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "axon_control"
+  },
+  "ai": {
+    "systemPromptSection": "### axon_discover_actions\nDiscover curated Axon-native control actions.\n\n**Format:**\n```tool_request\n{\"tool\":\"axon_discover_actions\",\"query\":\"{\\\"filter\\\":\\\"chat\\\"}\"}\n```\n\nOptional fields: `filter`, `platform`, `view`.",
+    "usageExamples": [
+      { "description": "List all actions", "input": "{}" },
+      { "description": "Filter to chat actions", "input": "{\"filter\":\"chat\"}" }
+    ],
+    "whenToUse": [
+      "Need to discover what Axon-native actions are available before invoking.",
+      "Need contract-safe action IDs."
+    ],
+    "whenNotToUse": [
+      "Action ID already known and validated."
+    ]
+  },
+  "sovereignty": {
+    "actionCategory": "tool_discovery",
+    "approvalDescription": "Discover Axon-native actions",
+    "scopes": ["axon.actions.read"],
+    "riskLevel": "low"
+  }
+}
