@@ -5,7 +5,7 @@ import XCTest
 final class AgentActionRegistryTests: XCTestCase {
 
     func testDiscoverActionsIncludesCoreSet() {
-        let registry = AgentActionRegistry(notificationCenter: NotificationCenter())
+        let registry = AgentActionRegistry.shared
         let actions = registry.discoverActions()
         let ids = Set(actions.map(\.id))
 
@@ -16,7 +16,7 @@ final class AgentActionRegistryTests: XCTestCase {
     }
 
     func testDiscoverActionsFiltersByView() {
-        let registry = AgentActionRegistry(notificationCenter: NotificationCenter())
+        let registry = AgentActionRegistry.shared
         let actions = registry.discoverActions(view: "settings")
 
         XCTAssertFalse(actions.isEmpty)
@@ -24,13 +24,13 @@ final class AgentActionRegistryTests: XCTestCase {
     }
 
     func testDiscoverActionsUnknownPlatformReturnsEmpty() {
-        let registry = AgentActionRegistry(notificationCenter: NotificationCenter())
+        let registry = AgentActionRegistry.shared
         let actions = registry.discoverActions(platform: "linux")
         XCTAssertTrue(actions.isEmpty)
     }
 
     func testRiskMetadataMarksSensitiveActions() {
-        let registry = AgentActionRegistry(notificationCenter: NotificationCenter())
+        let registry = AgentActionRegistry.shared
         let actions = registry.discoverActions()
 
         guard let send = actions.first(where: { $0.id == "send_message" }) else {
@@ -47,7 +47,7 @@ final class AgentActionRegistryTests: XCTestCase {
     }
 
     func testInvokeUnknownActionFailsDeterministically() async {
-        let registry = AgentActionRegistry(notificationCenter: NotificationCenter())
+        let registry = AgentActionRegistry.shared
         let result = await registry.invokeAction(id: "not_real_action")
 
         XCTAssertFalse(result.success)

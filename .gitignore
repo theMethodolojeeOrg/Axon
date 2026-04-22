@@ -730,14 +730,13 @@ Axon/Config/PublicConfig.local.plist
 !Axon/ViewModels/SettingsViewModels/APIKeysSettingsViewModel.swift
 
 Axon/Resources/BundleResources/Testing/Out of Flux - finallyfree.mp3
-.gitignore
-.gitignore
 Axon/Resources/BundleResources/Testing/TestImage.png
 Axon/Resources/BundleResources/Testing/TestVideo.mp4
 Axon/Resources/BundleResources/Testing/Speech-to-Text-n-Audio-Understanding-Test-Audio.mp3
-Axon/Resources/gemma-4-E2B-it-MLX/model.safetensors
-Axon/Resources/gemma-4-E2B-it-MLX/tokenizer_config.json
-Axon/Resources/gemma-4-E2B-it-MLX/tokenizer.json
-Axon/Resources/gemma-4-E2B-it-MLX/config.json
-Axon/Resources/gemma-4-E2B-it-MLX/generation_config.json
-Axon/Resources/gemma-4-E2B-it-MLX/README.md
+Axon/Resources/MLXModels/google_gemma-4-E2B-it-MLX/model.safetensors
+Axon/Resources/MLXModels/google_gemma-4-E2B-it-MLX/tokenizer_config.json
+Axon/Resources/MLXModels/google_gemma-4-E2B-it-MLX/tokenizer.json
+Axon/Resources/MLXModels/google_gemma-4-E2B-it-MLX/config.json
+Axon/Resources/MLXModels/google_gemma-4-E2B-it-MLX/generation_config.json
+Axon/Resources/MLXModels/google_gemma-4-E2B-it-MLX/special_tokens_map.json
+Axon/Resources/MLXModels/google_gemma-4-E2B-it-MLX/README.md
