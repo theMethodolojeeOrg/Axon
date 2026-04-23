@@ -16,6 +16,7 @@ enum SubAgentRole: String, Codable, CaseIterable, Identifiable, Sendable {
     case scout      // Lightweight reconnaissance, read-only, fast/cheap models
     case mechanic   // Focused execution, read+write, balanced models
     case designer   // Meta-reasoning, task decomposition, capable models
+    case namer      // Internal read-only titling agent with strict output format
 
     var id: String { rawValue }
 
@@ -26,6 +27,7 @@ enum SubAgentRole: String, Codable, CaseIterable, Identifiable, Sendable {
         case .scout: return "Scout"
         case .mechanic: return "Mechanic"
         case .designer: return "Designer"
+        case .namer: return "Namer"
         }
     }
 
@@ -34,6 +36,7 @@ enum SubAgentRole: String, Codable, CaseIterable, Identifiable, Sendable {
         case .scout: return "binoculars"
         case .mechanic: return "wrench.and.screwdriver"
         case .designer: return "square.and.pencil"
+        case .namer: return "textformat.abc"
         }
     }
 
@@ -45,6 +48,8 @@ enum SubAgentRole: String, Codable, CaseIterable, Identifiable, Sendable {
             return "Focused execution agent. Carries out specific tasks with precision based on inherited context."
         case .designer:
             return "Meta-level reasoning agent. Analyzes tasks, decomposes problems, and recommends agent assignments."
+        case .namer:
+            return "Internal title agent. Generates concise conversation titles with strict one-line output."
         }
     }
 
@@ -82,6 +87,15 @@ enum SubAgentRole: String, Codable, CaseIterable, Identifiable, Sendable {
                 maxTokenBudget: 16_000,
                 maxDurationSeconds: 120
             )
+        case .namer:
+            return SubAgentPermissions(
+                canRead: true,
+                canWrite: false,
+                allowedTools: [],
+                memoryScope: .none,
+                maxTokenBudget: 1_000,
+                maxDurationSeconds: 30
+            )
         }
     }
 
@@ -96,6 +110,8 @@ enum SubAgentRole: String, Codable, CaseIterable, Identifiable, Sendable {
             return [.balanced, .capable]  // Sonnet, GPT-4o, Gemini Pro
         case .designer:
             return [.capable, .flagship]  // Opus, o3, Gemini-3-Pro
+        case .namer:
+            return [.fast, .cheap]
         }
     }
 
@@ -170,6 +186,18 @@ enum SubAgentRole: String, Codable, CaseIterable, Identifiable, Sendable {
             **Important:** You CANNOT spawn agents directly.
             Add spawn recommendations to your AGENT ASSIGNMENTS section.
             Axon will review and authorize each spawn individually.
+            """
+        case .namer:
+            return """
+            ## Sub-Agent Role: Namer
+            You generate concise conversation titles.
+
+            **Constraints:**
+            - READ-ONLY
+            - Return exactly one line
+            - Required format: TITLE: <3-6 word title>
+            - No markdown, bullets, numbering, quotes, or extra commentary
+            - Avoid greetings or generic filler titles
             """
         }
     }

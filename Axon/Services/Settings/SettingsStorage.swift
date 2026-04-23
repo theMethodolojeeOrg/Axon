@@ -17,6 +17,7 @@ class SettingsStorage {
 
     // Additional keys for conversation management
     private let displayNameOverridesKey = "conversation.displayNameOverrides"
+    private let generatedTitleOverridesKey = "conversation.generatedTitleOverrides"
     private let archivedConversationsKey = "conversation.archived"
     private let pinnedConversationsKey = "conversation.pinned"
 
@@ -103,6 +104,51 @@ class SettingsStorage {
         return map[conversationId]
     }
 
+    /// Whether a manual display name override exists.
+    func hasManualDisplayName(for conversationId: String) -> Bool {
+        displayName(for: conversationId) != nil
+    }
+
+    // MARK: - Conversation Generated Title Overrides
+
+    /// Stores a generated (auto) title separately from manual display name overrides.
+    func setGeneratedTitle(_ title: String?, for conversationId: String) {
+        var map = (try? loadGeneratedTitleOverrides()) ?? [:]
+        if let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            map[conversationId] = title
+        } else {
+            map.removeValue(forKey: conversationId)
+        }
+        saveGeneratedTitleOverrides(map)
+    }
+
+    /// Returns the generated (auto) title if present.
+    func generatedTitle(for conversationId: String) -> String? {
+        let map = (try? loadGeneratedTitleOverrides()) ?? [:]
+        return map[conversationId]
+    }
+
+    /// Effective title resolution:
+    /// 1) manual display-name override
+    /// 2) generated title
+    /// 3) persisted Conversation.title fallback
+    func resolvedConversationTitle(
+        conversationId: String,
+        persistedTitle: String
+    ) -> String {
+        if let manual = displayName(for: conversationId),
+           !manual.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return manual
+        }
+
+        if let generated = generatedTitle(for: conversationId),
+           !generated.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return generated
+        }
+
+        return persistedTitle
+    }
+
     private func loadDisplayNameOverrides() throws -> [String: String] {
         guard let data = defaults.data(forKey: displayNameOverridesKey) else { return [:] }
         return try JSONDecoder().decode([String: String].self, from: data)
@@ -111,6 +157,17 @@ class SettingsStorage {
     private func saveDisplayNameOverrides(_ map: [String: String]) {
         if let data = try? JSONEncoder().encode(map) {
             defaults.set(data, forKey: displayNameOverridesKey)
+        }
+    }
+
+    private func loadGeneratedTitleOverrides() throws -> [String: String] {
+        guard let data = defaults.data(forKey: generatedTitleOverridesKey) else { return [:] }
+        return try JSONDecoder().decode([String: String].self, from: data)
+    }
+
+    private func saveGeneratedTitleOverrides(_ map: [String: String]) {
+        if let data = try? JSONEncoder().encode(map) {
+            defaults.set(data, forKey: generatedTitleOverridesKey)
         }
     }
 
@@ -246,6 +303,7 @@ class SettingsStorage {
 
     func clearSettings() {
         defaults.removeObject(forKey: displayNameOverridesKey)
+        defaults.removeObject(forKey: generatedTitleOverridesKey)
         defaults.removeObject(forKey: archivedConversationsKey)
         defaults.removeObject(forKey: settingsKey)
         defaults.removeObject(forKey: corruptBackupKey)

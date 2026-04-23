@@ -31,7 +31,7 @@ struct ArchivedConversationsSettingsView: View {
                                     .frame(width: 28)
 
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(storage.displayName(for: entry.id) ?? conversationTitle(for: entry.id) ?? entry.id)
+                                    Text(resolvedTitle(for: entry.id))
                                         .font(AppTypography.bodyMedium(.medium))
                                         .foregroundColor(AppColors.textPrimary)
 
@@ -56,6 +56,7 @@ struct ArchivedConversationsSettingsView: View {
                                             }
                                             storage.unarchiveConversation(id: entry.id)
                                             storage.setDisplayName(nil, for: entry.id)
+                                            storage.setGeneratedTitle(nil, for: entry.id)
                                             reload()
                                         }
                                     } label: {
@@ -141,6 +142,22 @@ struct ArchivedConversationsSettingsView: View {
             return conv.title
         }
         return nil
+    }
+
+    private func resolvedTitle(for id: String) -> String {
+        if let persisted = conversationTitle(for: id) {
+            return storage.resolvedConversationTitle(conversationId: id, persistedTitle: persisted)
+        }
+
+        if let manual = storage.displayName(for: id) {
+            return manual
+        }
+
+        if let generated = storage.generatedTitle(for: id) {
+            return generated
+        }
+
+        return id
     }
 }
 

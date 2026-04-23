@@ -184,6 +184,7 @@ extension AgentOrchestratorService {
         case .scout: taskType = .webResearch
         case .mechanic: taskType = .codeExecution
         case .designer: taskType = .taskDecomposition
+        case .namer: taskType = .conversationTitling
         }
 
         // Check affinities

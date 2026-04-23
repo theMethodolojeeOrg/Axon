@@ -154,15 +154,6 @@ struct AppContainerView: View {
                 presenter: artifactPresenter
             )
             .toolbar {
-                ToolbarItem(placement: .navigation) {
-                    Button {
-                        // Standard macOS sidebar toggle in the toolbar.
-                        NSApp.keyWindow?.firstResponder?.tryToPerform(#selector(NSSplitViewController.toggleSidebar(_:)), with: nil)
-                    } label: {
-                        Image(systemName: "sidebar.left")
-                    }
-                }
-
                 if currentView == .chat {
                     ToolbarItem {
                         Button(action: startNewChat) {
@@ -374,7 +365,10 @@ struct AppContainerView: View {
         switch currentView {
         case .chat:
             if let conv = selectedConversation {
-                return SettingsStorage.shared.displayName(for: conv.id) ?? conv.title
+                return SettingsStorage.shared.resolvedConversationTitle(
+                    conversationId: conv.id,
+                    persistedTitle: conv.title
+                )
             }
             return "New Chat"
         case .cognition:
@@ -392,10 +386,14 @@ struct AppContainerView: View {
         if let previousConversation = selectedConversation,
            !conversationService.messages.isEmpty {
             Task {
+                let conversationTitle = SettingsStorage.shared.resolvedConversationTitle(
+                    conversationId: previousConversation.id,
+                    persistedTitle: previousConversation.title
+                )
                 await ConversationSummaryService.shared.generateSummary(
                     messages: conversationService.messages,
                     conversationId: previousConversation.id,
-                    conversationTitle: previousConversation.title
+                    conversationTitle: conversationTitle
                 )
             }
         }
@@ -427,10 +425,14 @@ struct AppContainerView: View {
         if let previousConversation = selectedConversation,
            !conversationService.messages.isEmpty {
             Task {
+                let conversationTitle = SettingsStorage.shared.resolvedConversationTitle(
+                    conversationId: previousConversation.id,
+                    persistedTitle: previousConversation.title
+                )
                 await ConversationSummaryService.shared.generateSummary(
                     messages: conversationService.messages,
                     conversationId: previousConversation.id,
-                    conversationTitle: previousConversation.title
+                    conversationTitle: conversationTitle
                 )
             }
         }
@@ -673,10 +675,10 @@ struct ChatContainerView: View {
                     welcomeView
                 }
                 #if os(macOS)
+                composerOrSoloToolbar
                 if terminalController.isDrawerOpen {
                     TerminalDrawerView(controller: terminalController)
                 }
-                composerOrSoloToolbar
                 #endif
             }
             .overlay(alignment: .top) {
@@ -720,10 +722,10 @@ struct ChatContainerView: View {
             .animation(AppAnimations.standardEasing, value: mlxService.isLoading)
             #if os(iOS)
             .safeAreaInset(edge: .bottom, spacing: 0) {
+                composerOrSoloToolbar
                 if terminalController.isDrawerOpen {
                     TerminalDrawerView(controller: terminalController)
                 }
-                composerOrSoloToolbar
             }
             #endif
             #if os(macOS)
@@ -1286,6 +1288,10 @@ struct ChatContainerView: View {
     private func loadMessages(for conversation: Conversation) async {
         do {
             _ = try await conversationService.getMessages(conversationId: conversation.id)
+            ConversationTitleMaintenanceService.shared.scheduleCatchUpAfterMessagesLoad(
+                conversation: conversation,
+                messages: conversationService.messages
+            )
         } catch {
             print("Error loading messages: \(error.localizedDescription)")
         }
@@ -2043,7 +2049,7 @@ struct ChatContainerView: View {
             }
 
             await MainActor.run {
-                finalizeStreamingMessage(
+                _ = finalizeStreamingMessage(
                     assistantId: assistantId,
                     conversationId: conversationId,
                     content: providerGuidance,
@@ -2068,7 +2074,7 @@ struct ChatContainerView: View {
 
         // Finalize the message
         await MainActor.run {
-            finalizeStreamingMessage(
+            let finalizedAssistant = finalizeStreamingMessage(
                 assistantId: assistantId,
                 conversationId: conversationId,
                 content: finalContent,
@@ -2082,6 +2088,13 @@ struct ChatContainerView: View {
             )
             if shouldConsumeTurnLease {
                 ConversationRuntimeOverrideManager.shared.consumeTurnLeaseOnSuccessfulReply(conversationId: conversationId)
+                if let finalizedAssistant {
+                    conversationService.schedulePostReplyTitling(
+                        conversationId: conversationId,
+                        userMessage: userMessage,
+                        assistantMessage: finalizedAssistant
+                    )
+                }
             }
             // Clear first-message flag after streaming completes
             isFirstMessageSending = false
@@ -2100,9 +2113,10 @@ struct ChatContainerView: View {
         modelName: String,
         providerName: String?,
         triggerSubconsciousLogging: Bool = false
-    ) {
+    ) -> Message? {
         // Retrieve context debug info from state
         let contextDebugInfo = contextDebugInfos[assistantId]
+        var finalizedMessage: Message?
 
         // Update the placeholder message with final content
         if let index = conversationService.messages.firstIndex(where: { $0.id == assistantId }) {
@@ -2121,6 +2135,7 @@ struct ChatContainerView: View {
                 liveToolCalls: toolCalls.isEmpty ? nil : toolCalls
             )
             conversationService.messages[index] = finalMessage
+            finalizedMessage = finalMessage
 
             // Save assistant message to Core Data
             // This is critical for message persistence when using streaming
@@ -2157,6 +2172,7 @@ struct ChatContainerView: View {
 
         // Clean up streaming state
         cleanupStreamingState()
+        return finalizedMessage
     }
 
     /// Clean up streaming state after completion or error

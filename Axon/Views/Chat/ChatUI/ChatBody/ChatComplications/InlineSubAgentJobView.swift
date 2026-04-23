@@ -213,6 +213,7 @@ struct InlineSubAgentJobView: View {
         case .scout: return AppColors.signalMercury  // Standard mercury
         case .mechanic: return AppColors.signalLichen.opacity(0.8)  // Greenish tint
         case .designer: return Color.purple.opacity(0.7)  // Purple tint
+        case .namer: return Color.orange.opacity(0.8)  // Amber tint for internal naming jobs
         }
     }
 
@@ -368,6 +369,18 @@ struct AnimatedRoleIcon: View {
                     .onAppear {
                         withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
                             offset = -2
+                        }
+                    }
+
+            case .namer:
+                // Type pulse
+                Image(systemName: "textformat.abc")
+                    .font(.system(size: 14))
+                    .foregroundColor(color)
+                    .opacity(offset == 0 ? 1 : 0.6)
+                    .onAppear {
+                        withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                            offset = 1
                         }
                     }
             }

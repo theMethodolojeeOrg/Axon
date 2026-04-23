@@ -191,6 +191,7 @@ struct SubAgentLockScreenView: View {
         case .scout: return .cyan
         case .mechanic: return .green
         case .designer: return .purple
+        case .namer: return .orange
         }
     }
 
@@ -223,6 +224,7 @@ struct SubAgentCompactLeadingView: View {
         case .scout: return .cyan
         case .mechanic: return .green
         case .designer: return .purple
+        case .namer: return .orange
         }
     }
 }
@@ -263,6 +265,7 @@ struct SubAgentMinimalView: View {
         case .scout: return .cyan
         case .mechanic: return .green
         case .designer: return .purple
+        case .namer: return .orange
         }
     }
 }
@@ -299,6 +302,7 @@ struct SubAgentExpandedLeadingView: View {
         case .scout: return .cyan
         case .mechanic: return .green
         case .designer: return .purple
+        case .namer: return .orange
         }
     }
 }
@@ -422,6 +426,7 @@ struct SubAgentExpandedBottomView: View {
         case .scout: return .cyan
         case .mechanic: return .green
         case .designer: return .purple
+        case .namer: return .orange
         }
     }
 }

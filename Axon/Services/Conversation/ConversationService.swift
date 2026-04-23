@@ -67,6 +67,9 @@ class ConversationService: ObservableObject {
 
         print("[ConversationService] Loaded \(loaded.count) conversations from Core Data")
         conversations = loaded
+
+        // Startup catch-up for legacy placeholder/first-message titles.
+        ConversationTitleMaintenanceService.shared.scheduleStartupCatchUp(conversations: loaded)
     }
 
     /// Clean up deletion records older than retention period
@@ -435,6 +438,10 @@ class ConversationService: ObservableObject {
             messages = []
         }
 
+        // Remove local title overrides for deleted conversations.
+        SettingsStorage.shared.setDisplayName(nil, for: id)
+        SettingsStorage.shared.setGeneratedTitle(nil, for: id)
+
         // For local-only conversations OR when no backend configured, hard delete immediately
         if id.hasPrefix("local_") || !apiClient.isBackendConfigured {
             try localStore.deleteLocalConversation(id: id)
@@ -754,16 +761,12 @@ class ConversationService: ObservableObject {
             // Save both messages to Core Data immediately
             try await syncManager.saveMessagesToCoreData([userMessage, assistantMessage], conversationId: conversationId)
 
-            // After the assistant completes its response, attempt to generate a concise chat title
-            // using Apple Intelligence (FoundationModels). This does NOT replace the existing
-            // initial-title method; it just upgrades the title post-response.
-            Task { @MainActor in
-                await self.tryAutoRenameConversationAfterFirstReply(
-                    conversationId: conversationId,
-                    userMessage: userMessage,
-                    assistantMessage: assistantMessage
-                )
-            }
+            // Shared post-reply titling entrypoint (used by both non-streaming and streaming).
+            schedulePostReplyTitling(
+                conversationId: conversationId,
+                userMessage: userMessage,
+                assistantMessage: assistantMessage
+            )
 
             // Process and save memories if any were created
             if let memories = memories, !memories.isEmpty {
@@ -912,66 +915,18 @@ class ConversationService: ObservableObject {
 
     // MARK: - Auto Title
 
-    /// Attempts to auto-rename a conversation after the assistant completes a reply.
-    ///
-    /// - Important: Will not override user manual renames (displayNameOverride).
-    /// - Important: Uses only the last (user, assistant) messages to keep latency predictable.
+    /// Shared post-reply title hook used by both non-streaming and streaming completion paths.
     @MainActor
-    private func tryAutoRenameConversationAfterFirstReply(
+    func schedulePostReplyTitling(
         conversationId: String,
         userMessage: Message,
         assistantMessage: Message
-    ) async {
-        // Do not override a manual rename.
-        if SettingsStorage.shared.displayName(for: conversationId) != nil {
-            print("[ConversationService] ℹ️ Auto-title skipped: manual rename exists")
-            return
-        }
-
-        // Only attempt when we have a conversation loaded.
-        guard let conv = conversations.first(where: { $0.id == conversationId }) else {
-            print("[ConversationService] ⚠️ Auto-title skipped: conversation not in memory")
-            return
-        }
-
-        // Heuristic: only auto-rename if the current title looks like the placeholder
-        // (the app currently uses the first user message prefix).
-        let placeholderTitle = String(userMessage.content.prefix(50)).trimmingCharacters(in: .whitespacesAndNewlines)
-        let isPlaceholder = conv.title == "New Chat" || conv.title == placeholderTitle
-        guard isPlaceholder else {
-            print("[ConversationService] ℹ️ Auto-title skipped: title already non-placeholder ('\(conv.title)')")
-            return
-        }
-
-        do {
-            let generated = try await ConversationTitleOrchestrator.shared.generateTitle(
-                userMessage: userMessage,
-                assistantMessage: assistantMessage
-            )
-
-            let trimmed = generated.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else {
-                print("[ConversationService] ⚠️ Auto-title generation produced empty title; skipping")
-                return
-            }
-
-            // 1) Update UI immediately via local display name override.
-            ConversationTitleOrchestrator.shared.applyTitle(trimmed, to: conversationId)
-
-            // 2) Persist/sync as the official conversation title (if possible).
-            do {
-                _ = try await updateConversation(id: conversationId, title: trimmed)
-            } catch {
-                // In local-only / offline mode this can still succeed (local store), but if it
-                // fails we keep the displayNameOverride so the UI still shows the new title.
-                print("[ConversationService] ⚠️ Auto-title could not persist server-side: \(error.localizedDescription)")
-            }
-
-            print("[ConversationService] ✅ Auto-renamed conversation \(conversationId) -> '\(trimmed)'")
-        } catch {
-            // Leave the existing title as-is.
-            print("[ConversationService] ⚠️ Auto-title generation failed: \(error.localizedDescription)")
-        }
+    ) {
+        ConversationTitleSubAgentService.shared.schedulePostReplyTitling(
+            conversationId: conversationId,
+            userMessage: userMessage,
+            assistantMessage: assistantMessage
+        )
     }
 
     // MARK: - Message Editing & Deletion

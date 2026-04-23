@@ -149,6 +149,7 @@ enum TaskType: String, Codable, CaseIterable, Sendable {
     case codeExecution        // Mechanic: running code
     case fileModification     // Mechanic: editing files
     case codeGeneration       // Mechanic: writing new code
+    case conversationTitling  // Namer: concise conversation title generation
     case taskDecomposition    // Designer: breaking down tasks
     case agentSelection       // Designer: choosing which agent
     case reasoning            // Deep reasoning tasks
@@ -164,6 +165,7 @@ enum TaskType: String, Codable, CaseIterable, Sendable {
         case .codeExecution: return "Code Execution"
         case .fileModification: return "File Modification"
         case .codeGeneration: return "Code Generation"
+        case .conversationTitling: return "Conversation Titling"
         case .taskDecomposition: return "Task Decomposition"
         case .agentSelection: return "Agent Selection"
         case .reasoning: return "Reasoning"
@@ -180,6 +182,8 @@ enum TaskType: String, Codable, CaseIterable, Sendable {
             return [.scout]
         case .codeExecution, .fileModification, .codeGeneration:
             return [.mechanic]
+        case .conversationTitling:
+            return [.namer]
         case .taskDecomposition, .agentSelection:
             return [.designer]
         case .reasoning, .summarization, .translation, .dataExtraction:

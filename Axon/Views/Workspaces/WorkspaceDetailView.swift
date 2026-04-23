@@ -348,7 +348,10 @@ struct WorkspaceConversationRow: View {
                 .frame(width: 24)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(SettingsStorage.shared.displayName(for: conversation.id) ?? conversation.title)
+                Text(SettingsStorage.shared.resolvedConversationTitle(
+                    conversationId: conversation.id,
+                    persistedTitle: conversation.title
+                ))
                     .font(AppTypography.bodyMedium())
                     .foregroundColor(AppColors.textPrimary)
                     .lineLimit(1)

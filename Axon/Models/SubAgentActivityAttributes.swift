@@ -53,12 +53,14 @@ enum SubAgentActivityRole: String, Codable, Hashable {
     case scout
     case mechanic
     case designer
+    case namer
 
     var displayName: String {
         switch self {
         case .scout: return "Scout"
         case .mechanic: return "Mechanic"
         case .designer: return "Designer"
+        case .namer: return "Namer"
         }
     }
 
@@ -67,6 +69,7 @@ enum SubAgentActivityRole: String, Codable, Hashable {
         case .scout: return "binoculars"
         case .mechanic: return "wrench.and.screwdriver"
         case .designer: return "square.and.pencil"
+        case .namer: return "textformat.abc"
         }
     }
 
@@ -75,6 +78,7 @@ enum SubAgentActivityRole: String, Codable, Hashable {
         case .scout: return "Exploring"
         case .mechanic: return "Fixing"
         case .designer: return "Designing"
+        case .namer: return "Naming"
         }
     }
 
@@ -84,6 +88,7 @@ enum SubAgentActivityRole: String, Codable, Hashable {
         case .scout: return "mercury"      // Standard cyan-ish
         case .mechanic: return "lichen"    // Green tint
         case .designer: return "amethyst"  // Purple tint
+        case .namer: return "amber"
         }
     }
 }
@@ -166,6 +171,7 @@ extension SubAgentActivityRole {
         case .scout: self = .scout
         case .mechanic: self = .mechanic
         case .designer: self = .designer
+        case .namer: self = .namer
         }
     }
 }

@@ -577,6 +577,9 @@ final class AgentOrchestratorService: ObservableObject {
         if taskLower.contains("summarize") || taskLower.contains("summary") {
             return .summarization
         }
+        if taskLower.contains("title:") || taskLower.contains("conversation title") || taskLower.contains("title ") {
+            return .conversationTitling
+        }
         if taskLower.contains("analyze") || taskLower.contains("read") {
             return .documentAnalysis
         }
@@ -586,6 +589,7 @@ final class AgentOrchestratorService: ObservableObject {
         case .scout: return .webResearch
         case .mechanic: return .codeExecution
         case .designer: return .taskDecomposition
+        case .namer: return .conversationTitling
         }
     }
 

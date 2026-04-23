@@ -142,7 +142,11 @@ struct SidebarView: View {
             }
         } message: {
             if let conversation = deletingConversation {
-                Text("Are you sure you want to delete '\(SettingsStorage.shared.displayName(for: conversation.id) ?? conversation.title)'? This action cannot be undone.")
+                let resolvedTitle = SettingsStorage.shared.resolvedConversationTitle(
+                    conversationId: conversation.id,
+                    persistedTitle: conversation.title
+                )
+                Text("Are you sure you want to delete '\(resolvedTitle)'? This action cannot be undone.")
             }
         }
         .alert("Error Deleting Conversation", isPresented: .constant(deleteError != nil)) {
@@ -316,7 +320,10 @@ struct SidebarView: View {
                         ConversationSidebarRow(
                             conversation: conversation,
                             isSelected: selectedConversation?.id == conversation.id && currentView == .chat,
-                            displayNameOverride: SettingsStorage.shared.displayName(for: conversation.id),
+                            displayNameOverride: SettingsStorage.shared.resolvedConversationTitle(
+                                conversationId: conversation.id,
+                                persistedTitle: conversation.title
+                            ),
                             isPinned: isPinned
                         ) {
                             onSelectConversation(conversation)
@@ -337,7 +344,10 @@ struct SidebarView: View {
 
                             Button {
                                 renamingConversation = conversation
-                                tempRenameTitle = SettingsStorage.shared.displayName(for: conversation.id) ?? conversation.title
+                                tempRenameTitle = SettingsStorage.shared.resolvedConversationTitle(
+                                    conversationId: conversation.id,
+                                    persistedTitle: conversation.title
+                                )
                                 showingRenameSheet = true
                             } label: {
                                 Label("Rename", systemImage: "pencil")
@@ -533,7 +543,13 @@ struct ConversationSidebarRow: View {
                     )
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(displayNameOverride ?? conversation.title)
+                    Text(
+                        displayNameOverride
+                        ?? SettingsStorage.shared.resolvedConversationTitle(
+                            conversationId: conversation.id,
+                            persistedTitle: conversation.title
+                        )
+                    )
                         .font(isPinned ? AppTypography.bodyMedium(.semibold) : AppTypography.bodyMedium(.medium))
                         .foregroundColor(isPinned ? AppColors.textPrimary : AppColors.textPrimary)
                         .lineLimit(1)

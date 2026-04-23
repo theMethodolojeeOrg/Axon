@@ -144,7 +144,10 @@ struct ConversationRow: View {
                             .font(.system(size: 14))
                     }
                     
-                    Text(conversation.title)
+                    Text(SettingsStorage.shared.resolvedConversationTitle(
+                        conversationId: conversation.id,
+                        persistedTitle: conversation.title
+                    ))
                         .font(AppTypography.titleMedium())
                         .foregroundColor(AppColors.textPrimary)
                         .lineLimit(1)

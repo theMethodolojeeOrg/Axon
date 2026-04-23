@@ -225,7 +225,14 @@ final class AgentActionRegistry: ObservableObject {
         let conversation = ConversationService.shared.currentConversation
 
         let fallbackConversationId = selectedConversationId ?? conversation?.id
-        let fallbackConversationTitle = selectedConversationTitle ?? conversation?.title
+        let resolvedCurrentConversationTitle: String? = {
+            guard let conversation else { return nil }
+            return SettingsStorage.shared.resolvedConversationTitle(
+                conversationId: conversation.id,
+                persistedTitle: conversation.title
+            )
+        }()
+        let fallbackConversationTitle = selectedConversationTitle ?? resolvedCurrentConversationTitle
         let fallbackView = currentViewRef ?? "chat"
 
         return AgentActionStateSnapshot(
@@ -251,7 +258,14 @@ final class AgentActionRegistry: ObservableObject {
     func updateUIState(currentView: String, selectedConversation: Conversation?) {
         currentViewRef = currentView
         selectedConversationId = selectedConversation?.id
-        selectedConversationTitle = selectedConversation?.title
+        if let selectedConversation {
+            selectedConversationTitle = SettingsStorage.shared.resolvedConversationTitle(
+                conversationId: selectedConversation.id,
+                persistedTitle: selectedConversation.title
+            )
+        } else {
+            selectedConversationTitle = nil
+        }
     }
 
     // MARK: UI Request Completion

@@ -114,6 +114,13 @@ final class SystemStateService: ObservableObject {
         let presenceService = DevicePresenceService.shared
         let activeRemoteTask = presenceService.activeRemoteTask
         let pendingRemoteApprovals = presenceService.pendingRemoteApprovals
+        let resolvedConversationTitle: String? = {
+            guard let activeConversation else { return nil }
+            return SettingsStorage.shared.resolvedConversationTitle(
+                conversationId: activeConversation.id,
+                persistedTitle: activeConversation.title
+            )
+        }()
 
         let snapshot = SystemStateSnapshot(
             deviceId: deviceId,
@@ -121,7 +128,7 @@ final class SystemStateService: ObservableObject {
             activeCovenantId: activeCovenant?.id,
             trustTierSummary: trustTierSummary,
             activeConversationId: activeConversation?.id,
-            activeConversationTitle: activeConversation?.title,
+            activeConversationTitle: resolvedConversationTitle,
             conversationPosition: messages.count,
             pendingToolApprovals: pendingApprovals,
             lastUserMessage: lastUserMessage,
