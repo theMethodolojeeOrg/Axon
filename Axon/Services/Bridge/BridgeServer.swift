@@ -383,6 +383,38 @@ class BridgeServer: ObservableObject {
         return try JSONDecoder().decode(TerminalRunResult.self, from: resultData)
     }
 
+    func startTerminalSession(_ params: TerminalSessionStartParams) async throws -> TerminalSessionStartResult {
+        let result = try await sendRequest(method: BridgeMethod.terminalSessionStart.rawValue, params: try params.bridgeAnyCodable())
+        if let error = result.error {
+            throw error
+        }
+        guard let payload = result.result else {
+            throw BridgeError(code: .terminalError, message: "Missing terminal session start result")
+        }
+        return try payload.decodeBridgeValue(TerminalSessionStartResult.self)
+    }
+
+    func sendTerminalInput(_ params: TerminalSessionInputParams) async throws {
+        let result = try await sendRequest(method: BridgeMethod.terminalSessionInput.rawValue, params: try params.bridgeAnyCodable())
+        if let error = result.error {
+            throw error
+        }
+    }
+
+    func resizeTerminalSession(_ params: TerminalSessionResizeParams) async throws {
+        let result = try await sendRequest(method: BridgeMethod.terminalSessionResize.rawValue, params: try params.bridgeAnyCodable())
+        if let error = result.error {
+            throw error
+        }
+    }
+
+    func closeTerminalSession(_ params: TerminalSessionCloseParams) async throws {
+        let result = try await sendRequest(method: BridgeMethod.terminalSessionClose.rawValue, params: try params.bridgeAnyCodable())
+        if let error = result.error {
+            throw error
+        }
+    }
+
     /// Get workspace info from VS Code
     func getWorkspaceInfo() async throws -> WorkspaceInfoResult {
         let result = try await executeMethod(method: .workspaceInfo, params: .null)
@@ -864,7 +896,26 @@ class BridgeServer: ObservableObject {
 
     private func handleIncomingNotification(_ notification: BridgeNotification, connectionId: String) {
         print("[BridgeServer] Received notification: \(notification.method) (connectionId: \(connectionId.prefix(8)))")
-        // Handle notifications from VS Code if needed (e.g., file changed events)
+        handleTerminalNotification(notification)
+    }
+
+    private func handleTerminalNotification(_ notification: BridgeNotification) {
+        guard let params = notification.params else { return }
+
+        do {
+            switch notification.method {
+            case TerminalBridgeMethod.output:
+                let output = try params.decodeBridgeValue(TerminalSessionOutputNotification.self)
+                NotificationCenter.default.post(name: .terminalSessionOutput, object: output)
+            case TerminalBridgeMethod.exited:
+                let exited = try params.decodeBridgeValue(TerminalSessionExitedNotification.self)
+                NotificationCenter.default.post(name: .terminalSessionExited, object: exited)
+            default:
+                break
+            }
+        } catch {
+            print("[BridgeServer] Failed to decode terminal notification: \(error)")
+        }
     }
 
     private func handleHello(_ request: BridgeRequest, on connection: NWConnection, connectionId: String) async {

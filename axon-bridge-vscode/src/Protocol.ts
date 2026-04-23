@@ -243,6 +243,44 @@ export interface TerminalRunResult {
     timedOut: boolean;
 }
 
+export interface TerminalSessionStartParams {
+    cwd: string;
+    cols: number;
+    rows: number;
+    shell?: string;
+}
+
+export interface TerminalSessionStartResult {
+    sessionId: string;
+    cwd: string;
+    shell: string;
+}
+
+export interface TerminalSessionInputParams {
+    sessionId: string;
+    data: string;
+}
+
+export interface TerminalSessionResizeParams {
+    sessionId: string;
+    cols: number;
+    rows: number;
+}
+
+export interface TerminalSessionCloseParams {
+    sessionId: string;
+}
+
+export interface TerminalSessionOutputNotification {
+    sessionId: string;
+    data: string;
+}
+
+export interface TerminalSessionExitedNotification {
+    sessionId: string;
+    exitCode?: number;
+}
+
 // MARK: - Pairing / Setup
 
 export interface BridgePairingInfo {

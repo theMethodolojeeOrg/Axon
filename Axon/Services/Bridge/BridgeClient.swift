@@ -248,6 +248,23 @@ class BridgeClient: ObservableObject {
         return try JSONDecoder().decode(TerminalRunResult.self, from: resultData)
     }
 
+    func startTerminalSession(_ params: TerminalSessionStartParams) async throws -> TerminalSessionStartResult {
+        let result = try await executeMethod(method: .terminalSessionStart, params: try params.bridgeAnyCodable())
+        return try result.decodeBridgeValue(TerminalSessionStartResult.self)
+    }
+
+    func sendTerminalInput(_ params: TerminalSessionInputParams) async throws {
+        _ = try await executeMethod(method: .terminalSessionInput, params: try params.bridgeAnyCodable())
+    }
+
+    func resizeTerminalSession(_ params: TerminalSessionResizeParams) async throws {
+        _ = try await executeMethod(method: .terminalSessionResize, params: try params.bridgeAnyCodable())
+    }
+
+    func closeTerminalSession(_ params: TerminalSessionCloseParams) async throws {
+        _ = try await executeMethod(method: .terminalSessionClose, params: try params.bridgeAnyCodable())
+    }
+
     /// Get workspace info from VS Code
     func getWorkspaceInfo() async throws -> WorkspaceInfoResult {
         let result = try await executeMethod(method: .workspaceInfo, params: .null)
@@ -486,7 +503,26 @@ class BridgeClient: ObservableObject {
 
     private func handleIncomingNotification(_ notification: BridgeNotification) {
         print("[BridgeClient] Received notification: \(notification.method)")
-        // Handle notifications from VS Code if needed
+        handleTerminalNotification(notification)
+    }
+
+    private func handleTerminalNotification(_ notification: BridgeNotification) {
+        guard let params = notification.params else { return }
+
+        do {
+            switch notification.method {
+            case TerminalBridgeMethod.output:
+                let output = try params.decodeBridgeValue(TerminalSessionOutputNotification.self)
+                NotificationCenter.default.post(name: .terminalSessionOutput, object: output)
+            case TerminalBridgeMethod.exited:
+                let exited = try params.decodeBridgeValue(TerminalSessionExitedNotification.self)
+                NotificationCenter.default.post(name: .terminalSessionExited, object: exited)
+            default:
+                break
+            }
+        } catch {
+            print("[BridgeClient] Failed to decode terminal notification: \(error)")
+        }
     }
 
     // MARK: - Reconnection

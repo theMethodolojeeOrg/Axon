@@ -389,6 +389,54 @@ class BridgeConnectionManager: ObservableObject {
         }
     }
 
+    func startTerminalSession(_ params: TerminalSessionStartParams, sessionId: String? = nil) async throws -> TerminalSessionStartResult {
+        switch mode {
+        case .local:
+            return try await BridgeServer.shared.startTerminalSession(params)
+        case .remote:
+            guard let client = bridgeClient else {
+                throw BridgeError(code: .notConnected, message: "Not connected")
+            }
+            return try await client.startTerminalSession(params)
+        }
+    }
+
+    func sendTerminalInput(_ params: TerminalSessionInputParams, sessionId: String? = nil) async throws {
+        switch mode {
+        case .local:
+            try await BridgeServer.shared.sendTerminalInput(params)
+        case .remote:
+            guard let client = bridgeClient else {
+                throw BridgeError(code: .notConnected, message: "Not connected")
+            }
+            try await client.sendTerminalInput(params)
+        }
+    }
+
+    func resizeTerminalSession(_ params: TerminalSessionResizeParams, sessionId: String? = nil) async throws {
+        switch mode {
+        case .local:
+            try await BridgeServer.shared.resizeTerminalSession(params)
+        case .remote:
+            guard let client = bridgeClient else {
+                throw BridgeError(code: .notConnected, message: "Not connected")
+            }
+            try await client.resizeTerminalSession(params)
+        }
+    }
+
+    func closeTerminalSession(_ params: TerminalSessionCloseParams, sessionId: String? = nil) async throws {
+        switch mode {
+        case .local:
+            try await BridgeServer.shared.closeTerminalSession(params)
+        case .remote:
+            guard let client = bridgeClient else {
+                throw BridgeError(code: .notConnected, message: "Not connected")
+            }
+            try await client.closeTerminalSession(params)
+        }
+    }
+
     /// Get workspace info from VS Code
     func getWorkspaceInfo(sessionId: String? = nil) async throws -> WorkspaceInfoResult {
         switch mode {

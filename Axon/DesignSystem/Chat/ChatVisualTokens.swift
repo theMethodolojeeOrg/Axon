@@ -10,7 +10,15 @@ import SwiftUI
 enum ChatVisualTokens {
     // MARK: - Message Layout
 
+    #if os(macOS)
+    static let chatRailMaxWidth: CGFloat = 940
+    static let chatRailHorizontalPadding: CGFloat = 24
+    static let messageMaxReadableWidth: CGFloat = 940
+    #else
+    static let chatRailMaxWidth: CGFloat = .infinity
+    static let chatRailHorizontalPadding: CGFloat = 0
     static let messageMaxReadableWidth: CGFloat = 520
+    #endif
     static let messageOuterHorizontalPadding: CGFloat = 12
     static let messageBubbleHorizontalPadding: CGFloat = 14
     static let messageBubbleVerticalPadding: CGFloat = 10

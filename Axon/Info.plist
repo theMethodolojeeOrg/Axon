@@ -14,7 +14,7 @@
 		<string>com.axon.sync.memories</string>
 		<string>com.axon.sync.background</string>
 	</array>
-	<key>FIrebaseAPIKey</key>
+	<key>FirebaseAPIKey</key>
 	<string>$(FIREBASE_API_KEY)</string>
 	<key>FirebaseAppID</key>
 	<string>$(FIREBASE_APP_ID)</string>

@@ -20,6 +20,7 @@ import {
     isRequest,
     isResponse,
     createResponse,
+    createNotification,
     createError,
     createWelcomeFromVSCode,
     getEffectiveMode,
@@ -65,7 +66,13 @@ export class BridgeServer {
     constructor(statusBar: StatusBar) {
         this.statusBar = statusBar;
         this.fileHandler = new FileHandler();
-        this.terminalHandler = new TerminalHandler();
+        this.terminalHandler = new TerminalHandler((method, params) => {
+            for (const client of this.clients.values()) {
+                if (client.sessionId) {
+                    this.sendNotification(client, method, params);
+                }
+            }
+        });
         this.workspaceHandler = new WorkspaceHandler();
 
         // Load configuration
@@ -157,6 +164,8 @@ export class BridgeServer {
      * Stop the WebSocket server
      */
     async stop(): Promise<void> {
+        this.terminalHandler.dispose();
+
         // Close all client connections
         for (const client of this.clients.values()) {
             try {
@@ -311,6 +320,22 @@ export class BridgeServer {
                     result = await this.terminalHandler.run(request.params as any);
                     break;
 
+                case 'terminal/sessionStart':
+                    result = this.terminalHandler.startSession(request.params as any);
+                    break;
+
+                case 'terminal/sessionInput':
+                    result = this.terminalHandler.input(request.params as any);
+                    break;
+
+                case 'terminal/sessionResize':
+                    result = this.terminalHandler.resize(request.params as any);
+                    break;
+
+                case 'terminal/sessionClose':
+                    result = this.terminalHandler.close(request.params as any);
+                    break;
+
                 case 'workspace/info':
                     result = await this.workspaceHandler.getInfo();
                     break;
@@ -385,6 +410,10 @@ export class BridgeServer {
                 'file/write',
                 'file/list',
                 'terminal/run',
+                'terminal/sessionStart',
+                'terminal/sessionInput',
+                'terminal/sessionResize',
+                'terminal/sessionClose',
                 'workspace/info',
             ],
             supportedMethods: [
@@ -393,6 +422,10 @@ export class BridgeServer {
                 'file/write',
                 'file/list',
                 'terminal/run',
+                'terminal/sessionStart',
+                'terminal/sessionInput',
+                'terminal/sessionResize',
+                'terminal/sessionClose',
                 'workspace/info',
             ],
         });
@@ -414,6 +447,18 @@ export class BridgeServer {
         BridgeLogService.shared.logOutgoing(data);
         BridgeLogsViewProvider.shared?.notifyNewEntry();
 
+        client.socket.send(data);
+    }
+
+    private sendNotification(client: ConnectedClient, method: string, params?: unknown) {
+        if (client.socket.readyState !== WebSocket.OPEN) {
+            return;
+        }
+
+        const notification = createNotification(method, params);
+        const data = JSON.stringify(notification);
+        BridgeLogService.shared.logOutgoing(data);
+        BridgeLogsViewProvider.shared?.notifyNewEntry();
         client.socket.send(data);
     }
 

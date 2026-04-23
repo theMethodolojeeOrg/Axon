@@ -95,6 +95,18 @@ struct BridgeSettings: Codable, Equatable, Sendable {
     /// Terminal command timeout (seconds)
     var terminalTimeout: Int = 60
 
+    /// Prefer the active VS Code workspace as the terminal working directory.
+    var preferBridgeWorkspaceForTerminal: Bool = true
+
+    /// User-configured fallback directory for the bottom terminal drawer.
+    var terminalDefaultDirectory: String = ""
+
+    /// Persisted terminal drawer open state.
+    var terminalDrawerOpen: Bool = false
+
+    /// Persisted terminal drawer height.
+    var terminalDrawerHeight: Double = 280
+
     /// Optional pairing token required to accept VS Code connections.
     ///
     /// When set (non-empty), Axon will reject hello handshakes that do not present
@@ -531,6 +543,22 @@ class BridgeSettingsStorage: ObservableObject {
 
     func setTerminalTimeout(_ seconds: Int) {
         settings.terminalTimeout = max(5, seconds)
+    }
+
+    func setPreferBridgeWorkspaceForTerminal(_ enabled: Bool) {
+        settings.preferBridgeWorkspaceForTerminal = enabled
+    }
+
+    func setTerminalDefaultDirectory(_ path: String) {
+        settings.terminalDefaultDirectory = path.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func setTerminalDrawerOpen(_ open: Bool) {
+        settings.terminalDrawerOpen = open
+    }
+
+    func setTerminalDrawerHeight(_ height: Double) {
+        settings.terminalDrawerHeight = min(max(height, 180), 640)
     }
 
     func setBlockedPatterns(_ patterns: [String]) {

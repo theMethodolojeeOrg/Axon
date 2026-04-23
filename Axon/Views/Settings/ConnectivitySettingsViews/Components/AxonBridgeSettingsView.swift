@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 struct AxonBridgeSettingsView: View {
     @StateObject private var bridgeManager = BridgeConnectionManager.shared
@@ -80,6 +83,8 @@ struct AxonBridgeSettingsView: View {
             )
 
             behaviorSection
+
+            terminalSection
 
             BridgeAdvancedSection(
                 bridgeSettings: bridgeSettings
@@ -510,6 +515,88 @@ struct AxonBridgeSettingsView: View {
         }
     }
 
+    // MARK: - Terminal
+
+    private var terminalSection: some View {
+        SettingsSection(title: "Terminal") {
+            VStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Prefer connected VS Code workspace")
+                            .font(AppTypography.bodySmall(.medium))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Text("The bottom terminal opens in the active bridge workspace when one is connected.")
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+
+                    Spacer()
+
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { bridgeSettings.settings.preferBridgeWorkspaceForTerminal },
+                            set: { bridgeSettings.setPreferBridgeWorkspaceForTerminal($0) }
+                        )
+                    )
+                    .labelsHidden()
+                    .tint(AppColors.signalMercury)
+                }
+                .padding()
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
+
+                #if os(macOS)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Fallback folder")
+                        .font(AppTypography.bodySmall(.medium))
+                        .foregroundColor(AppColors.textPrimary)
+
+                    HStack(spacing: 8) {
+                        Text(terminalFallbackLabel)
+                            .font(AppTypography.labelSmall())
+                            .foregroundColor(AppColors.textSecondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+
+                        Spacer()
+
+                        Button("Choose") {
+                            chooseTerminalFolder()
+                        }
+                        .buttonStyle(.bordered)
+
+                        if !bridgeSettings.settings.terminalDefaultDirectory.isEmpty {
+                            Button("Clear") {
+                                bridgeSettings.setTerminalDefaultDirectory("")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                }
+                .padding()
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
+                #else
+                HStack(spacing: 12) {
+                    Image(systemName: "iphone.and.arrow.forward")
+                        .foregroundColor(AppColors.signalMercury)
+
+                    Text("On iPhone, the terminal requires a connected VS Code bridge and runs remotely on the Mac or VS Code workspace.")
+                        .font(AppTypography.bodySmall())
+                        .foregroundColor(AppColors.textSecondary)
+
+                    Spacer()
+                }
+                .padding()
+                .background(AppColors.substrateSecondary)
+                .cornerRadius(8)
+                #endif
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     private var statusTitle: String {
@@ -537,6 +624,25 @@ struct AxonBridgeSettingsView: View {
         }
         return AppColors.textTertiary
     }
+
+    private var terminalFallbackLabel: String {
+        let path = bridgeSettings.settings.terminalDefaultDirectory
+        return path.isEmpty ? "Home directory" : path
+    }
+
+    #if os(macOS)
+    private func chooseTerminalFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Use Folder"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            bridgeSettings.setTerminalDefaultDirectory(url.path)
+        }
+    }
+    #endif
 
     private func saveProfile(
         name: String,

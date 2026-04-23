@@ -38,6 +38,7 @@ struct AppContainerView: View {
     @StateObject private var taglineManager = TaglineManager.shared
     @StateObject private var liveService = LiveSessionService.shared
     @StateObject private var settingsViewModel = SettingsViewModel.shared
+    @StateObject private var terminalController = TerminalSessionController.shared
 
     @State private var showSidebar = false
     @State private var selectedConversation: Conversation?
@@ -177,6 +178,15 @@ struct AppContainerView: View {
                         }
 
                         ToolbarItem {
+                            Button(action: {
+                                terminalController.toggleDrawer()
+                            }) {
+                                Label("Terminal", systemImage: "terminal")
+                            }
+                            .help(terminalController.isDrawerOpen ? "Hide Terminal" : "Show Terminal")
+                        }
+
+                        ToolbarItem {
                             ToolsStatusMenu(style: .pill)
                                 .fixedSize()
                         }
@@ -274,6 +284,16 @@ struct AppContainerView: View {
                                     accessibilityLabel: "Chat Info"
                                 ) {
                                     showChatInfo = true
+                                }
+                            }
+
+                            if selectedConversation != nil {
+                                chatToolbarButton(
+                                    icon: "terminal",
+                                    tint: AppColors.signalMercury,
+                                    accessibilityLabel: terminalController.isDrawerOpen ? "Hide Terminal" : "Show Terminal"
+                                ) {
+                                    terminalController.toggleDrawer()
                                 }
                             }
 
@@ -586,6 +606,7 @@ struct ChatContainerView: View {
     @ObservedObject private var ttsService = TTSPlaybackService.shared
     @ObservedObject private var toolApprovalService = ToolApprovalService.shared
     @ObservedObject private var mlxService = MLXModelService.shared
+    @ObservedObject private var terminalController = TerminalSessionController.shared
     #if os(macOS)
     @ObservedObject private var bridgeServer = BridgeServer.shared
     #endif
@@ -652,6 +673,9 @@ struct ChatContainerView: View {
                     welcomeView
                 }
                 #if os(macOS)
+                if terminalController.isDrawerOpen {
+                    TerminalDrawerView(controller: terminalController)
+                }
                 composerOrSoloToolbar
                 #endif
             }
@@ -696,6 +720,9 @@ struct ChatContainerView: View {
             .animation(AppAnimations.standardEasing, value: mlxService.isLoading)
             #if os(iOS)
             .safeAreaInset(edge: .bottom, spacing: 0) {
+                if terminalController.isDrawerOpen {
+                    TerminalDrawerView(controller: terminalController)
+                }
                 composerOrSoloToolbar
             }
             #endif
@@ -1166,6 +1193,9 @@ struct ChatContainerView: View {
                             )
                     }
                     .padding(.vertical, ChatVisualTokens.messageSectionVerticalPadding)
+                    .frame(maxWidth: ChatVisualTokens.chatRailMaxWidth, alignment: .center)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.horizontal, ChatVisualTokens.chatRailHorizontalPadding)
                 }
                 .coordinateSpace(name: "chat_scroll")
                 .onPreferenceChange(BottomAnchorOffsetPreferenceKey.self) { bottomY in
@@ -1231,7 +1261,9 @@ struct ChatContainerView: View {
                         memoryService.ignoreSubconsciousLoggingForThread(conversationId: conversation.id)
                     }
                 )
-                .padding(.horizontal)
+                .frame(maxWidth: ChatVisualTokens.chatRailMaxWidth)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.horizontal, ChatVisualTokens.chatRailHorizontalPadding)
                 .padding(.top, 8)
             }
         }

@@ -22,6 +22,7 @@ import {
     isRequest,
     isResponse,
     createResponse,
+    createNotification,
     createError,
     BridgeErrorCode,
 } from './Protocol';
@@ -74,7 +75,9 @@ export class BridgeClient {
     constructor(statusBar: StatusBar) {
         this.statusBar = statusBar;
         this.fileHandler = new FileHandler();
-        this.terminalHandler = new TerminalHandler();
+        this.terminalHandler = new TerminalHandler((method, params) => {
+            this.send(createNotification(method, params));
+        });
         this.workspaceHandler = new WorkspaceHandler();
 
         // Load configuration
@@ -386,6 +389,22 @@ export class BridgeClient {
                     result = await this.terminalHandler.run(request.params as any);
                     break;
 
+                case 'terminal/sessionStart':
+                    result = this.terminalHandler.startSession(request.params as any);
+                    break;
+
+                case 'terminal/sessionInput':
+                    result = this.terminalHandler.input(request.params as any);
+                    break;
+
+                case 'terminal/sessionResize':
+                    result = this.terminalHandler.resize(request.params as any);
+                    break;
+
+                case 'terminal/sessionClose':
+                    result = this.terminalHandler.close(request.params as any);
+                    break;
+
                 case 'workspace/info':
                 case 'workspaceInfo': // Alias for more intuitive naming
                     result = await this.workspaceHandler.getInfo();
@@ -414,7 +433,7 @@ export class BridgeClient {
         this.send(response);
     }
 
-    private send(message: BridgeRequest | BridgeResponse) {
+    private send(message: BridgeRequest | BridgeResponse | ReturnType<typeof createNotification>) {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
             console.error('[AxonBridge] Cannot send: not connected');
             return;
@@ -527,6 +546,7 @@ export class BridgeClient {
 
     dispose() {
         this.cancelReconnect();
+        this.terminalHandler.dispose();
         this.cleanupSocket();
     }
 }

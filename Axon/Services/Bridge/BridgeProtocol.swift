@@ -772,6 +772,10 @@ enum BridgeMethod: String, CaseIterable {
 
     // Terminal operations
     case terminalRun = "terminal/run"
+    case terminalSessionStart = "terminal/sessionStart"
+    case terminalSessionInput = "terminal/sessionInput"
+    case terminalSessionResize = "terminal/sessionResize"
+    case terminalSessionClose = "terminal/sessionClose"
 
     // Workspace operations
     case workspaceInfo = "workspace/info"
@@ -808,6 +812,7 @@ enum BridgeMethod: String, CaseIterable {
     var requiresApproval: Bool {
         switch self {
         case .fileWrite, .terminalRun,
+             .terminalSessionStart, .terminalSessionInput, .terminalSessionResize, .terminalSessionClose,
              .clipboardWrite, .appLaunch, .shellExecute:
             return true
         case .hello,
@@ -846,7 +851,9 @@ enum BridgeMethod: String, CaseIterable {
         case .guestQueryMemories, .guestGetContext, .guestChatWithContext, .guestDisconnect, .hello:
             return true
         case .getPairingInfo, .chatListConversations, .chatGetMessages,
-             .fileRead, .fileWrite, .fileList, .terminalRun, .workspaceInfo,
+             .fileRead, .fileWrite, .fileList,
+             .terminalRun, .terminalSessionStart, .terminalSessionInput, .terminalSessionResize, .terminalSessionClose,
+             .workspaceInfo,
              .systemInfo, .systemProcesses, .systemDiskUsage,
              .clipboardRead, .clipboardWrite, .notificationSend,
              .spotlightSearch, .fileFind, .fileMetadata,
@@ -876,6 +883,14 @@ enum BridgeMethod: String, CaseIterable {
             return "List directory contents"
         case .terminalRun:
             return "Execute terminal command"
+        case .terminalSessionStart:
+            return "Start interactive terminal session"
+        case .terminalSessionInput:
+            return "Send input to interactive terminal session"
+        case .terminalSessionResize:
+            return "Resize interactive terminal session"
+        case .terminalSessionClose:
+            return "Close interactive terminal session"
         case .workspaceInfo:
             return "Get workspace information"
         case .guestQueryMemories:

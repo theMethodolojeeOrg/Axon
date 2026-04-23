@@ -504,6 +504,9 @@ struct MessageInputBar: View {
                     )
                     .padding(.horizontal)
                     .padding(.bottom, 92)
+                    .frame(maxWidth: ChatVisualTokens.chatRailMaxWidth)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.horizontal, ChatVisualTokens.chatRailHorizontalPadding)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
@@ -552,6 +555,9 @@ struct MessageInputBar: View {
             .padding(.horizontal, ChatVisualTokens.composerHorizontalPadding)
             .padding(.bottom, ChatVisualTokens.composerBottomPadding)
         }
+        .frame(maxWidth: ChatVisualTokens.chatRailMaxWidth)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.horizontal, ChatVisualTokens.chatRailHorizontalPadding)
     }
 
     #if os(iOS)
