@@ -120,23 +120,35 @@ struct AssistantMarkdownView: View {
         )
     }
 
-    /// Find an executed tool call matching the given tool request JSON
-    private func findExecutedToolCall(for code: String) -> LiveToolCall? {
-        guard let executedCalls = executedToolCalls, !executedCalls.isEmpty else {
-            return nil
-        }
+    private struct ParsedToolRequest {
+        let tool: String
+        let query: String
+    }
 
-        // Parse the tool request JSON to get tool name and query
+    /// Parse tool request JSON payload from a fenced block.
+    private func parseToolRequest(from code: String) -> ParsedToolRequest? {
         guard let data = code.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let tool = json["tool"] as? String,
               let query = json["query"] as? String else {
             return nil
         }
+        return ParsedToolRequest(tool: tool, query: query)
+    }
+
+    /// Find an executed tool call matching the given tool request JSON
+    private func findExecutedToolCall(for code: String) -> LiveToolCall? {
+        guard let executedCalls = executedToolCalls, !executedCalls.isEmpty else {
+            return nil
+        }
+
+        guard let parsed = parseToolRequest(from: code) else {
+            return nil
+        }
 
         // Find a matching executed tool call
         return executedCalls.first { call in
-            call.name == tool && call.request?.query == query
+            call.name == parsed.tool && call.request?.query == parsed.query
         }
     }
 
@@ -154,18 +166,33 @@ struct AssistantMarkdownView: View {
                         .layoutPriority(1)
 
                 case .code(let language, let path, _, let code):
-                    // Special handling for tool_request blocks - show actionable UI
-                    if language?.lowercased() == "tool_request" {
-                        // Check if this tool was already executed (from persisted message data)
+                    // Special handling for tool fences - show actionable UI when JSON is valid.
+                    let normalizedLanguage = language?.lowercased()
+                    if normalizedLanguage == "tool_request" || normalizedLanguage == "tool" {
                         if let executedCall = findExecutedToolCall(for: code) {
                             CompletedToolCallView(toolCall: executedCall)
-                        } else {
+                        } else if parseToolRequest(from: code) != nil {
                             // Pass isFromHistory to prevent auto-execution on app restart
                             ToolRequestCodeBlockView(
                                 code: code,
                                 isFromHistory: isFromHistory,
                                 conversationId: conversationId,
                                 sourceMessageId: messageId
+                            )
+                        } else if normalizedLanguage == "tool" {
+                            // Compatibility: if a model accidentally wraps normal prose in
+                            // ```tool fences, render it as markdown instead of a code box.
+                            Markdown(code)
+                                .markdownTheme(MarkdownTheme.axon)
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .layoutPriority(1)
+                        } else {
+                            CodeBlockView(
+                                language: language,
+                                filePath: path,
+                                workspace: path == nil ? nil : workspaceBundle,
+                                code: code
                             )
                         }
                     } else {

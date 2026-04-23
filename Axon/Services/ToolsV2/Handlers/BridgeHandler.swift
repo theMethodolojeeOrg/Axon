@@ -36,6 +36,11 @@ final class BridgeHandler: ToolHandlerV2 {
         context: ToolContextV2
     ) async throws -> ToolResultV2 {
         let toolId = manifest.tool.id
+
+        if toolId == "debug_bridge" {
+            return executeDebugBridgeTool(toolId: toolId)
+        }
+
         let bridgeTarget = manifest.execution.bridgeTarget ?? "mac"
         
         // Route based on bridge target
@@ -195,7 +200,45 @@ final class BridgeHandler: ToolHandlerV2 {
     }
     
     // MARK: - Result Formatting
-    
+
+    /// Execute debug_bridge in V2 without requiring bridgeMethod metadata.
+    private func executeDebugBridgeTool(toolId: String) -> ToolResultV2 {
+        let server = BridgeServer.shared
+        let logs = BridgeLogService.shared.entries.prefix(15)
+
+        var output = "## VS Code Bridge Status\n\n"
+        output += "- **Running:** \(server.isRunning ? "Yes" : "No")\n"
+        output += "- **Connected:** \(server.isConnected ? "Yes" : "No")\n"
+        output += "- **Connections:** \(server.connectionCount)\n"
+
+        if let session = server.connectedSession {
+            output += "- **Session:** \(session.displayName) (v\(session.extensionVersion))\n"
+        }
+
+        if let error = server.lastError {
+            output += "- **Last Error:** \(error)\n"
+        }
+
+        output += "\n### Recent Logs (Last 15)\n\n"
+
+        if logs.isEmpty {
+            output += "*No logs available.*\n"
+        } else {
+            for log in logs {
+                let direction = log.direction == .incoming ? "←" : "→"
+                output += "`\(log.formattedTimestamp)` \(direction) [\(log.messageType.rawValue)] \(log.summary)\n"
+            }
+        }
+
+        output += "\n\n*View full logs in Settings -> Axon Bridge -> Bridge Inspector*"
+
+        return ToolResultV2.success(
+            toolId: toolId,
+            output: output,
+            structured: nil
+        )
+    }
+
     private func formatFileReadResult(_ result: FileReadResult) -> String {
         var output = "📄 **File:** \(result.path)\n"
         output += "📏 **Size:** \(formatBytes(result.size))\n"

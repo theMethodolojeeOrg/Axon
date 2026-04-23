@@ -382,6 +382,7 @@ extension LiveToolCall {
         case "reflect_on_conversation": return "Reflect"
         case "vscode_read_file": return "Read File"
         case "vscode_write_file": return "Write File"
+        case "vscode_list_directory": return "List Directory"
         case "vscode_list_files": return "List Files"
         case "vscode_run_terminal": return "Run Terminal"
         default: return toolName.replacingOccurrences(of: "_", with: " ").capitalized
@@ -401,6 +402,7 @@ extension LiveToolCall {
         case "reflect_on_conversation": return "bubble.left.and.bubble.right"
         case "vscode_read_file": return "doc.text"
         case "vscode_write_file": return "square.and.pencil"
+        case "vscode_list_directory": return "folder"
         case "vscode_list_files": return "folder"
         case "vscode_run_terminal": return "terminal"
         default: return "gear"
@@ -420,6 +422,7 @@ extension LiveToolCall {
         case "reflect_on_conversation": return "Analyzing conversation..."
         case "vscode_read_file": return "Reading file..."
         case "vscode_write_file": return "Writing file..."
+        case "vscode_list_directory": return "Listing directory..."
         case "vscode_list_files": return "Listing files..."
         case "vscode_run_terminal": return "Running command..."
         default: return "Executing..."

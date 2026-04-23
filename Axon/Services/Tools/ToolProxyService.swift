@@ -4827,16 +4827,37 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     // MARK: - Format Tool Results
 
+    private let modelInjectionResultCharacterLimit = 12000
+
     /// Format tool results for injection into conversation
-    func formatToolResult(_ result: ToolResult) -> String {
+    func formatToolResult(
+        _ result: ToolResult,
+        provider: String? = nil,
+        model: String? = nil,
+        conversationId: String? = nil,
+        assistantMessageId: String? = nil
+    ) -> String {
         // Compact fence-based format that mirrors the tool_request structure.
         // The model sees a symmetric request/response pattern which aids coherence.
+        let originalLength = result.result.count
+        let wasTruncated = originalLength > modelInjectionResultCharacterLimit
+        let boundedResult = wasTruncated
+            ? String(result.result.prefix(modelInjectionResultCharacterLimit))
+            : result.result
+
+        if wasTruncated {
+            print("[ToolChain][tool_result_truncation] provider=\(provider ?? "unknown") model=\(model ?? "unknown") conversation_id=\(conversationId ?? "unknown") assistant_message_id=\(assistantMessageId ?? "unknown") truncated=yes original_length=\(originalLength) injected_length=\(boundedResult.count) limit=\(modelInjectionResultCharacterLimit)")
+        }
+
         var statusJSON = "{\"tool\":\"\(jsonEscape(result.tool))\",\"success\":\(result.success ? "true" : "false")"
         if !result.success {
             let failureSummary = summarizeFailureForModel(result.result)
             statusJSON += ",\"error\":\"\(jsonEscape(failureSummary))\""
         }
-        statusJSON += ",\"result\":\"\(jsonEscape(result.result))\"}"
+        statusJSON += ",\"result\":\"\(jsonEscape(boundedResult))\""
+        statusJSON += ",\"truncated\":\(wasTruncated ? "true" : "false")"
+        statusJSON += ",\"original_length\":\(originalLength)"
+        statusJSON += "}"
 
         var formatted = "```tool_result\n\(statusJSON)\n```"
 

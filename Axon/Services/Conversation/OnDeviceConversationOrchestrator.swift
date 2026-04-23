@@ -62,41 +62,92 @@ struct ToolGatedResponseSegment {
     let visiblePrefix: String
     let firstToolRequest: ToolRequest?
     let awaitingFenceClose: Bool
+    let fenceTag: String?
 }
 
 enum ToolGatedResponseSegmenter {
-    private static let toolFenceOpen = "```tool_request"
+    static let canonicalFenceTag = "tool_request"
+    static let compatibilityFenceTag = "tool"
     private static let codeFenceClose = "```"
+    private static let toolFenceRegex = try! NSRegularExpression(pattern: "```(tool_request|tool)(?=\\s|$)")
 
     static func segment(_ response: String) -> ToolGatedResponseSegment {
-        guard let firstOpenRange = response.range(of: toolFenceOpen) else {
+        guard let firstMatch = firstValidFenceMatch(in: response) else {
             return ToolGatedResponseSegment(
                 visiblePrefix: response,
                 firstToolRequest: nil,
-                awaitingFenceClose: false
+                awaitingFenceClose: false,
+                fenceTag: nil
             )
         }
 
-        let visiblePrefix = String(response[..<firstOpenRange.lowerBound])
-        let afterOpen = response[firstOpenRange.upperBound...]
+        return firstMatch
+    }
 
-        guard let closeRange = afterOpen.range(of: codeFenceClose) else {
-            return ToolGatedResponseSegment(
-                visiblePrefix: visiblePrefix,
-                firstToolRequest: nil,
-                awaitingFenceClose: true
-            )
+    private static func firstValidFenceMatch(in response: String) -> ToolGatedResponseSegment? {
+        let fullRange = NSRange(response.startIndex..<response.endIndex, in: response)
+        let matches = toolFenceRegex.matches(in: response, options: [], range: fullRange)
+        guard !matches.isEmpty else { return nil }
+
+        for (index, match) in matches.enumerated() {
+            guard let openRange = Range(match.range, in: response),
+                  let tagRange = Range(match.range(at: 1), in: response)
+            else {
+                continue
+            }
+
+            let fenceTag = String(response[tagRange])
+            let visiblePrefix = String(response[..<openRange.lowerBound])
+            let afterOpen = response[openRange.upperBound...]
+
+            if let closeRange = afterOpen.range(of: codeFenceClose) {
+                let payload = String(afterOpen[..<closeRange.lowerBound])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let firstToolRequest = decodeToolRequest(from: payload) else {
+                    // Ignore malformed JSON fences and keep scanning.
+                    continue
+                }
+
+                // Tool fences are terminal control blocks. Ignore examples or inline docs.
+                let trailing = String(response[closeRange.upperBound...])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard trailing.isEmpty else {
+                    continue
+                }
+
+                return ToolGatedResponseSegment(
+                    visiblePrefix: visiblePrefix,
+                    firstToolRequest: firstToolRequest,
+                    awaitingFenceClose: false,
+                    fenceTag: fenceTag
+                )
+            }
+
+            // Treat dangling fence as in-flight only when it's the last candidate and
+            // plausibly an actual control block, not a prose/example fence.
+            let isLastCandidate = index == matches.count - 1
+            guard isLastCandidate else { continue }
+            let suffix = String(afterOpen).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !suffix.isEmpty else {
+                return ToolGatedResponseSegment(
+                    visiblePrefix: visiblePrefix,
+                    firstToolRequest: nil,
+                    awaitingFenceClose: true,
+                    fenceTag: fenceTag
+                )
+            }
+
+            if fenceTag == canonicalFenceTag || suffix.hasPrefix("{") || suffix.hasPrefix("[") {
+                return ToolGatedResponseSegment(
+                    visiblePrefix: visiblePrefix,
+                    firstToolRequest: nil,
+                    awaitingFenceClose: true,
+                    fenceTag: fenceTag
+                )
+            }
         }
 
-        let payload = String(afterOpen[..<closeRange.lowerBound])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let firstToolRequest = decodeToolRequest(from: payload)
-
-        return ToolGatedResponseSegment(
-            visiblePrefix: visiblePrefix,
-            firstToolRequest: firstToolRequest,
-            awaitingFenceClose: false
-        )
+        return nil
     }
 
     private static func decodeToolRequest(from payload: String) -> ToolRequest? {
@@ -106,6 +157,9 @@ enum ToolGatedResponseSegmenter {
 
     /// System injection to elicit the tool_request block after a stop sequence fires.
     static let toolBlockFollowUp = "You were about to use a tool. Output only the ```tool_request block now, nothing else."
+    /// Recovery prompt for dangling tool fences. Keep canonical output contract.
+    static let incompleteToolBlockRecoveryFollowUp = "Your previous response started a tool fence but did not close it. Output only one complete ```tool_request block with valid JSON and a closing ```."
+    static let incompleteToolBlockDiagnosticNote = "[Tool note] I skipped an incomplete tool block and continued with a normal response."
 }
 
 
@@ -296,6 +350,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var usedToolProxy = false
         var groundingSources: [MessageGroundingSource] = []
         var memoryOperations: [MessageMemoryOperation] = []
+        let assistantMessageId = UUID().uuidString
         lastToolResponse = nil
 
         // Route all providers through standard path - tool proxy handles tool execution uniformly
@@ -320,6 +375,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             let (finalResponse, toolUsed, sources, memOps) = try await handleToolProxyLoop(
                 initialResponse: responseContent,
                 conversationId: conversationId,
+                assistantMessageId: assistantMessageId,
                 config: config,
                 systemPrompt: systemPrompt,
                 messages: finalMessages,
@@ -355,6 +411,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         }
 
         let assistantMessage = Message(
+            id: assistantMessageId,
             conversationId: conversationId,
             role: .assistant,
             content: responseContent,
@@ -547,12 +604,14 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         var collectedToolCalls: [LiveToolCall] = []
         var collectedSources: [MessageGroundingSource] = []
         var collectedMemoryOperations: [MessageMemoryOperation] = []
+        let assistantMessageId = "pending-\(UUID().uuidString)"
 
         if supportsStreaming && useToolProxy {
             // Streaming with tool proxy - stream content then execute tools and feed results back
             // All providers use the same unified tool proxy architecture
             try await streamWithToolProxy(
                 conversationId: conversationId,
+                assistantMessageId: assistantMessageId,
                 config: config,
                 systemPrompt: systemPrompt,
                 messages: mergedMessages,
@@ -573,7 +632,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 baseUrl: config.customBaseUrl,
                 system: systemPrompt,
                 maxTokens: 4096,
-                modelParams: config.modelParams
+                modelParams: config.modelParams,
+                conversationId: conversationId,
+                assistantMessageId: assistantMessageId
             )
 
             let handler = StreamingResponseHandler()
@@ -620,6 +681,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 try await handleStreamingToolProxyLoop(
                     initialResponse: providerResult.content,
                     conversationId: conversationId,
+                    assistantMessageId: assistantMessageId,
                     config: config,
                     systemPrompt: systemPrompt,
                     messages: mergedMessages,
@@ -667,6 +729,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     /// After streaming completes, parses tool requests, executes them, and calls the provider again
     private func streamWithToolProxy(
         conversationId: String,
+        assistantMessageId: String,
         config: OrchestrationConfig,
         systemPrompt: String?,
         messages: [Message],
@@ -686,7 +749,9 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             system: systemPrompt,
             maxTokens: 4096,
             modelParams: config.modelParams,
-            stopSequences: ["```tool_request"]
+            stopSequences: ["```tool_request"],
+            conversationId: conversationId,
+            assistantMessageId: assistantMessageId
         )
 
         let handler = StreamingResponseHandler()
@@ -758,6 +823,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         try await handleStreamingToolProxyLoop(
             initialResponse: rawStreamResponse,
             conversationId: conversationId,
+            assistantMessageId: assistantMessageId,
             config: config,
             systemPrompt: systemPrompt,
             messages: messages,
@@ -778,6 +844,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     private func handleStreamingToolProxyLoop(
         initialResponse: String,
         conversationId: String,
+        assistantMessageId: String,
         config: OrchestrationConfig,
         systemPrompt: String?,
         messages: [Message],
@@ -803,8 +870,15 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             runtimeModel: config.model
         )
 
-        while iteration < maxIterations {
+        toolLoop: while iteration < maxIterations {
             var segment = ToolGatedResponseSegmenter.segment(currentResponse)
+            logFenceParseEvent(
+                segment,
+                provider: config.provider,
+                model: config.model,
+                conversationId: conversationId,
+                assistantMessageId: assistantMessageId
+            )
 
             // Two-phase: if stop sequence fired and no fence in response, get the tool block
             if segment.firstToolRequest == nil && stoppedByStopSequence {
@@ -820,12 +894,60 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 ).content
                 currentResponse = currentResponse + "\n" + toolBlock
                 segment = ToolGatedResponseSegmenter.segment(currentResponse)
+                logFenceParseEvent(
+                    segment,
+                    provider: config.provider,
+                    model: config.model,
+                    conversationId: conversationId,
+                    assistantMessageId: assistantMessageId
+                )
                 stoppedByStopSequence = false  // Only do this once per iteration
+            }
+
+            if segment.awaitingFenceClose {
+                let recoveryResult = await attemptIncompleteFenceRecovery(
+                    currentResponse: currentResponse,
+                    rollingMessages: rollingMessages,
+                    conversationId: conversationId,
+                    assistantMessageId: assistantMessageId,
+                    provider: config.provider,
+                    model: config.model,
+                    config: config,
+                    systemPrompt: systemPrompt
+                )
+
+                switch recoveryResult {
+                case .succeeded(let recoveredResponse, let recoveredSegment):
+                    currentResponse = recoveredResponse
+                    segment = recoveredSegment
+                    logFenceParseEvent(
+                        segment,
+                        provider: config.provider,
+                        model: config.model,
+                        conversationId: conversationId,
+                        assistantMessageId: assistantMessageId
+                    )
+                case .failed:
+                    let shouldEmitRecoveryFallback = shouldEmitVisiblePrefix
+                    if shouldEmitRecoveryFallback, !segment.visiblePrefix.isEmpty {
+                        for char in segment.visiblePrefix {
+                            continuation.yield(.textDelta(String(char)))
+                        }
+                        accumulatedContent += segment.visiblePrefix
+                    }
+                    continuation.yield(.textDelta(ToolGatedResponseSegmenter.incompleteToolBlockDiagnosticNote))
+                    accumulatedContent += ToolGatedResponseSegmenter.incompleteToolBlockDiagnosticNote
+                    break toolLoop
+                }
             }
 
             let visiblePrefix = segment.visiblePrefix
             let hasToolRequest = segment.firstToolRequest != nil
-            let shouldEmitThisPass = shouldEmitVisiblePrefix && !(suppressVisiblePrefixOnToolTurn && hasToolRequest)
+            // `emitInitialVisiblePrefix` handles first-pass de-duplication when stream text
+            // has already been surfaced to the user. Do not suppress subsequent tool-turn
+            // prefixes or the narrative can disappear between chained calls.
+            let shouldSuppressThisPass = suppressVisiblePrefixOnToolTurn && hasToolRequest && !shouldEmitVisiblePrefix
+            let shouldEmitThisPass = shouldEmitVisiblePrefix && !shouldSuppressThisPass
 
             if shouldEmitThisPass && !visiblePrefix.isEmpty {
                 for char in visiblePrefix {
@@ -925,7 +1047,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 rollingMessages.append(Message(conversationId: conversationId, role: .assistant, content: trimmedResponse))
             }
 
-            let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
+            let formattedResult = await ToolProxyService.shared.formatToolResult(
+                toolResult,
+                provider: config.provider,
+                model: config.model,
+                conversationId: conversationId,
+                assistantMessageId: assistantMessageId
+            )
             rollingMessages.append(Message(conversationId: conversationId, role: .user, content: formattedResult))
 
             let providerResult = try await callProvider(
@@ -988,6 +1116,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     private func handleToolProxyLoop(
         initialResponse: String,
         conversationId: String,
+        assistantMessageId: String,
         config: OrchestrationConfig,
         systemPrompt: String?,
         messages: [Message],
@@ -1019,8 +1148,46 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             }
         }
 
-        while iteration < maxIterations {
-            let segment = ToolGatedResponseSegmenter.segment(currentResponse)
+        toolLoop: while iteration < maxIterations {
+            var segment = ToolGatedResponseSegmenter.segment(currentResponse)
+            logFenceParseEvent(
+                segment,
+                provider: config.provider,
+                model: config.model,
+                conversationId: conversationId,
+                assistantMessageId: assistantMessageId
+            )
+
+            if segment.awaitingFenceClose {
+                let recoveryResult = await attemptIncompleteFenceRecovery(
+                    currentResponse: currentResponse,
+                    rollingMessages: rollingMessages,
+                    conversationId: conversationId,
+                    assistantMessageId: assistantMessageId,
+                    provider: config.provider,
+                    model: config.model,
+                    config: config,
+                    systemPrompt: systemPrompt
+                )
+
+                switch recoveryResult {
+                case .succeeded(let recoveredResponse, let recoveredSegment):
+                    currentResponse = recoveredResponse
+                    segment = recoveredSegment
+                    logFenceParseEvent(
+                        segment,
+                        provider: config.provider,
+                        model: config.model,
+                        conversationId: conversationId,
+                        assistantMessageId: assistantMessageId
+                    )
+                case .failed:
+                    appendVisibleSegment(segment.visiblePrefix, into: &accumulatedVisibleResponse)
+                    appendVisibleSegment(ToolGatedResponseSegmenter.incompleteToolBlockDiagnosticNote, into: &accumulatedVisibleResponse)
+                    break toolLoop
+                }
+            }
+
             let visiblePrefix = segment.visiblePrefix
 
             guard let toolRequest = segment.firstToolRequest else {
@@ -1121,6 +1288,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 break
             }
 
+            appendVisibleSegment(visiblePrefix, into: &accumulatedVisibleResponse)
             print("[OnDeviceOrchestrator] Tool request detected: \(toolRequest.tool) - \"\(toolRequest.query)\"")
             toolUsed = true
 
@@ -1175,7 +1343,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 rollingMessages.append(Message(conversationId: conversationId, role: .assistant, content: trimmedResponse))
             }
 
-            let formattedResult = await ToolProxyService.shared.formatToolResult(toolResult)
+            let formattedResult = await ToolProxyService.shared.formatToolResult(
+                toolResult,
+                provider: config.provider,
+                model: config.model,
+                conversationId: conversationId,
+                assistantMessageId: assistantMessageId
+            )
             rollingMessages.append(Message(
                 conversationId: conversationId,
                 role: .user,
@@ -1280,6 +1454,139 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             return String(trimmed[..<newlineIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
         }
         return String(trimmed.prefix(240))
+    }
+
+    private enum IncompleteFenceRecoveryResult {
+        case succeeded(response: String, segment: ToolGatedResponseSegment)
+        case failed
+    }
+
+    private func attemptIncompleteFenceRecovery(
+        currentResponse: String,
+        rollingMessages: [Message],
+        conversationId: String,
+        assistantMessageId: String,
+        provider: String,
+        model: String,
+        config: OrchestrationConfig,
+        systemPrompt: String?
+    ) async -> IncompleteFenceRecoveryResult {
+        logToolChainEvent(
+            "incomplete_fence_recovery",
+            provider: provider,
+            model: model,
+            conversationId: conversationId,
+            assistantMessageId: assistantMessageId,
+            fields: ["status": "attempted"]
+        )
+
+        var recoveryMessages = rollingMessages
+        recoveryMessages.append(Message(conversationId: conversationId, role: .assistant, content: currentResponse))
+        recoveryMessages.append(Message(conversationId: conversationId, role: .user, content: ToolGatedResponseSegmenter.incompleteToolBlockRecoveryFollowUp))
+
+        do {
+            let followUp = try await callProvider(
+                provider: provider,
+                config: config,
+                system: systemPrompt,
+                messages: recoveryMessages
+            ).content
+
+            let combinedResponse: String
+            if followUp.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                combinedResponse = currentResponse
+            } else {
+                combinedResponse = currentResponse + "\n" + followUp
+            }
+
+            let recoveredSegment = ToolGatedResponseSegmenter.segment(combinedResponse)
+            guard !recoveredSegment.awaitingFenceClose, recoveredSegment.firstToolRequest != nil else {
+                logToolChainEvent(
+                    "incomplete_fence_recovery",
+                    provider: provider,
+                    model: model,
+                    conversationId: conversationId,
+                    assistantMessageId: assistantMessageId,
+                    fields: [
+                        "status": "failed",
+                        "reason": "invalid_or_incomplete_after_retry"
+                    ]
+                )
+                return .failed
+            }
+
+            logToolChainEvent(
+                "incomplete_fence_recovery",
+                provider: provider,
+                model: model,
+                conversationId: conversationId,
+                assistantMessageId: assistantMessageId,
+                fields: [
+                    "status": "succeeded",
+                    "fence_tag": recoveredSegment.fenceTag ?? "none"
+                ]
+            )
+            return .succeeded(response: combinedResponse, segment: recoveredSegment)
+        } catch {
+            logToolChainEvent(
+                "incomplete_fence_recovery",
+                provider: provider,
+                model: model,
+                conversationId: conversationId,
+                assistantMessageId: assistantMessageId,
+                fields: [
+                    "status": "failed",
+                    "reason": "recovery_call_error",
+                    "error": String(error.localizedDescription.prefix(180))
+                ]
+            )
+            return .failed
+        }
+    }
+
+    private func logFenceParseEvent(
+        _ segment: ToolGatedResponseSegment,
+        provider: String,
+        model: String,
+        conversationId: String,
+        assistantMessageId: String
+    ) {
+        guard let fenceTag = segment.fenceTag else { return }
+        logToolChainEvent(
+            "tool_fence_parsed",
+            provider: provider,
+            model: model,
+            conversationId: conversationId,
+            assistantMessageId: assistantMessageId,
+            fields: [
+                "fence_tag": fenceTag,
+                "alias_fence": fenceTag == ToolGatedResponseSegmenter.compatibilityFenceTag ? "yes" : "no",
+                "awaiting_close": segment.awaitingFenceClose ? "yes" : "no",
+                "decoded": segment.firstToolRequest != nil ? "yes" : "no"
+            ]
+        )
+    }
+
+    private func logToolChainEvent(
+        _ event: String,
+        provider: String,
+        model: String,
+        conversationId: String,
+        assistantMessageId: String,
+        fields: [String: String] = [:]
+    ) {
+        let metadata = fields
+            .sorted { $0.key < $1.key }
+            .map { key, value in "\(key)=\(sanitizeToolChainLogValue(value))" }
+            .joined(separator: " ")
+        let suffix = metadata.isEmpty ? "" : " \(metadata)"
+        print("[ToolChain][\(event)] provider=\(provider) model=\(model) conversation_id=\(conversationId) assistant_message_id=\(assistantMessageId)\(suffix)")
+    }
+
+    private func sanitizeToolChainLogValue(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
     }
 
     // MARK: - Provider Routing
@@ -1431,6 +1738,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             return try await callOpenAICompatible(
                 apiKey: apiKey,
                 baseUrl: baseUrl,
+                providerName: "openai-compatible",
                 model: config.model,
                 system: system,
                 messages: messages,
@@ -1978,6 +2286,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         return try await callOpenAICompatible(
             apiKey: apiKey,
             baseUrl: "https://api.openai.com/v1",
+            providerName: "openai",
             model: model,
             system: system,
             messages: messages,
@@ -1989,6 +2298,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     private func callOpenAICompatible(
         apiKey: String,
         baseUrl: String,
+        providerName: String = "openai-compatible",
         model: String,
         system: String?,
         messages: [Message],
@@ -2014,7 +2324,13 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             "model": model,
             "messages": apiMessages
         ]
-        if let stops = stopSequences, !stops.isEmpty {
+        let effectiveStopSequences = filteredOpenAIStopSequences(
+            requested: stopSequences,
+            provider: providerName,
+            model: model,
+            baseUrl: baseUrl
+        )
+        if let stops = effectiveStopSequences, !stops.isEmpty {
             body["stop"] = stops
         }
         body.merge(openAIStyleSamplingParameters(from: modelParams, provider: "openai")) { _, new in new }
@@ -2049,8 +2365,31 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         let decoded = try JSONDecoder().decode(OpenAIResponse.self, from: data)
         let text = decoded.choices.first?.message.content ?? ""
         let stoppedByStop = decoded.choices.first?.finishReason == "stop"
-            && stopSequences != nil && !stopSequences!.isEmpty
+            && effectiveStopSequences != nil && !effectiveStopSequences!.isEmpty
         return ProviderResponse(content: text, stoppedByStopSequence: stoppedByStop)
+    }
+
+    private func filteredOpenAIStopSequences(
+        requested: [String]?,
+        provider: String,
+        model: String,
+        baseUrl: String
+    ) -> [String]? {
+        guard let requested, !requested.isEmpty else { return nil }
+
+        let normalizedProvider = provider.lowercased()
+        let normalizedModel = model.lowercased()
+        let normalizedBaseUrl = baseUrl.lowercased()
+        let targetsOpenAIEndpoint = normalizedProvider == "openai"
+            || (normalizedProvider == "openai-compatible" && normalizedBaseUrl.contains("api.openai.com"))
+        let modelRejectsStop = normalizedModel.hasPrefix("gpt-5")
+
+        if targetsOpenAIEndpoint && modelRejectsStop {
+            print("[ToolChain][stop_sequence_omitted] provider=\(provider) model=\(model) reason=unsupported_parameter")
+            return nil
+        }
+
+        return requested
     }
 
     private func callGrok(

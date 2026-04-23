@@ -1120,7 +1120,7 @@ struct ChatContainerView: View {
                                                 messageText += "\n\n" + quotedText
                                             }
                                         },
-                                        liveToolCalls: liveToolCalls[message.id],
+                                        liveToolCalls: liveToolCalls[message.id] ?? message.liveToolCalls,
                                         streamingReasoning: streamedReasoning[message.id],
                                         contextDebugInfo: contextDebugInfos[message.id],
                                         showMetadata: isEndOfCluster
@@ -1955,6 +1955,11 @@ struct ChatContainerView: View {
                         finalContent = completion.fullContent
                     } else if completion.fullContent.count < finalContent.count {
                         print("[Streaming] Completion fullContent shorter than accumulated deltas (completion=\(completion.fullContent.count), accumulated=\(finalContent.count)). Keeping accumulated.")
+                    }
+
+                    if !completion.toolCalls.isEmpty {
+                        finalToolCalls = completion.toolCalls
+                        liveToolCalls[assistantId] = completion.toolCalls
                     }
 
                     if let completionReasoning = completion.reasoning, !completionReasoning.isEmpty {

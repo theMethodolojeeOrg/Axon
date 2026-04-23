@@ -200,9 +200,8 @@ final class ToolRoutingService: ObservableObject {
 
     /// Maps V1 tool IDs to their V2 equivalents for backward compatibility
     private let v1ToV2Aliases: [String: String] = [
-        // VS Code bridge tools → Mac equivalents (when running on Mac without bridge)
-        "vscode_read_file": "mac_file_read",
-        "vscode_list_files": "mac_file_find",
+        // VS Code bridge tools (legacy naming drift)
+        "vscode_list_files": "vscode_list_directory",
         // Legacy aliases
         "google_search": "gemini_google_search",
         "code_execution": "gemini_code_execution",
@@ -218,7 +217,13 @@ final class ToolRoutingService: ObservableObject {
 
     /// Resolve a tool ID, checking for V1 aliases
     private func resolveToolId(_ toolId: String) -> String {
-        // First check if this is a V1 alias that should map to V2
+        // First, honor exact IDs when the tool exists in V2.
+        // This prevents alias rules from overriding explicit tool intent.
+        if pluginLoader.hasToolId(toolId) {
+            return toolId
+        }
+
+        // Then check if this is a V1 alias that should map to V2
         if let v2Id = v1ToV2Aliases[toolId] {
             // Only use alias if the V2 tool exists
             if pluginLoader.hasToolId(v2Id) {
@@ -515,3 +520,12 @@ extension ToolRoutingService {
         // V1 doesn't need explicit reload - tools are loaded from Settings
     }
 }
+
+#if DEBUG
+extension ToolRoutingService {
+    /// Exposes alias resolution for deterministic unit tests.
+    func resolveToolIdForTesting(_ toolId: String) -> String {
+        resolveToolId(toolId)
+    }
+}
+#endif

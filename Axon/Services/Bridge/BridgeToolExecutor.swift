@@ -154,7 +154,7 @@ class BridgeToolExecutor {
                     memoryOperation: nil
                 )
 
-            case .listFiles:
+            case .listDirectory, .listFilesLegacy:
                 // Parse path and recursive flag
                 let parts = request.query.components(separatedBy: "|")
                 let path = parts[0].trimmingCharacters(in: .whitespaces)
@@ -230,7 +230,7 @@ class BridgeToolExecutor {
         }
 
         return ToolResult(
-            tool: BridgeToolId.listFiles.rawValue,
+            tool: BridgeToolId.listDirectory.rawValue,
             success: true,
             result: output,
             sources: nil,

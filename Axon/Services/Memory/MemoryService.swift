@@ -931,17 +931,35 @@ class MemoryService: ObservableObject {
             break
         }
 
-        let modelId: String = {
-            if let selected = selection.builtInModel {
-                return selected
+        let availableModels: [AIModel] = {
+            let registryModels = UnifiedModelRegistry.shared.chatModels(for: builtInProvider)
+            return registryModels.isEmpty ? builtInProvider.availableModels : registryModels
+        }()
+        guard !availableModels.isEmpty else {
+            return .failure(SubconsciousRuntimeResolutionError(message: "Subconscious model is unavailable: no models are configured for \(builtInProvider.displayName)."))
+        }
+
+        let selectedModel: AIModel = {
+            if let explicitModelId = selection.builtInModel,
+               let explicitModel = availableModels.first(where: { $0.id == explicitModelId }) {
+                return explicitModel
             }
-            if builtInProvider == settings.defaultProvider {
-                return settings.defaultModel
+
+            if let explicitModelId = selection.builtInModel {
+                let fallback = availableModels.first!
+                print("[MemoryService] Subconscious model '\(explicitModelId)' is not valid for provider '\(builtInProvider.rawValue)'; falling back to '\(fallback.id)'.")
+                return fallback
             }
-            return builtInProvider.availableModels.first?.id ?? settings.defaultModel
+
+            if builtInProvider == settings.defaultProvider,
+               let defaultModel = availableModels.first(where: { $0.id == settings.defaultModel }) {
+                return defaultModel
+            }
+
+            return availableModels.first!
         }()
 
-        let contextWindow = max(1_024, AIProvider.contextWindowForModel(modelId, settings: settings))
+        let contextWindow = max(1_024, selectedModel.contextWindow)
 
         let providerApiKey: String? = {
             switch builtInProvider {
@@ -967,7 +985,7 @@ class MemoryService: ObservableObject {
             SubconsciousRuntimeConfig(
                 provider: providerString,
                 providerDisplayName: builtInProvider.displayName,
-                model: modelId,
+                model: selectedModel.id,
                 contextWindow: contextWindow,
                 apiKey: apiKey,
                 baseUrl: nil

@@ -426,7 +426,10 @@ struct AssistantMessageView: View {
                 // Streaming mode with tool calls - interleave content and tools
                 StreamingContentWithToolsView(
                     content: textToRender,
-                    toolCalls: toolCalls
+                    toolCalls: toolCalls,
+                    isFromHistory: !isStreaming,
+                    conversationId: message.conversationId,
+                    messageId: message.id
                 )
             } else {
                 // Standard markdown rendering
@@ -919,6 +922,9 @@ private enum ContentSegment: Identifiable {
 struct StreamingContentWithToolsView: View {
     let content: String
     let toolCalls: [LiveToolCall]
+    var isFromHistory: Bool = false
+    var conversationId: String? = nil
+    var messageId: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -928,7 +934,13 @@ struct StreamingContentWithToolsView: View {
                 switch segment {
                 case .text(let text):
                     if !text.isEmpty {
-                        AssistantMarkdownView(content: text)
+                        AssistantMarkdownView(
+                            content: text,
+                            executedToolCalls: toolCalls,
+                            isFromHistory: isFromHistory,
+                            conversationId: conversationId,
+                            messageId: messageId
+                        )
                             .codeArtifactHost()
                     }
 

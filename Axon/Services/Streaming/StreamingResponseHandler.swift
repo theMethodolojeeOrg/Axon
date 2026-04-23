@@ -24,6 +24,8 @@ class StreamingResponseHandler {
         let maxTokens: Int
         let modelParams: ModelGenerationSettings?
         let stopSequences: [String]?
+        let conversationId: String?
+        let assistantMessageId: String?
 
         init(
             provider: String,
@@ -33,7 +35,9 @@ class StreamingResponseHandler {
             system: String? = nil,
             maxTokens: Int = 4096,
             modelParams: ModelGenerationSettings? = nil,
-            stopSequences: [String]? = nil
+            stopSequences: [String]? = nil,
+            conversationId: String? = nil,
+            assistantMessageId: String? = nil
         ) {
             self.provider = provider
             self.apiKey = apiKey
@@ -43,6 +47,8 @@ class StreamingResponseHandler {
             self.maxTokens = maxTokens
             self.modelParams = modelParams
             self.stopSequences = stopSequences
+            self.conversationId = conversationId
+            self.assistantMessageId = assistantMessageId
         }
     }
 
@@ -250,7 +256,10 @@ class StreamingResponseHandler {
                 baseUrl: "https://api.openai.com/v1",
                 system: config.system,
                 maxTokens: config.maxTokens,
-                modelParams: config.modelParams
+                modelParams: config.modelParams,
+                stopSequences: config.stopSequences,
+                conversationId: config.conversationId,
+                assistantMessageId: config.assistantMessageId
             ),
             messages: messages,
             continuation: continuation
@@ -289,6 +298,20 @@ class StreamingResponseHandler {
         while baseUrl.hasSuffix("/") {
             baseUrl.removeLast()
         }
+
+        let effectiveStopSequences = filteredOpenAIStopSequences(
+            requested: config.stopSequences,
+            provider: config.provider,
+            model: config.model,
+            baseUrl: baseUrl,
+            conversationId: config.conversationId,
+            assistantMessageId: config.assistantMessageId
+        )
+        logStopSequenceForwarding(
+            event: "stream_stop_sequence_forwarded",
+            config: config,
+            forwarded: (effectiveStopSequences?.isEmpty == false)
+        )
         
         let fullUrlString = "\(baseUrl)/chat/completions"
         
@@ -332,7 +355,7 @@ class StreamingResponseHandler {
             "messages": apiMessages,
             "stream": true
         ]
-        if let stops = config.stopSequences, !stops.isEmpty {
+        if let stops = effectiveStopSequences, !stops.isEmpty {
             body["stop"] = stops
         }
         body.merge(openAIStyleSamplingParameters(from: config.modelParams, provider: config.provider)) { _, new in new }
@@ -736,11 +759,49 @@ class StreamingResponseHandler {
                 baseUrl: "https://api.x.ai/v1",
                 system: config.system,
                 maxTokens: config.maxTokens,
-                modelParams: config.modelParams
+                modelParams: config.modelParams,
+                stopSequences: config.stopSequences,
+                conversationId: config.conversationId,
+                assistantMessageId: config.assistantMessageId
             ),
             messages: messages,
             continuation: continuation
         )
+    }
+
+    private func filteredOpenAIStopSequences(
+        requested: [String]?,
+        provider: String,
+        model: String,
+        baseUrl: String,
+        conversationId: String?,
+        assistantMessageId: String?
+    ) -> [String]? {
+        guard let requested, !requested.isEmpty else { return nil }
+
+        let normalizedProvider = provider.lowercased()
+        let normalizedModel = model.lowercased()
+        let normalizedBaseUrl = baseUrl.lowercased()
+        let targetsOpenAIEndpoint = normalizedProvider == "openai"
+            || (normalizedProvider == "openai-compatible" && normalizedBaseUrl.contains("api.openai.com"))
+        let modelRejectsStop = normalizedModel.hasPrefix("gpt-5")
+
+        if targetsOpenAIEndpoint && modelRejectsStop {
+            print("[ToolChain][stream_stop_sequence_omitted] provider=\(provider) model=\(model) conversation_id=\(conversationId ?? "unknown") assistant_message_id=\(assistantMessageId ?? "unknown") reason=unsupported_parameter")
+            return nil
+        }
+
+        return requested
+    }
+
+    private func logStopSequenceForwarding(
+        event: String,
+        config: StreamingConfig,
+        forwarded: Bool
+    ) {
+        let conversationId = config.conversationId ?? "unknown"
+        let assistantMessageId = config.assistantMessageId ?? "unknown"
+        print("[ToolChain][\(event)] provider=\(config.provider) model=\(config.model) conversation_id=\(conversationId) assistant_message_id=\(assistantMessageId) stop_sequence_forwarded=\(forwarded ? "yes" : "no")")
     }
 
     // MARK: - Attachment Formatting

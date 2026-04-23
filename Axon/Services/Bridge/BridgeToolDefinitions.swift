@@ -14,14 +14,15 @@ import Foundation
 enum BridgeToolId: String, CaseIterable {
     case readFile = "vscode_read_file"
     case writeFile = "vscode_write_file"
-    case listFiles = "vscode_list_files"
+    case listDirectory = "vscode_list_directory"
+    case listFilesLegacy = "vscode_list_files"
     case runTerminal = "vscode_run_terminal"
 
     var displayName: String {
         switch self {
         case .readFile: return "Read File (VS Code)"
         case .writeFile: return "Write File (VS Code)"
-        case .listFiles: return "List Files (VS Code)"
+        case .listDirectory, .listFilesLegacy: return "List Directory (VS Code)"
         case .runTerminal: return "Run Terminal (VS Code)"
         }
     }
@@ -32,7 +33,7 @@ enum BridgeToolId: String, CaseIterable {
             return "Read the contents of a file from the connected VS Code workspace"
         case .writeFile:
             return "Write or create a file in the connected VS Code workspace"
-        case .listFiles:
+        case .listDirectory, .listFilesLegacy:
             return "List files and directories in the connected VS Code workspace"
         case .runTerminal:
             return "Execute a terminal command in the connected VS Code workspace"
@@ -43,7 +44,7 @@ enum BridgeToolId: String, CaseIterable {
         switch self {
         case .readFile: return "doc.text.magnifyingglass"
         case .writeFile: return "doc.badge.plus"
-        case .listFiles: return "folder.badge.gearshape"
+        case .listDirectory, .listFilesLegacy: return "folder.badge.gearshape"
         case .runTerminal: return "terminal"
         }
     }
@@ -52,7 +53,7 @@ enum BridgeToolId: String, CaseIterable {
     /// All VS Code bridge tools require approval since they access external workspace
     var requiresApproval: Bool {
         switch self {
-        case .readFile, .listFiles:
+        case .readFile, .listDirectory, .listFilesLegacy:
             return true  // Even read-only needs approval for VS Code access
         case .writeFile, .runTerminal:
             return true   // Mutations require approval
@@ -62,7 +63,7 @@ enum BridgeToolId: String, CaseIterable {
     /// Risk level for approval UI
     var riskLevel: String {
         switch self {
-        case .readFile, .listFiles: return "low"
+        case .readFile, .listDirectory, .listFilesLegacy: return "low"
         case .writeFile: return "medium"
         case .runTerminal: return "high"
         }
@@ -73,7 +74,7 @@ enum BridgeToolId: String, CaseIterable {
         switch self {
         case .readFile: return .fileRead
         case .writeFile: return .fileWrite
-        case .listFiles: return .fileList
+        case .listDirectory, .listFilesLegacy: return .fileList
         case .runTerminal: return .terminalRun
         }
     }
@@ -97,6 +98,15 @@ extension BridgeToolId {
             Read the contents of a file from the workspace.
             ```tool_request
             {"tool": "vscode_read_file", "query": "path/to/file.ts"}
+            ```
+
+            ### vscode_list_directory
+            List directory contents from the workspace.
+            ```tool_request
+            {"tool": "vscode_list_directory", "query": "."}
+            ```
+
+            Legacy compatibility note: `vscode_list_files` may still appear in older prompts, but prefer `vscode_list_directory`.
             """
     }
 }
