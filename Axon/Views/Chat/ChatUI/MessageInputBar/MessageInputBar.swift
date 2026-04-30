@@ -30,6 +30,226 @@ extension MessageAttachment.AttachmentType {
     }
 }
 
+// MARK: - Attachment Hub
+
+private struct AttachmentHubSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let capability: AttachmentCapability
+    let bridgeStatus: String?
+    let onSelectPhotos: () -> Void
+    let onSelectAnyFile: () -> Void
+    let onSelectDocument: () -> Void
+    let onSelectVideo: () -> Void
+    let onSelectAudio: () -> Void
+    let onToggleBridge: () -> Void
+
+    private let attachmentTypes: [MessageAttachment.AttachmentType] = [.image, .document, .audio, .video]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                header
+                quickActions
+                supportedTypes
+            }
+            .padding(24)
+        }
+        .scrollContentBackground(.hidden)
+        .presentationDetents([.medium, .large])
+        #if os(macOS)
+        .frame(minWidth: 440, minHeight: 420)
+        #endif
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Add to Message")
+                    .font(.title3.weight(.semibold))
+                    .foregroundColor(AppColors.textPrimary)
+
+                Spacer()
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(AppColors.textSecondary)
+                        .frame(width: 28, height: 28)
+                        .background(AppSurfaces.color(.controlMutedBackground), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close")
+            }
+
+            Text(capability.description)
+                .font(AppTypography.bodySmall())
+                .foregroundColor(AppColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var quickActions: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), spacing: 12)], spacing: 12) {
+            AttachmentQuickActionTile(
+                title: "Photos",
+                subtitle: capability.images ? "Images" : "Unavailable",
+                systemImage: "photo.on.rectangle",
+                isEnabled: capability.images,
+                action: onSelectPhotos
+            )
+
+            AttachmentQuickActionTile(
+                title: "Files",
+                subtitle: capability.supportsAnyAttachment ? "Browse" : "Unavailable",
+                systemImage: "folder",
+                isEnabled: capability.supportsAnyAttachment,
+                action: onSelectAnyFile
+            )
+
+            if let bridgeStatus {
+                AttachmentQuickActionTile(
+                    title: "VS Code",
+                    subtitle: bridgeStatus,
+                    systemImage: "personalhotspot",
+                    isEnabled: true,
+                    action: onToggleBridge
+                )
+            }
+        }
+    }
+
+    private var supportedTypes: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Accepted MIME Types")
+                .font(AppTypography.labelSmall())
+                .foregroundColor(AppColors.textTertiary)
+
+            VStack(spacing: 8) {
+                ForEach(attachmentTypes, id: \.self) { type in
+                    AttachmentMimeTypeRow(
+                        type: type,
+                        patterns: capability.mimePatterns(for: type),
+                        action: action(for: type)
+                    )
+                }
+            }
+        }
+    }
+
+    private func action(for type: MessageAttachment.AttachmentType) -> () -> Void {
+        switch type {
+        case .image:
+            return onSelectPhotos
+        case .document:
+            return onSelectDocument
+        case .audio:
+            return onSelectAudio
+        case .video:
+            return onSelectVideo
+        }
+    }
+}
+
+private struct AttachmentQuickActionTile: View {
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    let isEnabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundColor(isEnabled ? AppColors.textPrimary : AppColors.textDisabled)
+
+                VStack(spacing: 2) {
+                    Text(title)
+                        .font(AppTypography.bodyMedium().weight(.semibold))
+                        .foregroundColor(isEnabled ? AppColors.textPrimary : AppColors.textDisabled)
+
+                    Text(subtitle)
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 104)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(AppSurfaces.color(.cardBorder).opacity(0.65), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.55)
+    }
+}
+
+private struct AttachmentMimeTypeRow: View {
+    let type: MessageAttachment.AttachmentType
+    let patterns: [String]
+    let action: () -> Void
+
+    private var isSupported: Bool {
+        !patterns.isEmpty
+    }
+
+    private var title: String {
+        switch type {
+        case .image: return "Photos"
+        case .document: return "Documents"
+        case .audio: return "Audio"
+        case .video: return "Video"
+        }
+    }
+
+    private var subtitle: String {
+        isSupported ? patterns.joined(separator: ", ") : "Not supported by the current model"
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: type.iconName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(isSupported ? AppColors.signalMercury : AppColors.textDisabled)
+                    .frame(width: 30, height: 30)
+                    .background(AppSurfaces.color(.controlMutedBackground), in: Circle())
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(AppTypography.bodyMedium().weight(.semibold))
+                        .foregroundColor(isSupported ? AppColors.textPrimary : AppColors.textDisabled)
+
+                    Text(subtitle)
+                        .font(AppTypography.labelSmall())
+                        .foregroundColor(AppColors.textTertiary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppColors.textTertiary)
+            }
+            .padding(12)
+            .background(AppSurfaces.color(.controlMutedBackground).opacity(0.45), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isSupported)
+        .opacity(isSupported ? 1 : 0.55)
+    }
+}
+
 // MARK: - Custom Text Editor with Enter/Shift+Enter handling
 
 #if canImport(AppKit)
@@ -303,7 +523,7 @@ struct MessageInputBar: View {
     @State private var showVideoImporter = false
     @State private var showAudioImporter = false
     @State private var showAnyFileImporter = false
-    @State private var showAttachmentOptions = false  // iOS action sheet
+    @State private var showAttachmentHub = false
     @State private var attachmentValidationMessage: String?
 
     // Flag to prevent onChange from overriding manual state updates
@@ -368,6 +588,20 @@ struct MessageInputBar: View {
         canSend || isLoading ? .white : AppColors.textSecondary.opacity(0.55)
     }
 
+    private var bridgeStatusSummary: String? {
+        #if os(macOS)
+        if bridgeServer.isConnected, let session = bridgeServer.connectedSession {
+            return "Connected to \(session.displayName)"
+        }
+        if bridgeServer.isRunning {
+            return "Waiting for VS Code"
+        }
+        return "Start VS Code Bridge"
+        #else
+        return nil
+        #endif
+    }
+
     // MARK: - Actions
 
     private func handleSend() {
@@ -379,6 +613,23 @@ struct MessageInputBar: View {
         guard isLoading else { return }
         onStop?()
     }
+
+    private func presentAttachmentPicker(_ present: @escaping () -> Void) {
+        showAttachmentHub = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            present()
+        }
+    }
+
+    #if os(macOS)
+    private func toggleBridgeServer() async {
+        if bridgeServer.isRunning {
+            await bridgeServer.stop()
+        } else {
+            await bridgeServer.start()
+        }
+    }
+    #endif
 
     // MARK: - Slash Command Menu (delegated to ViewModel)
 
@@ -484,18 +735,26 @@ struct MessageInputBar: View {
             }
             .appSheetMaterial()
 }
-        .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
-        #if os(iOS)
-        .confirmationDialog(
-            "Add Attachment",
-            isPresented: $showAttachmentOptions,
-            titleVisibility: .visible
-        ) {
-            attachmentDialogButtons
-        } message: {
-            Text(attachmentCapability.description)
+        .sheet(isPresented: $showAttachmentHub) {
+            AttachmentHubSheet(
+                capability: attachmentCapability,
+                bridgeStatus: bridgeStatusSummary,
+                onSelectPhotos: { presentAttachmentPicker { showPhotoPicker = true } },
+                onSelectAnyFile: { presentAttachmentPicker { showAnyFileImporter = true } },
+                onSelectDocument: { presentAttachmentPicker { showFileImporter = true } },
+                onSelectVideo: { presentAttachmentPicker { showVideoImporter = true } },
+                onSelectAudio: { presentAttachmentPicker { showAudioImporter = true } },
+                onToggleBridge: {
+                    #if os(macOS)
+                    presentAttachmentPicker {
+                        Task { await toggleBridgeServer() }
+                    }
+                    #endif
+                }
+            )
+            .appSheetMaterial()
         }
-        #endif
+        .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
         .alert("Attachment Error", isPresented: Binding(
             get: { attachmentValidationMessage != nil },
             set: { shown in
@@ -555,41 +814,6 @@ struct MessageInputBar: View {
         .frame(maxWidth: .infinity, alignment: .center)
         .padding(.horizontal, ChatVisualTokens.chatRailHorizontalPadding)
     }
-
-    #if os(iOS)
-    @ViewBuilder
-    private var attachmentDialogButtons: some View {
-        let capability = attachmentCapability
-
-        if capability.images {
-            Button("Photo Library") {
-                debugLog(.attachments, "User tapped Photo Library")
-                showPhotoPicker = true
-            }
-        }
-        if capability.video {
-            Button("Video") {
-                debugLog(.attachments, "User tapped Video")
-                showVideoImporter = true
-            }
-        }
-        if capability.audio {
-            Button("Audio") {
-                debugLog(.attachments, "User tapped Audio")
-                showAudioImporter = true
-            }
-        }
-        if capability.documents {
-            Button("Document") {
-                debugLog(.attachments, "User tapped Document")
-                showFileImporter = true
-            }
-        }
-        Button("Cancel", role: .cancel) {
-            debugLog(.attachments, "User cancelled attachment selection")
-        }
-    }
-    #endif
 
     // MARK: - Subviews
 
@@ -740,68 +964,22 @@ struct MessageInputBar: View {
 
     @ViewBuilder
     private func attachmentMenu(capability: AttachmentCapability) -> some View {
-        #if os(iOS)
-        // iOS: Use button that triggers confirmationDialog (avoids UIContextMenu timing issues)
         Button {
-            debugLog(.attachments, "Attachment button tapped - opening action sheet")
-            showAttachmentOptions = true
+            debugLog(.attachments, "Attachment hub button tapped")
+            showAttachmentHub = true
         } label: {
-            HStack(spacing: 2) {
-                Image(systemName: "paperclip")
-                    .font(.system(size: ChatVisualTokens.composerControlGlyphSize, weight: .medium))
-                Image(systemName: "chevron.down")
-                    .font(.system(size: ChatVisualTokens.composerControlChevronSize, weight: .semibold))
-            }
+            Image(systemName: "plus")
+                .font(.system(size: ChatVisualTokens.composerControlGlyphSize + 2, weight: .medium))
             .foregroundColor(AppColors.textSecondary)
             .frame(width: ChatVisualTokens.composerControlSize, height: ChatVisualTokens.composerControlSize)
-            .contentShape(Rectangle())
+            .background(
+                Circle()
+                    .fill(AppSurfaces.color(.controlMutedBackground).opacity(0.45))
+            )
+            .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Add attachment")
-        #else
-        // macOS: Keep Menu (works fine, no UIContextMenu timing issues)
-        Menu {
-            Button(action: { showAnyFileImporter = true }) {
-                Label("Choose File...", systemImage: "folder")
-            }
-            Divider()
-            if capability.images {
-                Button(action: { showPhotoPicker = true }) {
-                    Label("Photo Library", systemImage: "photo.on.rectangle")
-                }
-            }
-            if capability.video {
-                Button(action: { showVideoImporter = true }) {
-                    Label("Video", systemImage: "video")
-                }
-            }
-            if capability.audio {
-                Button(action: { showAudioImporter = true }) {
-                    Label("Audio", systemImage: "waveform")
-                }
-            }
-            if capability.documents {
-                Button(action: { showFileImporter = true }) {
-                    Label("Document", systemImage: "doc")
-                }
-            }
-            Divider()
-            Text(capability.description)
-                .font(.caption)
-                .foregroundColor(AppColors.textSecondary)
-        } label: {
-            HStack(spacing: 2) {
-                Image(systemName: "paperclip")
-                    .font(.system(size: ChatVisualTokens.composerControlGlyphSize, weight: .medium))
-                Image(systemName: "chevron.down")
-                    .font(.system(size: ChatVisualTokens.composerControlChevronSize, weight: .semibold))
-            }
-            .foregroundColor(AppColors.textSecondary)
-            .frame(width: ChatVisualTokens.composerControlSize, height: ChatVisualTokens.composerControlSize)
-            .contentShape(Rectangle())
-        }
-        .menuStyle(.borderlessButton)
-        #endif
     }
 
     @ViewBuilder
