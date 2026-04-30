@@ -33,13 +33,35 @@ enum ChatVisualTokens {
     // MARK: - Composer
 
     static let minTouchTarget: CGFloat = 44
-    static let composerCornerRadius: CGFloat = 20
-    static let composerInnerCornerRadius: CGFloat = 14
+    #if os(macOS)
+    static let composerCornerRadius: CGFloat = 16
+    static let composerInnerCornerRadius: CGFloat = 11
+    static let composerControlSize: CGFloat = 32
+    static let composerControlGlyphSize: CGFloat = 15
+    static let composerControlChevronSize: CGFloat = 8
+    static let composerOuterVerticalPadding: CGFloat = 5
+    static let composerInputMaxHeight: CGFloat = 96
+    static let composerAttachmentTileSize: CGFloat = 48
+    #else
+    static let composerCornerRadius: CGFloat = 28
+    static let composerInnerCornerRadius: CGFloat = 18
+    static let composerControlSize: CGFloat = 44
+    static let composerControlGlyphSize: CGFloat = 18
+    static let composerControlChevronSize: CGFloat = 10
+    static let composerOuterVerticalPadding: CGFloat = 7
+    static let composerInputMaxHeight: CGFloat = 120
+    static let composerAttachmentTileSize: CGFloat = 56
+    #endif
     static let composerHorizontalPadding: CGFloat = 12
     static let composerBottomPadding: CGFloat = 6
-    static let composerAttachmentPreviewHeight: CGFloat = 64
+    static let composerAttachmentPreviewHeight: CGFloat = composerAttachmentTileSize + 16
     static let composerSendGlyphSize: CGFloat = 15
+    #if os(macOS)
+    static let composerSendIconFrame: CGFloat = 28
+    #else
     static let composerSendIconFrame: CGFloat = 34
+    #endif
+    static let composerSlashMenuBottomOffset: CGFloat = composerControlSize + (composerOuterVerticalPadding * 2) + composerBottomPadding + 32
 
     // MARK: - iOS Chrome
 

@@ -295,7 +295,6 @@ struct MessageInputBar: View {
     // ViewModel handles attachment capability and slash command state
     @StateObject private var viewModel: MessageInputViewModel
 
-    private let inputMaxHeight: CGFloat = 120
     @State private var inputHeight: CGFloat = 20
 
     @State private var selectedItem: PhotosPickerItem?
@@ -344,6 +343,29 @@ struct MessageInputBar: View {
 
     private var isSlashCommand: Bool {
         viewModel.isSlashCommand(text)
+    }
+
+    private var isComposerFocused: Bool {
+        focus?.wrappedValue ?? false
+    }
+
+    private var composerBorderColor: Color {
+        isComposerFocused ? AppColors.signalMercury.opacity(0.45) : AppSurfaces.color(.cardBorder).opacity(0.85)
+    }
+
+    private var composerFocusGlow: Color {
+        isComposerFocused ? AppColors.signalMercury.opacity(0.14) : .clear
+    }
+
+    private var sendButtonFill: Color {
+        if isLoading {
+            return AppColors.signalHematite.opacity(0.9)
+        }
+        return canSend ? AppColors.signalLichen : AppSurfaces.color(.controlBackground).opacity(0.8)
+    }
+
+    private var sendButtonForeground: Color {
+        canSend || isLoading ? .white : AppColors.textSecondary.opacity(0.55)
     }
 
     // MARK: - Actions
@@ -507,7 +529,7 @@ struct MessageInputBar: View {
                         onDismiss: { viewModel.dismissSlashMenu() }
                     )
                     .padding(.horizontal)
-                    .padding(.bottom, 92)
+                    .padding(.bottom, ChatVisualTokens.composerSlashMenuBottomOffset)
                     .frame(maxWidth: ChatVisualTokens.chatRailMaxWidth)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.horizontal, ChatVisualTokens.chatRailHorizontalPadding)
@@ -525,37 +547,7 @@ struct MessageInputBar: View {
                 attachmentsPreview
             }
 
-            // Main input bar
-            HStack(alignment: .center, spacing: 8) {
-                let capability = attachmentCapability
-
-                // VS Code Bridge Toggle (macOS only)
-                #if os(macOS)
-                bridgeButton
-                #endif
-
-                // Attachment Button
-                if capability.supportsAnyAttachment {
-                    attachmentMenu(capability: capability)
-                }
-
-                // Text input area
-                textInputArea
-
-                // Send button
-                sendButton
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: ChatVisualTokens.composerCornerRadius)
-                    .fill(AppSurfaces.color(.inputBackground).opacity(0.95))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: ChatVisualTokens.composerCornerRadius)
-                            .stroke(AppSurfaces.color(.cardBorder).opacity(0.8), lineWidth: 1)
-                    )
-            )
-            .shadow(color: AppColors.shadow.opacity(0.12), radius: 8, x: 0, y: -1)
+            composerShell
             .padding(.horizontal, ChatVisualTokens.composerHorizontalPadding)
             .padding(.bottom, ChatVisualTokens.composerBottomPadding)
         }
@@ -602,6 +594,72 @@ struct MessageInputBar: View {
     // MARK: - Subviews
 
     @ViewBuilder
+    private var composerShell: some View {
+        let capability = attachmentCapability
+
+        HStack(alignment: .center, spacing: 8) {
+            #if os(macOS)
+            leadingControlGroup(capability: capability)
+
+            if capability.supportsAnyAttachment {
+                composerSeparator
+            }
+            #else
+            if capability.supportsAnyAttachment {
+                attachmentMenu(capability: capability)
+            }
+            #endif
+
+            textInputArea
+
+            sendButton
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, ChatVisualTokens.composerOuterVerticalPadding)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: ChatVisualTokens.composerCornerRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: ChatVisualTokens.composerCornerRadius, style: .continuous)
+                .stroke(AppSurfaces.color(.cardBorder).opacity(0.55), lineWidth: 1)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: ChatVisualTokens.composerCornerRadius, style: .continuous)
+                .stroke(composerBorderColor, lineWidth: isComposerFocused ? 1.5 : 0.75)
+        )
+        .shadow(color: composerFocusGlow, radius: 10, x: 0, y: 0)
+        .shadow(color: AppColors.shadow.opacity(0.18), radius: 10, x: 0, y: -2)
+        .animation(.easeInOut(duration: 0.16), value: isComposerFocused)
+    }
+
+    #if os(macOS)
+    @ViewBuilder
+    private func leadingControlGroup(capability: AttachmentCapability) -> some View {
+        HStack(spacing: 1) {
+            bridgeButton
+
+            if capability.supportsAnyAttachment {
+                attachmentMenu(capability: capability)
+            }
+        }
+        .padding(2)
+        .background(
+            Capsule(style: .continuous)
+                .fill(AppSurfaces.color(.controlMutedBackground).opacity(0.65))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(AppSurfaces.color(.cardBorder).opacity(0.45), lineWidth: 1)
+        )
+    }
+
+    private var composerSeparator: some View {
+        Rectangle()
+            .fill(AppSurfaces.color(.separator).opacity(0.65))
+            .frame(width: 1, height: 22)
+            .padding(.horizontal, 1)
+    }
+    #endif
+
+    @ViewBuilder
     private var attachmentsPreview: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
@@ -609,14 +667,23 @@ struct MessageInputBar: View {
                     attachmentPreviewItem(attachment: $attachment)
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 8)
             .padding(.vertical, 8)
         }
         .frame(height: ChatVisualTokens.composerAttachmentPreviewHeight)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: ChatVisualTokens.composerInnerCornerRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: ChatVisualTokens.composerInnerCornerRadius, style: .continuous)
+                .stroke(AppSurfaces.color(.cardBorder).opacity(0.55), lineWidth: 1)
+        )
+        .padding(.horizontal, ChatVisualTokens.composerHorizontalPadding)
+        .padding(.bottom, 6)
     }
 
     @ViewBuilder
     private func attachmentPreviewItem(attachment: Binding<MessageAttachment>) -> some View {
+        let tileSize = ChatVisualTokens.composerAttachmentTileSize
+
         ZStack(alignment: .topTrailing) {
             // Preview
             if attachment.wrappedValue.type == .image,
@@ -627,14 +694,14 @@ struct MessageInputBar: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 56, height: 56)
+                    .frame(width: tileSize, height: tileSize)
                     .cornerRadius(10)
                     .clipped()
                 #elseif canImport(AppKit)
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 56, height: 56)
+                    .frame(width: tileSize, height: tileSize)
                     .cornerRadius(10)
                     .clipped()
                 #else
@@ -650,7 +717,7 @@ struct MessageInputBar: View {
                         .lineLimit(1)
                         .foregroundColor(AppColors.textSecondary)
                 }
-                .frame(width: 56, height: 56)
+                .frame(width: tileSize, height: tileSize)
                 .background(AppSurfaces.color(.controlBackground))
                 .cornerRadius(10)
             }
@@ -681,12 +748,12 @@ struct MessageInputBar: View {
         } label: {
             HStack(spacing: 2) {
                 Image(systemName: "paperclip")
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.system(size: ChatVisualTokens.composerControlGlyphSize, weight: .medium))
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: ChatVisualTokens.composerControlChevronSize, weight: .semibold))
             }
             .foregroundColor(AppColors.textSecondary)
-            .frame(width: ChatVisualTokens.minTouchTarget, height: ChatVisualTokens.minTouchTarget)
+            .frame(width: ChatVisualTokens.composerControlSize, height: ChatVisualTokens.composerControlSize)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -725,16 +792,35 @@ struct MessageInputBar: View {
         } label: {
             HStack(spacing: 2) {
                 Image(systemName: "paperclip")
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.system(size: ChatVisualTokens.composerControlGlyphSize, weight: .medium))
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: ChatVisualTokens.composerControlChevronSize, weight: .semibold))
             }
             .foregroundColor(AppColors.textSecondary)
-            .frame(width: ChatVisualTokens.minTouchTarget, height: ChatVisualTokens.minTouchTarget)
+            .frame(width: ChatVisualTokens.composerControlSize, height: ChatVisualTokens.composerControlSize)
             .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
         #endif
+    }
+
+    @ViewBuilder
+    private var focusedTextEditor: some View {
+        let editor = ChatTextEditor(
+                text: $text,
+                placeholder: "Message or /tool...",
+                isDisabled: isLoading,
+                maxHeight: ChatVisualTokens.composerInputMaxHeight,
+                dynamicHeight: $inputHeight,
+                onSubmit: handleSend
+            )
+            .frame(height: inputHeight)
+
+        if let focus {
+            editor.focused(focus)
+        } else {
+            editor
+        }
     }
 
     @ViewBuilder
@@ -750,28 +836,22 @@ struct MessageInputBar: View {
             }
 
             // Custom text editor with Enter handling
-            ChatTextEditor(
-                text: $text,
-                placeholder: "Message or /tool...",
-                isDisabled: isLoading,
-                maxHeight: inputMaxHeight,
-                dynamicHeight: $inputHeight,
-                onSubmit: handleSend
-            )
-            .frame(height: inputHeight)
+            focusedTextEditor
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
-        .frame(minHeight: 40)
-        .background(
-            RoundedRectangle(cornerRadius: ChatVisualTokens.composerInnerCornerRadius)
-                .fill(AppSurfaces.color(.controlMutedBackground))
-        )
+        .frame(minHeight: ChatVisualTokens.composerControlSize - 4)
+        .background(AppSurfaces.color(.controlMutedBackground).opacity(0.55), in: RoundedRectangle(cornerRadius: ChatVisualTokens.composerInnerCornerRadius, style: .continuous))
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: ChatVisualTokens.composerInnerCornerRadius, style: .continuous))
         .overlay(
             // Visual indicator when typing a slash command
-            RoundedRectangle(cornerRadius: ChatVisualTokens.composerInnerCornerRadius)
+            RoundedRectangle(cornerRadius: ChatVisualTokens.composerInnerCornerRadius, style: .continuous)
                 .stroke(isSlashCommand ? AppColors.signalMercury.opacity(0.6) : Color.clear, lineWidth: 1.5)
         )
+        .contentShape(RoundedRectangle(cornerRadius: ChatVisualTokens.composerInnerCornerRadius, style: .continuous))
+        .onTapGesture {
+            focus?.wrappedValue = true
+        }
         .animation(.easeInOut(duration: 0.15), value: isSlashCommand)
     }
 
@@ -782,20 +862,24 @@ struct MessageInputBar: View {
                 if isLoading {
                     Image(systemName: "stop.fill")
                         .font(.system(size: ChatVisualTokens.composerSendGlyphSize, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(sendButtonForeground)
                 } else {
                     Image(systemName: "arrow.up")
                         .font(.system(size: ChatVisualTokens.composerSendGlyphSize, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(sendButtonForeground)
                 }
             }
             .frame(width: ChatVisualTokens.composerSendIconFrame, height: ChatVisualTokens.composerSendIconFrame)
             .background(
                 Circle()
-                    .fill(isLoading ? .white.opacity(0.3) : (canSend ? AppColors.signalLichen : AppColors.textDisabled.opacity(0.3)))
-                    .shadow(color: canSend && !isLoading ? AppColors.signalLichen.opacity(0.3) : .clear, radius: 4, x: 0, y: 2)
+                    .fill(sendButtonFill)
+                    .overlay(
+                        Circle()
+                            .stroke(AppSurfaces.color(.cardBorder).opacity(canSend || isLoading ? 0.35 : 0.7), lineWidth: 1)
+                    )
+                    .shadow(color: canSend && !isLoading ? AppColors.signalLichen.opacity(0.28) : .clear, radius: 5, x: 0, y: 2)
             )
-            .frame(width: ChatVisualTokens.minTouchTarget, height: ChatVisualTokens.minTouchTarget)
+            .frame(width: ChatVisualTokens.composerControlSize, height: ChatVisualTokens.composerControlSize)
         }
         .buttonStyle(.plain)
         .disabled(!isLoading && !canSend)
@@ -819,9 +903,9 @@ struct MessageInputBar: View {
             }
         } label: {
             Image(systemName: bridgeIconName)
-                .font(.system(size: 16, weight: .medium))
+                .font(.system(size: ChatVisualTokens.composerControlGlyphSize, weight: .medium))
                 .foregroundColor(bridgeIconColor)
-                .frame(width: ChatVisualTokens.minTouchTarget, height: ChatVisualTokens.minTouchTarget)
+                .frame(width: ChatVisualTokens.composerControlSize, height: ChatVisualTokens.composerControlSize)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
