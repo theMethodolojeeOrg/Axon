@@ -69,10 +69,10 @@ struct ArchivedConversationsSettingsView: View {
                                 }
                             }
                             .padding()
-                            .background(AppColors.substrateSecondary)
+                            .background(AppSurfaces.color(.cardBackground))
                             .overlay(
                                 Rectangle()
-                                    .fill(AppColors.glassBorder)
+                                    .fill(AppSurfaces.color(.cardBorder))
                                     .frame(height: 1)
                                     .opacity(0.5), alignment: .bottom
                             )
@@ -104,7 +104,7 @@ struct ArchivedConversationsSettingsView: View {
                         .labelsHidden()
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
 
                     Button(action: purgeNow) {
@@ -166,5 +166,5 @@ struct ArchivedConversationsSettingsView: View {
         ArchivedConversationsSettingsView(viewModel: SettingsViewModel())
             .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

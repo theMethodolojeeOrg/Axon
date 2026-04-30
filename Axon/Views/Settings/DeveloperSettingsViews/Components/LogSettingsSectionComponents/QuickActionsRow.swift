@@ -39,7 +39,7 @@ struct QuickActionsRow: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 10)
-        .background(AppColors.substrateTertiary.opacity(0.5))
+        .background(AppSurfaces.color(.controlMutedBackground))
     }
 }
 

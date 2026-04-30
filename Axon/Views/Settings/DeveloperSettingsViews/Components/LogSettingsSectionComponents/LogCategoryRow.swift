@@ -48,5 +48,5 @@ struct LogCategoryRow: View {
         isEnabled: true,
         onToggle: {}
     )
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

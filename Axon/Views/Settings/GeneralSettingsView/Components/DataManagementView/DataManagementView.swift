@@ -141,7 +141,7 @@ struct DataManagementView: View {
                         HStack(spacing: 16) {
                             ZStack {
                                 Circle()
-                                    .fill(AppColors.substrateSecondary)
+                                    .fill(AppSurfaces.color(.cardBackground))
                                     .frame(width: 40, height: 40)
 
                                 Image(systemName: "timer")
@@ -178,7 +178,7 @@ struct DataManagementView: View {
                         .padding(12)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(AppColors.substrateSecondary)
+                                .fill(AppSurfaces.color(.cardBackground))
                         )
 
                         HStack {
@@ -227,7 +227,7 @@ struct DataManagementView: View {
                         HStack(spacing: 16) {
                             ZStack {
                                 Circle()
-                                    .fill(AppColors.substrateSecondary)
+                                    .fill(AppSurfaces.color(.cardBackground))
                                     .frame(width: 44, height: 44)
 
                                 Image(systemName: "archivebox.fill")
@@ -254,10 +254,10 @@ struct DataManagementView: View {
                         .padding(16)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(AppColors.substrateSecondary)
+                                .fill(AppSurfaces.color(.cardBackground))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                                 )
                         )
                     }
@@ -268,7 +268,7 @@ struct DataManagementView: View {
             }
             .padding()
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .navigationTitle("Data Management")
         #if !os(macOS)
         .navigationBarTitleDisplayMode(.large)
@@ -396,7 +396,7 @@ private struct ConfigBadge: View {
         .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.cardBackground))
         )
     }
 }
@@ -514,10 +514,10 @@ private struct DataManagementSyncStatus: View {
                 .padding(16)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(AppColors.substrateSecondary)
+                        .fill(AppSurfaces.color(.cardBackground))
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(AppColors.glassBorder, lineWidth: 1)
+                                .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                         )
                 )
             }

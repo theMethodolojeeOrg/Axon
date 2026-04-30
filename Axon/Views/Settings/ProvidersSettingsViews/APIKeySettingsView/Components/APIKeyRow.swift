@@ -59,7 +59,7 @@ struct APIKeyRow: View {
             }
         }
         .padding()
-        .background(isAdminKey ? AppColors.signalCopper.opacity(0.05) : AppColors.substrateSecondary)
+        .background(isAdminKey ? AppColors.signalCopper.opacity(0.05) : AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)

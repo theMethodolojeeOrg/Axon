@@ -101,10 +101,10 @@ struct CustomProviderCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.cardBackground))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
         )
     }

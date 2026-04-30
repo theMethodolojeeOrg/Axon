@@ -73,7 +73,7 @@ struct ModelEditRow: View {
                         .frame(width: 32, height: 32)
                         .overlay(
                             Circle()
-                                .stroke(AppColors.glassBorder, lineWidth: 1)
+                                .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                         )
                     
                     // Color picker button
@@ -95,11 +95,11 @@ struct ModelEditRow: View {
                     }
                 }
                 .padding(12)
-                .background(AppColors.substratePrimary)
+                .background(AppSurfaces.color(.contentBackground))
                 .cornerRadius(6)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
                 
                 if let error = colorValidationError {
@@ -150,11 +150,11 @@ struct ModelEditRow: View {
                 TextEditor(text: $mimePatternsText)
                     .frame(minHeight: 74, maxHeight: 110)
                     .padding(8)
-                    .background(AppColors.substratePrimary)
+                    .background(AppSurfaces.color(.contentBackground))
                     .cornerRadius(6)
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(AppColors.glassBorder, lineWidth: 1)
+                            .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                     )
                     .onChange(of: mimePatternsText) { _, newValue in
                         updateMimePatterns(from: newValue)
@@ -257,7 +257,7 @@ struct ModelEditRow: View {
             .accentColor(AppColors.signalMercury)
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
         .onAppear {
             initializeColor()

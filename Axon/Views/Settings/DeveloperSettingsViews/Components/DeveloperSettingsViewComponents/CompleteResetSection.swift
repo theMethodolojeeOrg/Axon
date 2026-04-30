@@ -336,5 +336,5 @@ struct CompleteResetSection: View {
     SettingsSection(title: "Complete Reset") {
         CompleteResetSection(viewModel: SettingsViewModel())
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

@@ -17,7 +17,7 @@ struct ModelTuningStatsBanner: View {
             ModelTuningStatItem(value: "\(overriddenCount)", label: "Overridden")
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 }

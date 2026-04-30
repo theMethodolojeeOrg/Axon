@@ -97,7 +97,7 @@ struct BridgeQRCodeScannerView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 
     private func errorView(_ message: String) -> some View {
@@ -119,7 +119,7 @@ struct BridgeQRCodeScannerView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 
     private func requestCameraAccessIfNeeded() {

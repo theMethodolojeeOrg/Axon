@@ -55,7 +55,7 @@ struct BridgeAdvancedSection: View {
             .tint(AppColors.signalMercury)
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 
@@ -86,7 +86,7 @@ struct BridgeAdvancedSection: View {
             .tint(AppColors.signalMercury)
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 
@@ -117,7 +117,7 @@ struct BridgeAdvancedSection: View {
             .tint(AppColors.signalMercury)
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 
@@ -157,7 +157,7 @@ struct BridgeAdvancedSection: View {
                 .foregroundColor(AppColors.textSecondary)
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 
@@ -197,7 +197,7 @@ struct BridgeAdvancedSection: View {
                 .foregroundColor(AppColors.textSecondary)
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 
@@ -277,7 +277,7 @@ struct BridgeAdvancedSection: View {
             }
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 }

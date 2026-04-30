@@ -35,7 +35,7 @@ struct ModelTuningGlobalDefaultsLink: View {
                     .foregroundColor(AppColors.textTertiary)
             }
             .padding()
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(8)
         }
         .buttonStyle(.plain)

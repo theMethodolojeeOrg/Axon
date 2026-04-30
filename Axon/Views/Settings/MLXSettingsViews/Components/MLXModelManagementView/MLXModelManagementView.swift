@@ -113,10 +113,10 @@ struct MLXModelManagementView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.cardBackground))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
         )
     }
@@ -505,7 +505,7 @@ struct MLXModelCard: View {
                         .padding(.vertical, 8)
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .stroke(isInMemory ? AppColors.signalLichen : AppColors.glassBorder, lineWidth: 1)
+                                .stroke(isInMemory ? AppColors.signalLichen : AppSurfaces.color(.cardBorder), lineWidth: 1)
                         )
                     }
                     .buttonStyle(.plain)
@@ -556,10 +556,10 @@ struct MLXModelCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : (isInMemory ? AppColors.signalLichen.opacity(0.1) : AppColors.substrateSecondary))
+                .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : (isInMemory ? AppColors.signalLichen.opacity(0.1) : AppSurfaces.color(.cardBackground)))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(isSelected ? AppColors.signalMercury : (isInMemory ? AppColors.signalLichen : AppColors.glassBorder), lineWidth: 1)
+                        .stroke(isSelected ? AppSurfaces.color(.selectedBorder) : (isInMemory ? AppColors.signalLichen : AppSurfaces.color(.cardBorder)), lineWidth: 1)
                 )
         )
     }
@@ -662,6 +662,6 @@ struct MLXModelCard: View {
             MLXModelManagementView()
                 .padding()
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 }

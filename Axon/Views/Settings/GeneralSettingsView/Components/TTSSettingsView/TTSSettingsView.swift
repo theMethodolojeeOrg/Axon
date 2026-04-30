@@ -893,10 +893,10 @@ struct TTSSettingsView: View {
                         .padding(10)
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(AppColors.substrateSecondary)
+                                .fill(AppSurfaces.color(.cardBackground))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                                 )
                         )
                         .lineLimit(2...4)
@@ -1084,10 +1084,10 @@ struct TTSSettingsView: View {
                             .padding(10)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(AppColors.substrateSecondary)
+                                    .fill(AppSurfaces.color(.cardBackground))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8)
-                                            .stroke(AppColors.glassBorder, lineWidth: 1)
+                                            .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                                     )
                             )
                             .lineLimit(2...4)
@@ -1375,10 +1375,10 @@ struct AppleVoiceCard: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
+                    .fill(isSelected ? AppSurfaces.color(.selectedBackground) : AppSurfaces.color(.cardBackground))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(isSelected ? AppColors.signalMercury : AppColors.glassBorder, lineWidth: 1)
+                            .stroke(isSelected ? AppSurfaces.color(.selectedBorder) : AppSurfaces.color(.cardBorder), lineWidth: 1)
                     )
             )
         }
@@ -1468,10 +1468,10 @@ struct GeminiVoiceCard: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
+                    .fill(isSelected ? AppSurfaces.color(.selectedBackground) : AppSurfaces.color(.cardBackground))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(isSelected ? AppColors.signalMercury : AppColors.glassBorder, lineWidth: 1)
+                            .stroke(isSelected ? AppSurfaces.color(.selectedBorder) : AppSurfaces.color(.cardBorder), lineWidth: 1)
                     )
             )
         }
@@ -1561,10 +1561,10 @@ struct OpenAIVoiceCard: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
+                    .fill(isSelected ? AppSurfaces.color(.selectedBackground) : AppSurfaces.color(.cardBackground))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(isSelected ? AppColors.signalMercury : AppColors.glassBorder, lineWidth: 1)
+                            .stroke(isSelected ? AppSurfaces.color(.selectedBorder) : AppSurfaces.color(.cardBorder), lineWidth: 1)
                     )
             )
         }
@@ -1853,10 +1853,10 @@ struct KokoroVoiceCard: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
+                    .fill(isSelected ? AppSurfaces.color(.selectedBackground) : AppSurfaces.color(.cardBackground))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(isSelected ? AppColors.signalMercury : AppColors.glassBorder, lineWidth: 1)
+                            .stroke(isSelected ? AppSurfaces.color(.selectedBorder) : AppSurfaces.color(.cardBorder), lineWidth: 1)
                     )
             )
             .opacity(isAvailable ? 1.0 : 0.5)
@@ -1870,5 +1870,5 @@ struct KokoroVoiceCard: View {
         TTSSettingsView(viewModel: SettingsViewModel())
             .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

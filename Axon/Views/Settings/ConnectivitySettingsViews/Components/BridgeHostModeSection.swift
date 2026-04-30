@@ -49,7 +49,7 @@ struct BridgeHostModeSection: View {
                     Spacer()
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
 
                 Button {
@@ -99,7 +99,7 @@ struct BridgeHostModeSection: View {
                         }
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
 
                 // Bind Address
@@ -127,7 +127,7 @@ struct BridgeHostModeSection: View {
                     .tint(AppColors.signalMercury)
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
         }
@@ -144,7 +144,7 @@ struct BridgeHostModeSection: View {
                         .foregroundColor(AppColors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding()
-                        .background(AppColors.substrateSecondary)
+                        .background(AppSurfaces.color(.cardBackground))
                         .cornerRadius(8)
                 } else {
                     VStack(spacing: 8) {
@@ -159,7 +159,7 @@ struct BridgeHostModeSection: View {
                     .foregroundColor(AppColors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
             }
         }
@@ -208,7 +208,7 @@ struct BridgeHostModeSection: View {
             .buttonStyle(.borderless)
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 
@@ -279,7 +279,7 @@ struct BridgeHostModeSection: View {
                 }
             }
             .padding()
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(8)
         }
     }
@@ -294,7 +294,7 @@ struct BridgeHostModeSection: View {
                     .foregroundColor(AppColors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
             } else {
                 VStack(spacing: 8) {
@@ -321,7 +321,7 @@ struct BridgeHostModeSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 }

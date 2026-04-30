@@ -37,7 +37,7 @@ struct ProviderSummaryRow: View {
                         .foregroundColor(AppColors.textTertiary)
                 }
                 .padding(12)
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
             .buttonStyle(.plain)
@@ -82,14 +82,14 @@ struct ProviderSummaryRow: View {
                     }
                 }
                 .padding(.vertical, 8)
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
         }
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(AppColors.glassBorder, lineWidth: 1)
+                .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
         )
     }
 

@@ -61,7 +61,7 @@ struct SettingsTabView: View {
                 }
                 .padding()
             }
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
 
             Divider()
                 .background(AppColors.divider)
@@ -91,7 +91,7 @@ struct SettingsTabView: View {
                     }
                     .padding()
                 }
-                .background(AppColors.substratePrimary)
+                .background(AppSurfaces.color(.contentBackground))
             }
 
             // Success/Error messages
@@ -113,7 +113,7 @@ struct SettingsTabView: View {
                 )
             }
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 }
 
@@ -149,7 +149,7 @@ struct DismissableBanner: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppColors.textSecondary)
                     .padding(6)
-                    .background(Circle().fill(AppColors.substrateTertiary))
+                    .background(Circle().fill(AppSurfaces.color(.controlBackground)))
             }
             .buttonStyle(.plain)
         }
@@ -213,7 +213,7 @@ struct SettingsTabButton: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury : AppColors.substrateTertiary)
+                    .fill(isSelected ? AppColors.signalMercury : AppSurfaces.color(.controlBackground))
             )
             .foregroundColor(isSelected ? .white : AppColors.textSecondary)
         }

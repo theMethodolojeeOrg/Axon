@@ -41,7 +41,7 @@ struct BackendSettingsView: View {
                         Spacer()
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
 
                     // Info about local-first mode
@@ -74,7 +74,7 @@ struct BackendSettingsView: View {
                             .keyboardType(.URL)
                             #endif
                             .padding()
-                            .background(AppColors.substrateTertiary)
+                            .background(AppSurfaces.color(.controlBackground))
                             .cornerRadius(6)
                             .onChange(of: urlInput) { _, newValue in
                                 validationState = BackendConfig.validateURL(newValue)
@@ -92,7 +92,7 @@ struct BackendSettingsView: View {
                         }
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
 
                     // Save button
@@ -167,11 +167,11 @@ struct BackendSettingsView: View {
                             }
                         }
                         .padding()
-                        .background(AppColors.substrateTertiary)
+                        .background(AppSurfaces.color(.controlBackground))
                         .cornerRadius(6)
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
 
                     // Save token button
@@ -231,7 +231,7 @@ struct BackendSettingsView: View {
                                     .foregroundColor(result.success ? AppColors.accentSuccess : AppColors.accentError)
                             }
                             .padding()
-                            .background(AppColors.substrateSecondary)
+                            .background(AppSurfaces.color(.cardBackground))
                             .cornerRadius(8)
                         }
                     }
@@ -258,7 +258,7 @@ struct BackendSettingsView: View {
                     )
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
         }
@@ -417,5 +417,5 @@ struct InfoRow: View {
         BackendSettingsView(viewModel: SettingsViewModel())
             .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

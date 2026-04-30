@@ -234,7 +234,7 @@ struct SubconsciousMemoryLoggingDetailView: View {
                         }
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
                 }
 
@@ -271,7 +271,7 @@ struct SubconsciousMemoryLoggingDetailView: View {
                             .foregroundColor(AppColors.textTertiary)
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
                 }
 
@@ -419,7 +419,7 @@ struct SubconsciousMemoryLoggingDetailView: View {
                         )
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
                 }
 
@@ -455,13 +455,13 @@ struct SubconsciousMemoryLoggingDetailView: View {
                             .foregroundColor(AppColors.textTertiary)
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
                 }
             }
             .padding()
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .navigationTitle("Subconscious Logging")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

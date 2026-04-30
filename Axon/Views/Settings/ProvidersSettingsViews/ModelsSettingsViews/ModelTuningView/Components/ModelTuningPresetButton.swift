@@ -18,7 +18,7 @@ struct ModelTuningPresetButton: View {
                 .foregroundColor(AppColors.textPrimary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(AppColors.substrateTertiary)
+                .background(AppSurfaces.color(.controlBackground))
                 .cornerRadius(16)
         }
         .buttonStyle(.plain)

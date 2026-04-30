@@ -338,5 +338,5 @@ struct DemoModeSection: View {
     SettingsSection(title: "Screenshot Mode") {
         DemoModeSection(viewModel: SettingsViewModel(), resetComplete: .constant(false))
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

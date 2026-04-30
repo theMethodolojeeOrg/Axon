@@ -58,7 +58,7 @@ struct BridgeSecuritySection: View {
             }
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 
@@ -89,7 +89,7 @@ struct BridgeSecuritySection: View {
             .tint(AppColors.signalMercury)
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 
@@ -126,7 +126,7 @@ struct BridgeSecuritySection: View {
                 .buttonStyle(.borderless)
             }
             .padding()
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(8)
         }
     }
@@ -220,7 +220,7 @@ struct BridgeSecuritySection: View {
                 }
             }
             .padding()
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(8)
         }
     }

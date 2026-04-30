@@ -135,7 +135,7 @@ struct ToolSettingsViewV2: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(12)
     }
 
@@ -170,7 +170,7 @@ struct ToolSettingsViewV2: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(12)
     }
 
@@ -222,7 +222,7 @@ private struct ToolSystemToggleCard: View {
             )
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(12)
     }
 }
@@ -252,10 +252,10 @@ private struct ToolSystemOption: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : Color.clear)
+                    .fill(isSelected ? AppSurfaces.color(.selectedBackground) : Color.clear)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(isSelected ? AppColors.signalMercury : AppColors.glassBorder, lineWidth: isSelected ? 2 : 1)
+                            .stroke(isSelected ? AppSurfaces.color(.selectedBorder) : AppSurfaces.color(.cardBorder), lineWidth: isSelected ? 2 : 1)
                     )
             )
         }
@@ -296,7 +296,7 @@ private struct MasterToolsToggleCard: View {
             }
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 }
@@ -316,7 +316,7 @@ private struct ToolStatsBanner: View {
             }
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 }
@@ -363,7 +363,7 @@ private struct SearchBar: View {
             }
         }
         .padding(12)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 }
@@ -414,7 +414,7 @@ private struct CategoryChip: View {
             .foregroundColor(isSelected ? .white : AppColors.textSecondary)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? AppColors.signalMercury : AppColors.substrateSecondary)
+            .background(isSelected ? AppColors.signalMercury : AppSurfaces.color(.cardBackground))
             .cornerRadius(16)
         }
         .buttonStyle(.plain)
@@ -547,7 +547,7 @@ private struct ToolCategorySection: View {
                         .foregroundColor(AppColors.textTertiary)
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
             .buttonStyle(.plain)
@@ -570,7 +570,7 @@ private struct ToolCategorySection: View {
                     }
                 }
                 .padding(.vertical, 8)
-                .background(AppColors.substrateTertiary.opacity(0.5))
+                .background(AppSurfaces.color(.controlMutedBackground))
                 .cornerRadius(8)
                 .padding(.top, 4)
             }
@@ -788,7 +788,7 @@ private struct ToolDetailSheet: View {
                                         .foregroundColor(AppColors.textPrimary)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 4)
-                                        .background(AppColors.substrateTertiary)
+                                        .background(AppSurfaces.color(.controlBackground))
                                         .cornerRadius(4)
                                 }
                             }
@@ -848,13 +848,13 @@ private struct ToolDetailSheet: View {
                             .lineLimit(2)
                     }
                     .padding()
-                    .background(AppColors.substrateTertiary)
+                    .background(AppSurfaces.color(.controlBackground))
                     .cornerRadius(8)
                     #endif
                 }
                 .padding()
             }
-            .background(AppColors.substratePrimary)
+            .background(AppSurfaces.color(.contentBackground))
             .navigationTitle("Tool Details")
 #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -943,6 +943,6 @@ private struct ToolSettingsFlowLayout: Layout {
         ToolSettingsViewV2(viewModel: SettingsViewModel())
             .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }
 

@@ -69,7 +69,7 @@ struct ServerSettingsView: View {
                         }
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
 
                     // Warning about foreground requirement
@@ -119,7 +119,7 @@ struct ServerSettingsView: View {
                                         .font(.system(size: 12, design: .monospaced))
                                         .foregroundColor(AppColors.textSecondary)
                                         .padding()
-                                        .background(AppColors.substrateTertiary)
+                                        .background(AppSurfaces.color(.controlBackground))
                                         .cornerRadius(6)
                                 }
                             }
@@ -142,7 +142,7 @@ struct ServerSettingsView: View {
                             .foregroundColor(AppColors.textTertiary)
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
                 }
             }
@@ -178,7 +178,7 @@ struct ServerSettingsView: View {
                         .frame(width: 100)
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
 
                     // Password field
@@ -207,7 +207,7 @@ struct ServerSettingsView: View {
                                     .padding(.vertical, 6)
                                     .background(
                                         RoundedRectangle(cornerRadius: 6)
-                                            .fill(AppColors.substrateTertiary)
+                                            .fill(AppSurfaces.color(.controlBackground))
                                     )
                             }
                         }
@@ -252,11 +252,11 @@ struct ServerSettingsView: View {
                             }
                         }
                         .padding()
-                        .background(AppColors.substrateTertiary)
+                        .background(AppSurfaces.color(.controlBackground))
                         .cornerRadius(6)
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
 
                     // External connections toggle
@@ -281,7 +281,7 @@ struct ServerSettingsView: View {
                         .tint(AppColors.signalMercury)
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
                 }
             }
@@ -301,7 +301,7 @@ struct ServerSettingsView: View {
                     }
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
         }
@@ -384,13 +384,13 @@ struct ConnectionInfoRow: View {
                     .padding(.vertical, 6)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(AppColors.substrateTertiary)
+                            .fill(AppSurfaces.color(.controlBackground))
                     )
                 }
             }
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 }
@@ -426,5 +426,5 @@ struct CompatibilityRow: View {
         ServerSettingsView(viewModel: SettingsViewModel())
             .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

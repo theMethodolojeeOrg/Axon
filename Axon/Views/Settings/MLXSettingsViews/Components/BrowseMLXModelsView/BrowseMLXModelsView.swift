@@ -42,7 +42,7 @@ struct BrowseMLXModelsView: View {
                 modelListView
             }
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .navigationTitle("Browse MLX Models")
         .task {
             // Load popular models on appear
@@ -93,7 +93,7 @@ struct BrowseMLXModelsView: View {
             }
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(12)
         .padding()
     }
@@ -117,7 +117,7 @@ struct BrowseMLXModelsView: View {
                         .background(
                             sortOption == option
                                 ? AppColors.signalMercury.opacity(0.2)
-                                : AppColors.substrateSecondary
+                                : AppSurfaces.color(.cardBackground)
                         )
                         .foregroundColor(
                             sortOption == option
@@ -327,12 +327,12 @@ struct MLXModelSearchRow: View {
                 }
             }
             .padding()
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(
-                        isDownloaded ? AppColors.accentSuccess.opacity(0.5) : AppColors.glassBorder,
+                        isDownloaded ? AppColors.accentSuccess.opacity(0.5) : AppSurfaces.color(.cardBorder),
                         lineWidth: 1
                     )
             )
@@ -367,7 +367,7 @@ struct MLXModelDetailSheet: View {
                     headerSection
 
                     Divider()
-                        .background(AppColors.glassBorder)
+                        .background(AppSurfaces.color(.cardBorder))
 
                     // Info section
                     if isLoadingDetails {
@@ -407,7 +407,7 @@ struct MLXModelDetailSheet: View {
                 }
                 .padding()
             }
-            .background(AppColors.substratePrimary)
+            .background(AppSurfaces.color(.contentBackground))
             #if os(macOS)
             // Prevent overly compact sheets on macOS.
             .frame(minWidth: 500, idealWidth: 600, minHeight: 550, idealHeight: 700)
@@ -511,7 +511,7 @@ struct MLXModelDetailSheet: View {
                 }
             }
             .padding()
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(12)
 
             // Description
@@ -561,7 +561,7 @@ struct MLXModelDetailSheet: View {
                         .foregroundColor(AppColors.textSecondary)
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(12)
             } else if isDownloaded {
                 // Already downloaded

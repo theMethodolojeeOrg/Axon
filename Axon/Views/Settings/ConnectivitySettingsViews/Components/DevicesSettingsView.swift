@@ -91,10 +91,10 @@ struct DevicesSettingsView: View {
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(AppColors.substrateSecondary)
+                                .fill(AppSurfaces.color(.cardBackground))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                                 )
                         )
                     }
@@ -123,10 +123,10 @@ struct DevicesSettingsView: View {
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(AppColors.substrateSecondary)
+                                .fill(AppSurfaces.color(.cardBackground))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                                 )
                         )
                     }
@@ -382,7 +382,7 @@ struct CurrentDeviceCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.cardBackground))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(AppColors.signalMercury.opacity(0.3), lineWidth: 1)
@@ -405,7 +405,7 @@ struct OtherDeviceCard: View {
                 // Platform icon
                 ZStack {
                     Circle()
-                        .fill(AppColors.substrateTertiary)
+                        .fill(AppSurfaces.color(.controlBackground))
                         .frame(width: 40, height: 40)
 
                     Image(systemName: device.platform.icon)
@@ -476,10 +476,10 @@ struct OtherDeviceCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.cardBackground))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
         )
     }
@@ -508,7 +508,7 @@ struct LoadingDeviceCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.cardBackground))
         )
     }
 }
@@ -533,10 +533,10 @@ struct EmptyDevicesCard: View {
         .padding(24)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.cardBackground))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
         )
     }
@@ -604,7 +604,7 @@ struct PushToDeviceSheet: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(AppColors.substrateSecondary)
+                    .fill(AppSurfaces.color(.cardBackground))
             )
 
             // Explanation
@@ -625,7 +625,7 @@ struct PushToDeviceSheet: View {
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(AppColors.substrateTertiary)
+                                .fill(AppSurfaces.color(.controlBackground))
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -658,7 +658,7 @@ struct PushToDeviceSheet: View {
             }
         }
         .padding(24)
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         #if os(macOS)
         .frame(width: 400, height: 350)
         #endif
@@ -703,10 +703,10 @@ struct EditDeviceNameSheet: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(AppColors.substrateSecondary)
+                            .fill(AppSurfaces.color(.cardBackground))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .stroke(AppColors.glassBorder, lineWidth: 1)
+                                    .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                             )
                     )
             }
@@ -723,7 +723,7 @@ struct EditDeviceNameSheet: View {
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(AppColors.substrateTertiary)
+                                .fill(AppSurfaces.color(.controlBackground))
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -746,7 +746,7 @@ struct EditDeviceNameSheet: View {
             }
         }
         .padding(24)
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .onAppear {
             name = currentName
         }
@@ -763,5 +763,5 @@ struct EditDeviceNameSheet: View {
         DevicesSettingsView(viewModel: SettingsViewModel())
             .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

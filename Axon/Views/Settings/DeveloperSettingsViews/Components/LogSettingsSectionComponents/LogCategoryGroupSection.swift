@@ -73,7 +73,7 @@ struct LogCategoryGroupSection: View {
                     }
                 }
                 .padding(.vertical, 8)
-                .background(AppColors.substrateTertiary.opacity(0.5))
+                .background(AppSurfaces.color(.controlMutedBackground))
             }
         }
     }
@@ -86,5 +86,5 @@ struct LogCategoryGroupSection: View {
             logger: DebugLogger.shared
         )
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

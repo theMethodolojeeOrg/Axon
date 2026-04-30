@@ -47,7 +47,7 @@ struct ToolSettingsView: View {
                     Spacer()
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
 
@@ -226,7 +226,7 @@ struct ToolSettingsView: View {
                         }
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
                 }
             }
@@ -261,7 +261,7 @@ struct ToolSettingsView: View {
                     Spacer()
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
 
@@ -360,7 +360,7 @@ struct ToolInfoRow: View {
             Spacer()
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 }
@@ -486,7 +486,7 @@ struct VSCodeBridgeSection: View {
                 }
             }
             .padding()
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(8)
         }
     }
@@ -668,7 +668,7 @@ struct ToolCategoryAccordion: View {
                         .foregroundColor(AppColors.textTertiary)
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
             .buttonStyle(.plain)
@@ -692,7 +692,7 @@ struct ToolCategoryAccordion: View {
                     }
                 }
                 .padding(.vertical, 8)
-                .background(AppColors.substrateTertiary.opacity(0.5))
+                .background(AppSurfaces.color(.controlMutedBackground))
                 .cornerRadius(8)
                 .padding(.top, 4)
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -742,5 +742,5 @@ struct CategoryToggleButton: View {
         ToolSettingsView(viewModel: SettingsViewModel())
             .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

@@ -79,7 +79,7 @@ struct CustomProviderEditSheet: View {
                                 .foregroundColor(AppColors.textSecondary)
                                 .padding()
                                 .frame(maxWidth: .infinity)
-                                .background(AppColors.substrateSecondary)
+                                .background(AppSurfaces.color(.cardBackground))
                                 .cornerRadius(8)
                         } else {
                             ForEach(Array(models.enumerated()), id: \.element.id) { index, model in
@@ -106,7 +106,7 @@ struct CustomProviderEditSheet: View {
                 }
                 .padding()
             }
-            .background(AppColors.substratePrimary)
+            .background(AppSurfaces.color(.contentBackground))
             .navigationTitle(isEditing ? "Edit Provider" : "Add Provider")
             #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)

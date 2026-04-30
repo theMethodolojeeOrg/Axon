@@ -61,5 +61,5 @@ struct GenerativeUISection: View {
     SettingsSection(title: "Generative UI") {
         GenerativeUISection()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

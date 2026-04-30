@@ -57,7 +57,7 @@ struct ModelTuningProviderAccordion: View {
                         .foregroundColor(AppColors.textTertiary)
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
             .buttonStyle(.plain)
@@ -81,7 +81,7 @@ struct ModelTuningProviderAccordion: View {
                     }
                 }
                 .padding(.vertical, 8)
-                .background(AppColors.substrateTertiary.opacity(0.5))
+                .background(AppSurfaces.color(.controlMutedBackground))
                 .cornerRadius(8)
                 .padding(.top, 4)
             }

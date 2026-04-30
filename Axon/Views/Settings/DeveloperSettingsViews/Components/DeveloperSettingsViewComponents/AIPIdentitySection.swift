@@ -113,5 +113,5 @@ struct AIPIdentitySection: View {
     SettingsSection(title: "AIP Identity (Testing)") {
         AIPIdentitySection(viewModel: SettingsViewModel())
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

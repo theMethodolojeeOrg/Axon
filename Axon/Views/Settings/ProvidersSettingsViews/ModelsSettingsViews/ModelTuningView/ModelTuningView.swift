@@ -40,7 +40,7 @@ struct ModelTuningView: View {
             }
             .padding()
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .navigationTitle("Model Tuning")
         .sheet(item: $showingModelDetail) { context in
             ModelOverrideSheet(

@@ -50,7 +50,7 @@ struct KokoroVoiceManagerView: View {
             }
             .padding()
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .navigationTitle("Manage Voices")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

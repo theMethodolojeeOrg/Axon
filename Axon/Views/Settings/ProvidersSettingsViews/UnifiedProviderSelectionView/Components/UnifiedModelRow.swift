@@ -70,10 +70,10 @@ struct UnifiedModelRow: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
+                    .fill(isSelected ? AppSurfaces.color(.selectedBackground) : AppSurfaces.color(.cardBackground))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(isSelected ? AppColors.signalMercury : AppColors.glassBorder, lineWidth: 1)
+                            .stroke(isSelected ? AppSurfaces.color(.selectedBorder) : AppSurfaces.color(.cardBorder), lineWidth: 1)
                     )
             )
         }

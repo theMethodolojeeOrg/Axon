@@ -31,7 +31,7 @@ struct ModelTuningSearchBar: View {
             }
         }
         .padding(12)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 }

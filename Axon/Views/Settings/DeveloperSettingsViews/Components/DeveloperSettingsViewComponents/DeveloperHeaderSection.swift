@@ -37,5 +37,5 @@ struct DeveloperHeaderSection: View {
     SettingsSection(title: "Developer Tools") {
         DeveloperHeaderSection()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

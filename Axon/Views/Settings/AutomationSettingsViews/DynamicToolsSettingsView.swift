@@ -495,11 +495,11 @@ struct SecretConfigRow: View {
             }
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(AppColors.glassBorder, lineWidth: 1)
+                .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
         )
         .onAppear {
             checkIfConfigured()
@@ -585,11 +585,11 @@ struct DynamicToolsDraftPreviewSheet: View {
                                     .foregroundColor(AppColors.textTertiary)
                             }
                             .padding(12)
-                            .background(AppColors.substrateSecondary)
+                            .background(AppSurfaces.color(.cardBackground))
                             .cornerRadius(8)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .stroke(AppColors.glassBorder, lineWidth: 1)
+                                    .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                             )
                         }
                     }
@@ -600,7 +600,7 @@ struct DynamicToolsDraftPreviewSheet: View {
                         .padding()
                 }
             }
-            .background(AppColors.substratePrimary)
+            .background(AppSurfaces.color(.contentBackground))
             .navigationTitle("Draft Preview")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -675,11 +675,11 @@ struct DynamicToolDetailSheet: View {
                                         .foregroundColor(AppColors.textTertiary)
                                 }
                                 .padding(12)
-                                .background(AppColors.substrateSecondary)
+                                .background(AppSurfaces.color(.cardBackground))
                                 .cornerRadius(8)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                                 )
                             }
                         }
@@ -730,7 +730,7 @@ struct DynamicToolDetailSheet: View {
                 }
                 .padding()
             }
-            .background(AppColors.substratePrimary)
+            .background(AppSurfaces.color(.contentBackground))
             .navigationTitle("Tool Details")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -781,7 +781,7 @@ struct DynamicToolEditorSheet: View {
                     .padding(.horizontal)
             }
             .padding()
-            .background(AppColors.substratePrimary)
+            .background(AppSurfaces.color(.contentBackground))
             .navigationTitle(mode.isCreate ? "Create Tool" : "Edit Tool")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -812,5 +812,5 @@ extension DynamicToolEditorSheet.Mode {
         DynamicToolsSettingsView(viewModel: SettingsViewModel.shared)
             .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

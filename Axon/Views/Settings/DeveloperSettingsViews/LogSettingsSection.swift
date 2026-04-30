@@ -49,7 +49,7 @@ struct LogSettingsSection: View {
                 }
             }
         }
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 }
@@ -179,7 +179,7 @@ struct DeveloperConsoleQuickAccess: View {
                             .foregroundColor(AppColors.textTertiary)
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
                 }
                 .buttonStyle(.plain)
@@ -209,5 +209,5 @@ struct DeveloperConsoleQuickAccess: View {
         }
         .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

@@ -84,5 +84,5 @@ struct DeveloperSettingsView: View {
         DeveloperSettingsView(viewModel: SettingsViewModel())
             .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

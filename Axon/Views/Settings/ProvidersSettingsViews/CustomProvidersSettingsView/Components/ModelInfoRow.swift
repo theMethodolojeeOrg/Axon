@@ -48,7 +48,7 @@ struct ModelInfoRow: View {
             }
         }
         .padding(12)
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .cornerRadius(6)
     }
 }

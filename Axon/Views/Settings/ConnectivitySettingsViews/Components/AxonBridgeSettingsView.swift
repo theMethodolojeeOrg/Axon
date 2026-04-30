@@ -176,7 +176,7 @@ struct AxonBridgeSettingsView: View {
                     Spacer()
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
 
                 if let session = bridgeManager.connectedSession {
@@ -198,7 +198,7 @@ struct AxonBridgeSettingsView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
                 }
 
@@ -239,7 +239,7 @@ struct AxonBridgeSettingsView: View {
                 .foregroundColor(AppColors.textTertiary)
             }
             .padding()
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(8)
         }
     }
@@ -261,7 +261,7 @@ struct AxonBridgeSettingsView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
 
                     HStack(spacing: 10) {
@@ -294,7 +294,7 @@ struct AxonBridgeSettingsView: View {
                         .foregroundColor(AppColors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding()
-                        .background(AppColors.substrateSecondary)
+                        .background(AppSurfaces.color(.cardBackground))
                         .cornerRadius(8)
                 }
             }
@@ -311,7 +311,7 @@ struct AxonBridgeSettingsView: View {
                     .foregroundColor(AppColors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
             } else {
                 VStack(spacing: 10) {
@@ -372,7 +372,7 @@ struct AxonBridgeSettingsView: View {
             }
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 
@@ -405,7 +405,7 @@ struct AxonBridgeSettingsView: View {
                 .buttonStyle(.borderedProminent)
             }
             .padding()
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(8)
         }
     }
@@ -461,7 +461,7 @@ struct AxonBridgeSettingsView: View {
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
                 }
 
@@ -508,7 +508,7 @@ struct AxonBridgeSettingsView: View {
                         .tint(AppColors.signalMercury)
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
                 }
             }
@@ -544,7 +544,7 @@ struct AxonBridgeSettingsView: View {
                     .tint(AppColors.signalMercury)
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
 
                 #if os(macOS)
@@ -576,7 +576,7 @@ struct AxonBridgeSettingsView: View {
                     }
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
                 #else
                 HStack(spacing: 12) {
@@ -590,7 +590,7 @@ struct AxonBridgeSettingsView: View {
                     Spacer()
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
                 #endif
             }

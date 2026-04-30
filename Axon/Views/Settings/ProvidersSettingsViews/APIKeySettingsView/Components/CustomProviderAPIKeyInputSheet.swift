@@ -16,7 +16,7 @@ struct CustomProviderAPIKeyInputSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                AppColors.substratePrimary
+                AppSurfaces.color(.contentBackground)
                     .ignoresSafeArea()
 
                 ScrollView {
@@ -47,7 +47,7 @@ struct CustomProviderAPIKeyInputSheet: View {
                             }
                         }
                         .padding()
-                        .background(AppColors.substrateSecondary)
+                        .background(AppSurfaces.color(.cardBackground))
                         .cornerRadius(8)
 
                         // Key Input

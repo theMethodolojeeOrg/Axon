@@ -128,7 +128,7 @@ struct SecuritySettingsView: View {
                     }
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
 
@@ -164,7 +164,7 @@ struct SecuritySettingsView: View {
                     .tint(AppColors.signalMercury)
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
 
@@ -243,7 +243,7 @@ struct SecuritySettingsView: View {
                     }
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
 
@@ -266,7 +266,7 @@ struct SecuritySettingsView: View {
                         }
                     }
                     .padding()
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
                 }
             }
@@ -281,5 +281,5 @@ struct SecuritySettingsView: View {
         SecuritySettingsView(viewModel: SettingsViewModel())
             .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

@@ -67,7 +67,7 @@ struct ModelTuningParameterSectionInt: View {
             }
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 }

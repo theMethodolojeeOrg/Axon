@@ -42,7 +42,7 @@ struct GeneralSettingsView: View {
                                 .foregroundColor(AppColors.textSecondary)
                         }
                         .padding()
-                        .background(AppColors.substrateSecondary)
+                        .background(AppSurfaces.color(.cardBackground))
                         .cornerRadius(8)
                     }
                 }
@@ -128,10 +128,10 @@ struct GeneralSettingsView: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(AppColors.substrateSecondary)
+                            .fill(AppSurfaces.color(.cardBackground))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .stroke(AppColors.glassBorder, lineWidth: 1)
+                                    .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                             )
                     )
 
@@ -157,10 +157,10 @@ struct GeneralSettingsView: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(AppColors.substrateSecondary)
+                            .fill(AppSurfaces.color(.cardBackground))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .stroke(AppColors.glassBorder, lineWidth: 1)
+                                    .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                             )
                     )
 
@@ -227,10 +227,10 @@ struct GeneralSettingsView: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(AppColors.substrateSecondary)
+                            .fill(AppSurfaces.color(.cardBackground))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .stroke(AppColors.glassBorder, lineWidth: 1)
+                                    .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                             )
                     )
                 }
@@ -268,10 +268,10 @@ struct GeneralSettingsView: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(AppColors.substrateSecondary)
+                            .fill(AppSurfaces.color(.cardBackground))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .stroke(AppColors.glassBorder, lineWidth: 1)
+                                    .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                             )
                     )
                 }
@@ -353,10 +353,10 @@ struct SettingsOptionRow: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
+                    .fill(isSelected ? AppSurfaces.color(.selectedBackground) : AppSurfaces.color(.cardBackground))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(isSelected ? AppColors.signalMercury : AppColors.glassBorder, lineWidth: 1)
+                            .stroke(isSelected ? AppSurfaces.color(.selectedBorder) : AppSurfaces.color(.cardBorder), lineWidth: 1)
                     )
             )
         }
@@ -386,7 +386,7 @@ struct TemporalModeButton: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury : AppColors.substrateSecondary)
+                    .fill(isSelected ? AppColors.signalMercury : AppSurfaces.color(.cardBackground))
             )
             .foregroundColor(isSelected ? .white : AppColors.textPrimary)
         }
@@ -401,5 +401,5 @@ struct TemporalModeButton: View {
         GeneralSettingsView(viewModel: SettingsViewModel())
             .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

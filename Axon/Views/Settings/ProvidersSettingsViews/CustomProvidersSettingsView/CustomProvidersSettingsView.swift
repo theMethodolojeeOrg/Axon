@@ -77,7 +77,7 @@ struct CustomProvidersSettingsView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(AppColors.substrateSecondary)
+                        .fill(AppSurfaces.color(.cardBackground))
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
                                 .stroke(AppColors.signalMercury.opacity(0.3), lineWidth: 1)
@@ -117,5 +117,5 @@ struct CustomProvidersSettingsView: View {
 
 #Preview {
     CustomProvidersSettingsView(viewModel: SettingsViewModel())
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
 }

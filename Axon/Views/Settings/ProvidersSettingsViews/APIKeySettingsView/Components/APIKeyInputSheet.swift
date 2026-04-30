@@ -17,7 +17,7 @@ struct APIKeyInputSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                AppColors.substratePrimary
+                AppSurfaces.color(.contentBackground)
                     .ignoresSafeArea()
 
                 ScrollView {

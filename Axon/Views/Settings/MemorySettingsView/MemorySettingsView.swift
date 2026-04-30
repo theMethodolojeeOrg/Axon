@@ -42,5 +42,5 @@ struct MemorySettingsView: View {
         MemorySettingsView(viewModel: SettingsViewModel())
             .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

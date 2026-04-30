@@ -25,7 +25,7 @@ struct SystemPromptSection: View {
                         .font(.system(.body, design: .monospaced))
                         .scrollContentBackground(.hidden)
                         .padding(8)
-                        .background(AppColors.substrateTertiary.opacity(0.5))
+                        .background(AppSurfaces.color(.controlMutedBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }

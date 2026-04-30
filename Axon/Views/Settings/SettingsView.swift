@@ -12,7 +12,7 @@ struct SettingsView: View {
 
     var body: some View {
         ZStack {
-            AppColors.substratePrimary
+            AppSurfaces.color(.contentBackground)
                 .ignoresSafeArea()
 
             SettingsTabView()
@@ -69,14 +69,14 @@ struct SuccessToast: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppColors.textSecondary)
                     .padding(6)
-                    .background(Circle().fill(AppColors.substrateTertiary))
+                    .background(Circle().fill(AppSurfaces.color(.controlBackground)))
             }
             .buttonStyle(.plain)
         }
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.cardBackground))
                 .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
         )
         .padding()
@@ -133,14 +133,14 @@ struct ErrorToast: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppColors.textSecondary)
                     .padding(6)
-                    .background(Circle().fill(AppColors.substrateTertiary))
+                    .background(Circle().fill(AppSurfaces.color(.controlBackground)))
             }
             .buttonStyle(.plain)
         }
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.cardBackground))
                 .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
         )
         .padding()

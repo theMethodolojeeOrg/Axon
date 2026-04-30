@@ -31,5 +31,5 @@ struct WhatHappensSection: View {
     SettingsSection(title: "What Happens") {
         WhatHappensSection()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

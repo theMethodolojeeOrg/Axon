@@ -136,5 +136,5 @@ struct APIKeysSettingsView: View {
         APIKeysSettingsView(viewModel: SettingsViewModel())
             .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

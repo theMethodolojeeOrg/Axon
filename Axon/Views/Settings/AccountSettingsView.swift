@@ -86,7 +86,7 @@ struct AccountSettingsView: View {
                     }
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
             
@@ -216,7 +216,7 @@ struct AccountSettingsView: View {
                     }
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
 
@@ -242,7 +242,7 @@ struct AccountSettingsView: View {
                                 .foregroundColor(AppColors.textTertiary)
                         }
                         .padding()
-                        .background(AppColors.substrateSecondary)
+                        .background(AppSurfaces.color(.cardBackground))
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
@@ -268,7 +268,7 @@ struct AccountSettingsView: View {
                             Spacer()
                         }
                         .padding()
-                        .background(AppColors.substrateSecondary)
+                        .background(AppSurfaces.color(.cardBackground))
                         .cornerRadius(8)
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -289,7 +289,7 @@ struct AccountSettingsView: View {
                             Spacer()
                         }
                         .padding()
-                        .background(AppColors.substrateSecondary)
+                        .background(AppSurfaces.color(.cardBackground))
                         .cornerRadius(8)
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -429,5 +429,5 @@ struct AccountSettingsView: View {
         AccountSettingsView(viewModel: SettingsViewModel())
             .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

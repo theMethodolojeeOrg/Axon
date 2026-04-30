@@ -70,5 +70,5 @@ struct ChatDebugSection: View {
     SettingsSection(title: "Chat Debug") {
         ChatDebugSection(viewModel: SettingsViewModel())
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

@@ -25,7 +25,7 @@ struct ModelOverrideSheet: View {
 
     var body: some View {
         ZStack {
-            AppColors.substratePrimary
+            AppSurfaces.color(.contentBackground)
                 .ignoresSafeArea()
 
             ScrollView {
@@ -99,7 +99,7 @@ struct ModelOverrideSheet: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(12)
     }
 
@@ -125,7 +125,7 @@ struct ModelOverrideSheet: View {
             Spacer()
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 

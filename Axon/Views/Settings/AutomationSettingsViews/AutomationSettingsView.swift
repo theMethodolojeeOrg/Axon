@@ -272,7 +272,7 @@ private struct ToolExecutionConfigSection: View {
                 }
             }
             .padding()
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(12)
 
             // Info text
@@ -333,7 +333,7 @@ private struct ToolSystemQuickToggle: View {
             .buttonStyle(.plain)
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(12)
     }
 }

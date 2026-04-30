@@ -202,7 +202,7 @@ struct SettingsOptionCard: View {
                 // Icon
                 ZStack {
                     Circle()
-                        .fill(isSelected ? AppColors.signalMercury.opacity(0.2) : AppSurfaces.color(.controlBackground))
+                        .fill(isSelected ? AppSurfaces.color(.selectedBackground) : AppSurfaces.color(.controlBackground))
                         .frame(width: 44, height: 44)
 
                     Image(systemName: icon)
@@ -1633,7 +1633,7 @@ struct GenderFilterButton: View {
                 .padding(.vertical, 4)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(isSelected ? AppColors.signalMercury.opacity(0.2) : Color.clear)
+                        .fill(isSelected ? AppSurfaces.color(.selectedBackground) : Color.clear)
                 )
                 .foregroundColor(isSelected ? AppColors.signalMercury : AppColors.textSecondary)
         }
