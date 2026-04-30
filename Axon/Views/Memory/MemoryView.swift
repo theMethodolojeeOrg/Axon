@@ -12,7 +12,7 @@ struct MemoryView: View {
 
     var body: some View {
         ZStack {
-            AppColors.substratePrimary
+            AppSurfaces.color(.contentBackground)
                 .ignoresSafeArea()
 
             MemoryContentView()
@@ -54,7 +54,7 @@ struct MemorySuccessToast: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.transientBackground))
                 .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
         )
         .padding()
@@ -78,7 +78,7 @@ struct MemoryErrorToast: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.transientBackground))
                 .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
         )
         .padding()

@@ -44,7 +44,7 @@ struct MemoryDetailView: View {
     var body: some View {
         #if os(macOS)
         ZStack {
-            AppColors.substratePrimary
+            AppSurfaces.color(.contentBackground)
                 .ignoresSafeArea()
             
             ScrollView {
@@ -86,7 +86,7 @@ struct MemoryDetailView: View {
                                 .foregroundColor(AppColors.textPrimary)
                                 .frame(minHeight: 120)
                                 .padding(8)
-                                .background(AppColors.substrateTertiary)
+                                .background(AppSurfaces.color(.controlBackground))
                                 .cornerRadius(8)
                         } else {
                             Text(memory.content)
@@ -94,7 +94,7 @@ struct MemoryDetailView: View {
                                 .foregroundColor(AppColors.textPrimary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding()
-                                .background(AppColors.substrateSecondary)
+                                .background(AppSurfaces.color(.cardBackground))
                                 .cornerRadius(12)
                         }
                     }
@@ -113,7 +113,7 @@ struct MemoryDetailView: View {
                                     .foregroundColor(AppColors.textPrimary)
                                     .frame(minHeight: 80)
                                     .padding(8)
-                                    .background(AppColors.substrateTertiary)
+                                    .background(AppSurfaces.color(.controlBackground))
                                     .cornerRadius(8)
                             } else {
                                 Text(context)
@@ -121,7 +121,7 @@ struct MemoryDetailView: View {
                                     .foregroundColor(AppColors.textPrimary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding()
-                                    .background(AppColors.substrateSecondary)
+                                    .background(AppSurfaces.color(.cardBackground))
                                     .cornerRadius(12)
                             }
                         }
@@ -150,7 +150,7 @@ struct MemoryDetailView: View {
                             .foregroundColor(AppColors.textPrimary)
                             .padding()
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(AppColors.substrateSecondary)
+                            .background(AppSurfaces.color(.cardBackground))
                             .cornerRadius(12)
                         }
                     }
@@ -192,7 +192,7 @@ struct MemoryDetailView: View {
                                 .font(AppTypography.bodyMedium())
                                 .foregroundColor(AppColors.textPrimary)
                                 .padding()
-                                .background(AppColors.substrateTertiary)
+                                .background(AppSurfaces.color(.controlBackground))
                                 .cornerRadius(8)
                         } else {
                             if !memory.tags.isEmpty {
@@ -238,7 +238,7 @@ struct MemoryDetailView: View {
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(AppColors.substrateSecondary)
+                                .background(AppSurfaces.color(.cardBackground))
                                 .cornerRadius(8)
 
                                 // Success/Failure counts
@@ -256,7 +256,7 @@ struct MemoryDetailView: View {
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(AppColors.substrateSecondary)
+                                .background(AppSurfaces.color(.cardBackground))
                                 .cornerRadius(8)
                             }
 
@@ -298,7 +298,7 @@ struct MemoryDetailView: View {
                                 .foregroundColor(AppColors.textPrimary)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(AppColors.substrateSecondary)
+                                .background(AppSurfaces.color(.cardBackground))
                                 .cornerRadius(12)
                             }
 
@@ -370,7 +370,7 @@ struct MemoryDetailView: View {
         #else
         NavigationView {
             ZStack {
-                AppColors.substratePrimary
+                AppSurfaces.color(.contentBackground)
                     .ignoresSafeArea()
                 
                 ScrollView {
@@ -412,7 +412,7 @@ struct MemoryDetailView: View {
                                     .foregroundColor(AppColors.textPrimary)
                                     .frame(minHeight: 120)
                                     .padding(8)
-                                    .background(AppColors.substrateTertiary)
+                                    .background(AppSurfaces.color(.controlBackground))
                                     .cornerRadius(8)
                             } else {
                                 Text(memory.content)
@@ -420,7 +420,7 @@ struct MemoryDetailView: View {
                                     .foregroundColor(AppColors.textPrimary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding()
-                                    .background(AppColors.substrateSecondary)
+                                    .background(AppSurfaces.color(.cardBackground))
                                     .cornerRadius(12)
                             }
                         }
@@ -439,7 +439,7 @@ struct MemoryDetailView: View {
                                         .foregroundColor(AppColors.textPrimary)
                                         .frame(minHeight: 80)
                                         .padding(8)
-                                        .background(AppColors.substrateTertiary)
+                                        .background(AppSurfaces.color(.controlBackground))
                                         .cornerRadius(8)
                                 } else {
                                     Text(context)
@@ -447,7 +447,7 @@ struct MemoryDetailView: View {
                                         .foregroundColor(AppColors.textPrimary)
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                         .padding()
-                                        .background(AppColors.substrateSecondary)
+                                        .background(AppSurfaces.color(.cardBackground))
                                         .cornerRadius(12)
                                 }
                             }
@@ -476,7 +476,7 @@ struct MemoryDetailView: View {
                                 .foregroundColor(AppColors.textPrimary)
                                 .padding()
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(AppColors.substrateSecondary)
+                                .background(AppSurfaces.color(.cardBackground))
                                 .cornerRadius(12)
                             }
                         }
@@ -518,7 +518,7 @@ struct MemoryDetailView: View {
                                     .font(AppTypography.bodyMedium())
                                     .foregroundColor(AppColors.textPrimary)
                                     .padding()
-                                    .background(AppColors.substrateTertiary)
+                                    .background(AppSurfaces.color(.controlBackground))
                                     .cornerRadius(8)
                             } else {
                                 if !memory.tags.isEmpty {
@@ -564,7 +564,7 @@ struct MemoryDetailView: View {
                                     }
                                     .frame(maxWidth: .infinity)
                                     .padding()
-                                    .background(AppColors.substrateSecondary)
+                                    .background(AppSurfaces.color(.cardBackground))
                                     .cornerRadius(8)
 
                                     // Success/Failure counts
@@ -582,7 +582,7 @@ struct MemoryDetailView: View {
                                     }
                                     .frame(maxWidth: .infinity)
                                     .padding()
-                                    .background(AppColors.substrateSecondary)
+                                    .background(AppSurfaces.color(.cardBackground))
                                     .cornerRadius(8)
                                 }
 
@@ -624,7 +624,7 @@ struct MemoryDetailView: View {
                                     .foregroundColor(AppColors.textPrimary)
                                     .frame(maxWidth: .infinity)
                                     .padding()
-                                    .background(AppColors.substrateSecondary)
+                                    .background(AppSurfaces.color(.cardBackground))
                                     .cornerRadius(12)
                                 }
 

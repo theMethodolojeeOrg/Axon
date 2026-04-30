@@ -33,7 +33,7 @@ struct ContextUsageSection: View {
                         ZStack(alignment: .leading) {
                             // Background
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(AppColors.substrateTertiary)
+                                .fill(AppSurfaces.color(.controlBackground))
                                 .frame(height: 12)
                             
                             // Fill
@@ -49,7 +49,7 @@ struct ContextUsageSection: View {
                         .foregroundColor(AppColors.textTertiary)
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
         }

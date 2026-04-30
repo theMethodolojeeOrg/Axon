@@ -72,7 +72,7 @@ struct ChatInfoSettingsView: View {
             }
             .padding(24)
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .frame(minWidth: 480, idealWidth: 520, minHeight: 500, idealHeight: 600)
         .task {
             loadConversationOverrides()
@@ -94,7 +94,7 @@ struct ChatInfoSettingsView: View {
                 }
                 .padding()
             }
-            .background(AppColors.substratePrimary)
+            .background(AppSurfaces.color(.contentBackground))
             .navigationTitle("Chat Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -381,7 +381,7 @@ struct ChatInfoToolCategorySection: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 12)
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
                 }
                 .buttonStyle(.plain)
@@ -441,7 +441,7 @@ struct ChatInfoToolToggleRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 }

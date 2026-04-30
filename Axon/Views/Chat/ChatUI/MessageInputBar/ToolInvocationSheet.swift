@@ -141,7 +141,7 @@ struct ToolInvocationSheet: View {
             // Action Buttons pinned to bottom
             actionButtons
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 
     // MARK: - Tool Header
@@ -189,11 +189,11 @@ struct ToolInvocationSheet: View {
                 .scrollContentBackground(.hidden)
                 .padding(12)
                 .frame(minHeight: 100, maxHeight: 160)
-                .background(AppColors.substrateTertiary)
+                .background(AppSurfaces.color(.controlBackground))
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(isQueryFocused ? AppColors.signalLichen : AppColors.glassBorder, lineWidth: 1)
+                        .stroke(isQueryFocused ? AppColors.signalLichen : AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
                 .focused($isQueryFocused)
 
@@ -248,11 +248,11 @@ struct ToolInvocationSheet: View {
                     #endif
                     .disableAutocorrection(true)
                     .padding(12)
-                    .background(AppColors.substrateTertiary)
+                    .background(AppSurfaces.color(.controlBackground))
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(isUrlFocused ? AppColors.signalLichen : AppColors.glassBorder, lineWidth: 1)
+                            .stroke(isUrlFocused ? AppColors.signalLichen : AppSurfaces.color(.cardBorder), lineWidth: 1)
                     )
                     .focused($isUrlFocused)
             }
@@ -268,11 +268,11 @@ struct ToolInvocationSheet: View {
                     .scrollContentBackground(.hidden)
                     .padding(12)
                     .frame(minHeight: 80, maxHeight: 120)
-                    .background(AppColors.substrateTertiary)
+                    .background(AppSurfaces.color(.controlBackground))
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(isQueryFocused ? AppColors.signalLichen : AppColors.glassBorder, lineWidth: 1)
+                            .stroke(isQueryFocused ? AppColors.signalLichen : AppSurfaces.color(.cardBorder), lineWidth: 1)
                     )
                     .focused($isQueryFocused)
 
@@ -319,11 +319,11 @@ struct ToolInvocationSheet: View {
                 .scrollContentBackground(.hidden)
                 .padding(12)
                 .frame(minHeight: 120, maxHeight: 200)
-                .background(AppColors.substrateTertiary)
+                .background(AppSurfaces.color(.controlBackground))
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(isQueryFocused ? AppColors.signalLichen : AppColors.glassBorder, lineWidth: 1)
+                        .stroke(isQueryFocused ? AppColors.signalLichen : AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
                 .focused($isQueryFocused)
 
@@ -348,11 +348,11 @@ struct ToolInvocationSheet: View {
                 .scrollContentBackground(.hidden)
                 .padding(12)
                 .frame(minHeight: 120, maxHeight: 200)
-                .background(AppColors.substrateTertiary)
+                .background(AppSurfaces.color(.controlBackground))
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(isQueryFocused ? AppColors.signalLichen : AppColors.glassBorder, lineWidth: 1)
+                        .stroke(isQueryFocused ? AppColors.signalLichen : AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
                 .focused($isQueryFocused)
 
@@ -377,11 +377,11 @@ struct ToolInvocationSheet: View {
                 .scrollContentBackground(.hidden)
                 .padding(12)
                 .frame(minHeight: 80, maxHeight: 120)
-                .background(AppColors.substrateTertiary)
+                .background(AppSurfaces.color(.controlBackground))
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(isQueryFocused ? AppColors.signalLichen : AppColors.glassBorder, lineWidth: 1)
+                        .stroke(isQueryFocused ? AppColors.signalLichen : AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
                 .focused($isQueryFocused)
 
@@ -408,11 +408,11 @@ struct ToolInvocationSheet: View {
                 .scrollContentBackground(.hidden)
                 .padding(12)
                 .frame(minHeight: 120, maxHeight: 200)
-                .background(AppColors.substrateTertiary)
+                .background(AppSurfaces.color(.controlBackground))
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(isQueryFocused ? AppColors.signalLichen : AppColors.glassBorder, lineWidth: 1)
+                        .stroke(isQueryFocused ? AppColors.signalLichen : AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
                 .focused($isQueryFocused)
 
@@ -438,7 +438,7 @@ struct ToolInvocationSheet: View {
                             .padding(.vertical, 8)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(noteVisibility == visibility ? AppColors.signalLichen : AppColors.substrateTertiary)
+                                    .fill(noteVisibility == visibility ? AppColors.signalLichen : AppSurfaces.color(.controlBackground))
                             )
                         }
                         .buttonStyle(.plain)
@@ -522,7 +522,7 @@ struct ToolInvocationSheet: View {
                 }
                 .frame(maxHeight: 200)
                 .padding(12)
-                .background(AppColors.substrateTertiary)
+                .background(AppSurfaces.color(.controlBackground))
                 .cornerRadius(12)
             }
         }
@@ -618,7 +618,7 @@ struct ToolInvocationSheet: View {
             }
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
     }
 
     private var canExecute: Bool {

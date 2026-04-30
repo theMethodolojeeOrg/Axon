@@ -103,7 +103,7 @@ struct RealtimeVoiceSection: View {
                         .foregroundColor(AppColors.textTertiary)
                 }
                 .padding(12)
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
             .buttonStyle(.plain)
@@ -140,7 +140,7 @@ struct RealtimeVoiceSection: View {
                         .foregroundColor(AppColors.textTertiary)
                 }
                 .padding(12)
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
             .buttonStyle(.plain)
@@ -190,7 +190,7 @@ struct RealtimeVoiceSection: View {
                 .foregroundColor(AppColors.textTertiary)
         }
         .padding(12)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
     
@@ -214,5 +214,5 @@ struct RealtimeVoiceSection: View {
         onSave: {}
     )
     .padding()
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

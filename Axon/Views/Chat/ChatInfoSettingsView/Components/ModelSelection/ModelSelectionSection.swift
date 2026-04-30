@@ -49,5 +49,5 @@ struct ChatModelSelectionSection: View {
         onModelSelected: { _ in }
     )
     .padding()
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

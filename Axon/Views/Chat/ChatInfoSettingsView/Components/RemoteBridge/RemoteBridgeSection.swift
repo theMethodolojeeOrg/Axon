@@ -68,7 +68,7 @@ struct RemoteBridgeSection: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
     
@@ -92,7 +92,7 @@ struct RemoteBridgeSection: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(8)
             
             // Port input
@@ -109,7 +109,7 @@ struct RemoteBridgeSection: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(8)
         }
     }
@@ -138,7 +138,7 @@ struct RemoteBridgeSection: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
     
@@ -261,6 +261,6 @@ struct RemoteBridgeSection: View {
         remotePort: .constant("8082")
     )
     .padding()
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }
 #endif

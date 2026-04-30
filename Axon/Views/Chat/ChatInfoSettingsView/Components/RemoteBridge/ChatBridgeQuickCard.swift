@@ -63,7 +63,7 @@ struct ChatBridgeQuickCard: View {
                     Spacer()
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
 
                 HStack(spacing: 10) {

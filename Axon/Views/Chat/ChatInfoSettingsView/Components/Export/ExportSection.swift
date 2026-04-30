@@ -162,5 +162,5 @@ struct ExportSection: View {
         messageCount: 10
     ))
     .padding()
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

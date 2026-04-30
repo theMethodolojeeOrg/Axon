@@ -59,10 +59,10 @@ struct TemporalStatusBar: View {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(AppColors.substrateSecondary.opacity(0.8))
+                    .fill(AppSurfaces.color(.transientBackground).opacity(0.8))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(AppColors.glassBorder.opacity(0.5), lineWidth: 0.5)
+                            .stroke(AppSurfaces.color(.cardBorder).opacity(0.5), lineWidth: 0.5)
                     )
             )
             .transition(.opacity.combined(with: .move(edge: .top)))
@@ -106,7 +106,7 @@ struct TemporalStatusBar: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(AppColors.substrateTertiary)
+                        .fill(AppSurfaces.color(.controlMutedBackground))
                         .frame(height: 4)
 
                     RoundedRectangle(cornerRadius: 2)
@@ -176,5 +176,5 @@ struct TemporalStatusBar: View {
         TemporalStatusBar(contextSaturation: 0.95)
     }
     .padding()
-    .background(AppColors.substratePrimary)
+    .appSurface(.contentBackground)
 }

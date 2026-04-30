@@ -98,7 +98,7 @@ struct MemoryIssuesContentView: View {
             }
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
     }
 
     // MARK: - Empty State
@@ -127,7 +127,7 @@ struct MemoryIssuesContentView: View {
                     .foregroundColor(AppColors.signalMercury)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
             }
 
@@ -175,7 +175,7 @@ private struct IssueSelectionBar: View {
             }
             .padding(.horizontal)
             .padding(.vertical, 12)
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
 
             // Action buttons (when items selected)
             if viewModel.selectedIssueCount > 0 {
@@ -204,7 +204,7 @@ private struct IssueSelectionBar: View {
                 }
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity)
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
             }
         }
     }
@@ -318,7 +318,7 @@ private struct IssueCard: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
+                .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppSurfaces.color(.cardBackground))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -418,7 +418,7 @@ private struct MemoryComparisonRow: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(isSelectedToKeep ? AppColors.accentSuccess.opacity(0.1) : AppColors.substrateTertiary)
+                .fill(isSelectedToKeep ? AppColors.accentSuccess.opacity(0.1) : AppSurfaces.color(.controlBackground))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8)

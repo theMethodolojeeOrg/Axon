@@ -89,5 +89,5 @@ struct CovenantRestrictionBanner: View {
         )
     }
     .padding()
-    .background(AppColors.substratePrimary)
+    .appSurface(.contentBackground)
 }

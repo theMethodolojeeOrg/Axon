@@ -46,7 +46,7 @@ struct ExportButtonRow: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(8)
         }
         .buttonStyle(.plain)
@@ -73,5 +73,5 @@ struct ExportButtonRow: View {
         )
     }
     .padding()
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

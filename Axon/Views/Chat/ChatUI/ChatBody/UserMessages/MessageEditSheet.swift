@@ -112,7 +112,7 @@ struct MessageEditSheet: View {
                 .font(AppTypography.bodyMedium())
                 .foregroundColor(AppColors.textPrimary)
                 .scrollContentBackground(.hidden)
-                .background(AppColors.substratePrimary)
+                .background(AppSurfaces.color(.contentBackground))
                 .focused($isTextEditorFocused)
                 .padding()
 
@@ -146,7 +146,7 @@ struct MessageEditSheet: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .foregroundColor(AppColors.textPrimary)
                     .cornerRadius(10)
                 }
@@ -154,7 +154,7 @@ struct MessageEditSheet: View {
             }
             .padding()
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 }
 
@@ -196,7 +196,7 @@ struct EditHistoryView: View {
                         }
                         .padding(8)
                         .frame(width: 140)
-                        .background(AppColors.substrateSecondary)
+                        .background(AppSurfaces.color(.cardBackground))
                         .cornerRadius(8)
                     }
                     .buttonStyle(.plain)

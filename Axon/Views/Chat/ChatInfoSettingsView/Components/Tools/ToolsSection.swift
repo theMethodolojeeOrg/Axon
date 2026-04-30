@@ -111,7 +111,7 @@ struct ToolsSection: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
     
@@ -154,7 +154,7 @@ struct ToolsSection: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
     #endif
@@ -167,5 +167,5 @@ struct ToolsSection: View {
         onToggleTool: { _, _ in }
     )
     .padding()
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

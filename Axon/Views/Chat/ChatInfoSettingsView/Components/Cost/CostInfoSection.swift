@@ -38,7 +38,7 @@ struct CostInfoSection: View {
                     #endif
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
         }
@@ -48,5 +48,5 @@ struct CostInfoSection: View {
 #Preview {
     CostInfoSection()
         .padding()
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
 }

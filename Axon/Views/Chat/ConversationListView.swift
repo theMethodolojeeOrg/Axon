@@ -15,7 +15,7 @@ struct ConversationListView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                AppColors.substratePrimary
+                AppSurfaces.color(.contentBackground)
                     .ignoresSafeArea()
 
                 if conversationService.conversations.isEmpty && !conversationService.isLoading {
@@ -196,7 +196,7 @@ struct NewConversationSheet: View {
     var body: some View {
         NavigationView {
             ZStack {
-                AppColors.substratePrimary
+                AppSurfaces.color(.contentBackground)
                     .ignoresSafeArea()
 
                 VStack(spacing: 24) {
