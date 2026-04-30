@@ -47,9 +47,14 @@ struct GenerativeUITestView: View {
             }
         }
         .sheet(isPresented: $showingHelp) {
+            Group {
             helpSheet
-        }
+
+            }
+            .appSheetMaterial()
+}
         .sheet(isPresented: $showingPropertyEditor) {
+            Group {
             if let path = selectedNodePath, let node = getNode(at: path) {
                 PropertyEditorSheet(
                     node: node,
@@ -66,7 +71,10 @@ struct GenerativeUITestView: View {
                     }
                 )
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
         #else
         NavigationStack {
             VStack(spacing: 0) {
@@ -99,9 +107,14 @@ struct GenerativeUITestView: View {
                 }
             }
             .sheet(isPresented: $showingHelp) {
+                Group {
                 helpSheet
-            }
+
+                }
+                .appSheetMaterial()
+}
             .sheet(isPresented: $showingPropertyEditor) {
+                Group {
                 if let path = selectedNodePath, let node = getNode(at: path) {
                     PropertyEditorSheet(
                         node: node,
@@ -118,7 +131,10 @@ struct GenerativeUITestView: View {
                         }
                     )
                 }
-            }
+
+                }
+                .appSheetMaterial()
+}
             .onAppear {
                 loadDefaultJSON()
             }

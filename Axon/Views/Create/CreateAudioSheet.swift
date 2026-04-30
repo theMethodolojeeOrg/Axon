@@ -43,15 +43,23 @@ struct CreateAudioSheet: View {
             .frame(minWidth: 520, idealWidth: 580, minHeight: 560, idealHeight: 700)
             .onAppear { setupOnAppear() }
             .sheet(isPresented: $showDetailSheet) {
+                Group {
                 if let item = generatedItem { CreativeItemDetailView(item: item) }
-            }
+
+                }
+                .appSheetMaterial()
+}
         #else
         sheetContent
             .navigationTitle("Audio Studio")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showDetailSheet) {
+                Group {
                 if let item = generatedItem { CreativeItemDetailView(item: item) }
-            }
+
+                }
+                .appSheetMaterial()
+}
             .onAppear { setupOnAppear() }
         #endif
     }

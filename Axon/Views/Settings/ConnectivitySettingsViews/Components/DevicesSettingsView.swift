@@ -164,17 +164,23 @@ struct DevicesSettingsView: View {
         } message: {
             Text("This will create a snapshot of your current state and sync it to iCloud for all your devices to see.")
         }
-        .sheet(item: $selectedDeviceForPush) { device in
+        .sheet(item: $selectedDeviceForPush) {
+            device in
+            Group {
             PushToDeviceSheet(
                 device: device,
                 onPush: { await pushStateTo(device) },
                 onCancel: { selectedDeviceForPush = nil }
             )
-        }
+
+            }
+            .appSheetMaterial()
+}
         .sheet(isPresented: Binding(
             get: { editingDeviceName != nil },
             set: { if !$0 { editingDeviceName = nil } }
         )) {
+            Group {
             if let deviceId = editingDeviceName {
                 EditDeviceNameSheet(
                     deviceId: deviceId,
@@ -187,7 +193,10 @@ struct DevicesSettingsView: View {
                     onCancel: { editingDeviceName = nil }
                 )
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     // MARK: - Actions

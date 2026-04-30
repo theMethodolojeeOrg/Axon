@@ -48,7 +48,7 @@ struct ComponentPickerSheet: View {
                 }
                 .padding()
             }
-            .background(AppColors.substratePrimary)
+            .background(Color.clear)
             .navigationTitle("Add Component")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

@@ -2,7 +2,7 @@
 //  GlassCard.swift
 //  Axon
 //
-//  Glass Morphism Card Component
+//  Card Surface Components
 //
 
 import SwiftUI
@@ -31,21 +31,48 @@ struct GlassCard<Content: View>: View {
     var body: some View {
         content
             .padding(padding)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(AppSurfaces.color(.cardBorder), lineWidth: borderWidth)
+            )
+            .shadow(color: AppColors.shadow.opacity(0.35), radius: shadowRadius, x: 0, y: 4)
+    }
+}
+
+struct AxonCard<Content: View>: View {
+    let content: Content
+    let padding: CGFloat
+    let cornerRadius: CGFloat
+    let borderWidth: CGFloat
+    let shadowRadius: CGFloat
+
+    init(
+        padding: CGFloat = 16,
+        cornerRadius: CGFloat = 12,
+        borderWidth: CGFloat = 1,
+        shadowRadius: CGFloat = 8,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.content = content()
+        self.padding = padding
+        self.cornerRadius = cornerRadius
+        self.borderWidth = borderWidth
+        self.shadowRadius = shadowRadius
+    }
+
+    var body: some View {
+        content
+            .padding(padding)
             .background(
-                RoundedRectangle(cornerRadius: cornerRadius)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(AppSurfaces.color(.cardBackground))
                     .overlay(
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .fill(AppColors.glassOverlay)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: cornerRadius)
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .stroke(AppSurfaces.color(.cardBorder), lineWidth: borderWidth)
                     )
                     .shadow(color: AppColors.shadow, radius: shadowRadius, x: 0, y: 4)
             )
-            .background(.ultraThinMaterial.opacity(0.3))
-            .cornerRadius(cornerRadius)
     }
 }
 
@@ -57,11 +84,11 @@ struct GlassCard<Content: View>: View {
             .ignoresSafeArea()
 
         VStack(spacing: 20) {
-            GlassCard {
+            AxonCard {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Glass Card Title")
+                    Text("Axon Card Title")
                         .appStyle(AppTypography.titleLarge(), color: AppColors.textPrimary)
-                    Text("This is a glass morphism card with backdrop blur and subtle borders.")
+                    Text("This is a standard Axon card with semantic surface color and subtle borders.")
                         .appStyle(AppTypography.bodyMedium(), color: AppColors.textSecondary)
                 }
             }
@@ -74,7 +101,7 @@ struct GlassCard<Content: View>: View {
                     VStack(alignment: .leading) {
                         Text("AI Response")
                             .appStyle(AppTypography.titleMedium(), color: AppColors.textPrimary)
-                        Text("With custom padding")
+                        Text("True material surface")
                             .appStyle(AppTypography.bodySmall(), color: AppColors.textSecondary)
                     }
                     Spacer()

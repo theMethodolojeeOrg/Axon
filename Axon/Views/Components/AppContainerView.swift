@@ -108,10 +108,14 @@ struct AppContainerView: View {
             }
         }
         .sheet(isPresented: $showChatInfo) {
+            Group {
             if let conversation = selectedConversation {
                 ChatInfoSettingsView(conversation: conversation)
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
         .appSurface(.windowBackground)
         .onAppear {
             // Ensure launch overlay is visible on first appearance
@@ -550,12 +554,12 @@ struct AppContainerView: View {
         var provider: AIProvider = settings.defaultProvider
         var modelId = settings.defaultModelId
         var voice = (provider == .openai) ? settings.openAIVoice : settings.geminiVoice
-        
+
         // Check for overrides
         let key = "conversation_overrides_\(conversation.id)"
         if let data = UserDefaults.standard.data(forKey: key),
            let overrides = try? JSONDecoder().decode(ConversationOverrides.self, from: data) {
-            
+
             if let pRaw = overrides.liveProvider {
                  if pRaw == "openai" { provider = .openai }
                  else if pRaw == "gemini" { provider = .gemini }
@@ -563,7 +567,7 @@ struct AppContainerView: View {
             if let m = overrides.liveModel { modelId = m }
             if let v = overrides.liveVoice { voice = v }
         }
-        
+
         // Update voice based on provider if not overridden specifically (simplified logic)
         // Ideally we should check if voice matches provider context, but we trust the user/logic here.
 
@@ -667,7 +671,7 @@ struct ChatContainerView: View {
                     if conversation.isSoloThread {
                         SoloThreadStatusBar(conversation: conversation)
                     }
-                    
+
                     // Existing conversation
                     existingChatView(conversation: conversation)
                 } else {
@@ -834,7 +838,9 @@ struct ChatContainerView: View {
             // Show first-run welcome card if user hasn't seen it yet
             showFirstRunWelcome = !settingsViewModel.settings.hasSeenFirstRunWelcome
         }
-        .sheet(item: $messageToEdit) { message in
+        .sheet(item: $messageToEdit) {
+            message in
+            Group {
             MessageEditSheet(
                 message: message,
                 onSave: { newContent in
@@ -872,7 +878,10 @@ struct ChatContainerView: View {
                     messageToEdit = nil
                 }
             )
-        }
+
+            }
+            .appSheetMaterial()
+}
         .alert("Delete Message?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) {
                 messageToDelete = nil
@@ -2213,7 +2222,7 @@ struct ChatContainerView: View {
             )
         }
     }
-    
+
     private func stopGeneration() {
         print("[ChatContainer] Stopping message generation...")
         currentSendTask?.cancel()
@@ -2247,9 +2256,9 @@ struct ChatContainerView: View {
             onComplete?()
         }
     }
-    
+
     // MARK: - Draft Management
-    
+
     private func loadDraft(for conversationId: String) {
         if let draft = draftService.loadDraft(conversationId: conversationId) {
             messageText = draft.text
@@ -2257,7 +2266,7 @@ struct ChatContainerView: View {
             print("[ChatContainer] Loaded draft for conversation: \(conversationId)")
         }
     }
-    
+
     private func saveDraftDebounced() {
         // Cancel previous save task
         draftSaveTask?.cancel()
@@ -2399,14 +2408,7 @@ struct ScrollToBottomButton: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .frame(minHeight: ChatVisualTokens.minTouchTarget)
-            .background(
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        Capsule()
-                            .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
-                    )
-            )
+            .appMaterialSurface(radius: 999)
             .shadow(color: AppColors.shadow.opacity(0.3), radius: 8, x: 0, y: 4)
         }
         .buttonStyle(PlainButtonStyle())

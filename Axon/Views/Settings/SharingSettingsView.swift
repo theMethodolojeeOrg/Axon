@@ -47,12 +47,22 @@ struct SharingSettingsView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
         #endif
-        .sheet(item: $showingRequestDetail) { request in
+        .sheet(item: $showingRequestDetail) {
+            request in
+            Group {
             RequestDetailSheet(request: request)
-        }
-        .sheet(item: $showingInvitationDetail) { invitation in
+
+            }
+            .appSheetMaterial()
+}
+        .sheet(item: $showingInvitationDetail) {
+            invitation in
+            Group {
             InvitationDetailSheet(invitation: invitation)
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     // MARK: - Enable Section
@@ -86,8 +96,12 @@ struct SharingSettingsView: View {
                     }
                 }
                 .sheet(isPresented: $showingRequestLink) {
+                    Group {
                     RequestLinkSheet()
-                }
+
+                    }
+                    .appSheetMaterial()
+}
             }
         } header: {
             Text("Sharing")

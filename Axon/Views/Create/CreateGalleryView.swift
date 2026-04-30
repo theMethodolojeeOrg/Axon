@@ -86,7 +86,9 @@ struct CreateGalleryView: View {
             await galleryService.loadAllItems()
             await generativeViewStorageService.loadAllViews()
         }
-        .sheet(item: $selectedItem) { item in
+        .sheet(item: $selectedItem) {
+            item in
+            Group {
             if let workspace = workspaceForEditor(from: item) {
                 ArtifactWorkspaceEditorView(
                     initialWorkspace: workspace,
@@ -101,7 +103,10 @@ struct CreateGalleryView: View {
             } else {
                 CreativeItemDetailView(item: item)
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
         .navigationDestination(isPresented: $showingImageSheet) { CreateImageSheet() }
         .navigationDestination(isPresented: $showingAudioSheet) { CreateAudioSheet() }
         .navigationDestination(isPresented: $showingVideoSheet) { CreateVideoSheet() }

@@ -42,7 +42,9 @@ struct ModelTuningView: View {
         }
         .background(AppSurfaces.color(.contentBackground))
         .navigationTitle("Model Tuning")
-        .sheet(item: $showingModelDetail) { context in
+        .sheet(item: $showingModelDetail) {
+            context in
+            Group {
             ModelOverrideSheet(
                 context: context,
                 viewModel: viewModel
@@ -51,7 +53,10 @@ struct ModelTuningView: View {
             // Encourage a usable default size on iPhone/iPad.
             .presentationDetents([.medium, .large])
             #endif
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     // MARK: - Provider Accordions

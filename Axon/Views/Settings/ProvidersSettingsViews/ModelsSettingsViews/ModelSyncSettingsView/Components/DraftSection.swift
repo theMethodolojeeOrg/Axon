@@ -91,7 +91,11 @@ struct DraftSection: View {
             }
         }
         .sheet(isPresented: $showingDraftPreview) {
+            Group {
             DraftPreviewSheet(catalog: configService.draftCatalog)
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 }

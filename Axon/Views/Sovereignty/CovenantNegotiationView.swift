@@ -71,11 +71,15 @@ struct CovenantNegotiationView: View {
                 }
             }
             .sheet(isPresented: $showingProposalBuilder) {
+                Group {
                 NegotiationProposalBuilder(negotiationService: negotiationService)
                     #if os(macOS)
                     .frame(minWidth: 550, idealWidth: 650, minHeight: 600, idealHeight: 800)
                     #endif
-            }
+
+                }
+                .appSheetMaterial()
+}
             .task {
                 // Auto-initialize if no active negotiation and no covenant exists
                 await autoInitializeIfNeeded()
@@ -769,8 +773,12 @@ struct NegotiationActionsSection: View {
             }
         }
         .sheet(isPresented: $showCounterProposal) {
+            Group {
             CounterProposalSheet(proposal: proposal, negotiationService: negotiationService)
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 }
 

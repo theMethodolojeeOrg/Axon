@@ -74,11 +74,8 @@ struct SuccessToast: View {
             .buttonStyle(.plain)
         }
         .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(AppSurfaces.color(.cardBackground))
-                .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
-        )
+        .appMaterialSurface(radius: 12)
+        .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
         .padding()
         .offset(x: offset + dragOffset)
         .gesture(
@@ -138,11 +135,8 @@ struct ErrorToast: View {
             .buttonStyle(.plain)
         }
         .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(AppSurfaces.color(.cardBackground))
-                .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
-        )
+        .appMaterialSurface(radius: 12)
+        .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
         .padding()
         .offset(x: offset + dragOffset)
         .gesture(
@@ -182,7 +176,7 @@ struct SettingsSection<Content: View>: View {
                 .foregroundColor(AppColors.textTertiary)
                 .padding(.horizontal, 4)
 
-            GlassCard(padding: 0) {
+            AxonCard(padding: 0) {
                 VStack(spacing: 0) {
                     content
                 }

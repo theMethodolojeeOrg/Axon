@@ -177,8 +177,12 @@ struct DynamicToolsSettingsView: View {
             }
         }
         .sheet(isPresented: $showingDraftPreview) {
+            Group {
             DynamicToolsDraftPreviewSheet(catalog: configService.draftCatalog)
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     // MARK: - Tools List Section
@@ -229,12 +233,21 @@ struct DynamicToolsSettingsView: View {
             .buttonStyle(.bordered)
             .tint(AppColors.signalMercury)
         }
-        .sheet(item: $selectedTool) { tool in
+        .sheet(item: $selectedTool) {
+            tool in
+            Group {
             DynamicToolDetailSheet(tool: tool)
-        }
+
+            }
+            .appSheetMaterial()
+}
         .sheet(isPresented: $showingAddTool) {
+            Group {
             DynamicToolEditorSheet(mode: .create)
-        }
+
+            }
+            .appSheetMaterial()
+}
         .alert("Test Output", isPresented: $showingTestOutput) {
             Button("OK") {
                 testOutput = nil

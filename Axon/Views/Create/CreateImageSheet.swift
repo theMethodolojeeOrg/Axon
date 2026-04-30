@@ -28,15 +28,23 @@ struct CreateImageSheet: View {
         sheetContent
             .frame(minWidth: 520, idealWidth: 580, minHeight: 560, idealHeight: 680)
             .sheet(isPresented: $showDetailSheet) {
+                Group {
                 if let item = generatedItem { CreativeItemDetailView(item: item) }
-            }
+
+                }
+                .appSheetMaterial()
+}
         #else
         sheetContent
             .navigationTitle("Image Studio")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showDetailSheet) {
+                Group {
                 if let item = generatedItem { CreativeItemDetailView(item: item) }
-            }
+
+                }
+                .appSheetMaterial()
+}
         #endif
     }
 

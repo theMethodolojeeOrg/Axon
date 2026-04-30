@@ -123,6 +123,7 @@ struct FirstRunWelcomeCard: View {
                 )
         )
         .sheet(isPresented: $showAPIKeysSheet) {
+            Group {
             NavigationStack {
                 ScrollView {
                     APIKeysSettingsView(viewModel: settingsViewModel)
@@ -141,7 +142,10 @@ struct FirstRunWelcomeCard: View {
                     }
                 }
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     private func markWelcomeSeen() {

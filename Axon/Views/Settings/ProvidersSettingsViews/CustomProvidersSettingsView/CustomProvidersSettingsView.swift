@@ -87,6 +87,7 @@ struct CustomProvidersSettingsView: View {
             .buttonStyle(PlainButtonStyle())
         }
         .sheet(isPresented: $showingProviderSheet) {
+            Group {
             CustomProviderEditSheet(
                 viewModel: viewModel,
                 existingProvider: editingProvider,
@@ -95,7 +96,10 @@ struct CustomProvidersSettingsView: View {
                     editingProvider = nil
                 }
             )
-        }
+
+            }
+            .appSheetMaterial()
+}
         .alert("Delete Provider", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {

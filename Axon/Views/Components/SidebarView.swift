@@ -73,6 +73,7 @@ struct SidebarView: View {
             }
         }
         .sheet(isPresented: $showingRenameSheet) {
+            Group {
             NavigationStack {
                 ZStack {
                     AppSurfaces.color(.contentBackground).ignoresSafeArea()
@@ -122,7 +123,10 @@ struct SidebarView: View {
                     #endif
                 }
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
         .alert("Delete Conversation", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) {
                 deletingConversation = nil
@@ -173,8 +177,12 @@ struct SidebarView: View {
             }
         }
         .sheet(isPresented: $showingWorkspaces) {
+            Group {
             WorkspacesView()
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     // MARK: - Header
@@ -263,7 +271,7 @@ struct SidebarView: View {
                         .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
             }
-            
+
             // Create Gallery button
             Button(action: {
                 onNavigate(.create)

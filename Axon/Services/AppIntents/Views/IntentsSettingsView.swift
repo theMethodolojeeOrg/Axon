@@ -43,11 +43,19 @@ struct IntentsSettingsView: View {
         }
         .background(AppColors.substratePrimary)
         .sheet(isPresented: $showingImportShortcut) {
+            Group {
             ImportShortcutSheet()
-        }
+
+            }
+            .appSheetMaterial()
+}
         .sheet(isPresented: $showingAddPort) {
+            Group {
             AddCustomPortSheet()
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     // MARK: - Header

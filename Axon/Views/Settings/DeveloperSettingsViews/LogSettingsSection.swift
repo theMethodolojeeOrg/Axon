@@ -127,6 +127,7 @@ struct DeveloperConsoleRow: View {
             }
         }
         .sheet(isPresented: $showingConsole) {
+            Group {
             #if os(iOS)
             NavigationView {
                 DeveloperConsoleView()
@@ -135,7 +136,10 @@ struct DeveloperConsoleRow: View {
             DeveloperConsoleView()
                 .frame(minWidth: 800, idealWidth: 1000, minHeight: 500, idealHeight: 700)
             #endif
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 }
 
@@ -185,6 +189,7 @@ struct DeveloperConsoleQuickAccess: View {
                 .buttonStyle(.plain)
             }
             .sheet(isPresented: $showingConsole) {
+                Group {
                 #if os(iOS)
                 NavigationView {
                     DeveloperConsoleView()
@@ -193,7 +198,10 @@ struct DeveloperConsoleQuickAccess: View {
                 DeveloperConsoleView()
                     .frame(minWidth: 800, idealWidth: 1000, minHeight: 500, idealHeight: 700)
                 #endif
-            }
+
+                }
+                .appSheetMaterial()
+}
         }
     }
 }

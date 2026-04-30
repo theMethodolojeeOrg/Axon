@@ -96,6 +96,7 @@ struct GenerativeViewGallerySection: View {
         }
 #else
         .sheet(isPresented: $showingCanvas) {
+            Group {
             if let view = editingView {
                 GenerativeViewCanvas(
                     initialView: view,
@@ -110,9 +111,13 @@ struct GenerativeViewGallerySection: View {
                     }
                 )
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
 #endif
         .sheet(isPresented: $showingViewer) {
+            Group {
             if let view = selectedView {
                 GenerativeViewViewer(
                     view: view,
@@ -123,7 +128,10 @@ struct GenerativeViewGallerySection: View {
                     }
                 )
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     // MARK: - Context Menu

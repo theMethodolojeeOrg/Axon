@@ -114,8 +114,7 @@ struct SlashCommandMenu: View {
             }
             .frame(maxHeight: min(menuMaxHeight, 240))
         }
-        .background(menuBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .appMaterialSurface(radius: 12)
         .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: -4)
     }
 
@@ -179,8 +178,7 @@ struct SlashCommandMenu: View {
             .padding(.vertical, 6)
             .background(AppSurfaces.color(.controlMutedBackground))
         }
-        .background(menuBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .appMaterialSurface(radius: 12)
         .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: -6)
     }
 
@@ -244,8 +242,7 @@ struct SlashCommandMenu: View {
             .padding(.vertical, 6)
             .background(AppSurfaces.color(.controlMutedBackground))
         }
-        .background(menuBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .appMaterialSurface(radius: 12)
         .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: -6)
     }
 
@@ -260,16 +257,8 @@ struct SlashCommandMenu: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
-        .background(menuBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .appMaterialSurface(radius: 12)
         .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: -4)
-    }
-
-    private var menuBackground: some View {
-        ZStack {
-            AppSurfaces.color(.overlayBackground)
-            Color.black.opacity(0.1)
-        }
     }
 }
 
@@ -480,7 +469,7 @@ private struct CategoryHeader: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(AppSurfaces.color(.transientBackground))
+        .background(.ultraThinMaterial)
     }
 }
 

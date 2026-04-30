@@ -95,19 +95,32 @@ struct WorkspacesView: View {
         .animation(AppAnimations.standardEasing, value: viewModel.successMessage != nil)
         .animation(AppAnimations.standardEasing, value: viewModel.error != nil)
         .sheet(isPresented: $viewModel.showCreateSheet) {
+            Group {
             CreateWorkspaceSheet()
                 .environmentObject(viewModel)
-        }
+
+            }
+            .appSheetMaterial()
+}
         .sheet(isPresented: $viewModel.showEditSheet) {
+            Group {
             if let workspace = viewModel.editingWorkspace {
                 EditWorkspaceSheet(workspace: workspace)
                     .environmentObject(viewModel)
             }
-        }
-        .sheet(item: $viewModel.selectedWorkspace) { workspace in
+
+            }
+            .appSheetMaterial()
+}
+        .sheet(item: $viewModel.selectedWorkspace) {
+            workspace in
+            Group {
             WorkspaceDetailView(workspace: workspace)
                 .environmentObject(viewModel)
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 }
 
@@ -203,11 +216,8 @@ struct WorkspaceSuccessToast: View {
             Spacer()
         }
         .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(AppColors.substrateSecondary)
-                .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
-        )
+        .appMaterialSurface(radius: 12)
+        .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
         .padding()
     }
 }
@@ -227,11 +237,8 @@ struct WorkspaceErrorToast: View {
             Spacer()
         }
         .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(AppColors.substrateSecondary)
-                .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
-        )
+        .appMaterialSurface(radius: 12)
+        .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
         .padding()
     }
 }

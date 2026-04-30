@@ -101,6 +101,7 @@ struct ChatBridgeQuickCard: View {
             }
         }
         .sheet(isPresented: $showingProfilePicker) {
+            Group {
             ProfilePickerSheet(
                 profiles: profiles,
                 selectedProfileId: $selectedProfileId,
@@ -110,7 +111,10 @@ struct ChatBridgeQuickCard: View {
             #if os(macOS)
             .frame(minWidth: 500, minHeight: 420)
             #endif
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     private var statusText: String {

@@ -51,6 +51,7 @@ struct BrowseMLXModelsView: View {
             }
         }
         .sheet(isPresented: $showingModelDetail) {
+            Group {
             if let model = selectedModel {
                 MLXModelDetailSheet(
                     modelInfo: model,
@@ -58,7 +59,10 @@ struct BrowseMLXModelsView: View {
                     browserService: browserService
                 )
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     // MARK: - Search Bar

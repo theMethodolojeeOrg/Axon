@@ -204,11 +204,15 @@ struct CovenantDetailView: View {
                 }
             }
             .sheet(isPresented: $showingRenegotiation) {
+                Group {
                 CovenantNegotiationView()
                     #if os(macOS)
                     .frame(minWidth: 550, idealWidth: 650, minHeight: 550, idealHeight: 700)
                     #endif
-            }
+
+                }
+                .appSheetMaterial()
+}
         }
     }
 

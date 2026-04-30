@@ -43,7 +43,7 @@ struct AuthenticationView: View {
                     .padding(.top, 60)
 
                     // Auth form
-                    GlassCard(padding: 24) {
+                    AxonCard(padding: 24) {
                         VStack(spacing: 24) {
                             // Toggle between sign in and sign up
                             Picker("", selection: $isSignUp) {
@@ -121,7 +121,7 @@ struct AuthenticationView: View {
 
                     // Error message
                     if showError {
-                        GlassCard(padding: 16) {
+                        AxonCard(padding: 16) {
                             HStack(spacing: 12) {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .foregroundColor(AppColors.accentError)

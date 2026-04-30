@@ -94,6 +94,7 @@ struct AxonBridgeSettingsView: View {
         .sheet(isPresented: $showingAddSheet, onDismiss: {
             addSheetSeed = nil
         }) {
+            Group {
             AddBridgeConnectionSheet(
                 initialName: addSheetSeed?.suggestedName ?? "",
                 initialHost: addSheetSeed?.host ?? "",
@@ -113,17 +114,26 @@ struct AxonBridgeSettingsView: View {
             #if os(macOS)
             .frame(minWidth: 520, minHeight: 420)
             #endif
-        }
-        .sheet(item: $editingProfile) { profile in
+
+            }
+            .appSheetMaterial()
+}
+        .sheet(item: $editingProfile) {
+            profile in
+            Group {
             EditBridgeConnectionSheet(profile: profile) { updatedProfile in
                 _ = bridgeSettings.updateConnectionProfile(updatedProfile)
             }
             #if os(macOS)
             .frame(minWidth: 520, minHeight: 380)
             #endif
-        }
+
+            }
+            .appSheetMaterial()
+}
         #if os(iOS)
         .sheet(isPresented: $showingQRScanner) {
+            Group {
             BridgeQRCodeScannerView(
                 onScanned: { payload in
                     showingQRScanner = false
@@ -133,7 +143,10 @@ struct AxonBridgeSettingsView: View {
                     showingQRScanner = false
                 }
             )
-        }
+
+            }
+            .appSheetMaterial()
+}
         #endif
         .alert("Delete Connection?", isPresented: Binding(
             get: { profilePendingDelete != nil },

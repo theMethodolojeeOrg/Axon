@@ -54,47 +54,71 @@ struct SovereigntySettingsView: View {
             Spacer()
         }
         .sheet(isPresented: $showingComprehensionOnboarding) {
+            Group {
             ComprehensionOnboardingView()
                 #if os(macOS)
                 .frame(minWidth: 500, idealWidth: 600, minHeight: 500, idealHeight: 650)
                 #endif
-        }
+
+            }
+            .appSheetMaterial()
+}
         .sheet(isPresented: $showingCovenantNegotiation) {
+            Group {
             CovenantNegotiationView()
                 #if os(macOS)
                 .frame(minWidth: 550, idealWidth: 650, minHeight: 550, idealHeight: 700)
                 #endif
-        }
+
+            }
+            .appSheetMaterial()
+}
         .sheet(isPresented: $showingTrustTierManagement) {
+            Group {
             NavigationStack {
                 TrustTierManagementView()
             }
             #if os(macOS)
             .frame(minWidth: 500, idealWidth: 600, minHeight: 500, idealHeight: 700)
             #endif
-        }
+
+            }
+            .appSheetMaterial()
+}
         .sheet(isPresented: $showingDeadlockResolution) {
+            Group {
             NavigationStack {
                 DeadlockResolutionView()
             }
             #if os(macOS)
             .frame(minWidth: 500, idealWidth: 600, minHeight: 450, idealHeight: 600)
             #endif
-        }
+
+            }
+            .appSheetMaterial()
+}
         .sheet(isPresented: $showingCovenantDetail) {
+            Group {
             if let covenant = sovereigntyService.activeCovenant {
                 CovenantDetailView(covenant: covenant)
                     #if os(macOS)
                     .frame(minWidth: 500, idealWidth: 600, minHeight: 550, idealHeight: 700)
                     #endif
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
         .sheet(isPresented: $showingCovenantHistory) {
+            Group {
             CovenantHistoryView()
                 #if os(macOS)
                 .frame(minWidth: 500, idealWidth: 600, minHeight: 500, idealHeight: 650)
                 #endif
-        }
+
+            }
+            .appSheetMaterial()
+}
         .alert("Reset Co-Sovereignty?", isPresented: $showingResetConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Reset Everything", role: .destructive) {

@@ -152,14 +152,14 @@ struct MemoryContentView: View {
             if !viewModel.isSelectionMode {
                 HStack {
                     Spacer()
-                    
+
                     Button(action: { viewModel.enterSelectionMode() }) {
                         Text("Select")
                             .font(AppTypography.bodyMedium())
                             .foregroundColor(AppColors.signalMercury)
                     }
                     .padding(.trailing, 8)
-                    
+
                     Button(action: { viewModel.showNewMemory = true }) {
                         Image(systemName: "plus")
                             .foregroundColor(AppColors.signalMercury)
@@ -209,22 +209,35 @@ struct MemoryContentView: View {
             }
         }
         .sheet(isPresented: $viewModel.showNewMemory) {
+            Group {
             NewMemorySheet()
-        }
-        .sheet(item: $viewModel.selectedMemory) { memory in
+
+            }
+            .appSheetMaterial()
+}
+        .sheet(item: $viewModel.selectedMemory) {
+            memory in
+            Group {
             MemoryDetailView(memory: memory)
                 #if os(iOS)
                 .presentationDetents([.large, .medium])
                 .presentationDragIndicator(.visible)
                 #endif
-        }
+
+            }
+            .appSheetMaterial()
+}
         .sheet(isPresented: $viewModel.showAllTags) {
+            Group {
             AllTagsSheet(
                 tagInfos: viewModel.tagInfos,
                 selectedTag: $viewModel.selectedTag,
                 onDismiss: { viewModel.showAllTags = false }
             )
-        }
+
+            }
+            .appSheetMaterial()
+}
         .alert("Delete \(viewModel.selectedCount) Memories?", isPresented: $viewModel.showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) { viewModel.deleteSelected() }
@@ -250,7 +263,7 @@ struct MemoryContentView: View {
     private var emptyStateView: some View {
         VStack(spacing: 20) {
             Spacer()
-            
+
             Image("AxonLogoTemplate")
                 .resizable()
                 .scaledToFit()
@@ -265,7 +278,7 @@ struct MemoryContentView: View {
                 .font(AppTypography.bodyMedium())
                 .foregroundColor(AppColors.textSecondary)
                 .multilineTextAlignment(.center)
-            
+
             Spacer()
         }
         .padding()
@@ -576,7 +589,7 @@ struct MemoryCard: View {
     }
 
     var body: some View {
-        GlassCard(padding: 16) {
+        AxonCard(padding: 16) {
             VStack(alignment: .leading, spacing: 12) {
                 // Suspicious memory banner
                 if isSuspicious {

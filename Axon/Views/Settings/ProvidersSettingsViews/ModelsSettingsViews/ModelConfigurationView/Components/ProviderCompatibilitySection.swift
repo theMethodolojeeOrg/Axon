@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ProviderCompatibilitySection: View {
     @State private var showingProviderInfo = false
-    
+
     var body: some View {
         Section {
             Button {
@@ -27,8 +27,12 @@ struct ProviderCompatibilitySection: View {
             Text("Information")
         }
         .sheet(isPresented: $showingProviderInfo) {
+            Group {
             ProviderCompatibilitySheet()
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 }
 

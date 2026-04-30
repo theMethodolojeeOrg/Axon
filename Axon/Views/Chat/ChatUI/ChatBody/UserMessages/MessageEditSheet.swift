@@ -12,11 +12,11 @@ struct MessageEditSheet: View {
     let onSave: (String) -> Void
     let onSaveAndRegenerate: (String) -> Void
     let onCancel: () -> Void
-    
+
     @State private var editedContent: String = ""
     @State private var showHistory = false
     @FocusState private var isTextEditorFocused: Bool
-    
+
     var body: some View {
         #if os(macOS)
         // macOS: Direct content without NavigationView to avoid sidebar-like behavior
@@ -112,7 +112,7 @@ struct MessageEditSheet: View {
                 .font(AppTypography.bodyMedium())
                 .foregroundColor(AppColors.textPrimary)
                 .scrollContentBackground(.hidden)
-                .background(AppSurfaces.color(.contentBackground))
+                .background(AppSurfaces.color(.inputBackground))
                 .focused($isTextEditorFocused)
                 .padding()
 
@@ -154,7 +154,7 @@ struct MessageEditSheet: View {
             }
             .padding()
         }
-        .background(AppSurfaces.color(.contentBackground))
+        .background(Color.clear)
     }
 }
 
@@ -164,7 +164,7 @@ struct EditHistoryView: View {
     let editHistory: [MessageEdit]
     let currentVersion: Int
     let onSelectVersion: (Int) -> Void
-    
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {

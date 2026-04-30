@@ -321,8 +321,12 @@ struct ToolApprovalBadge: View {
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showDetails) {
+            Group {
             ToolApprovalDetailSheet(record: record)
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 }
 

@@ -53,11 +53,16 @@ struct ToolSettingsViewV2: View {
                 isLoading = false
             }
         }
-        .sheet(item: $showingToolDetail) { tool in
+        .sheet(item: $showingToolDetail) {
+            tool in
+            Group {
             ToolDetailSheet(tool: tool, onToggle: { enabled in
                 pluginLoader.setToolEnabled(tool.id, enabled: enabled)
             })
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     // MARK: - V2 Content

@@ -91,11 +91,15 @@ struct ConversationListView: View {
                 #endif
             }
             .sheet(isPresented: $showNewConversation) {
+                Group {
                 NewConversationSheet(
                     title: $newConversationTitle,
                     onCreate: createConversation
                 )
-            }
+
+                }
+                .appSheetMaterial()
+}
             .task {
                 await loadConversations()
             }
@@ -134,7 +138,7 @@ struct ConversationRow: View {
     let conversation: Conversation
 
     var body: some View {
-        GlassCard(padding: 16) {
+        AxonCard(padding: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     // Solo thread indicator
@@ -143,7 +147,7 @@ struct ConversationRow: View {
                             .foregroundColor(conversation.isSoloActive ? AppColors.signalLichen : AppColors.textSecondary)
                             .font(.system(size: 14))
                     }
-                    
+
                     Text(SettingsStorage.shared.resolvedConversationTitle(
                         conversationId: conversation.id,
                         persistedTitle: conversation.title

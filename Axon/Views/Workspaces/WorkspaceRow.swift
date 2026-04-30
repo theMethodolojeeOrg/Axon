@@ -13,7 +13,7 @@ struct WorkspaceRow: View {
     @StateObject private var workspaceService = WorkspaceService.shared
 
     var body: some View {
-        GlassCard(padding: 16) {
+        AxonCard(padding: 16) {
             HStack(spacing: 14) {
                 // Icon
                 ZStack {

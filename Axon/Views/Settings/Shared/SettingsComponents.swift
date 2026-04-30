@@ -798,17 +798,17 @@ struct UnifiedModelPicker: View {
     // Provider Configuration
     let provider: UnifiedProvider?
     var customProviderIndex: Int = 1
-    
+
     // Selection State
     @Binding var selectedModel: UnifiedModel?
-    
+
     // Context Filtering (optional)
     var estimatedTokens: Int? = nil
     var showInsufficientModels: Bool = false
-    
+
     // UI Configuration
     var showInfoCard: Bool = false
-    
+
     // Callbacks
     var onModelSelected: ((UnifiedModel) -> Void)? = nil
 
@@ -1530,7 +1530,7 @@ struct StandardModelSelectionContent: View {
                     }
                 }
             ),
-            
+
             estimatedTokens: nil, // No context filtering for global settings
             showInsufficientModels: false,
             showInfoCard: showInfoCard
@@ -1682,10 +1682,14 @@ struct ProviderModelSelectionSection: View {
             }
         }
         .sheet(isPresented: $showingNegotiationSheet) {
+            Group {
             CovenantNegotiationView(preselectedCategory: .providerChange)
                 #if os(macOS)
                 .frame(minWidth: 550, idealWidth: 650, minHeight: 600, idealHeight: 800)
                 #endif
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 }

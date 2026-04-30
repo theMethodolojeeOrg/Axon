@@ -37,7 +37,7 @@ struct DraftPreviewSheet: View {
                         .padding()
                 }
             }
-            .background(AppSurfaces.color(.contentBackground))
+            .background(Color.clear)
             .navigationTitle("Draft Preview")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

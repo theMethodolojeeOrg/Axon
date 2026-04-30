@@ -52,11 +52,8 @@ struct MemorySuccessToast: View {
             Spacer()
         }
         .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(AppSurfaces.color(.transientBackground))
-                .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
-        )
+        .appMaterialSurface(radius: 12)
+        .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
         .padding()
     }
 }
@@ -76,11 +73,8 @@ struct MemoryErrorToast: View {
             Spacer()
         }
         .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(AppSurfaces.color(.transientBackground))
-                .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
-        )
+        .appMaterialSurface(radius: 12)
+        .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
         .padding()
     }
 }

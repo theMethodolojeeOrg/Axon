@@ -145,7 +145,7 @@ struct ChatTextEditor: NSViewRepresentable {
 /// Custom NSTextView that intercepts Enter key
 class ChatNSTextView: NSTextView {
     var onSubmit: (() -> Void)?
-    
+
     override func keyDown(with event: NSEvent) {
         // Check for Enter key (keyCode 36) without Shift
         if event.keyCode == 36 && !event.modifierFlags.contains(.shift) {
@@ -443,6 +443,7 @@ struct MessageInputBar: View {
             handleAnyFileImport(result)
         }
         .sheet(isPresented: $viewModel.showToolInvocationSheet) {
+            Group {
             if let tool = viewModel.selectedToolForInvocation {
                 ToolInvocationSheet(
                     tool: tool,
@@ -457,7 +458,10 @@ struct MessageInputBar: View {
                     }
                 )
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
         #if os(iOS)
         .confirmationDialog(
@@ -596,7 +600,7 @@ struct MessageInputBar: View {
     #endif
 
     // MARK: - Subviews
-    
+
     @ViewBuilder
     private var attachmentsPreview: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -610,7 +614,7 @@ struct MessageInputBar: View {
         }
         .frame(height: ChatVisualTokens.composerAttachmentPreviewHeight)
     }
-    
+
     @ViewBuilder
     private func attachmentPreviewItem(attachment: Binding<MessageAttachment>) -> some View {
         ZStack(alignment: .topTrailing) {
@@ -666,7 +670,7 @@ struct MessageInputBar: View {
             .offset(x: 6, y: -6)
         }
     }
-    
+
     @ViewBuilder
     private func attachmentMenu(capability: AttachmentCapability) -> some View {
         #if os(iOS)
@@ -770,7 +774,7 @@ struct MessageInputBar: View {
         )
         .animation(.easeInOut(duration: 0.15), value: isSlashCommand)
     }
-    
+
     @ViewBuilder
     private var sendButton: some View {
         Button(action: isLoading ? handleStop : handleSend) {
@@ -854,9 +858,9 @@ struct MessageInputBar: View {
         }
     }
     #endif
-    
+
     // MARK: - Helper Methods
-    
+
     private func handlePhotoSelection(_ newItem: PhotosPickerItem?) {
         guard let newItem = newItem else { return }
         Task {
@@ -890,7 +894,7 @@ struct MessageInputBar: View {
             }
         }
     }
-    
+
     private func handleFileImport(_ result: Result<[URL], Error>, type: MessageAttachment.AttachmentType) {
         debugLog(.attachments, "handleFileImport called for type: \(String(describing: type))")
         switch result {

@@ -85,13 +85,17 @@ struct CovenantHistoryView: View {
                 }
             }
             .sheet(isPresented: $showingCovenantDetail) {
+                Group {
                 if let covenant = selectedCovenant {
                     CovenantDetailView(covenant: covenant)
                         #if os(macOS)
                         .frame(minWidth: 500, idealWidth: 600, minHeight: 550, idealHeight: 700)
                         #endif
                 }
-            }
+
+                }
+                .appSheetMaterial()
+}
         }
     }
 }

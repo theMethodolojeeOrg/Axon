@@ -86,6 +86,28 @@ private struct AppRoundedSurfaceModifier: ViewModifier {
     }
 }
 
+private struct AppMaterialSurfaceModifier: ViewModifier {
+    let radius: CGFloat
+    let border: Color?
+
+    func body(content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .stroke(border ?? .clear, lineWidth: border == nil ? 0 : 1)
+            )
+    }
+}
+
+private struct AppSheetMaterialModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .presentationBackground(.ultraThinMaterial)
+            .presentationCornerRadius(24)
+    }
+}
+
 extension View {
     func appSurface(_ role: AppSurfaceRole) -> some View {
         modifier(AppSurfaceModifier(role: role))
@@ -97,5 +119,16 @@ extension View {
         border: Color? = nil
     ) -> some View {
         modifier(AppRoundedSurfaceModifier(role: role, radius: radius, border: border))
+    }
+
+    func appMaterialSurface(
+        radius: CGFloat = 12,
+        border: Color? = AppSurfaces.color(.cardBorder)
+    ) -> some View {
+        modifier(AppMaterialSurfaceModifier(radius: radius, border: border))
+    }
+
+    func appSheetMaterial() -> some View {
+        modifier(AppSheetMaterialModifier())
     }
 }

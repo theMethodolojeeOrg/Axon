@@ -275,7 +275,7 @@ struct UserMessageView: View {
         .padding(.horizontal, ChatVisualTokens.messageOuterHorizontalPadding)
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
-    
+
     @ViewBuilder
     private func attachmentView(for attachment: MessageAttachment) -> some View {
         #if canImport(UIKit)
@@ -486,7 +486,7 @@ struct AssistantMessageView: View {
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-    
+
     @ViewBuilder
     private func attachmentView(for attachment: MessageAttachment) -> some View {
         #if canImport(UIKit)
@@ -661,11 +661,15 @@ struct AssistantToolbar: View {
             }
         }
         .sheet(isPresented: $showTextSelector) {
+            Group {
             TextSelectorSheet(
                 content: message.content,
                 onQuote: onQuote
             )
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     @ViewBuilder
@@ -1118,26 +1122,26 @@ private struct TruncationPreferenceKey: PreferenceKey {
                     role: .assistant,
                     content: """
                     # SwiftUI State Management
-                    
+
                     SwiftUI provides several property wrappers for managing state:
-                    
+
                     ## @State
                     For simple value types owned by a view:
-                    
+
                     ```swift
                     @State private var count = 0
                     ```
-                    
+
                     ## @Binding
                     For passing state to child views:
-                    
+
                     ```swift
                     @Binding var isPresented: Bool
                     ```
-                    
+
                     ## @StateObject
                     For reference types (ObservableObject) owned by a view.
-                    
+
                     ## @ObservedObject
                     For reference types passed from a parent view.
                     """,

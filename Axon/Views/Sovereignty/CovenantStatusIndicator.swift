@@ -35,8 +35,12 @@ struct CovenantStatusIndicator: View {
         }
         .buttonStyle(.plain)
         .sheet(isPresented: $showingDetails) {
+            Group {
             CovenantDetailsSheet(sovereigntyService: sovereigntyService)
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     // MARK: - Status Display

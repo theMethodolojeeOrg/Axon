@@ -571,18 +571,26 @@ struct CodeArtifactView: View {
         }
         .background(AppSurfaces.color(.contentBackground))
         .sheet(isPresented: $showExportSheet) {
+            Group {
             #if canImport(UIKit)
             ActivityView(activityItems: [artifact.exportFileURL])
             #else
             EmptyView()
             #endif
-        }
+
+            }
+            .appSheetMaterial()
+}
         .sheet(isPresented: $showRenderedPreview) {
+            Group {
             RenderedCodePreviewSheet(
                 artifact: artifact,
                 javaScriptEnabled: $previewJavaScriptEnabled
             )
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     private var header: some View {
@@ -1829,11 +1837,16 @@ struct CodeArtifactHost: ViewModifier {
             .environment(\.presentCodeArtifact, { artifact in
                 selected = artifact
             })
-            .sheet(item: $selected) { presentation in
+            .sheet(item: $selected) {
+                presentation in
+                Group {
                 CodeArtifactPresentationSheetView(presentation: presentation)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
-            }
+
+                }
+                .appSheetMaterial()
+}
         #endif
     }
 }
@@ -1887,6 +1900,7 @@ struct CodeArtifactInspectorColumn: View {
         .frame(maxHeight: .infinity)
         .background(AppSurfaces.color(.contentBackground))
         .sheet(isPresented: $showRenderedPreview) {
+            Group {
             if case .single(let artifact) = artifactToShow {
                 RenderedCodePreviewSheet(
                     artifact: artifact,
@@ -1894,7 +1908,10 @@ struct CodeArtifactInspectorColumn: View {
                 )
                 .frame(minWidth: 760, minHeight: 540)
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     private var header: some View {

@@ -106,7 +106,7 @@ struct CustomProviderEditSheet: View {
                 }
                 .padding()
             }
-            .background(AppSurfaces.color(.contentBackground))
+            .background(Color.clear)
             .navigationTitle(isEditing ? "Edit Provider" : "Add Provider")
             #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)

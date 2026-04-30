@@ -90,6 +90,7 @@ struct GenerativeViewCanvas: View {
             Text("You have unsaved changes. What would you like to do?")
         }
         .sheet(isPresented: $showComponentPicker) {
+            Group {
             ComponentPickerSheet(
                 onSelect: { componentType in
                     addComponent(type: componentType)
@@ -99,8 +100,12 @@ struct GenerativeViewCanvas: View {
                     showComponentPicker = false
                 }
             )
-        }
+
+            }
+            .appSheetMaterial()
+}
         .sheet(isPresented: $showPropertyEditor) {
+            Group {
             if let path = selectedNodePath, let node = getNode(at: path) {
                 PropertyEditorSheet(
                     node: node,
@@ -117,7 +122,10 @@ struct GenerativeViewCanvas: View {
                     }
                 )
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
         .onAppear {
             snapshotView = initialView
         }

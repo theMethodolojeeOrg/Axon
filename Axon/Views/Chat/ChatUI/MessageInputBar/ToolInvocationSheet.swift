@@ -141,7 +141,7 @@ struct ToolInvocationSheet: View {
             // Action Buttons pinned to bottom
             actionButtons
         }
-        .background(AppSurfaces.color(.contentBackground))
+        .background(Color.clear)
     }
 
     // MARK: - Tool Header

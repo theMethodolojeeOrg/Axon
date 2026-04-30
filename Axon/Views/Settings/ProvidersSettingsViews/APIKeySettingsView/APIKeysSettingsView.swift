@@ -93,7 +93,9 @@ struct APIKeysSettingsView: View {
                 }
             }
         }
-        .sheet(item: $selectedProvider) { provider in
+        .sheet(item: $selectedProvider) {
+            provider in
+            Group {
             APIKeyInputSheet(
                 provider: provider,
                 keyValue: $editingKeyValue,
@@ -110,8 +112,13 @@ struct APIKeysSettingsView: View {
                     selectedProvider = nil
                 }
             )
-        }
-        .sheet(item: $selectedCustomProvider) { customProvider in
+
+            }
+            .appSheetMaterial()
+}
+        .sheet(item: $selectedCustomProvider) {
+            customProvider in
+            Group {
             CustomProviderAPIKeyInputSheet(
                 provider: customProvider,
                 keyValue: $editingKeyValue,
@@ -125,7 +132,10 @@ struct APIKeysSettingsView: View {
                     selectedCustomProvider = nil
                 }
             )
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 }
 

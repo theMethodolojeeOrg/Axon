@@ -49,6 +49,7 @@ struct MacSidebarContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .appSurface(.sidebarBackground)
         .sheet(isPresented: $showingRenameSheet) {
+            Group {
             NavigationStack {
                 ZStack {
                     AppSurfaces.color(.contentBackground).ignoresSafeArea()
@@ -78,7 +79,10 @@ struct MacSidebarContentView: View {
                     }
                 }
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
         .alert("Delete Conversation", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { deletingConversation = nil }
             Button("Delete", role: .destructive) {
@@ -119,8 +123,12 @@ struct MacSidebarContentView: View {
             }
         }
         .sheet(isPresented: $showingWorkspaces) {
+            Group {
             WorkspacesView()
-        }
+
+            }
+            .appSheetMaterial()
+}
         .task {
             let retention = SettingsStorage.shared.loadSettings()?.archiveRetentionDays ?? 30
             SettingsStorage.shared.purgeExpiredArchived(retentionDays: retention)

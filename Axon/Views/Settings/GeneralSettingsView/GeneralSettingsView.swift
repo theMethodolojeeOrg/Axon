@@ -279,11 +279,15 @@ struct GeneralSettingsView: View {
             }
         }
         .sheet(isPresented: $showingNegotiationSheet) {
+            Group {
             CovenantNegotiationView(preselectedCategory: .providerChange)
                 #if os(macOS)
                 .frame(minWidth: 550, idealWidth: 650, minHeight: 600, idealHeight: 800)
                 #endif
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     private var ttsSummary: String {

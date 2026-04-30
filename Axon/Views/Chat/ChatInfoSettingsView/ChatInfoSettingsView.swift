@@ -16,30 +16,30 @@ struct ChatInfoSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var settingsViewModel = SettingsViewModel()
     @StateObject private var conversationService = ConversationService.shared
-    
+
     // Per-conversation overrides (stored locally)
     @State private var selectedProvider: UnifiedProvider?
     @State private var selectedModel: UnifiedModel?
     @State private var estimatedTokens: Int = 0
-    
+
     // Negotiation sheet
     @State private var showingNegotiationSheet = false
     @State private var showingBridgeManager = false
-    
+
     // Whether this conversation has custom overrides (vs using defaults)
     @State private var hasCustomOverrides: Bool = false
-    
+
     // Track enabled tools locally for this conversation (per-chat override)
     @State private var localEnabledTools: Set<String> = []
-    
+
     // Whether tool settings have been customized for this conversation
     @State private var hasCustomToolOverrides: Bool = false
-    
+
     // Realtime Voice Overrides
     @State private var selectedLiveProvider: String?
     @State private var selectedLiveModel: String?
     @State private var selectedLiveVoice: String?
-    
+
     var body: some View {
         #if os(macOS)
         macOSBody
@@ -47,7 +47,7 @@ struct ChatInfoSettingsView: View {
         iOSBody
         #endif
     }
-    
+
     #if os(macOS)
     private var macOSBody: some View {
         ScrollView {
@@ -57,9 +57,9 @@ struct ChatInfoSettingsView: View {
                     Text("Chat Settings")
                         .font(AppTypography.titleLarge())
                         .foregroundColor(AppColors.textPrimary)
-                    
+
                     Spacer()
-                    
+
                     Button("Done") {
                         dismiss()
                     }
@@ -67,7 +67,7 @@ struct ChatInfoSettingsView: View {
                     .foregroundColor(AppColors.signalMercury)
                 }
                 .padding(.bottom, 8)
-                
+
                 mainContent
             }
             .padding(24)
@@ -80,11 +80,15 @@ struct ChatInfoSettingsView: View {
             await estimateTokenCount()
         }
         .sheet(isPresented: $showingBridgeManager) {
+            Group {
             bridgeManagerSheet
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
     #endif
-    
+
     #if !os(macOS)
     private var iOSBody: some View {
         NavigationView {
@@ -112,13 +116,17 @@ struct ChatInfoSettingsView: View {
             await estimateTokenCount()
         }
         .sheet(isPresented: $showingBridgeManager) {
+            Group {
             bridgeManagerSheet
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
     #endif
-    
+
     // MARK: - Main Content
-    
+
     @ViewBuilder
     private var mainContent: some View {
         // MARK: - Provider Selection
@@ -130,7 +138,7 @@ struct ChatInfoSettingsView: View {
                 selectProvider(provider)
             }
         )
-        
+
         // MARK: - Model Selection
         ChatModelSelectionSection(
             settingsViewModel: settingsViewModel,
@@ -141,13 +149,13 @@ struct ChatInfoSettingsView: View {
                 selectModel(model)
             }
         )
-        
+
         // MARK: - Context Usage
         ContextUsageSection(
             model: selectedModel ?? settingsViewModel.currentUnifiedModel(),
             estimatedTokens: estimatedTokens
         )
-        
+
         // MARK: - Realtime Voice
         RealtimeVoiceSection(
             settingsViewModel: settingsViewModel,
@@ -155,13 +163,13 @@ struct ChatInfoSettingsView: View {
             selectedLiveVoice: $selectedLiveVoice,
             onSave: saveConversationOverrides
         )
-        
+
         // MARK: - Costs
         CostInfoSection()
-        
+
         // MARK: - Export
         ExportSection(conversation: conversation)
-        
+
         // MARK: - Tools
         ToolsSection(
             settingsViewModel: settingsViewModel,
@@ -170,28 +178,32 @@ struct ChatInfoSettingsView: View {
                 toggleTool(tool, enabled: enabled)
             }
         )
-        
+
         ChatBridgeQuickCard(
             onManage: {
                 showingBridgeManager = true
             }
         )
-        
+
         // MARK: - Developer Console Quick Access
         DeveloperConsoleQuickAccess()
-        
+
         // MARK: - Info Note
         infoNote
             .sheet(isPresented: $showingNegotiationSheet) {
+                Group {
                 CovenantNegotiationView(preselectedCategory: .providerChange)
                     #if os(macOS)
                     .frame(minWidth: 550, idealWidth: 650, minHeight: 600, idealHeight: 800)
                     #endif
-            }
+
+                }
+                .appSheetMaterial()
+}
     }
-    
+
     // MARK: - Info Note
-    
+
     private var infoNote: some View {
         HStack(spacing: 12) {
             Image(systemName: "info.circle")
@@ -225,26 +237,26 @@ struct ChatInfoSettingsView: View {
             }
         }
     }
-    
+
     // MARK: - Provider/Model Selection
-    
+
     private func selectProvider(_ provider: UnifiedProvider?) {
         guard let provider = provider else { return }
         selectedProvider = provider
-        
+
         // Auto-select first model from new provider
         selectedModel = ProviderModelHelpers.selectProvider(provider, settingsViewModel: settingsViewModel)
-        
+
         saveConversationOverrides()
     }
-    
+
     private func selectModel(_ model: UnifiedModel) {
         selectedModel = model
         saveConversationOverrides()
     }
-    
+
     // MARK: - Token Estimation
-    
+
     private func estimateTokenCount() async {
         // Rough estimation: 4 characters per token
         if let messages = try? await conversationService.getMessages(conversationId: conversation.id, limit: 10_000) {
@@ -254,9 +266,9 @@ struct ChatInfoSettingsView: View {
             estimatedTokens = 0
         }
     }
-    
+
     // MARK: - Tool Management
-    
+
     private func loadEnabledTools() {
         let (tools, hasOverrides) = ConversationOverridesManager.shared.loadEnabledTools(
             for: conversation.id,
@@ -265,7 +277,7 @@ struct ChatInfoSettingsView: View {
         localEnabledTools = tools
         hasCustomToolOverrides = hasOverrides
     }
-    
+
     private func toggleTool(_ tool: ToolId, enabled: Bool) {
         // Update local state immediately for UI
         if enabled {
@@ -273,26 +285,26 @@ struct ChatInfoSettingsView: View {
         } else {
             localEnabledTools.remove(tool.rawValue)
         }
-        
+
         // Mark that we now have custom tool overrides for this conversation
         hasCustomToolOverrides = true
-        
+
         // Save as per-conversation override
         ConversationOverridesManager.shared.saveEnabledTools(localEnabledTools, for: conversation.id)
     }
-    
+
     // MARK: - Conversation Overrides
-    
+
     private func loadConversationOverrides() {
         let (provider, model, hasOverrides) = ConversationOverridesManager.shared.loadProviderAndModel(
             for: conversation.id,
             settingsViewModel: settingsViewModel
         )
-        
+
         selectedProvider = provider
         selectedModel = model
         hasCustomOverrides = hasOverrides
-        
+
         // Load live settings
         let (liveProvider, liveModel, liveVoice) = ConversationOverridesManager.shared.loadLiveSettings(
             for: conversation.id
@@ -301,7 +313,7 @@ struct ChatInfoSettingsView: View {
         selectedLiveModel = liveModel
         selectedLiveVoice = liveVoice
     }
-    
+
     private func saveConversationOverrides() {
         // Save provider and model
         ConversationOverridesManager.shared.saveProviderAndModel(
@@ -309,7 +321,7 @@ struct ChatInfoSettingsView: View {
             model: selectedModel,
             for: conversation.id
         )
-        
+
         // Save live settings
         ConversationOverridesManager.shared.saveLiveSettings(
             provider: selectedLiveProvider,
@@ -325,13 +337,13 @@ struct ChatInfoSettingsView: View {
 struct ChatInfoSection<Content: View>: View {
     let title: String
     @ViewBuilder let content: Content
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(AppTypography.headlineSmall())
                 .foregroundColor(AppColors.textPrimary)
-            
+
             content
         }
     }
@@ -345,9 +357,9 @@ struct ChatInfoToolCategorySection: View {
     let tools: [ToolId]
     let enabledTools: Set<String>
     let onToggle: (ToolId, Bool) -> Void
-    
+
     @State private var isExpanded: Bool = false
-    
+
     var body: some View {
         if !tools.isEmpty {
             VStack(spacing: 0) {
@@ -362,19 +374,19 @@ struct ChatInfoToolCategorySection: View {
                             .font(.system(size: 16))
                             .foregroundColor(AppColors.signalMercury)
                             .frame(width: 24)
-                        
+
                         Text(title)
                             .font(AppTypography.bodySmall(.medium))
                             .foregroundColor(AppColors.textPrimary)
-                        
+
                         Spacer()
-                        
+
                         // Show count of enabled tools
                         let enabledCount = tools.filter { enabledTools.contains($0.rawValue) }.count
                         Text("\(enabledCount)/\(tools.count)")
                             .font(AppTypography.labelSmall())
                             .foregroundColor(AppColors.textTertiary)
-                        
+
                         Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                             .font(.system(size: 12))
                             .foregroundColor(AppColors.textTertiary)
@@ -385,7 +397,7 @@ struct ChatInfoToolCategorySection: View {
                     .cornerRadius(8)
                 }
                 .buttonStyle(.plain)
-                
+
                 // Expanded Tool List
                 if isExpanded {
                     VStack(spacing: 1) {
@@ -410,27 +422,27 @@ struct ChatInfoToolToggleRow: View {
     let tool: ToolId
     let isEnabled: Bool
     let onToggle: (Bool) -> Void
-    
+
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: tool.icon)
                 .font(.system(size: 16))
                 .foregroundColor(isEnabled ? AppColors.signalMercury : AppColors.textTertiary)
                 .frame(width: 24)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(tool.displayName)
                     .font(AppTypography.bodySmall(.medium))
                     .foregroundColor(AppColors.textPrimary)
-                
+
                 Text(tool.description)
                     .font(AppTypography.labelSmall())
                     .foregroundColor(AppColors.textTertiary)
                     .lineLimit(1)
             }
-            
+
             Spacer()
-            
+
             Toggle("", isOn: Binding(
                 get: { isEnabled },
                 set: { onToggle($0) }

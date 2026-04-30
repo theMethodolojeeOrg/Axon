@@ -92,19 +92,27 @@ struct TrustTierManagementView: View {
         }
         .navigationTitle("Trust Tiers")
         .sheet(isPresented: $showingNewTierSheet) {
+            Group {
             NewTrustTierSheet(negotiationService: negotiationService)
                 #if os(macOS)
                 .frame(minWidth: 480, idealWidth: 550, minHeight: 550, idealHeight: 700)
                 #endif
-        }
+
+            }
+            .appSheetMaterial()
+}
         .sheet(isPresented: $showingTierDetail) {
+            Group {
             if let tier = selectedTier {
                 TrustTierDetailSheet(tier: tier, negotiationService: negotiationService)
                     #if os(macOS)
                     .frame(minWidth: 500, idealWidth: 600, minHeight: 550, idealHeight: 750)
                     #endif
             }
-        }
+
+            }
+            .appSheetMaterial()
+}
     }
 
     // MARK: - Computed Properties
@@ -476,11 +484,15 @@ struct TrustTierDetailSheet: View {
                 }
             }
             .sheet(isPresented: $showingModifySheet) {
+                Group {
                 ModifyTrustTierSheet(tier: tier, negotiationService: negotiationService)
                     #if os(macOS)
                     .frame(minWidth: 450, idealWidth: 520, minHeight: 400, idealHeight: 500)
                     #endif
-            }
+
+                }
+                .appSheetMaterial()
+}
             .confirmationDialog(
                 "Revoke Trust Tier?",
                 isPresented: $showingRevokeConfirmation,

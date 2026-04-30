@@ -53,7 +53,7 @@ struct TerminalDrawerView: View {
             inputRow
         }
         .frame(height: controller.drawerHeight)
-        .background(AppSurfaces.color(.contentBackground))
+        .appMaterialSurface(radius: 16)
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(AppSurfaces.color(.cardBorder).opacity(0.8))
