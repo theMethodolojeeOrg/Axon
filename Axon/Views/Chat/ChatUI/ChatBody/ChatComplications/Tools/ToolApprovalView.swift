@@ -95,7 +95,7 @@ struct ToolApprovalRequestView: View {
                             }
                         }
                         .padding(10)
-                        .background(AppColors.substrateTertiary)
+                        .background(AppSurfaces.color(.controlBackground))
                         .cornerRadius(8)
                     }
 
@@ -196,7 +196,7 @@ struct ToolApprovalRequestView: View {
                                 .foregroundColor(AppColors.textSecondary)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
-                                .background(AppColors.substrateTertiary)
+                                .background(AppSurfaces.color(.controlBackground))
                                 .cornerRadius(8)
                             }
                             .disabled(isAuthenticating)
@@ -231,7 +231,7 @@ struct ToolApprovalRequestView: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -422,7 +422,7 @@ struct ToolApprovalDetailSheet: View {
                                 .foregroundColor(AppColors.textSecondary)
                                 .textSelection(.enabled)
                                 .padding(10)
-                                .background(AppColors.substrateTertiary)
+                                .background(AppSurfaces.color(.controlBackground))
                                 .cornerRadius(8)
 
                             Button {
@@ -461,7 +461,7 @@ struct ToolApprovalDetailSheet: View {
                 }
                 .padding()
             }
-            .background(AppColors.substratePrimary)
+            .background(AppSurfaces.color(.contentBackground))
             .navigationTitle("Approval Details")
             #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -668,5 +668,5 @@ struct ToolSessionApprovalBadge: View {
         ToolApprovalDeniedView(toolName: "Create Jules Task")
     }
     .padding()
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

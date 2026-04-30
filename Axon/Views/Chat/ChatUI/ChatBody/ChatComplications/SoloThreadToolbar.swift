@@ -55,7 +55,7 @@ struct SoloThreadToolbar: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(AppColors.substrateSecondary.opacity(0.95))
+                .fill(AppSurfaces.color(.cardBackground).opacity(0.95))
                 .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: -2)
         )
         .padding(.horizontal, 12)
@@ -201,7 +201,7 @@ struct SoloThreadStatusBar: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(AppColors.substrateSecondary.opacity(0.8))
+            .background(AppSurfaces.color(.cardBackground).opacity(0.8))
         }
     }
     
@@ -251,5 +251,5 @@ struct SoloThreadStatusBar: View {
             onTakeOver: {}
         )
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

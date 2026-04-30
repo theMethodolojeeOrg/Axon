@@ -191,10 +191,10 @@ struct ToolsStatusMenu: View {
             .padding(.vertical, 6)
             .background(
                 Capsule()
-                    .fill(AppColors.substrateSecondary)
+                    .fill(AppSurfaces.color(.cardBackground))
                     .overlay(
                         Capsule()
-                            .stroke(AppColors.glassBorder, lineWidth: 1)
+                            .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                     )
             )
         }
@@ -207,5 +207,5 @@ struct ToolsStatusMenu: View {
         ToolsStatusMenu(style: .pill)
     }
     .padding()
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

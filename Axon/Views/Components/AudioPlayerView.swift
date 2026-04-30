@@ -72,7 +72,7 @@ struct AudioPlayerView: View {
 
                                     Image(systemName: ttsService.isPlaying ? "pause.fill" : "play.fill")
                                         .font(.system(size: 20, weight: .bold))
-                                        .foregroundColor(AppColors.substratePrimary)
+                                        .foregroundColor(AppSurfaces.color(.contentBackground))
                                 }
                             }
                             .buttonStyle(ScaleButtonStyle())
@@ -111,7 +111,7 @@ struct AudioPlayerView: View {
                                             .frame(width: max(0, min(geometry.size.width * CGFloat(fraction), geometry.size.width)), height: 8)
 
                                         Circle()
-                                            .fill(AppColors.substratePrimary)
+                                            .fill(AppSurfaces.color(.contentBackground))
                                             .frame(width: 12, height: 12)
                                             .shadow(color: Color.black.opacity(0.12), radius: 3, x: 0, y: 1)
                                             .offset(x: knobX)
@@ -182,7 +182,7 @@ struct AudioPlayerView: View {
                         RoundedRectangle(cornerRadius: 26, style: .continuous)
                             .fill(.ultraThinMaterial)
                         RoundedRectangle(cornerRadius: 26, style: .continuous)
-                            .fill(AppColors.substrateSecondary.opacity(0.35))
+                            .fill(AppSurfaces.color(.cardBackground).opacity(0.35))
                     }
                 )
                 .overlay(
@@ -308,6 +308,6 @@ struct ScaleButtonStyle: ButtonStyle {
     
     #Preview {
         AudioPlayerView(ttsService: TTSPlaybackService.shared)
-            .background(AppColors.substratePrimary)
+            .background(AppSurfaces.color(.contentBackground))
     }
 }

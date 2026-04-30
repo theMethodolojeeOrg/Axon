@@ -272,6 +272,6 @@ struct AssistantMarkdownView: View {
         More text.
         """)
         .padding()
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 }

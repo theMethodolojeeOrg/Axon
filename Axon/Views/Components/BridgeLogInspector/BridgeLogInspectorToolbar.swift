@@ -26,7 +26,7 @@ struct BridgeLogInspectorToolbar: View {
                     }
                 }
                 .padding(8)
-                .background(AppColors.substrateTertiary)
+                .background(AppSurfaces.color(.controlBackground))
                 .cornerRadius(8)
 
                 Menu {
@@ -45,13 +45,13 @@ struct BridgeLogInspectorToolbar: View {
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(activeFilterCount > 0 ? AppColors.accentPrimary : AppColors.textSecondary)
                             .padding(8)
-                            .background(AppColors.substrateTertiary)
+                            .background(AppSurfaces.color(.controlBackground))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
 
                         if activeFilterCount > 0 {
                             Text("\(activeFilterCount)")
                                 .font(AppTypography.labelSmall(.bold))
-                                .foregroundColor(AppColors.substratePrimary)
+                                .foregroundColor(AppSurfaces.color(.contentBackground))
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 1)
                                 .background(AppColors.accentPrimary)
@@ -65,7 +65,7 @@ struct BridgeLogInspectorToolbar: View {
                     Image(systemName: "trash")
                         .foregroundColor(logService.entries.isEmpty ? AppColors.textTertiary : AppColors.textSecondary)
                         .padding(8)
-                        .background(AppColors.substrateTertiary)
+                        .background(AppSurfaces.color(.controlBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain)
@@ -104,7 +104,7 @@ struct BridgeLogInspectorToolbar: View {
             }
         }
         .padding(12)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .onChange(of: searchText) { _, newValue in
             logService.filterText = newValue
         }

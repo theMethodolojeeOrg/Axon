@@ -23,7 +23,7 @@ struct LogDetailView: View {
                 .padding()
             }
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 
     private var header: some View {
@@ -48,7 +48,7 @@ struct LogDetailView: View {
             .frame(width: 120)
         }
         .padding()
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
     }
 
     private var metadata: some View {
@@ -101,7 +101,7 @@ struct LogDetailView: View {
                 .foregroundColor(AppColors.textPrimary)
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
         }
     }

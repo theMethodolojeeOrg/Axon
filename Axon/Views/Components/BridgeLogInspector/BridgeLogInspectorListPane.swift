@@ -20,12 +20,12 @@ struct BridgeLogInspectorListPane: View {
                             .tag(entry)
                             .listRowInsets(EdgeInsets())
                             .listRowSeparator(.hidden)
-                            .listRowBackground(selectedEntry == entry ? AppColors.substrateTertiary : Color.clear)
+                            .listRowBackground(selectedEntry == entry ? AppSurfaces.color(.controlBackground) : Color.clear)
                     }
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-                .background(AppColors.substratePrimary)
+                .background(AppSurfaces.color(.contentBackground))
             }
         }
     }
@@ -49,6 +49,6 @@ struct BridgeLogInspectorListPane: View {
                 .frame(maxWidth: 260)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 }

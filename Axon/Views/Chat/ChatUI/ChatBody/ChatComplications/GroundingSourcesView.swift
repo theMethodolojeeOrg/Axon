@@ -84,7 +84,7 @@ private struct MessageSourceRow: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(6)
             }
         }
@@ -168,7 +168,7 @@ private struct SourceRow: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(6)
             }
         }
@@ -324,7 +324,7 @@ private struct MemoryOperationRow: View {
             }
         }
         .padding(10)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 }
@@ -414,5 +414,5 @@ struct MemoryOperationsBadge: View {
         MemoryOperationsBadge(count: 2, hasFailures: false)
     }
     .padding()
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

@@ -116,7 +116,7 @@ struct FirstRunWelcomeCard: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(AppColors.substrateSecondary.opacity(0.82))
+                .fill(AppSurfaces.color(.cardBackground).opacity(0.82))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(AppColors.signalMercury.opacity(0.22), lineWidth: 1)
@@ -128,7 +128,7 @@ struct FirstRunWelcomeCard: View {
                     APIKeysSettingsView(viewModel: settingsViewModel)
                         .padding()
                 }
-                .background(AppColors.substratePrimary)
+                .background(AppSurfaces.color(.contentBackground))
                 .navigationTitle("API Keys")
                 #if !os(macOS)
                 .navigationBarTitleDisplayMode(.inline)
@@ -183,7 +183,7 @@ private struct FirstRunLinkRow: View {
                 .foregroundColor(AppColors.textTertiary)
         }
         .padding(12)
-        .background(AppColors.substrateTertiary)
+        .background(AppSurfaces.color(.controlBackground))
         .cornerRadius(8)
     }
 }
@@ -251,7 +251,7 @@ struct APIKeySourcesView: View {
                                 }
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 8)
-                                .background(AppColors.substrateTertiary)
+                                .background(AppSurfaces.color(.controlBackground))
                                 .cornerRadius(6)
                             }
                         }
@@ -277,5 +277,5 @@ struct APIKeySourcesView: View {
                 .padding()
         }
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

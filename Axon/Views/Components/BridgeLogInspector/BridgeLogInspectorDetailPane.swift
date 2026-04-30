@@ -12,7 +12,7 @@ struct BridgeLogInspectorDetailPane: View {
                 VStack(spacing: 12) {
                     Image(systemName: logService.entries.isEmpty ? "waveform.path.ecg" : "arrow.left.arrow.right.circle")
                         .font(.system(size: 48))
-                        .foregroundColor(AppColors.substrateTertiary)
+                        .foregroundColor(AppSurfaces.color(.controlBackground))
 
                     Text(logService.entries.isEmpty ? "Waiting for bridge traffic" : "Select a log entry to view details")
                         .font(AppTypography.bodyMedium())
@@ -27,9 +27,9 @@ struct BridgeLogInspectorDetailPane: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(AppColors.substratePrimary)
+                .background(AppSurfaces.color(.contentBackground))
             }
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 }

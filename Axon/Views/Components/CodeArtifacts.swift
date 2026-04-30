@@ -197,7 +197,7 @@ private struct ArtifactCodeContentView: View {
                 }
             }
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 
     private var codeText: some View {
@@ -228,7 +228,7 @@ private struct ArtifactActionBar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 
     private var fullLayout: some View {
@@ -307,7 +307,7 @@ private struct ArtifactActionBar: View {
                     .frame(width: 32, height: 32)
                     .background(
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(AppColors.substrateSecondary)
+                            .fill(AppSurfaces.color(.cardBackground))
                     )
             }
             .menuStyle(.borderlessButton)
@@ -328,7 +328,7 @@ private struct ArtifactActionBar: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
-                Capsule().fill(AppColors.substrateSecondary)
+                Capsule().fill(AppSurfaces.color(.cardBackground))
             )
     }
 
@@ -338,7 +338,7 @@ private struct ArtifactActionBar: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(AppColors.textSecondary)
                 .padding(8)
-                .background(Circle().fill(AppColors.substrateSecondary))
+                .background(Circle().fill(AppSurfaces.color(.cardBackground)))
                 .frame(minWidth: 32, minHeight: 32)
         }
         .buttonStyle(.plain)
@@ -358,7 +358,7 @@ private struct ArtifactActionBar: View {
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(AppColors.substrateSecondary)
+                        .fill(AppSurfaces.color(.cardBackground))
                 )
                 .frame(minHeight: 32)
         }
@@ -373,7 +373,7 @@ private struct ArtifactActionBar: View {
                 .frame(width: 32, height: 32)
                 .background(
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(AppColors.substrateSecondary)
+                        .fill(AppSurfaces.color(.cardBackground))
                 )
         }
         .buttonStyle(.plain)
@@ -435,7 +435,7 @@ private struct ArtifactWebPreview: View {
             html: html,
             javaScriptEnabled: javaScriptEnabled
         )
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 }
 
@@ -518,20 +518,20 @@ private struct RenderedCodePreviewSheet: View {
                 .padding(.vertical, 6)
                 .background(
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(AppColors.substrateSecondary)
+                        .fill(AppSurfaces.color(.cardBackground))
                 )
             }
             .padding(12)
-            .background(AppColors.substratePrimary)
+            .background(AppSurfaces.color(.contentBackground))
 
-            Divider().overlay(AppColors.glassBorder.opacity(0.6))
+            Divider().overlay(AppSurfaces.color(.cardBorder).opacity(0.6))
 
             ArtifactWebPreview(
                 html: previewDocument,
                 javaScriptEnabled: javaScriptEnabled && jsCapable
             )
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 
     private var jsCapable: Bool {
@@ -565,11 +565,11 @@ struct CodeArtifactView: View {
             header
 
             Divider()
-                .overlay(AppColors.glassBorder.opacity(0.6))
+                .overlay(AppSurfaces.color(.cardBorder).opacity(0.6))
 
             ArtifactCodeContentView(artifact: artifact, wrapLines: wrapLines)
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .sheet(isPresented: $showExportSheet) {
             #if canImport(UIKit)
             ActivityView(activityItems: [artifact.exportFileURL])
@@ -677,10 +677,10 @@ struct CodeBlockView<Content: View>: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(AppColors.substrateTertiary)
+        .background(AppSurfaces.color(.controlBackground))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(AppColors.glassBorder, lineWidth: 1)
+                .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .contentShape(RoundedRectangle(cornerRadius: 12))
@@ -737,13 +737,13 @@ struct CodeBlockView<Content: View>: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(12)
             }
-            .background(AppColors.substrateTertiary)
+            .background(AppSurfaces.color(.controlBackground))
         } else {
             ScrollView(.horizontal, showsIndicators: true) {
                 codeText
                     .padding(12)
             }
-            .background(AppColors.substrateTertiary)
+            .background(AppSurfaces.color(.controlBackground))
         }
     }
 
@@ -793,7 +793,7 @@ struct CodeBlockView<Content: View>: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(
-                        Capsule().fill(AppColors.substrateSecondary)
+                        Capsule().fill(AppSurfaces.color(.cardBackground))
                     )
             }
 
@@ -812,11 +812,11 @@ struct CodeBlockView<Content: View>: View {
                         .padding(7)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(wrapLines ? AppColors.signalMercury.opacity(0.15) : AppColors.substrateSecondary)
+                                .fill(wrapLines ? AppColors.signalMercury.opacity(0.15) : AppSurfaces.color(.cardBackground))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(AppColors.glassBorder.opacity(0.7), lineWidth: 1)
+                                .stroke(AppSurfaces.color(.cardBorder).opacity(0.7), lineWidth: 1)
                         )
                 }
                 .buttonStyle(.plain)
@@ -843,11 +843,11 @@ struct CodeBlockView<Content: View>: View {
                         .padding(7)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(AppColors.substrateSecondary)
+                                .fill(AppSurfaces.color(.cardBackground))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(AppColors.glassBorder.opacity(0.7), lineWidth: 1)
+                                .stroke(AppSurfaces.color(.cardBorder).opacity(0.7), lineWidth: 1)
                         )
                 }
                 .buttonStyle(.plain)
@@ -872,11 +872,11 @@ struct CodeBlockView<Content: View>: View {
                         .padding(7)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(AppColors.substrateSecondary)
+                                .fill(AppSurfaces.color(.cardBackground))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(AppColors.glassBorder.opacity(0.7), lineWidth: 1)
+                                .stroke(AppSurfaces.color(.cardBorder).opacity(0.7), lineWidth: 1)
                         )
                 }
                 .buttonStyle(.plain)
@@ -884,10 +884,10 @@ struct CodeBlockView<Content: View>: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(AppColors.substrateElevated.opacity(0.55))
+        .background(AppSurfaces.color(.overlayBackground).opacity(0.55))
         .overlay(
             Rectangle()
-                .fill(AppColors.glassBorder.opacity(0.7))
+                .fill(AppSurfaces.color(.cardBorder).opacity(0.7))
                 .frame(height: 1),
             alignment: .bottom
         )
@@ -901,7 +901,7 @@ struct CodeBlockView<Content: View>: View {
             ZStack(alignment: .leading) {
                 // Base capsule
                 Capsule()
-                    .fill(AppColors.substrateSecondary)
+                    .fill(AppSurfaces.color(.cardBackground))
 
                 // Shimmer overlay — a narrow green gradient that sweeps right
                 let shimmerWidth = geo.size.width * 0.55
@@ -1053,21 +1053,21 @@ struct ArtifactWorkspaceEditorView: View {
         VStack(spacing: 0) {
             topBar
 
-            Divider().overlay(AppColors.glassBorder.opacity(0.5))
+            Divider().overlay(AppSurfaces.color(.cardBorder).opacity(0.5))
 
             HStack(spacing: 0) {
                 if isSidebarVisible {
                     sidebar
                         .transition(.move(edge: .leading).combined(with: .opacity))
 
-                    Divider().overlay(AppColors.glassBorder.opacity(0.5))
+                    Divider().overlay(AppSurfaces.color(.cardBorder).opacity(0.5))
                 }
 
                 mainPane
             }
             .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isSidebarVisible)
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .alert(
             promptTitle,
             isPresented: Binding(
@@ -1144,7 +1144,7 @@ struct ArtifactWorkspaceEditorView: View {
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(isSidebarVisible
                                       ? AppColors.signalMercury.opacity(0.15)
-                                      : AppColors.substrateSecondary)
+                                      : AppSurfaces.color(.cardBackground))
                         )
                 }
                 .buttonStyle(.plain)
@@ -1164,7 +1164,7 @@ struct ArtifactWorkspaceEditorView: View {
                         .foregroundColor(AppColors.textSecondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(Capsule().fill(AppColors.substrateSecondary))
+                        .background(Capsule().fill(AppSurfaces.color(.cardBackground)))
                 } else if workspace.isEditableFork {
                     Text("Editable Fork")
                         .font(AppTypography.labelSmall())
@@ -1204,7 +1204,7 @@ struct ArtifactWorkspaceEditorView: View {
             .padding(.bottom, 8)
             .animation(.easeInOut(duration: 0.15), value: selectedTab)
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 
     private var sidebar: some View {
@@ -1239,7 +1239,7 @@ struct ArtifactWorkspaceEditorView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
 
-                Divider().overlay(AppColors.glassBorder.opacity(0.4))
+                Divider().overlay(AppSurfaces.color(.cardBorder).opacity(0.4))
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 2) {
@@ -1249,7 +1249,7 @@ struct ArtifactWorkspaceEditorView: View {
                     }
                     .padding(8)
                 }
-                .background(AppColors.substrateSecondary.opacity(0.35))
+                .background(AppSurfaces.color(.cardBackground).opacity(0.35))
                 // Collect the widest label width from all sidebar rows
                 .onPreferenceChange(SidebarLabelWidthKey.self) { maxLabelWidth in
                     let needed = maxLabelWidth + ArtifactWorkspaceEditorView.sidebarLabelPadding
@@ -1267,11 +1267,11 @@ struct ArtifactWorkspaceEditorView: View {
                 }
             }
             .frame(width: sidebarWidth)
-            .background(AppColors.substratePrimary)
+            .background(AppSurfaces.color(.contentBackground))
 
             // Drag handle on the right edge of the sidebar
             Rectangle()
-                .fill(isDraggingSidebar ? AppColors.signalMercury.opacity(0.3) : AppColors.glassBorder.opacity(0.7))
+                .fill(isDraggingSidebar ? AppColors.signalMercury.opacity(0.3) : AppSurfaces.color(.cardBorder).opacity(0.7))
                 .frame(width: isDraggingSidebar ? 3 : 1)
                 .contentShape(Rectangle().inset(by: -4))
                 .gesture(
@@ -1447,13 +1447,13 @@ struct ArtifactWorkspaceEditorView: View {
                         .foregroundColor(AppColors.textTertiary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Capsule().fill(AppColors.substrateSecondary))
+                        .background(Capsule().fill(AppSurfaces.color(.cardBackground)))
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(AppColors.substratePrimary)
+                .background(AppSurfaces.color(.contentBackground))
 
-                Divider().overlay(AppColors.glassBorder.opacity(0.4))
+                Divider().overlay(AppSurfaces.color(.cardBorder).opacity(0.4))
 
                 TextEditor(
                     text: Binding(
@@ -1468,7 +1468,7 @@ struct ArtifactWorkspaceEditorView: View {
                 )
                 .font(.system(size: 13, design: .monospaced))
                 .padding(8)
-                .background(AppColors.substratePrimary)
+                .background(AppSurfaces.color(.contentBackground))
             }
         } else {
             VStack(spacing: 10) {
@@ -1480,7 +1480,7 @@ struct ArtifactWorkspaceEditorView: View {
                     .foregroundColor(AppColors.textSecondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AppColors.substratePrimary)
+            .background(AppSurfaces.color(.contentBackground))
         }
     }
 
@@ -1657,7 +1657,7 @@ private struct ArtifactWorkspacePreviewPane: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .onAppear(perform: rebuildPreview)
         .onChange(of: workspace) { _, _ in
             rebuildPreview()
@@ -1868,7 +1868,7 @@ struct CodeArtifactInspectorColumn: View {
                 header
 
                 Divider()
-                    .overlay(AppColors.glassBorder.opacity(0.6))
+                    .overlay(AppSurfaces.color(.cardBorder).opacity(0.6))
 
                 // Tab content
                 switch presenter.activeTab {
@@ -1885,7 +1885,7 @@ struct CodeArtifactInspectorColumn: View {
         }
         .frame(width: presenter.inspectorWidth)
         .frame(maxHeight: .infinity)
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .sheet(isPresented: $showRenderedPreview) {
             if case .single(let artifact) = artifactToShow {
                 RenderedCodePreviewSheet(
@@ -1909,7 +1909,7 @@ struct CodeArtifactInspectorColumn: View {
                         .foregroundColor(AppColors.textSecondary)
                         .padding(6)
                         .background(
-                            Circle().fill(AppColors.substrateSecondary)
+                            Circle().fill(AppSurfaces.color(.cardBackground))
                         )
                 }
                 .buttonStyle(.plain)
@@ -1953,12 +1953,12 @@ struct CodeArtifactInspectorColumn: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 
     private var resizeHandle: some View {
         Rectangle()
-            .fill(isDragging ? AppColors.signalMercury.opacity(0.3) : AppColors.glassBorder.opacity(0.7))
+            .fill(isDragging ? AppColors.signalMercury.opacity(0.3) : AppSurfaces.color(.cardBorder).opacity(0.7))
             .frame(width: isDragging ? 3 : 1)
             .contentShape(Rectangle().inset(by: -4))
             .gesture(
@@ -2002,10 +2002,10 @@ struct CodeArtifactInspectorColumn: View {
                     onPreview: { showRenderedPreview = true },
                     onClose: nil
                 )
-                .background(AppColors.substrateElevated.opacity(0.3))
+                .background(AppSurfaces.color(.overlayBackground).opacity(0.3))
 
                 Divider()
-                    .overlay(AppColors.glassBorder.opacity(0.4))
+                    .overlay(AppSurfaces.color(.cardBorder).opacity(0.4))
 
                 ArtifactCodeContentView(artifact: single, wrapLines: wrapLines)
             }
@@ -2045,7 +2045,7 @@ struct CodeArtifactInspectorColumn: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
     }
 }
 
@@ -2097,7 +2097,7 @@ struct CompletedToolCallView: View {
         switch toolCall.state {
         case .success: return AppColors.signalLichen
         case .failure: return AppColors.signalHematite
-        default: return AppColors.glassBorder
+        default: return AppSurfaces.color(.cardBorder)
         }
     }
 
@@ -2109,7 +2109,7 @@ struct CompletedToolCallView: View {
                 expandedContent
             }
         }
-        .background(AppColors.substrateTertiary)
+        .background(AppSurfaces.color(.controlBackground))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(borderColor, lineWidth: 1)
@@ -2175,7 +2175,7 @@ struct CompletedToolCallView: View {
             // Result if available
             if let result = toolCall.result {
                 Divider()
-                    .overlay(AppColors.glassBorder.opacity(0.5))
+                    .overlay(AppSurfaces.color(.cardBorder).opacity(0.5))
 
                 Text(result.output)
                     .font(.system(.caption, design: .monospaced))
@@ -2260,7 +2260,7 @@ struct ToolRequestCodeBlockView: View {
                 expandedContent
             }
         }
-        .background(AppColors.substrateTertiary)
+        .background(AppSurfaces.color(.controlBackground))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(borderColor, lineWidth: 1)
@@ -2277,7 +2277,7 @@ struct ToolRequestCodeBlockView: View {
 
     private var borderColor: Color {
         switch executionState {
-        case .notExecuted: return AppColors.glassBorder
+        case .notExecuted: return AppSurfaces.color(.cardBorder)
         case .executing: return AppColors.signalMercury
         case .success:
             if assertionOutcome.status == .fail {
@@ -2465,7 +2465,7 @@ struct ToolRequestCodeBlockView: View {
             if let parsed = parsedRequest,
                parsed.toolTestMetadata != nil || parsed.metadataWarning != nil {
                 Divider()
-                    .overlay(AppColors.glassBorder.opacity(0.5))
+                    .overlay(AppSurfaces.color(.cardBorder).opacity(0.5))
 
                 VStack(alignment: .leading, spacing: 4) {
                     if let metadata = parsed.toolTestMetadata {
@@ -2518,7 +2518,7 @@ struct ToolRequestCodeBlockView: View {
             // Result if available
             if let result = executionResult {
                 Divider()
-                    .overlay(AppColors.glassBorder.opacity(0.5))
+                    .overlay(AppSurfaces.color(.cardBorder).opacity(0.5))
 
                 Text(result)
                     .font(.system(.caption, design: .monospaced))

@@ -31,7 +31,7 @@ struct BridgeLogInspector: View {
                 regularLayout
             }
         }
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .onAppear {
             searchText = logService.filterText
             compactShowsDetail = usesCompactLayout && selectedEntry != nil
@@ -115,6 +115,6 @@ struct BridgeLogInspector: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
     }
 }

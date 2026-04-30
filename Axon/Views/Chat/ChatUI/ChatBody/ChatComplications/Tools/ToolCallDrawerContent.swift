@@ -39,7 +39,7 @@ struct ToolCallDrawerContent: View {
                     .foregroundColor(AppColors.textSecondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(4)
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -124,7 +124,7 @@ struct ToolCallDrawerContent: View {
             }
         }
         .padding(12)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 
@@ -248,7 +248,7 @@ private struct ToolCallCodeBlockView: View {
                 .textSelection(.enabled)
         }
         .padding(8)
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .cornerRadius(6)
     }
 
@@ -295,7 +295,7 @@ struct ToolResultSourcesView: View {
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(AppColors.substratePrimary)
+                        .background(AppSurfaces.color(.contentBackground))
                         .cornerRadius(4)
                     }
                 }
@@ -350,7 +350,7 @@ private struct MemoryOperationRow: View {
             }
         }
         .padding(8)
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .cornerRadius(6)
     }
 }
@@ -421,5 +421,5 @@ private struct MemoryOperationRow: View {
         }
         .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

@@ -876,7 +876,7 @@ struct SelectableTextView: NSViewRepresentable {
 struct MessageSeparator: View {
     var body: some View {
         Rectangle()
-            .fill(AppColors.glassBorder.opacity(0.5))
+            .fill(AppSurfaces.color(.cardBorder).opacity(0.5))
             .frame(height: 1)
             .padding(.horizontal)
     }

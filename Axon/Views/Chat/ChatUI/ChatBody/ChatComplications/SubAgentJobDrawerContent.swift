@@ -39,7 +39,7 @@ struct SubAgentJobDrawerContent: View {
                     .foregroundColor(AppColors.textSecondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(4)
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -137,7 +137,7 @@ struct SubAgentJobDrawerContent: View {
             MetadataFooter(job: job)
         }
         .padding(12)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 
@@ -284,7 +284,7 @@ private struct RawResultView: View {
         }
         .frame(maxHeight: 200)
         .padding(8)
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .cornerRadius(6)
     }
 }
@@ -390,7 +390,7 @@ private struct SpawnRecommendationsSection: View {
                         }
                     }
                     .padding(8)
-                    .background(AppColors.substratePrimary)
+                    .background(AppSurfaces.color(.contentBackground))
                     .cornerRadius(6)
                 }
             }
@@ -618,5 +618,5 @@ struct FlowLayout: Layout {
         .environmentObject(AgentOrchestratorService.shared)
         .padding()
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

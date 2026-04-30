@@ -26,7 +26,7 @@ struct TerminalDrawerView: View {
         VStack(spacing: 0) {
             #if os(macOS)
             Rectangle()
-                .fill(AppColors.glassBorder.opacity(0.55))
+                .fill(AppSurfaces.color(.cardBorder).opacity(0.55))
                 .frame(width: 44, height: 4)
                 .cornerRadius(2)
                 .padding(.top, 8)
@@ -53,10 +53,10 @@ struct TerminalDrawerView: View {
             inputRow
         }
         .frame(height: controller.drawerHeight)
-        .background(AppColors.substratePrimary)
+        .background(AppSurfaces.color(.contentBackground))
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(AppColors.glassBorder.opacity(0.8))
+                .fill(AppSurfaces.color(.cardBorder).opacity(0.8))
                 .frame(height: 1)
         }
         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -109,7 +109,7 @@ struct TerminalDrawerView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(AppColors.substrateSecondary.opacity(0.72))
+        .background(AppSurfaces.color(.cardBackground).opacity(0.72))
     }
 
     private var terminalBuffer: some View {
@@ -164,7 +164,7 @@ struct TerminalDrawerView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
     }
 
     private func iconButton(_ systemName: String, help: String, action: @escaping () -> Void) -> some View {

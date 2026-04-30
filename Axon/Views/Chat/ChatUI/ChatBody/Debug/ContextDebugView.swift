@@ -32,7 +32,7 @@ struct ContextDebugView: View {
                     GeometryReader { geometry in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 2)
-                                .fill(AppColors.substrateTertiary)
+                                .fill(AppSurfaces.color(.controlBackground))
                                 .frame(height: 4)
 
                             RoundedRectangle(cornerRadius: 2)
@@ -167,7 +167,7 @@ struct ContextDebugView: View {
                     }
                 }
                 .padding(12)
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -323,5 +323,5 @@ struct ContextDebugBadge: View {
         ))
     }
     .padding()
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }
