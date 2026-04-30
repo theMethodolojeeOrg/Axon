@@ -49,7 +49,7 @@ struct SidebarView: View {
                     bottomNavigation
                 }
                 .frame(width: min(360, proxy.size.width * 0.82))
-                .background(AppColors.substrateSecondary.opacity(0.95))
+                .background(AppSurfaces.color(.sidebarBackground).opacity(0.95))
                 .clipShape(
                     UnevenRoundedRectangle(
                         topLeadingRadius: 0,
@@ -65,7 +65,7 @@ struct SidebarView: View {
                         bottomTrailingRadius: 18,
                         topTrailingRadius: 18
                     )
-                    .stroke(AppColors.glassBorder.opacity(0.7), lineWidth: 1)
+                    .stroke(AppSurfaces.color(.cardBorder).opacity(0.7), lineWidth: 1)
                 )
                 .shadow(color: AppColors.shadowStrong.opacity(0.75), radius: 18, x: 6, y: 0)
 
@@ -75,7 +75,7 @@ struct SidebarView: View {
         .sheet(isPresented: $showingRenameSheet) {
             NavigationStack {
                 ZStack {
-                    AppColors.substratePrimary.ignoresSafeArea()
+                    AppSurfaces.color(.contentBackground).ignoresSafeArea()
                     VStack(spacing: 16) {
                         TextField("Display name", text: $tempRenameTitle)
                             .textFieldStyle(AppTextFieldStyle())
@@ -223,7 +223,7 @@ struct SidebarView: View {
                         .font(.system(size: 16))
                         .foregroundColor(AppColors.textSecondary)
                         .frame(width: 32, height: 32)
-                        .background(AppColors.substrateTertiary)
+                        .background(AppSurfaces.color(.controlBackground))
                         .clipShape(Circle())
                 }
             }
@@ -255,12 +255,12 @@ struct SidebarView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.controlBackground))
                 .foregroundColor(AppColors.textPrimary)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
             }
             
@@ -275,17 +275,17 @@ struct SidebarView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(currentView == .create ? AppColors.signalMercury.opacity(0.15) : AppColors.substrateSecondary)
+                .background(currentView == .create ? AppSurfaces.color(.selectedBackground) : AppSurfaces.color(.controlBackground))
                 .foregroundColor(currentView == .create ? AppColors.signalMercury : AppColors.textPrimary)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(currentView == .create ? AppColors.signalMercury.opacity(0.3) : AppColors.glassBorder, lineWidth: 1)
+                        .stroke(currentView == .create ? AppSurfaces.color(.selectedBorder) : AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
             }
         }
         .padding()
-        .background(AppColors.substratePrimary)
+        .appSurface(.sidebarHeaderBackground)
     }
 
     // MARK: - Conversations Section
@@ -445,7 +445,7 @@ struct SidebarView: View {
                 }
             }
             .padding(.vertical, 12)
-            .background(AppColors.substratePrimary)
+            .appSurface(.sidebarHeaderBackground)
         }
     }
 
@@ -510,7 +510,7 @@ struct NavigationButton: View {
             .frame(minHeight: ChatVisualTokens.minTouchTarget)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury.opacity(0.15) : Color.clear)
+                    .fill(isSelected ? AppSurfaces.color(.selectedBackground) : Color.clear)
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -575,13 +575,13 @@ struct ConversationSidebarRow: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury.opacity(0.15) :
-                          (isPinned ? AppColors.signalMercury.opacity(0.08) : Color.clear))
+                    .fill(isSelected ? AppSurfaces.color(.selectedBackground) :
+                          (isPinned ? AppSurfaces.color(.selectedBackground).opacity(0.65) : Color.clear))
             )
             .overlay(
                 isPinned ?
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppColors.signalMercury.opacity(0.2), lineWidth: 1) :
+                        .stroke(AppSurfaces.color(.selectedBorder), lineWidth: 1) :
                     nil
             )
         }
@@ -593,7 +593,7 @@ struct ConversationSidebarRow: View {
 
 #Preview {
     ZStack {
-        AppColors.substratePrimary
+        AppSurfaces.color(.contentBackground)
             .ignoresSafeArea()
 
         SidebarView(

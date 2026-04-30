@@ -138,7 +138,7 @@ struct SlashCommandMenu: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(AppColors.signalMercury.opacity(0.08))
+            .background(AppSurfaces.color(.selectedBackground))
 
             Divider()
                 .background(AppColors.divider)
@@ -177,7 +177,7 @@ struct SlashCommandMenu: View {
             .foregroundColor(AppColors.textTertiary.opacity(0.7))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
-            .background(AppColors.substrateTertiary.opacity(0.5))
+            .background(AppSurfaces.color(.controlMutedBackground))
         }
         .background(menuBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -242,7 +242,7 @@ struct SlashCommandMenu: View {
             .foregroundColor(AppColors.textTertiary.opacity(0.7))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
-            .background(AppColors.substrateTertiary.opacity(0.5))
+            .background(AppSurfaces.color(.controlMutedBackground))
         }
         .background(menuBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -267,7 +267,7 @@ struct SlashCommandMenu: View {
 
     private var menuBackground: some View {
         ZStack {
-            AppColors.substrateSecondary
+            AppSurfaces.color(.overlayBackground)
             Color.black.opacity(0.1)
         }
     }
@@ -293,7 +293,7 @@ private struct CommandRow: View {
                     .frame(width: 36, height: 36)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(isPressed || isHovering || isSelected ? AppColors.signalMercury : AppColors.substrateTertiary)
+                            .fill(isPressed || isHovering || isSelected ? AppColors.signalMercury : AppSurfaces.color(.controlBackground))
                     )
 
                 // Command info
@@ -322,7 +322,7 @@ private struct CommandRow: View {
             .padding(.vertical, 12) // Taller for better touch targets
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(isPressed || isHovering || isSelected ? AppColors.signalMercury.opacity(0.12) : Color.clear)
+                    .fill(isPressed || isHovering || isSelected ? AppSurfaces.color(.selectedBackground) : Color.clear)
             )
             .padding(.horizontal, 4)
         }
@@ -369,7 +369,7 @@ private struct ToolRow: View {
                     .frame(width: 28, height: 28)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(isHovering || isSelected ? AppColors.signalMercury : AppColors.substrateTertiary)
+                            .fill(isHovering || isSelected ? AppColors.signalMercury : AppSurfaces.color(.controlBackground))
                     )
 
                 // Tool info
@@ -395,7 +395,7 @@ private struct ToolRow: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isHovering || isSelected ? AppColors.signalMercury.opacity(0.1) : Color.clear)
+                    .fill(isHovering || isSelected ? AppSurfaces.color(.selectedBackground) : Color.clear)
             )
             .padding(.horizontal, 4)
         }
@@ -427,7 +427,7 @@ private struct UseToolRow: View {
                     .frame(width: 28, height: 28)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(isHovering || isSelected ? AppColors.signalLichen : AppColors.substrateTertiary)
+                            .fill(isHovering || isSelected ? AppColors.signalLichen : AppSurfaces.color(.controlBackground))
                     )
 
                 // Tool info
@@ -480,7 +480,7 @@ private struct CategoryHeader: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(AppColors.substrateSecondary.opacity(0.95))
+        .background(AppSurfaces.color(.transientBackground))
     }
 }
 
@@ -502,5 +502,5 @@ private struct CategoryHeader: View {
         .padding(.horizontal)
         .padding(.bottom, 60)
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

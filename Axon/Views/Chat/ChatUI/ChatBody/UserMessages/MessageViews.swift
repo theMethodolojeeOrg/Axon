@@ -296,7 +296,7 @@ struct UserMessageView: View {
                     .foregroundColor(AppColors.textPrimary)
             }
             .padding(8)
-            .background(AppColors.substrateTertiary)
+            .background(AppSurfaces.color(.controlBackground))
             .cornerRadius(8)
         }
         #else
@@ -309,7 +309,7 @@ struct UserMessageView: View {
                     .foregroundColor(AppColors.textPrimary)
             }
             .padding(8)
-            .background(AppColors.substrateTertiary)
+            .background(AppSurfaces.color(.controlBackground))
             .cornerRadius(8)
         } else if attachment.type == .document {
             HStack(spacing: 8) {
@@ -320,7 +320,7 @@ struct UserMessageView: View {
                     .foregroundColor(AppColors.textPrimary)
             }
             .padding(8)
-            .background(AppColors.substrateTertiary)
+            .background(AppSurfaces.color(.controlBackground))
             .cornerRadius(8)
         }
         #endif
@@ -415,10 +415,10 @@ struct AssistantMessageView: View {
                     .padding(14)
                     .background(
                         RoundedRectangle(cornerRadius: 14)
-                            .fill(AppColors.substrateSecondary)
+                            .fill(AppSurfaces.color(.cardBackground))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14)
-                                    .stroke(AppColors.glassBorder, lineWidth: 1)
+                                    .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                             )
                     )
                 }
@@ -507,7 +507,7 @@ struct AssistantMessageView: View {
                     .foregroundColor(AppColors.textPrimary)
             }
             .padding(10)
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(8)
         }
         #else
@@ -520,7 +520,7 @@ struct AssistantMessageView: View {
                     .foregroundColor(AppColors.textPrimary)
             }
             .padding(10)
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(8)
         } else if attachment.type == .document {
             HStack(spacing: 8) {
@@ -531,7 +531,7 @@ struct AssistantMessageView: View {
                     .foregroundColor(AppColors.textPrimary)
             }
             .padding(10)
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(8)
         }
         #endif
@@ -654,7 +654,7 @@ struct AssistantToolbar: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(AppColors.substrateSecondary)
+                    .background(AppSurfaces.color(.cardBackground))
                     .cornerRadius(8)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
                     .offset(y: -30)
@@ -682,11 +682,11 @@ struct AssistantToolbar: View {
                 .frame(width: 34, height: 34)
                 .background(
                     Capsule()
-                        .fill(AppColors.substrateSecondary.opacity(0.85))
+                        .fill(AppSurfaces.color(.transientBackground))
                 )
                 .overlay(
                     Capsule()
-                        .stroke(AppColors.glassBorder.opacity(0.7), lineWidth: 1)
+                        .stroke(AppSurfaces.color(.cardBorder).opacity(0.7), lineWidth: 1)
                 )
                 .frame(width: ChatVisualTokens.minTouchTarget, height: ChatVisualTokens.minTouchTarget)
                 .contentShape(Rectangle())
@@ -758,13 +758,13 @@ struct TextSelectorSheet: View {
                 }
             }
             .padding()
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
 
             // Text content - fills remaining space
             SelectableTextView(text: content)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
-                .background(AppColors.substratePrimary)
+                .background(AppSurfaces.color(.contentBackground))
         }
         .frame(minWidth: 500, idealWidth: 600, minHeight: 400, idealHeight: 500)
         #else
@@ -772,7 +772,7 @@ struct TextSelectorSheet: View {
             SelectableTextView(text: content)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
-                .background(AppColors.substratePrimary)
+                .background(AppSurfaces.color(.contentBackground))
                 .navigationTitle("Select Text")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -1106,7 +1106,7 @@ private struct TruncationPreferenceKey: PreferenceKey {
         )
     }
     .padding()
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }
 
 #Preview("Assistant Message") {
@@ -1151,5 +1151,5 @@ private struct TruncationPreferenceKey: PreferenceKey {
             )
         }
     }
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

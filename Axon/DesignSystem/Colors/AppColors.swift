@@ -225,7 +225,11 @@ struct AppColors {
     }
     #endif
 
-    // MARK: - Substrate (Background & Surfaces)
+    // MARK: - Raw Palette: Substrate
+    //
+    // These remain public for compatibility and for rare cases where a raw
+    // mineral palette value is needed. New UI should prefer semantic surface
+    // roles from AppSurfaces.swift.
 
     static let substratePrimary = dynamicColor(light: light.substratePrimary, dark: dark.substratePrimary)
     static let substrateSecondary = dynamicColor(light: light.substrateSecondary, dark: dark.substrateSecondary)

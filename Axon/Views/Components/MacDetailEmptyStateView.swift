@@ -56,7 +56,7 @@ struct MacDetailEmptyStateView: View {
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppColors.substratePrimary)
+        .appSurface(.contentBackground)
     }
 }
 

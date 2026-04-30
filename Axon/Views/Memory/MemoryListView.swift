@@ -31,7 +31,7 @@ struct MemoryContentView: View {
                         .font(.system(size: 20))
                         .foregroundColor(AppColors.signalMercury)
                         .frame(width: 44, height: 44)
-                        .background(AppColors.substrateSecondary)
+                        .background(AppSurfaces.color(.controlBackground))
                         .cornerRadius(12)
                 }
             }
@@ -363,7 +363,7 @@ private struct MemorySelectionBar: View {
             }
             .padding(.horizontal)
             .padding(.vertical, 12)
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.overlayBackground))
 
             // Action buttons
             if selectedCount > 0 {
@@ -390,7 +390,7 @@ private struct MemorySelectionBar: View {
                 }
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity)
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.overlayBackground))
             }
         }
     }
@@ -415,12 +415,12 @@ private struct MemoryTagChip: View {
                     .padding(.vertical, 2)
                     .background(
                         Capsule()
-                            .fill(isSelected ? .white.opacity(0.3) : AppColors.substrateTertiary)
+                            .fill(isSelected ? .white.opacity(0.3) : AppSurfaces.color(.controlBackground))
                     )
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(isSelected ? AppColors.signalMercury : AppColors.substrateSecondary)
+            .background(isSelected ? AppColors.signalMercury : AppSurfaces.color(.controlBackground))
             .foregroundColor(isSelected ? .white : AppColors.textSecondary)
             .cornerRadius(14)
         }
@@ -446,7 +446,7 @@ private struct AllTagsSheet: View {
     var body: some View {
         #if os(macOS)
         ZStack {
-            AppColors.substratePrimary
+            AppSurfaces.color(.contentBackground)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -477,7 +477,7 @@ private struct AllTagsSheet: View {
                             }
                             .padding(.vertical, 4)
                         }
-                        .listRowBackground(AppColors.substrateSecondary)
+                        .listRowBackground(AppSurfaces.color(.cardBackground))
                     }
                 }
                 .listStyle(.plain)
@@ -494,7 +494,7 @@ private struct AllTagsSheet: View {
         #else
         NavigationView {
             ZStack {
-                AppColors.substratePrimary
+                AppSurfaces.color(.contentBackground)
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
@@ -525,7 +525,7 @@ private struct AllTagsSheet: View {
                                 }
                                 .padding(.vertical, 4)
                             }
-                            .listRowBackground(AppColors.substrateSecondary)
+                            .listRowBackground(AppSurfaces.color(.cardBackground))
                         }
                     }
                     .listStyle(.plain)
@@ -640,7 +640,7 @@ struct MemoryCard: View {
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(AppColors.substrateTertiary)
+                    .background(AppSurfaces.color(.controlBackground))
                     .cornerRadius(8)
                 }
 
@@ -732,7 +732,7 @@ struct MemorySearchBar: View {
             }
         }
         .padding(12)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.overlayBackground))
         .cornerRadius(12)
     }
 }
@@ -757,7 +757,7 @@ struct MemoryFilterChip: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(isSelected ? AppColors.signalMercury : AppColors.substrateSecondary)
+            .background(isSelected ? AppColors.signalMercury : AppSurfaces.color(.controlBackground))
             .foregroundColor(isSelected ? .white : AppColors.textSecondary)
             .cornerRadius(20)
         }
@@ -777,7 +777,7 @@ struct NewMemorySheet: View {
     var body: some View {
         #if os(macOS)
         ZStack {
-            AppColors.substratePrimary
+            AppSurfaces.color(.contentBackground)
                 .ignoresSafeArea()
 
             VStack(spacing: 24) {
@@ -792,7 +792,7 @@ struct NewMemorySheet: View {
                         .foregroundColor(AppColors.textPrimary)
                         .frame(height: 120)
                         .padding(8)
-                        .background(AppColors.substrateTertiary)
+                        .background(AppSurfaces.color(.controlBackground))
                         .cornerRadius(8)
                 }
 
@@ -820,7 +820,7 @@ struct NewMemorySheet: View {
                         .font(AppTypography.bodyMedium())
                         .foregroundColor(AppColors.textPrimary)
                         .padding(12)
-                        .background(AppColors.substrateTertiary)
+                        .background(AppSurfaces.color(.controlBackground))
                         .cornerRadius(8)
                 }
 
@@ -869,7 +869,7 @@ struct NewMemorySheet: View {
         #else
         NavigationView {
             ZStack {
-                AppColors.substratePrimary
+                AppSurfaces.color(.contentBackground)
                     .ignoresSafeArea()
 
                 VStack(spacing: 24) {
@@ -884,7 +884,7 @@ struct NewMemorySheet: View {
                             .foregroundColor(AppColors.textPrimary)
                             .frame(height: 120)
                             .padding(8)
-                            .background(AppColors.substrateTertiary)
+                            .background(AppSurfaces.color(.controlBackground))
                             .cornerRadius(8)
                     }
 
@@ -912,7 +912,7 @@ struct NewMemorySheet: View {
                             .font(AppTypography.bodyMedium())
                             .foregroundColor(AppColors.textPrimary)
                             .padding(12)
-                            .background(AppColors.substrateTertiary)
+                            .background(AppSurfaces.color(.controlBackground))
                             .cornerRadius(8)
                     }
 

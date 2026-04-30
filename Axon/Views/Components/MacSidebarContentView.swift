@@ -47,11 +47,11 @@ struct MacSidebarContentView: View {
             bottomNavigation
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(AppColors.substrateSecondary)
+        .appSurface(.sidebarBackground)
         .sheet(isPresented: $showingRenameSheet) {
             NavigationStack {
                 ZStack {
-                    AppColors.substratePrimary.ignoresSafeArea()
+                    AppSurfaces.color(.contentBackground).ignoresSafeArea()
                     VStack(spacing: 16) {
                         TextField("Display name", text: $tempRenameTitle)
                             .textFieldStyle(AppTextFieldStyle())
@@ -194,7 +194,7 @@ struct MacSidebarContentView: View {
             .tint(AppColors.textSecondary)
         }
         .padding(12)
-        .background(AppColors.substratePrimary)
+        .appSurface(.sidebarHeaderBackground)
     }
 
     // MARK: - Conversations
@@ -282,7 +282,7 @@ struct MacSidebarContentView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(currentView == .chat ? AppColors.signalMercury.opacity(0.12) : Color.clear)
+            .background(currentView == .chat ? AppSurfaces.color(.selectedBackground) : Color.clear)
             .cornerRadius(8)
 
             Button {
@@ -294,7 +294,7 @@ struct MacSidebarContentView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(currentView == .cognition ? AppColors.signalMercury.opacity(0.12) : Color.clear)
+            .background(currentView == .cognition ? AppSurfaces.color(.selectedBackground) : Color.clear)
             .cornerRadius(8)
 
             Button {
@@ -306,11 +306,11 @@ struct MacSidebarContentView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(currentView == .settings ? AppColors.signalMercury.opacity(0.12) : Color.clear)
+            .background(currentView == .settings ? AppSurfaces.color(.selectedBackground) : Color.clear)
             .cornerRadius(8)
         }
         .padding(10)
-        .background(AppColors.substratePrimary)
+        .appSurface(.sidebarHeaderBackground)
     }
 
     // MARK: - Actions

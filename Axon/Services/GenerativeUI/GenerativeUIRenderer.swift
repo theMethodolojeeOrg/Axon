@@ -209,11 +209,27 @@ struct GenerativeUIRenderer {
         case "accentwarning", "warning": return AppColors.accentWarning
         case "accenterror", "error": return AppColors.accentError
 
-        // Substrate
-        case "substrateprimary": return AppColors.substratePrimary
-        case "substratesecondary": return AppColors.substrateSecondary
-        case "substratetertiary": return AppColors.substrateTertiary
-        case "substrateelevated": return AppColors.substrateElevated
+	        // Substrate
+	        case "substrateprimary": return AppColors.substratePrimary
+	        case "substratesecondary": return AppColors.substrateSecondary
+	        case "substratetertiary": return AppColors.substrateTertiary
+	        case "substrateelevated": return AppColors.substrateElevated
+
+	        // Semantic surfaces
+	        case "windowbackground": return AppSurfaces.color(.windowBackground)
+	        case "contentbackground": return AppSurfaces.color(.contentBackground)
+	        case "sidebarbackground": return AppSurfaces.color(.sidebarBackground)
+	        case "sidebarheaderbackground": return AppSurfaces.color(.sidebarHeaderBackground)
+	        case "cardbackground": return AppSurfaces.color(.cardBackground)
+	        case "cardborder": return AppSurfaces.color(.cardBorder)
+	        case "controlbackground": return AppSurfaces.color(.controlBackground)
+	        case "controlmutedbackground": return AppSurfaces.color(.controlMutedBackground)
+	        case "inputbackground": return AppSurfaces.color(.inputBackground)
+	        case "selectedbackground": return AppSurfaces.color(.selectedBackground)
+	        case "selectedborder": return AppSurfaces.color(.selectedBorder)
+	        case "overlaybackground": return AppSurfaces.color(.overlayBackground)
+	        case "transientbackground": return AppSurfaces.color(.transientBackground)
+	        case "separator": return AppSurfaces.color(.separator)
 
         // Standard colors
         case "white": return .white

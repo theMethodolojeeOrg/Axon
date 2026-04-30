@@ -64,7 +64,7 @@ struct HeuristicRow: View {
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(AppColors.substrateTertiary)
+                    .background(AppSurfaces.color(.controlBackground))
                     .foregroundColor(AppColors.textSecondary)
                     .cornerRadius(6)
 
@@ -111,11 +111,11 @@ struct HeuristicRow: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
+                .fill(isSelected ? AppSurfaces.color(.selectedBackground) : AppSurfaces.color(.cardBackground))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isSelected ? AppColors.signalMercury : Color.clear, lineWidth: 2)
+                .stroke(isSelected ? AppSurfaces.color(.selectedBorder) : Color.clear, lineWidth: 2)
         )
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: isPressed)
@@ -242,5 +242,5 @@ struct HeuristicRow: View {
         )
     }
     .padding()
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

@@ -58,10 +58,10 @@ struct SettingsCard<Content: View>: View {
         .padding(padding)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.cardBackground))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
         )
     }
@@ -77,7 +77,7 @@ struct SettingsSubviewContainer<Content: View>: View {
             content
                 .padding()
         }
-        .background(AppColors.substratePrimary)
+        .appSurface(.contentBackground)
     }
 }
 
@@ -115,7 +115,7 @@ struct SettingsCategoryRow: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.cardBackground))
         )
     }
 }
@@ -202,7 +202,7 @@ struct SettingsOptionCard: View {
                 // Icon
                 ZStack {
                     Circle()
-                        .fill(isSelected ? AppColors.signalMercury.opacity(0.2) : AppColors.substrateSecondary)
+                        .fill(isSelected ? AppColors.signalMercury.opacity(0.2) : AppSurfaces.color(.controlBackground))
                         .frame(width: 44, height: 44)
 
                     Image(systemName: icon)
@@ -245,17 +245,17 @@ struct SettingsOptionCard: View {
                         .foregroundColor(AppColors.signalMercury)
                 } else {
                     Circle()
-                        .stroke(AppColors.glassBorder, lineWidth: 1.5)
+                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1.5)
                         .frame(width: 22, height: 22)
                 }
             }
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? AppColors.signalMercury.opacity(0.08) : AppColors.substrateSecondary)
+                    .fill(isSelected ? AppSurfaces.color(.selectedBackground) : AppSurfaces.color(.cardBackground))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(isSelected ? AppColors.signalMercury.opacity(0.3) : AppColors.glassBorder, lineWidth: 1)
+                            .stroke(isSelected ? AppSurfaces.color(.selectedBorder) : AppSurfaces.color(.cardBorder), lineWidth: 1)
                     )
             )
             .opacity(!isAvailable ? 0.6 : 1.0)
@@ -337,10 +337,10 @@ struct SettingsStatusCard: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.cardBackground))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
         )
     }
@@ -449,7 +449,7 @@ struct SettingsToggleRow: View {
                     .tint(AppColors.signalMercury)
             }
             .padding(subtitle != nil ? 16 : 12)
-            .background(subtitle != nil ? Color.clear : AppColors.substrateSecondary)
+            .background(subtitle != nil ? Color.clear : AppSurfaces.color(.cardBackground))
             .cornerRadius(subtitle != nil ? 0 : 8)
         } else {
             // Description-based layout (no icon)
@@ -545,7 +545,7 @@ struct SecureInputField: View {
                 .disabled(isDisabled)
             }
             .padding()
-            .background(AppColors.substrateSecondary)
+            .background(AppSurfaces.color(.cardBackground))
             .cornerRadius(8)
 
             if let hint = hint {
@@ -611,7 +611,7 @@ struct InfoBanner: View {
             }
         }
         .padding()
-        .background(AppColors.signalMercury.opacity(0.1))
+        .background(AppSurfaces.color(.selectedBackground))
         .cornerRadius(8)
     }
 }
@@ -642,7 +642,7 @@ struct EmptyStateView: View {
         }
         .padding(40)
         .frame(maxWidth: .infinity)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(8)
     }
 }
@@ -655,11 +655,11 @@ struct CustomTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
             .padding(12)
-            .background(AppColors.substratePrimary)
+            .background(AppSurfaces.color(.contentBackground))
             .cornerRadius(6)
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(AppColors.glassBorder, lineWidth: 1)
+                    .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
             )
             .font(AppTypography.bodyMedium())
             .foregroundColor(AppColors.textPrimary)
@@ -741,7 +741,7 @@ struct ExpandableSettingsSection<Content: View>: View {
                         .foregroundColor(AppColors.textTertiary)
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
             .buttonStyle(.plain)
@@ -750,7 +750,7 @@ struct ExpandableSettingsSection<Content: View>: View {
             if isExpanded {
                 content
                     .padding(.vertical, 8)
-                    .background(AppColors.substrateTertiary.opacity(0.5))
+                    .background(AppSurfaces.color(.controlMutedBackground))
                     .cornerRadius(8)
                     .padding(.top, 4)
             }
@@ -1102,10 +1102,10 @@ struct UnifiedModelInfoCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.cardBackground))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
         )
 
@@ -1230,10 +1230,10 @@ struct ModelSelectionRow: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury.opacity(0.1) : AppColors.substrateSecondary)
+                    .fill(isSelected ? AppSurfaces.color(.selectedBackground) : AppSurfaces.color(.cardBackground))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(isSelected ? AppColors.signalMercury : AppColors.glassBorder, lineWidth: 1)
+                            .stroke(isSelected ? AppSurfaces.color(.selectedBorder) : AppSurfaces.color(.cardBorder), lineWidth: 1)
                     )
             )
         }
@@ -1494,7 +1494,7 @@ struct MLXModelSelectionContent: View {
                         .foregroundColor(AppColors.textTertiary)
                 }
                 .padding()
-                .background(AppColors.substrateSecondary)
+                .background(AppSurfaces.color(.cardBackground))
                 .cornerRadius(8)
             }
             .buttonStyle(.plain)
@@ -1607,10 +1607,10 @@ struct MLXModelInfoCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.cardBackground))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppColors.glassBorder, lineWidth: 1)
+                        .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                 )
         )
     }

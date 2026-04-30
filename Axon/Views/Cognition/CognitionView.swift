@@ -33,7 +33,7 @@ struct CognitionView: View {
 
     var body: some View {
         ZStack {
-            AppColors.substratePrimary
+            AppSurfaces.color(.contentBackground)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -120,7 +120,7 @@ struct CognitionView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
-        .background(AppColors.substrateSecondary)
+        .appSurface(.overlayBackground)
     }
 }
 
@@ -144,7 +144,7 @@ struct CognitionTabButton: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury : AppColors.substrateTertiary)
+                    .fill(isSelected ? AppColors.signalMercury : AppSurfaces.color(.controlBackground))
             )
             .foregroundColor(isSelected ? .white : AppColors.textSecondary)
         }
@@ -187,7 +187,7 @@ struct CognitionTabButtonWithBadge: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? AppColors.signalMercury : AppColors.substrateTertiary)
+                    .fill(isSelected ? AppColors.signalMercury : AppSurfaces.color(.controlBackground))
             )
             .foregroundColor(isSelected ? .white : AppColors.textSecondary)
         }

@@ -545,10 +545,10 @@ struct MessageInputBar: View {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: ChatVisualTokens.composerCornerRadius)
-                    .fill(AppColors.substrateSecondary.opacity(0.95))
+                    .fill(AppSurfaces.color(.inputBackground).opacity(0.95))
                     .overlay(
                         RoundedRectangle(cornerRadius: ChatVisualTokens.composerCornerRadius)
-                            .stroke(AppColors.glassBorder.opacity(0.8), lineWidth: 1)
+                            .stroke(AppSurfaces.color(.cardBorder).opacity(0.8), lineWidth: 1)
                     )
             )
             .shadow(color: AppColors.shadow.opacity(0.12), radius: 8, x: 0, y: -1)
@@ -647,7 +647,7 @@ struct MessageInputBar: View {
                         .foregroundColor(AppColors.textSecondary)
                 }
                 .frame(width: 56, height: 56)
-                .background(AppColors.substrateTertiary)
+                .background(AppSurfaces.color(.controlBackground))
                 .cornerRadius(10)
             }
 
@@ -761,7 +761,7 @@ struct MessageInputBar: View {
         .frame(minHeight: 40)
         .background(
             RoundedRectangle(cornerRadius: ChatVisualTokens.composerInnerCornerRadius)
-                .fill(AppColors.substrateTertiary.opacity(0.45))
+                .fill(AppSurfaces.color(.controlMutedBackground))
         )
         .overlay(
             // Visual indicator when typing a slash command

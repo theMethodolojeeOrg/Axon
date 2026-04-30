@@ -33,14 +33,14 @@ struct GlassCard<Content: View>: View {
             .padding(padding)
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(AppColors.substrateSecondary)
+                    .fill(AppSurfaces.color(.cardBackground))
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius)
                             .fill(AppColors.glassOverlay)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius)
-                            .stroke(AppColors.glassBorder, lineWidth: borderWidth)
+                            .stroke(AppSurfaces.color(.cardBorder), lineWidth: borderWidth)
                     )
                     .shadow(color: AppColors.shadow, radius: shadowRadius, x: 0, y: 4)
             )
@@ -53,7 +53,7 @@ struct GlassCard<Content: View>: View {
 
 #Preview {
     ZStack {
-        AppColors.substratePrimary
+        AppSurfaces.color(.contentBackground)
             .ignoresSafeArea()
 
         VStack(spacing: 20) {

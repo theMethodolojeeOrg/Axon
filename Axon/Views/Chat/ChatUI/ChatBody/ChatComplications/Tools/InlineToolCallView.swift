@@ -253,5 +253,5 @@ struct InlineToolCallsView: View {
         ])
     }
     .padding()
-    .background(AppColors.substratePrimary)
+    .background(AppSurfaces.color(.contentBackground))
 }

@@ -21,7 +21,7 @@ struct MacDetailWithInspector: View {
     var body: some View {
         HStack(spacing: 0) {
             ZStack {
-                AppColors.substratePrimary.ignoresSafeArea()
+                AppSurfaces.color(.contentBackground).ignoresSafeArea()
 
                 switch currentView {
                 case .chat:

@@ -73,7 +73,7 @@ struct AppContainerView: View {
             // Launch Screen Overlay
             if showLaunchScreen {
                 ZStack {
-                    AppColors.substratePrimary
+                    AppSurfaces.color(.windowBackground)
                         .ignoresSafeArea()
 
                     VStack(spacing: 16) {
@@ -112,7 +112,7 @@ struct AppContainerView: View {
                 ChatInfoSettingsView(conversation: conversation)
             }
         }
-        .background(AppColors.substratePrimary)
+        .appSurface(.windowBackground)
         .onAppear {
             // Ensure launch overlay is visible on first appearance
             showLaunchScreen = true
@@ -349,11 +349,11 @@ struct AppContainerView: View {
                 .frame(width: ChatVisualTokens.toolbarButtonSize, height: ChatVisualTokens.toolbarButtonSize)
                 .background(
                     Circle()
-                        .fill(AppColors.substrateSecondary.opacity(0.7))
+                        .fill(AppSurfaces.color(.controlBackground).opacity(0.7))
                 )
                 .overlay(
                     Circle()
-                        .stroke(AppColors.glassBorder.opacity(0.6), lineWidth: 1)
+                        .stroke(AppSurfaces.color(.cardBorder).opacity(0.6), lineWidth: 1)
                 )
                 .contentShape(Circle())
         }
@@ -656,7 +656,7 @@ struct ChatContainerView: View {
 
     var body: some View {
         ZStack {
-            AppColors.substratePrimary
+            AppSurfaces.color(.contentBackground)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture { isInputFocused = false }
@@ -713,7 +713,7 @@ struct ChatContainerView: View {
                     .padding(24)
                     .background(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(AppColors.substrateSecondary)
+                            .fill(AppSurfaces.color(.overlayBackground))
                             .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
                     )
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
@@ -1101,11 +1101,11 @@ struct ChatContainerView: View {
                                                         .foregroundColor(AppColors.textTertiary)
                                                         .padding(.horizontal, 12)
                                                         .padding(.vertical, 6)
-                                                        .background(AppColors.substrateSecondary.opacity(0.8))
+                                                        .background(AppSurfaces.color(.controlBackground).opacity(0.8))
                                                         .clipShape(Capsule())
                                                         .overlay(
                                                             Capsule()
-                                                                .stroke(AppColors.glassBorder.opacity(0.6), lineWidth: 1)
+                                                                .stroke(AppSurfaces.color(.cardBorder).opacity(0.6), lineWidth: 1)
                                                         )
                                                     }
                                                     .buttonStyle(.plain)
@@ -2353,10 +2353,10 @@ struct PromptCard: View {
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(AppColors.substrateSecondary.opacity(0.85))
+                    .fill(AppSurfaces.color(.cardBackground).opacity(0.85))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppColors.glassBorder.opacity(0.8), lineWidth: 1)
+                            .stroke(AppSurfaces.color(.cardBorder).opacity(0.8), lineWidth: 1)
                     )
             )
         }
@@ -2404,7 +2404,7 @@ struct ScrollToBottomButton: View {
                     .fill(.ultraThinMaterial)
                     .overlay(
                         Capsule()
-                            .stroke(AppColors.glassBorder, lineWidth: 1)
+                            .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                     )
             )
             .shadow(color: AppColors.shadow.opacity(0.3), radius: 8, x: 0, y: 4)
@@ -2445,7 +2445,7 @@ struct SubconsciousLoggingWarningBanner: View {
                     .padding(.vertical, 6)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(AppColors.glassBorder, lineWidth: 1)
+                            .stroke(AppSurfaces.color(.cardBorder), lineWidth: 1)
                     )
 
                 Button("Ignore This Thread", action: onIgnoreThread)
@@ -2508,7 +2508,7 @@ struct VSCodeBridgeBanner: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(AppColors.substrateSecondary)
+                .fill(AppSurfaces.color(.transientBackground))
                 .shadow(color: AppColors.shadowStrong, radius: 8, x: 0, y: 4)
         )
         .padding(.horizontal, 16)

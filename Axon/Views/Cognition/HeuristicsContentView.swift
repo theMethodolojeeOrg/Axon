@@ -104,7 +104,7 @@ struct HeuristicsContentView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
-        .background(AppColors.substrateSecondary)
+        .appSurface(.overlayBackground)
     }
 
     // MARK: - Dimension Filters
@@ -134,7 +134,7 @@ struct HeuristicsContentView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
         }
-        .background(AppColors.substrateSecondary)
+        .appSurface(.overlayBackground)
     }
 
     // MARK: - Heuristics List
@@ -270,7 +270,7 @@ struct HeuristicsContentView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(AppColors.substrateSecondary)
+        .appSurface(.overlayBackground)
         .overlay(
             Rectangle()
                 .fill(AppColors.divider)
@@ -320,7 +320,7 @@ struct HeuristicFilterChip: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(isSelected ? AppColors.signalMercury : AppColors.substrateTertiary)
+                    .fill(isSelected ? AppColors.signalMercury : AppSurfaces.color(.controlBackground))
             )
             .foregroundColor(isSelected ? .white : AppColors.textSecondary)
         }
@@ -343,7 +343,7 @@ struct HeuristicsSuccessToast: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
         .padding(.top, 8)
@@ -363,7 +363,7 @@ struct HeuristicsErrorToast: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(AppColors.substrateSecondary)
+        .background(AppSurfaces.color(.cardBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
         .padding(.top, 8)
