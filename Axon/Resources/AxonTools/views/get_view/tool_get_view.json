@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "get_view",
+    "name": "Get View",
+    "description": "Read the USE JSON document of a stored generative view.",
+    "category": "views",
+    "icon": { "sfSymbol": "doc.text.magnifyingglass" },
+    "requiresApproval": false,
+    "tags": ["views", "generative_ui", "read", "use"]
+  },
+  "parameters": {
+    "id": {
+      "type": "string",
+      "required": true,
+      "description": "UUID of the view (from list_views)"
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "generative_view"
+  },
+  "ai": {
+    "systemPromptSection": "### get_view\nRead a stored view's USE document, e.g. before patching it with update_view.\n\n**Format:**\n```tool_request\n{\"tool\":\"get_view\",\"query\":\"{\\\"id\\\":\\\"<uuid>\\\"}\"}\n```",
+    "usageExamples": [
+      { "description": "Read a view document", "input": "{\"id\":\"UUID-HERE\"}" }
+    ],
+    "whenToUse": [
+      "Before applying patches with update_view",
+      "User asks what a stored view contains"
+    ],
+    "whenNotToUse": [
+      "You already have the current document from this conversation"
+    ]
+  },
+  "sovereignty": {
+    "actionCategory": "content_read",
+    "approvalDescription": "Read generative view {{id}}",
+    "scopes": ["views.read"],
+    "riskLevel": "low"
+  }
+}

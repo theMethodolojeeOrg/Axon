@@ -1,0 +1,70 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "update_view",
+    "name": "Update View",
+    "description": "Update an existing USE-format generative view, either by replacing the whole document or applying targeted patch operations.",
+    "category": "views",
+    "icon": { "sfSymbol": "pencil.and.outline" },
+    "requiresApproval": false,
+    "tags": ["views", "generative_ui", "edit", "patch", "use"]
+  },
+  "parameters": {
+    "id": {
+      "type": "string",
+      "required": true,
+      "description": "UUID of the view to update (from list_views or create_view)"
+    },
+    "document": {
+      "type": "object",
+      "required": false,
+      "description": "Full replacement USE spec document. Use this OR 'patches'."
+    },
+    "patches": {
+      "type": "array",
+      "required": false,
+      "description": "Targeted patch ops. Each: {\"op\": setProp|removeProp|setComponent|insertChild|removeChild|replaceChild|replaceNode, \"path\": [child indices from root], ...}. setProp/removeProp take 'key' (+'value'); child ops take 'index' (+'node')."
+    },
+    "name": {
+      "type": "string",
+      "required": false,
+      "description": "Optional new display name"
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "generative_view"
+  },
+  "ai": {
+    "systemPromptSection": "### update_view\nEdit a stored USE view. Prefer 'patches' for small changes (token-efficient) and 'document' for full rewrites. Paths are arrays of child indices from the root: [] = root, [0,2] = third child of first child. Get the current document with get_view first when patching.\n\n**Format:**\n```tool_request\n{\"tool\":\"update_view\",\"query\":\"{\\\"id\\\":\\\"<uuid>\\\",\\\"patches\\\":[{\\\"op\\\":\\\"setProp\\\",\\\"path\\\":[0],\\\"key\\\":\\\"spacing\\\",\\\"value\\\":24}]}\"}\n```\n\nThe result is validated before saving (atomic: a failing patch changes nothing).",
+    "usageExamples": [
+      {
+        "description": "Change a prop via patch",
+        "input": "{\"id\":\"UUID-HERE\",\"patches\":[{\"op\":\"setProp\",\"path\":[],\"key\":\"spacing\",\"value\":24}]}"
+      },
+      {
+        "description": "Add a child node",
+        "input": "{\"id\":\"UUID-HERE\",\"patches\":[{\"op\":\"insertChild\",\"path\":[],\"index\":1,\"node\":{\"component\":\"divider\"}}]}"
+      },
+      {
+        "description": "Replace the whole document",
+        "input": "{\"id\":\"UUID-HERE\",\"document\":{\"component\":\"vstack\",\"children\":[]}}"
+      }
+    ],
+    "whenToUse": [
+      "User asks to change, extend, or fix an existing generative view",
+      "Iterating on a view you created earlier in the conversation"
+    ],
+    "whenNotToUse": [
+      "Creating a brand-new view (use create_view)",
+      "The view is legacy-format or a bundled template (read-only)"
+    ]
+  },
+  "sovereignty": {
+    "actionCategory": "content_modify",
+    "approvalDescription": "Update generative view {{id}}",
+    "scopes": ["views.write"],
+    "riskLevel": "low"
+  }
+}

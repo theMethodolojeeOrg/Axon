@@ -118,6 +118,9 @@ final class InternalHandlerRegistryV2: ObservableObject {
         // Research & Discovery handlers
         registerHandler(CollapseEngineHandler())
 
+        // Generative UI views (USE-Package)
+        registerHandler(GenerativeViewHandler())
+
         // Provider-specific handlers
         registerHandler(GeminiHandler())
         registerHandler(OpenAIHandler())

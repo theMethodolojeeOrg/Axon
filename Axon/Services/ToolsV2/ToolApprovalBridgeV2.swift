@@ -210,7 +210,7 @@ final class ToolApprovalBridgeV2: ObservableObject {
     /// Convert V2 category to V1
     private func convertCategory(_ v2Category: ToolCategoryV2) -> DynamicToolCategory {
         switch v2Category {
-        case .memory, .agentState, .heartbeat, .sovereignty, .subAgents, .temporal, .discovery, .notification:
+        case .memory, .agentState, .heartbeat, .sovereignty, .subAgents, .temporal, .discovery, .notification, .views:
             return .utility
         case .system, .vscode:
             return .integration

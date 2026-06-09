@@ -138,11 +138,14 @@ struct GenerativeViewGallerySection: View {
 
     @ViewBuilder
     private func viewContextMenu(for view: GenerativeViewDefinition) -> some View {
-        Button {
-            editingView = view
-            showingCanvas = true
-        } label: {
-            Label("Edit", systemImage: "pencil")
+        // The visual canvas only edits legacy node trees; USE views are AI-edited
+        if view.format == .legacy {
+            Button {
+                editingView = view
+                showingCanvas = true
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
         }
 
         Button {
@@ -177,8 +180,11 @@ struct GenerativeViewGallerySection: View {
     private func duplicateView(_ view: GenerativeViewDefinition) {
         do {
             let copy = try storageService.duplicateView(view)
-            editingView = copy
-            showingCanvas = true
+            // USE copies stay in the gallery; the canvas can't edit them
+            if copy.format == .legacy {
+                editingView = copy
+                showingCanvas = true
+            }
         } catch {
             print("[GenerativeViewGallery] Failed to duplicate view: \(error)")
         }
@@ -264,10 +270,24 @@ struct GenerativeViewCard: View {
             ZStack {
                 AppColors.substratePrimary
 
-                GenerativeUIRenderer.render(view.root)
+                miniPreview
                     .scaleEffect(0.5)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var miniPreview: some View {
+        switch view.format {
+        case .legacy:
+            if let root = view.root {
+                GenerativeUIRenderer.render(root)
+            }
+        case .useV1:
+            if let document = view.useDocument {
+                UseViewRendererView(document: document)
             }
         }
     }

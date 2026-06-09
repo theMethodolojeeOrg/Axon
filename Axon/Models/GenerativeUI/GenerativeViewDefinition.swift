@@ -13,15 +13,59 @@ enum GenerativeViewSource: String, Codable, Sendable {
     case userCreated // User-created, saved to Documents
 }
 
+/// Rendering format of a generative view
+enum GenerativeViewFormat: String, Codable, Sendable {
+    case legacy // GenerativeUINode tree rendered by GenerativeUIRenderer
+    case useV1  // USE spec document rendered by USEBridge
+}
+
 /// A saved generative view definition with metadata
 struct GenerativeViewDefinition: Codable, Identifiable, Equatable, Sendable {
     let id: UUID
     var name: String
     var createdAt: Date
     var updatedAt: Date
-    var root: GenerativeUINode
+    var format: GenerativeViewFormat
+    var root: GenerativeUINode?
+    var useDocument: USEDocument?
     var source: GenerativeViewSource
     var thumbnailBase64: String?
+
+    init(
+        id: UUID,
+        name: String,
+        createdAt: Date,
+        updatedAt: Date,
+        format: GenerativeViewFormat = .legacy,
+        root: GenerativeUINode? = nil,
+        useDocument: USEDocument? = nil,
+        source: GenerativeViewSource,
+        thumbnailBase64: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.format = format
+        self.root = root
+        self.useDocument = useDocument
+        self.source = source
+        self.thumbnailBase64 = thumbnailBase64
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        // Files written before the USE integration carry no format key
+        format = try container.decodeIfPresent(GenerativeViewFormat.self, forKey: .format) ?? .legacy
+        root = try container.decodeIfPresent(GenerativeUINode.self, forKey: .root)
+        useDocument = try container.decodeIfPresent(USEDocument.self, forKey: .useDocument)
+        source = try container.decode(GenerativeViewSource.self, forKey: .source)
+        thumbnailBase64 = try container.decodeIfPresent(String.self, forKey: .thumbnailBase64)
+    }
 
     // MARK: - Convenience Initializers
 
@@ -32,10 +76,25 @@ struct GenerativeViewDefinition: Codable, Identifiable, Equatable, Sendable {
             name: name,
             createdAt: Date(),
             updatedAt: Date(),
+            format: .legacy,
             root: .vstack(alignment: "leading", spacing: 16, children: [
                 .text("New View", font: "titleLarge", color: "textPrimary"),
                 .text("Tap Edit to start building", font: "bodyMedium", color: "textSecondary")
             ]),
+            source: .userCreated,
+            thumbnailBase64: nil
+        )
+    }
+
+    /// Create a new USE-format view from a spec document
+    static func newUseView(name: String, document: USEDocument) -> GenerativeViewDefinition {
+        GenerativeViewDefinition(
+            id: UUID(),
+            name: name,
+            createdAt: Date(),
+            updatedAt: Date(),
+            format: .useV1,
+            useDocument: document,
             source: .userCreated,
             thumbnailBase64: nil
         )
@@ -48,6 +107,7 @@ struct GenerativeViewDefinition: Codable, Identifiable, Equatable, Sendable {
             name: name,
             createdAt: Date(),
             updatedAt: Date(),
+            format: .legacy,
             root: root,
             source: .bundle,
             thumbnailBase64: nil
@@ -59,6 +119,12 @@ struct GenerativeViewDefinition: Codable, Identifiable, Equatable, Sendable {
     /// Update the view and timestamp
     mutating func update(root: GenerativeUINode) {
         self.root = root
+        self.updatedAt = Date()
+    }
+
+    /// Update the USE document and timestamp
+    mutating func update(document: USEDocument) {
+        self.useDocument = document
         self.updatedAt = Date()
     }
 
@@ -75,7 +141,22 @@ struct GenerativeViewDefinition: Codable, Identifiable, Equatable, Sendable {
     }
 
     var nodeCount: Int {
-        countNodes(root)
+        switch format {
+        case .legacy:
+            return root.map(countNodes) ?? 0
+        case .useV1:
+            return useDocument.map { countUseNodes($0.asDictionary()) } ?? 0
+        }
+    }
+
+    private func countUseNodes(_ node: [String: Any]) -> Int {
+        var count = 1
+        if let children = node["children"] as? [[String: Any]] {
+            for child in children {
+                count += countUseNodes(child)
+            }
+        }
+        return count
     }
 
     private func countNodes(_ node: GenerativeUINode) -> Int {

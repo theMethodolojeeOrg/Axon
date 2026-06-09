@@ -34,6 +34,11 @@ struct GenerativeViewCanvas: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    /// Canvas edits only legacy views; fall back to an empty stack if root is missing
+    private var canvasRoot: GenerativeUINode {
+        currentView.root ?? .vstack(spacing: 8, children: [])
+    }
+
     init(initialView: GenerativeViewDefinition, onSave: @escaping (GenerativeViewDefinition) -> Void, onCancel: @escaping () -> Void) {
         self.initialView = initialView
         self.onSave = onSave
@@ -158,7 +163,7 @@ struct GenerativeViewCanvas: View {
                         // Rendered content
                         if isEditMode {
                             EditableNodeView(
-                                node: currentView.root,
+                                node: canvasRoot,
                                 path: [],
                                 isEditMode: $isEditMode,
                                 onTap: { path in
@@ -171,7 +176,7 @@ struct GenerativeViewCanvas: View {
                             )
                             .padding()
                         } else {
-                            GenerativeUIRenderer.render(currentView.root)
+                            GenerativeUIRenderer.render(canvasRoot)
                                 .padding()
                         }
                     }
@@ -344,7 +349,7 @@ struct GenerativeViewCanvas: View {
     private var jsonString: String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard let data = try? encoder.encode(currentView.root),
+        guard let data = try? encoder.encode(canvasRoot),
               let json = String(data: data, encoding: .utf8) else {
             return "Error encoding JSON"
         }
@@ -400,7 +405,7 @@ struct GenerativeViewCanvas: View {
     // MARK: - Node Manipulation
 
     private func getNode(at path: [Int]) -> GenerativeUINode? {
-        var node = currentView.root
+        var node = canvasRoot
 
         for index in path {
             guard let children = node.children, index < children.count else { return nil }
@@ -411,7 +416,7 @@ struct GenerativeViewCanvas: View {
     }
 
     private func updateNode(at path: [Int], with newNode: GenerativeUINode) {
-        var root = currentView.root
+        var root = canvasRoot
 
         if path.isEmpty {
             root = newNode
@@ -443,7 +448,7 @@ struct GenerativeViewCanvas: View {
     private func deleteNode(at path: [Int]) {
         guard !path.isEmpty else { return }
 
-        var root = currentView.root
+        var root = canvasRoot
         deleteNodeRecursive(node: &root, path: path)
         currentView.update(root: root)
         hasUnsavedChanges = true
@@ -469,7 +474,7 @@ struct GenerativeViewCanvas: View {
     private func moveNode(from sourcePath: [Int], toIndex: Int) {
         guard !sourcePath.isEmpty else { return }
 
-        var root = currentView.root
+        var root = canvasRoot
         let parentPath = Array(sourcePath.dropLast())
         let sourceIndex = sourcePath.last!
 
@@ -507,7 +512,7 @@ struct GenerativeViewCanvas: View {
     }
 
     private func addComponent(type: GenerativeUIComponentType) {
-        var root = currentView.root
+        var root = canvasRoot
 
         // Create new node based on type
         let newNode: GenerativeUINode

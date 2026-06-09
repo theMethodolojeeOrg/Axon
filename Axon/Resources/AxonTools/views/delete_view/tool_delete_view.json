@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "delete_view",
+    "name": "Delete View",
+    "description": "Delete a user-created generative view. Bundled templates cannot be deleted.",
+    "category": "views",
+    "icon": { "sfSymbol": "trash" },
+    "requiresApproval": true,
+    "tags": ["views", "generative_ui", "delete", "use"]
+  },
+  "parameters": {
+    "id": {
+      "type": "string",
+      "required": true,
+      "description": "UUID of the view to delete (from list_views)"
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "generative_view"
+  },
+  "ai": {
+    "systemPromptSection": "### delete_view\nPermanently delete a user-created generative view.\n\n**Format:**\n```tool_request\n{\"tool\":\"delete_view\",\"query\":\"{\\\"id\\\":\\\"<uuid>\\\"}\"}\n```",
+    "usageExamples": [
+      { "description": "Delete a view", "input": "{\"id\":\"UUID-HERE\"}" }
+    ],
+    "whenToUse": [
+      "User explicitly asks to remove a view"
+    ],
+    "whenNotToUse": [
+      "User wants changes to a view (use update_view)",
+      "Without explicit user confirmation"
+    ]
+  },
+  "sovereignty": {
+    "actionCategory": "content_delete",
+    "approvalDescription": "Delete generative view {{id}}",
+    "scopes": ["views.write"],
+    "riskLevel": "medium"
+  }
+}

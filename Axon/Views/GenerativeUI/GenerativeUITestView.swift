@@ -11,10 +11,21 @@ import Foundation
 import SwiftUI
 
 struct GenerativeUITestView: View {
+    enum SandboxFormat: String, CaseIterable, Identifiable {
+        case legacy = "Legacy"
+        case use = "USE"
+        var id: String { rawValue }
+    }
+
     @State private var jsonText: String = ""
     @State private var parsedNode: GenerativeUINode?
     @State private var parseError: String?
     @State private var showingHelp = false
+
+    // USE format state
+    @State private var sandboxFormat: SandboxFormat = .legacy
+    @State private var parsedUseDocument: USEDocument?
+    @State private var useWarnings: [String] = []
 
     // Visual edit mode state
     @State private var isEditMode = false
@@ -155,6 +166,17 @@ struct GenerativeUITestView: View {
                     .foregroundColor(AppColors.textPrimary)
                 Spacer()
 
+                Picker("Format", selection: $sandboxFormat) {
+                    ForEach(SandboxFormat.allCases) { format in
+                        Text(format.rawValue).tag(format)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 160)
+                .onChange(of: sandboxFormat) { _, _ in
+                    loadDefaultJSON()
+                }
+
                 // Status indicator
                 if parseError != nil {
                     HStack(spacing: 4) {
@@ -163,7 +185,7 @@ struct GenerativeUITestView: View {
                     }
                     .font(AppTypography.labelSmall())
                     .foregroundColor(AppColors.accentError)
-                } else if parsedNode != nil {
+                } else if parsedNode != nil || parsedUseDocument != nil {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
                         Text("Valid")
@@ -201,6 +223,23 @@ struct GenerativeUITestView: View {
                     .padding()
                 }
                 .background(AppColors.accentError.opacity(0.1))
+            }
+
+            // USE validation warnings (advisory)
+            if !useWarnings.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Divider()
+                    HStack(alignment: .top) {
+                        Image(systemName: "exclamationmark.circle")
+                            .foregroundColor(AppColors.signalCopper)
+                        Text(useWarnings.joined(separator: "\n"))
+                            .font(AppTypography.bodySmall())
+                            .foregroundColor(AppColors.textSecondary)
+                            .textSelection(.enabled)
+                    }
+                    .padding()
+                }
+                .background(AppColors.signalCopper.opacity(0.1))
             }
         }
         .frame(minWidth: 300, idealWidth: 400)
@@ -242,12 +281,15 @@ struct GenerativeUITestView: View {
                             .foregroundColor(AppColors.textTertiary)
                     }
 
-                    Button(action: enterEditMode) {
-                        Label("Edit", systemImage: "pencil")
-                            .font(AppTypography.labelMedium())
+                    // Visual edit mode only supports the legacy node tree
+                    if sandboxFormat == .legacy {
+                        Button(action: enterEditMode) {
+                            Label("Edit", systemImage: "pencil")
+                                .font(AppTypography.labelMedium())
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(parsedNode == nil)
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(parsedNode == nil)
                 }
             }
             .padding()
@@ -257,7 +299,25 @@ struct GenerativeUITestView: View {
 
             // Preview area
             ScrollView {
-                if let node = parsedNode {
+                if sandboxFormat == .use, let document = parsedUseDocument {
+                    VStack {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(AppColors.substratePrimary)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(AppColors.dividerStrong, lineWidth: 1)
+                                )
+
+                            UseViewRendererView(document: document)
+                                .padding()
+                        }
+                        .frame(width: 320, height: 568)
+                        .shadow(color: AppColors.shadow, radius: 10, x: 0, y: 5)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding()
+                } else if let node = parsedNode {
                     VStack {
                         // Device frame
                         ZStack {
@@ -472,19 +532,35 @@ struct GenerativeUITestView: View {
     // MARK: - JSON Loading & Parsing
 
     private func loadDefaultJSON() {
-        // Try to load from bundle first
-        if let url = Bundle.main.url(forResource: "default_layout", withExtension: "json", subdirectory: "GenerativeUI"),
-           let data = try? Data(contentsOf: url),
-           let json = String(data: data, encoding: .utf8) {
-            jsonText = json
-        } else {
-            // Fallback to inline default
-            jsonText = Self.fallbackJSON
+        switch sandboxFormat {
+        case .legacy:
+            // Try to load from bundle first
+            if let url = Bundle.main.url(forResource: "default_layout", withExtension: "json", subdirectory: "GenerativeUI"),
+               let data = try? Data(contentsOf: url),
+               let json = String(data: data, encoding: .utf8) {
+                jsonText = json
+            } else {
+                // Fallback to inline default
+                jsonText = Self.fallbackJSON
+            }
+        case .use:
+            jsonText = Self.useSampleJSON
         }
         parseJSON(jsonText)
     }
 
     private func parseJSON(_ json: String) {
+        switch sandboxFormat {
+        case .legacy:
+            parseLegacyJSON(json)
+        case .use:
+            parseUseJSON(json)
+        }
+    }
+
+    private func parseLegacyJSON(_ json: String) {
+        parsedUseDocument = nil
+        useWarnings = []
         do {
             guard let data = json.data(using: .utf8) else {
                 parseError = "Invalid UTF-8 encoding"
@@ -501,6 +577,27 @@ struct GenerativeUITestView: View {
         } catch {
             parseError = error.localizedDescription
             parsedNode = nil
+        }
+    }
+
+    private func parseUseJSON(_ json: String) {
+        parsedNode = nil
+        guard let data = json.data(using: .utf8),
+              let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            parseError = "Not a valid JSON object"
+            parsedUseDocument = nil
+            useWarnings = []
+            return
+        }
+
+        let validation = UseViewValidator.validate(dict)
+        useWarnings = validation.warnings
+        if validation.isValid {
+            parsedUseDocument = USEDocument.from(dict)
+            parseError = nil
+        } else {
+            parsedUseDocument = nil
+            parseError = validation.errors.joined(separator: "\n")
         }
     }
 
@@ -682,6 +779,49 @@ struct GenerativeUITestView: View {
     }
 
     // MARK: - Fallback JSON
+
+    static let useSampleJSON = """
+    {
+      "component": "vstack",
+      "props": {
+        "spacing": 16,
+        "padding": 20
+      },
+      "children": [
+        {
+          "component": "text",
+          "props": {
+            "content": "Hello, USE!",
+            "font": "title"
+          }
+        },
+        {
+          "component": "text",
+          "props": {
+            "content": "This view is rendered by USEBridge from JSON."
+          }
+        },
+        {
+          "component": "toggle",
+          "props": {
+            "label": "Show details",
+            "stateKey": "showDetails"
+          }
+        },
+        {
+          "component": "button",
+          "props": {
+            "label": "Tap me",
+            "action": {
+              "type": "incrementState",
+              "key": "count",
+              "by": 1
+            }
+          }
+        }
+      ]
+    }
+    """
 
     static let fallbackJSON = """
 {

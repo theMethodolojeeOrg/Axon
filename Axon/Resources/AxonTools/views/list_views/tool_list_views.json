@@ -1,0 +1,44 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "list_views",
+    "name": "List Views",
+    "description": "List stored generative views (name, id, format, last updated).",
+    "category": "views",
+    "icon": { "sfSymbol": "list.bullet.rectangle" },
+    "requiresApproval": false,
+    "tags": ["views", "generative_ui", "list", "use"]
+  },
+  "parameters": {
+    "format": {
+      "type": "string",
+      "required": false,
+      "description": "Filter by format: 'use', 'legacy', or 'all' (default)"
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "generative_view"
+  },
+  "ai": {
+    "systemPromptSection": "### list_views\nList stored generative views with their ids.\n\n**Format:**\n```tool_request\n{\"tool\":\"list_views\",\"query\":\"{}\"}\n```",
+    "usageExamples": [
+      { "description": "All views", "input": "{}" },
+      { "description": "Only USE views", "input": "{\"format\":\"use\"}" }
+    ],
+    "whenToUse": [
+      "Need a view's id for get_view, update_view, or delete_view",
+      "User asks what views exist"
+    ],
+    "whenNotToUse": [
+      "The id is already known from an earlier result"
+    ]
+  },
+  "sovereignty": {
+    "actionCategory": "content_read",
+    "approvalDescription": "List generative views",
+    "scopes": ["views.read"],
+    "riskLevel": "low"
+  }
+}

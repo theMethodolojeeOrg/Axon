@@ -1,0 +1,57 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "create_view",
+    "name": "Create View",
+    "description": "Create a new generative view from a USE JSON document. The view becomes visible in Create > Views and renders as real SwiftUI.",
+    "category": "views",
+    "icon": { "sfSymbol": "plus.rectangle.on.rectangle" },
+    "requiresApproval": false,
+    "tags": ["views", "generative_ui", "create", "use"]
+  },
+  "parameters": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Display name for the view",
+      "minLength": 1
+    },
+    "document": {
+      "type": "object",
+      "required": true,
+      "description": "USE spec root node: {\"component\": \"vstack\", \"props\": {...}, \"children\": [...]}"
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "generative_view"
+  },
+  "ai": {
+    "systemPromptSection": "### create_view\nCreate a generative view from a USE JSON document. Call get_view_catalog first to learn valid components and actions.\n\n**Format:**\n```tool_request\n{\"tool\":\"create_view\",\"query\":\"{\\\"name\\\":\\\"Counter\\\",\\\"document\\\":{\\\"component\\\":\\\"vstack\\\",\\\"props\\\":{\\\"spacing\\\":16},\\\"children\\\":[{\\\"component\\\":\\\"text\\\",\\\"props\\\":{\\\"content\\\":\\\"Hello\\\"}}]}}\"}\n```\n\nThe document is validated before saving; on failure you get actionable errors. Interactive state uses 'stateKey' props and actions like setState/toggleState/incrementState.",
+    "usageExamples": [
+      {
+        "description": "Simple greeting card",
+        "input": "{\"name\":\"Greeting\",\"document\":{\"component\":\"vstack\",\"props\":{\"spacing\":12,\"padding\":16},\"children\":[{\"component\":\"text\",\"props\":{\"content\":\"Hello!\",\"font\":\"title\"}}]}}"
+      },
+      {
+        "description": "Interactive counter",
+        "input": "{\"name\":\"Counter\",\"document\":{\"component\":\"vstack\",\"props\":{\"spacing\":16},\"children\":[{\"component\":\"text\",\"props\":{\"content\":\"Tap to count\"}},{\"component\":\"button\",\"props\":{\"label\":\"Increment\",\"action\":{\"type\":\"incrementState\",\"key\":\"count\",\"by\":1}}}]}}"
+      }
+    ],
+    "whenToUse": [
+      "User asks for a new in-app view, widget, dashboard, form, or mini-app",
+      "Building UI the user can open later from Create > Views"
+    ],
+    "whenNotToUse": [
+      "Editing an existing view (use update_view)",
+      "Producing code artifacts or files (use artifact tools)"
+    ]
+  },
+  "sovereignty": {
+    "actionCategory": "content_create",
+    "approvalDescription": "Create generative view: {{name}}",
+    "scopes": ["views.write"],
+    "riskLevel": "low"
+  }
+}

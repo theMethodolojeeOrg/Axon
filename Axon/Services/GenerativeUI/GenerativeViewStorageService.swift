@@ -133,7 +133,9 @@ final class GenerativeViewStorageService: ObservableObject {
                     name: definition.name,
                     createdAt: definition.createdAt,
                     updatedAt: definition.updatedAt,
+                    format: definition.format,
                     root: definition.root,
+                    useDocument: definition.useDocument,
                     source: .bundle,
                     thumbnailBase64: definition.thumbnailBase64
                 )
@@ -227,6 +229,13 @@ final class GenerativeViewStorageService: ObservableObject {
         return view
     }
 
+    /// Create and save a new USE-format view
+    func createUseView(name: String, document: USEDocument) throws -> GenerativeViewDefinition {
+        let view = GenerativeViewDefinition.newUseView(name: name, document: document)
+        try saveUserView(view)
+        return view
+    }
+
     /// Duplicate a view (creates a user copy)
     func duplicateView(_ view: GenerativeViewDefinition) throws -> GenerativeViewDefinition {
         var newView = GenerativeViewDefinition(
@@ -234,7 +243,9 @@ final class GenerativeViewStorageService: ObservableObject {
             name: "\(view.name) Copy",
             createdAt: Date(),
             updatedAt: Date(),
+            format: view.format,
             root: view.root,
+            useDocument: view.useDocument,
             source: .userCreated,
             thumbnailBase64: view.thumbnailBase64
         )
@@ -274,8 +285,18 @@ final class GenerativeViewStorageService: ObservableObject {
     /// Generate a thumbnail for a view (call from main actor)
     @MainActor
     func generateThumbnail(for view: GenerativeViewDefinition) -> Data? {
+        let content: AnyView
+        switch view.format {
+        case .legacy:
+            guard let root = view.root else { return nil }
+            content = AnyView(GenerativeUIRenderer.render(root))
+        case .useV1:
+            guard let document = view.useDocument else { return nil }
+            content = AnyView(UseViewRendererView(document: document))
+        }
+
         let renderer = ImageRenderer(content:
-            GenerativeUIRenderer.render(view.root)
+            content
                 .frame(width: 200, height: 150)
                 .background(AppColors.substratePrimary)
                 .clipShape(RoundedRectangle(cornerRadius: 8))

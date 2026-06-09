@@ -63,6 +63,7 @@ enum ToolCategoryV2: String, Codable, CaseIterable, Equatable {
     case vscode
     case provider
     case port
+    case views
     case custom
 
     var displayName: String {
@@ -79,6 +80,7 @@ enum ToolCategoryV2: String, Codable, CaseIterable, Equatable {
         case .vscode: return "VS Code"
         case .provider: return "Provider"
         case .port: return "External App"
+        case .views: return "Views"
         case .custom: return "Custom"
         }
     }
@@ -97,6 +99,7 @@ enum ToolCategoryV2: String, Codable, CaseIterable, Equatable {
         case .vscode: return "chevron.left.forwardslash.chevron.right"
         case .provider: return "cloud.fill"
         case .port: return "app.connected.to.app.below.fill"
+        case .views: return "rectangle.3.group"
         case .custom: return "star.fill"
         }
     }

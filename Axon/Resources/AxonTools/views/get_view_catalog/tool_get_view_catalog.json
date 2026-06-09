@@ -1,0 +1,44 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "get_view_catalog",
+    "name": "Get View Catalog",
+    "description": "Get the catalog of USE components, props, and actions available for building generative views.",
+    "category": "views",
+    "icon": { "sfSymbol": "books.vertical" },
+    "requiresApproval": false,
+    "tags": ["views", "generative_ui", "catalog", "use"]
+  },
+  "parameters": {
+    "filter": {
+      "type": "string",
+      "required": false,
+      "description": "Optional substring to filter component names (e.g. 'stack')"
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "generative_view"
+  },
+  "ai": {
+    "systemPromptSection": "### get_view_catalog\nGet the reference of valid USE components, props, and actions before authoring a view document.\n\n**Format:**\n```tool_request\n{\"tool\":\"get_view_catalog\",\"query\":\"{}\"}\n```\n\n**Returns:** Compact JSON listing every component type (with props and whether it accepts children/actions), all action types, and the spec shape.",
+    "usageExamples": [
+      { "description": "Full catalog", "input": "{}" },
+      { "description": "Only stack components", "input": "{\"filter\":\"stack\"}" }
+    ],
+    "whenToUse": [
+      "Before calling create_view or update_view for the first time in a conversation",
+      "When unsure whether a component type or prop exists"
+    ],
+    "whenNotToUse": [
+      "The catalog was already fetched earlier in this conversation"
+    ]
+  },
+  "sovereignty": {
+    "actionCategory": "system_query",
+    "approvalDescription": "Read the generative view component catalog",
+    "scopes": ["views.catalog.read"],
+    "riskLevel": "low"
+  }
+}

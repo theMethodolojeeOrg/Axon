@@ -24,12 +24,12 @@ struct GenerativeViewViewer: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         // Rendered view
-                        GenerativeUIRenderer.render(view.root)
+                        renderedContent
                             .padding()
                             .frame(maxWidth: .infinity)
 
-                        // Edit hint (dismissable)
-                        if showEditHint && view.isEditable {
+                        // Edit hint (legacy canvas only)
+                        if showEditHint && view.isEditable && view.format == .legacy {
                             editHintBanner
                                 .padding()
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -39,8 +39,10 @@ struct GenerativeViewViewer: View {
                     }
                 }
                 .onLongPressGesture(minimumDuration: 0.5) {
-                    // Long press to enter edit mode
-                    onEdit()
+                    // Long press to enter edit mode (legacy canvas only)
+                    if view.format == .legacy {
+                        onEdit()
+                    }
                 }
             }
             .navigationTitle(view.name)
@@ -56,13 +58,15 @@ struct GenerativeViewViewer: View {
 
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
-                        Button {
-                            onEdit()
-                        } label: {
-                            Label("Edit View", systemImage: "pencil")
+                        if view.format == .legacy {
+                            Button {
+                                onEdit()
+                            } label: {
+                                Label("Edit View", systemImage: "pencil")
+                            }
                         }
 
-                        if view.source == .bundle {
+                        if view.source == .bundle && view.format == .legacy {
                             Button {
                                 // Duplicate to edit
                                 onEdit()
@@ -87,6 +91,22 @@ struct GenerativeViewViewer: View {
         #if os(macOS)
         .frame(minWidth: 400, idealWidth: 600, minHeight: 400, idealHeight: 600)
         #endif
+    }
+
+    // MARK: - Rendered Content
+
+    @ViewBuilder
+    private var renderedContent: some View {
+        switch view.format {
+        case .legacy:
+            if let root = view.root {
+                GenerativeUIRenderer.render(root)
+            }
+        case .useV1:
+            if let document = view.useDocument {
+                UseViewRendererView(document: document)
+            }
+        }
     }
 
     // MARK: - Edit Hint Banner
@@ -138,8 +158,15 @@ struct GenerativeViewViewer: View {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
 
-        guard let data = try? encoder.encode(view.root),
-              let json = String(data: data, encoding: .utf8) else { return }
+        let data: Data?
+        switch view.format {
+        case .legacy:
+            data = view.root.flatMap { try? encoder.encode($0) }
+        case .useV1:
+            data = view.useDocument.flatMap { try? encoder.encode($0.spec) }
+        }
+
+        guard let data, let json = String(data: data, encoding: .utf8) else { return }
 
         #if os(iOS)
         let activityVC = UIActivityViewController(
