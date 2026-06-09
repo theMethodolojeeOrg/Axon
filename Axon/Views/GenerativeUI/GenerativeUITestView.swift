@@ -26,6 +26,7 @@ struct GenerativeUITestView: View {
     @State private var sandboxFormat: SandboxFormat = .legacy
     @State private var parsedUseDocument: USEDocument?
     @State private var useWarnings: [String] = []
+    @State private var useRuntimeError: String?
 
     // Visual edit mode state
     @State private var isEditMode = false
@@ -309,11 +310,26 @@ struct GenerativeUITestView: View {
                                         .stroke(AppColors.dividerStrong, lineWidth: 1)
                                 )
 
-                            UseViewRendererView(document: document)
-                                .padding()
+                            UseViewRendererView(document: document, onError: { error in
+                                useRuntimeError = error
+                            })
+                            .padding()
                         }
                         .frame(width: 320, height: 568)
                         .shadow(color: AppColors.shadow, radius: 10, x: 0, y: 5)
+
+                        if let runtimeError = useRuntimeError {
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "bolt.trianglebadge.exclamationmark")
+                                    .foregroundColor(AppColors.accentError)
+                                Text(runtimeError)
+                                    .font(AppTypography.bodySmall())
+                                    .foregroundColor(AppColors.accentError)
+                                    .textSelection(.enabled)
+                            }
+                            .padding(10)
+                            .background(AppColors.accentError.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                        }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding()
@@ -582,6 +598,7 @@ struct GenerativeUITestView: View {
 
     private func parseUseJSON(_ json: String) {
         parsedNode = nil
+        useRuntimeError = nil
         guard let data = json.data(using: .utf8),
               let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
             parseError = "Not a valid JSON object"
@@ -782,44 +799,67 @@ struct GenerativeUITestView: View {
 
     static let useSampleJSON = """
     {
-      "component": "vstack",
-      "props": {
-        "spacing": 16,
-        "padding": 20
-      },
-      "children": [
+      "operations": [
+        { "op": "set", "key": "status", "value": "Function not yet called" },
         {
-          "component": "text",
-          "props": {
-            "content": "Hello, USE!",
-            "font": "title"
-          }
-        },
-        {
-          "component": "text",
-          "props": {
-            "content": "This view is rendered by USEBridge from JSON."
-          }
-        },
-        {
-          "component": "toggle",
-          "props": {
-            "label": "Show details",
-            "stateKey": "showDetails"
-          }
-        },
-        {
-          "component": "button",
-          "props": {
-            "label": "Tap me",
-            "action": {
-              "type": "incrementState",
-              "key": "count",
-              "by": 1
-            }
-          }
+          "op": "define",
+          "name": "celebrate",
+          "body": [
+            { "op": "log", "message": "celebrate() ran on the persistent executor" }
+          ]
         }
-      ]
+      ],
+      "root": {
+        "component": "vstack",
+        "props": {
+          "spacing": 16,
+          "padding": 20
+        },
+        "children": [
+          {
+            "component": "text",
+            "props": {
+              "content": "USE Phase 7 Sandbox",
+              "font": "title"
+            }
+          },
+          {
+            "component": "text",
+            "props": {
+              "content": "Operations ran once at load; the button calls a defined function and updates state."
+            }
+          },
+          {
+            "component": "button",
+            "props": {
+              "label": "Call celebrate()",
+              "action": {
+                "type": "sequence",
+                "actions": [
+                  { "type": "call", "name": "celebrate" },
+                  { "type": "setState", "key": "tapped", "value": "celebrate() was called!" },
+                  { "type": "incrementState", "key": "count", "by": 1 }
+                ]
+              }
+            }
+          },
+          {
+            "component": "foreach",
+            "props": {
+              "items": ["Define once", "Call from buttons", "Wire graphs"]
+            },
+            "children": [
+              {
+                "component": "label",
+                "props": {
+                  "title": "$item",
+                  "systemImage": "checkmark.circle"
+                }
+              }
+            ]
+          }
+        ]
+      }
     }
     """
 

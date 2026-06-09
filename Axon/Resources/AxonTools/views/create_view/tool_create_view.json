@@ -19,7 +19,7 @@
     "document": {
       "type": "object",
       "required": true,
-      "description": "USE spec root node: {\"component\": \"vstack\", \"props\": {...}, \"children\": [...]}"
+      "description": "USE document. Either a bare root spec {\"component\": \"vstack\", \"props\": {...}, \"children\": [...]} or, for views with logic, {\"operations\": [<executor ops run once at load>], \"root\": {<spec>}}"
     }
   },
   "inputFormat": { "style": "json" },
@@ -28,15 +28,23 @@
     "handler": "generative_view"
   },
   "ai": {
-    "systemPromptSection": "### create_view\nCreate a generative view from a USE JSON document. Call get_view_catalog first to learn valid components and actions.\n\n**Format:**\n```tool_request\n{\"tool\":\"create_view\",\"query\":\"{\\\"name\\\":\\\"Counter\\\",\\\"document\\\":{\\\"component\\\":\\\"vstack\\\",\\\"props\\\":{\\\"spacing\\\":16},\\\"children\\\":[{\\\"component\\\":\\\"text\\\",\\\"props\\\":{\\\"content\\\":\\\"Hello\\\"}}]}}\"}\n```\n\nThe document is validated before saving; on failure you get actionable errors. Interactive state uses 'stateKey' props and actions like setState/toggleState/incrementState.",
+    "systemPromptSection": "### create_view\nCreate a generative view from a USE JSON document. Call get_view_catalog first to learn valid components, modifiers, actions, and operations.\n\n**Two document shapes:**\n1. Bare root spec: `{\"component\":\"vstack\",\"props\":{...},\"children\":[...]}`\n2. With logic: `{\"operations\":[<executor ops>],\"root\":{<spec>}}` — operations run ONCE at view load (define functions, seed state with set); buttons then trigger them with `{\"type\":\"call\",\"name\":...}` actions.\n\n**Format:**\n```tool_request\n{\"tool\":\"create_view\",\"query\":\"{\\\"name\\\":\\\"Counter\\\",\\\"document\\\":{\\\"component\\\":\\\"vstack\\\",\\\"props\\\":{\\\"spacing\\\":16},\\\"children\\\":[{\\\"component\\\":\\\"text\\\",\\\"props\\\":{\\\"content\\\":\\\"Hello\\\"}}]}}\"}\n```\n\nKey patterns: ForEach repeats its FIRST child as a template (items = inline array or '$stateKey'; use $item / $index / $item.path inside). For sheets/alerts use the sheet/alert MODIFIER props with an isPresented state key toggled by a button — NOT the sheet/alert actions. The document is validated before saving; on failure you get actionable errors.",
     "usageExamples": [
-      {
-        "description": "Simple greeting card",
-        "input": "{\"name\":\"Greeting\",\"document\":{\"component\":\"vstack\",\"props\":{\"spacing\":12,\"padding\":16},\"children\":[{\"component\":\"text\",\"props\":{\"content\":\"Hello!\",\"font\":\"title\"}}]}}"
-      },
       {
         "description": "Interactive counter",
         "input": "{\"name\":\"Counter\",\"document\":{\"component\":\"vstack\",\"props\":{\"spacing\":16},\"children\":[{\"component\":\"text\",\"props\":{\"content\":\"Tap to count\"}},{\"component\":\"button\",\"props\":{\"label\":\"Increment\",\"action\":{\"type\":\"incrementState\",\"key\":\"count\",\"by\":1}}}]}}"
+      },
+      {
+        "description": "View with operations (define + call)",
+        "input": "{\"name\":\"Greeter\",\"document\":{\"operations\":[{\"op\":\"set\",\"key\":\"greeting\",\"value\":\"ready\"},{\"op\":\"define\",\"name\":\"greet\",\"body\":[{\"op\":\"log\",\"message\":\"greeted\"}]}],\"root\":{\"component\":\"vstack\",\"props\":{\"spacing\":12},\"children\":[{\"component\":\"button\",\"props\":{\"label\":\"Greet\",\"action\":{\"type\":\"call\",\"name\":\"greet\"}}}]}}}"
+      },
+      {
+        "description": "List via ForEach template",
+        "input": "{\"name\":\"Fruits\",\"document\":{\"component\":\"list\",\"children\":[{\"component\":\"foreach\",\"props\":{\"items\":[\"Apple\",\"Banana\",\"Cherry\"]},\"children\":[{\"component\":\"text\",\"props\":{\"content\":\"$item\"}}]}]}}"
+      },
+      {
+        "description": "Sheet via modifier (preferred over sheet action)",
+        "input": "{\"name\":\"Details\",\"document\":{\"component\":\"vstack\",\"props\":{\"sheet\":{\"isPresented\":\"showSheet\",\"content\":{\"component\":\"text\",\"props\":{\"content\":\"Details here\"}}}},\"children\":[{\"component\":\"button\",\"props\":{\"label\":\"Show\",\"action\":{\"type\":\"toggleState\",\"key\":\"showSheet\"}}}]}}"
       }
     ],
     "whenToUse": [

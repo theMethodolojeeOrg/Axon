@@ -145,7 +145,7 @@ struct GenerativeViewDefinition: Codable, Identifiable, Equatable, Sendable {
         case .legacy:
             return root.map(countNodes) ?? 0
         case .useV1:
-            return useDocument.map { countUseNodes($0.asDictionary()) } ?? 0
+            return useDocument.map { countUseNodes($0.rootSpec) } ?? 0
         }
     }
 

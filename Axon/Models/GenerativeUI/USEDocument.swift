@@ -9,7 +9,11 @@
 
 import Foundation
 
-/// A USE view document: the root spec node stored as type-erased JSON.
+/// A USE view document. Two stored shapes are supported:
+/// - bare root spec: {"component": ..., "props": ..., "children": ...}
+/// - wrapped: {"operations": [executor ops], "root": {spec}} — operations
+///   run once per view instance against a persistent USEExecutor before
+///   the root renders (Phase 7 function abstraction).
 struct USEDocument: Codable, Equatable, Sendable {
     var spec: [String: AnyCodable]
 
@@ -22,9 +26,33 @@ struct USEDocument: Codable, Equatable, Sendable {
         USEDocument(spec: dict.mapValues(wrap))
     }
 
-    /// Unwrap to the raw dictionary form consumed by USEBridge.render(_:).
+    /// Unwrap to the full stored dictionary (wrapper included, if any).
     func asDictionary() -> [String: Any] {
         spec.mapValues(Self.unwrap)
+    }
+
+    // MARK: - Shape Accessors
+
+    /// The renderable root spec. A document is "wrapped" only when it has a
+    /// top-level "root" object and no top-level component identity of its own.
+    var rootSpec: [String: Any] {
+        let full = asDictionary()
+        if let root = full["root"] as? [String: Any],
+           full["component"] == nil, full["swiftType"] == nil {
+            return root
+        }
+        return full
+    }
+
+    /// Executor operations to run once at view setup (wrapped shape only).
+    var operations: [[String: Any]] {
+        let full = asDictionary()
+        guard full["component"] == nil, full["swiftType"] == nil else { return [] }
+        return full["operations"] as? [[String: Any]] ?? []
+    }
+
+    var hasOperations: Bool {
+        !operations.isEmpty
     }
 
     // MARK: - Any <-> AnyCodable Bridging

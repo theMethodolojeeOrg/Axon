@@ -67,7 +67,7 @@ final class GenerativeViewHandler: BaseToolHandlerV2 {
             return failureResult(toolId: toolId, error: "Missing required parameter: name")
         }
         guard let document = documentValue("document", from: inputs) else {
-            return failureResult(toolId: toolId, error: "Missing or malformed 'document'. Pass the USE spec as a JSON object like {\"component\": \"vstack\", \"props\": {...}, \"children\": [...]}.")
+            return failureResult(toolId: toolId, error: "Missing or malformed 'document'. Pass a USE spec object like {\"component\": \"vstack\", ...} or, for views with logic, {\"operations\": [...], \"root\": {\"component\": ...}}.")
         }
 
         let validation = UseViewValidator.validate(document)
@@ -113,11 +113,19 @@ final class GenerativeViewHandler: BaseToolHandlerV2 {
         if let document = documentValue("document", from: inputs) {
             newDocument = document
         } else if let patches = patchesValue("patches", from: inputs) {
-            guard let current = view.useDocument?.asDictionary() else {
+            guard let current = view.useDocument else {
                 return failureResult(toolId: toolId, error: "View '\(view.name)' has no stored document to patch.")
             }
             do {
-                newDocument = try UseViewPatchApplier.apply(patches, to: current)
+                // Patches address the renderable root; a wrapped document's
+                // operations array is preserved verbatim and replaceable only
+                // via a full 'document' update.
+                let patchedRoot = try UseViewPatchApplier.apply(patches, to: current.rootSpec)
+                if current.hasOperations {
+                    newDocument = ["operations": current.operations, "root": patchedRoot]
+                } else {
+                    newDocument = patchedRoot
+                }
             } catch {
                 return failureResult(toolId: toolId, error: "Patch failed: \(error.localizedDescription)")
             }
