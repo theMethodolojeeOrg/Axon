@@ -1113,8 +1113,21 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 continue
             }
 
+            // Parse via JSONSerialization + envelope normalizer rather than the
+            // Decodable init: it accepts object-valued query/input/parameters and
+            // top-level parameter fields that the strict decoder dropped or threw on.
             do {
-                let request = try JSONDecoder().decode(ToolRequest.self, from: data)
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let tool = json["tool"] as? String else {
+                    print("[ToolProxy] Tool request is not an object with a 'tool' key. JSON: \(jsonString)")
+                    continue
+                }
+
+                let request = ToolRequest(
+                    tool: tool,
+                    query: ToolRequestEnvelope.extractQuery(from: json, toolId: tool),
+                    separateContent: ToolRequestEnvelope.extractContent(from: json)
+                )
                 print("[ToolProxy] Parsed tool request: \(request.tool)")
                 requests.append(request)
             } catch {

@@ -108,8 +108,19 @@ final class ToolExecutionRouterV2: ObservableObject {
         }
         
         // 4. Validate inputs
-        let validationErrors = validateInputsV2(inputs, manifest: loadedTool.manifest)
+        var validationErrors = validateInputsV2(inputs, manifest: loadedTool.manifest)
         if !validationErrors.isEmpty {
+            // Required params missing AND nothing was parsed at all usually
+            // means the request envelope wasn't recognized upstream and the
+            // input was silently emptied — tell the model the shape to use.
+            if inputs.isEmpty {
+                validationErrors.append(
+                    "Tool received no parameters — the request envelope may not have been recognized. " +
+                    "Send parameters as a JSON object under 'query', e.g. " +
+                    "{\"tool\": \"\(toolId)\", \"query\": {\"param\": \"value\"}} " +
+                    "(query may be a JSON object or a JSON-encoded string)."
+                )
+            }
             let error = ToolExecutionErrorV2.validationFailed(validationErrors)
             lastError = error
             throw error

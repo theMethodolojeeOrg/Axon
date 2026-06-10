@@ -397,59 +397,17 @@ final class ToolRoutingService: ObservableObject {
         }
     }
 
-    /// Extract query value with V1-compatible fallbacks
-    /// Supports: query, memory, content, input, data, path keys
-    /// Also handles nested {"tool": "x", "parameters": {"query": "..."}} format
+    /// Extract query value with V1-compatible fallbacks.
+    /// Delegates to ToolRequestEnvelope, which also accepts object-valued
+    /// query/input/parameters payloads and top-level parameter fields
+    /// (this generalizes the old reflect_on_conversation special case).
     private func extractQuery(from json: [String: Any], toolId: String) -> String {
-        // Check for nested parameters object first (common AI format)
-        if let params = json["parameters"] as? [String: Any] {
-            if let q = params["query"] as? String { return q }
-            if let q = params["path"] as? String { return q }
-            if let q = params["input"] as? String { return q }
-        }
-
-        // Flat format: try multiple possible key names (matching V1's ToolRequest decoder)
-        if let q = json["query"] as? String { return q }
-        if let q = json["memory"] as? String { return q }
-        if let q = json["path"] as? String { return q }
-        if let q = json["input"] as? String { return q }
-        if let q = json["data"] as? String { return q }
-
-        // Special case: reflect_on_conversation sends options as top-level fields
-        // Reconstruct them as JSON query (matching V1 behavior)
-        if toolId == "reflect_on_conversation" {
-            var optionsDict: [String: Any] = [:]
-            for (key, value) in json where key != "tool" {
-                optionsDict[key] = value
-            }
-            if !optionsDict.isEmpty,
-               let jsonData = try? JSONSerialization.data(withJSONObject: optionsDict, options: []),
-               let jsonString = String(data: jsonData, encoding: .utf8) {
-                return jsonString
-            }
-        }
-
-        // For content-only requests, use content as query if no query field
-        if let c = json["content"] as? String { return c }
-
-        // Default to empty string for tools that don't require parameters
-        return ""
+        ToolRequestEnvelope.extractQuery(from: json, toolId: toolId)
     }
 
     /// Extract separate content field if present (for write operations)
     private func extractContent(from json: [String: Any]) -> String? {
-        // Check nested parameters first
-        if let params = json["parameters"] as? [String: Any],
-           let content = params["content"] as? String {
-            return content
-        }
-
-        // Check flat format - only return content if query also exists (to distinguish from content-as-query)
-        if json["query"] != nil || json["path"] != nil || json["input"] != nil {
-            return json["content"] as? String
-        }
-
-        return nil
+        ToolRequestEnvelope.extractContent(from: json)
     }
 }
 
