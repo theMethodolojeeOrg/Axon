@@ -24,7 +24,7 @@ struct AdvancedSection: View {
                 .buttonStyle(.bordered)
                 .tint(AppColors.accentError)
 
-                Text("This will restore the bundled model catalog that shipped with the app.")
+                Text("This reloads the current AxonProviderKit model catalog snapshot.")
                     .font(AppTypography.labelSmall())
                     .foregroundColor(AppColors.textTertiary)
             }
@@ -35,7 +35,7 @@ struct AdvancedSection: View {
                 onReset()
             }
         } message: {
-            Text("This will replace your current model configuration with the bundled defaults. Your current configuration will be backed up.")
+            Text("This will reload the ProviderKit catalog used for built-in providers. Custom providers are not changed.")
         }
     }
 }

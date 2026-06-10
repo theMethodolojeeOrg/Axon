@@ -169,6 +169,28 @@ struct MLXModelConfig: Codable, Identifiable, Equatable, Sendable {
     let downloadURL: String?
     let huggingFaceRepoId: String
 
+    init(
+        id: String,
+        displayName: String,
+        contextWindow: Int,
+        modalities: [String],
+        description: String,
+        sizeBytes: Int64?,
+        isBuiltIn: Bool,
+        downloadURL: String?,
+        huggingFaceRepoId: String
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.contextWindow = contextWindow
+        self.modalities = modalities
+        self.description = description
+        self.sizeBytes = sizeBytes
+        self.isBuiltIn = isBuiltIn
+        self.downloadURL = downloadURL
+        self.huggingFaceRepoId = huggingFaceRepoId
+    }
+
     /// Convert to AIModel for backward compatibility
     func toAIModel() -> AIModel {
         AIModel(
@@ -230,6 +252,22 @@ struct FoundationModelConfig: Codable, Identifiable, Equatable, Sendable {
     let modalities: [String]
     let description: String
     let status: String?
+
+    init(
+        id: String,
+        displayName: String,
+        contextWindow: Int,
+        modalities: [String],
+        description: String,
+        status: String?
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.contextWindow = contextWindow
+        self.modalities = modalities
+        self.description = description
+        self.status = status
+    }
 
     /// Convert to AIModel for backward compatibility
     func toAIModel() -> AIModel {
@@ -314,20 +352,21 @@ final class UnifiedModelRegistry: ObservableObject {
 
         validationWarnings.removeAll()
 
-        loadChatProviders()
+        let providerKitCatalog = ProviderKitModelCatalogAdapter.catalogSnapshot()
+        chatProviders = providerKitCatalog.providers.filter { provider in
+            provider.id != AIProvider.localMLX.rawValue && provider.id != AIProvider.appleFoundation.rawValue
+        }
+        mlxProvider = nil
+        foundationProvider = nil
         loadTTSProviders()
-        loadMLXProvider()
-        loadFoundationProvider()
         validateEnumSync()
 
         isLoaded = true
 
-        let totalModels = chatProviders.flatMap(\.models).count
-            + (mlxProvider?.models.count ?? 0)
-            + (foundationProvider?.models.count ?? 0)
+        let totalModels = providerKitCatalog.providers.flatMap(\.models).count
         let totalVoices = ttsProviders.flatMap(\.voices).count
 
-        logger.info("Unified model registry loaded: \(self.chatProviders.count) chat providers, \(totalModels) models, \(self.ttsProviders.count) TTS providers, \(totalVoices) voices")
+        logger.info("Unified model registry loaded from ProviderKit: \(self.chatProviders.count) chat providers, \(totalModels) models, \(self.ttsProviders.count) TTS providers, \(totalVoices) voices")
 
         if !validationWarnings.isEmpty {
             logger.warning("Registry has \(self.validationWarnings.count) validation warnings")
@@ -436,68 +475,39 @@ final class UnifiedModelRegistry: ObservableObject {
 
     /// Get all chat models for a specific provider
     func chatModels(for provider: AIProvider) -> [AIModel] {
-        guard let providerConfig = chatProviders.first(where: { $0.id == provider.rawValue }) else {
-            return []
-        }
-        return providerConfig.models.map { $0.toAIModel(provider: provider) }
+        ProviderKitModelCatalogAdapter.chatModels(for: provider)
     }
 
     /// Get all chat models across all providers
     func allChatModels() -> [AIModel] {
-        chatProviders.flatMap { providerConfig -> [AIModel] in
-            guard let provider = providerConfig.aiProvider else { return [] }
-            return providerConfig.models.map { $0.toAIModel(provider: provider) }
-        }
+        ProviderKitModelCatalogAdapter.allChatModels()
     }
 
     /// Get chat models filtered by category
     func chatModels(category: ModelCategory) -> [AIModel] {
-        chatProviders.flatMap { providerConfig -> [AIModel] in
-            guard let provider = providerConfig.aiProvider else { return [] }
-            return providerConfig.models
-                .filter { $0.category == category }
-                .map { $0.toAIModel(provider: provider) }
+        ProviderKitModelCatalogAdapter.allChatModels().filter { model in
+            ProviderKitModelCatalogAdapter.modelConfig(for: model.id)?.category == category
         }
     }
 
     /// Get models that support live/real-time audio for a specific provider
     func liveAudioModels(for provider: AIProvider) -> [AIModel] {
-        guard let providerConfig = chatProviders.first(where: { $0.id == provider.rawValue }) else {
-            return []
-        }
-        return providerConfig.models
-            .filter { $0.supportsLiveAudio == true }
-            .map { $0.toAIModel(provider: provider) }
+        ProviderKitModelCatalogAdapter.liveAudioModels(for: provider)
     }
 
     /// Get all models that support live/real-time audio across all providers
     func allLiveAudioModels() -> [AIModel] {
-        chatProviders.flatMap { providerConfig -> [AIModel] in
-            guard let provider = providerConfig.aiProvider else { return [] }
-            return providerConfig.models
-                .filter { $0.supportsLiveAudio == true }
-                .map { $0.toAIModel(provider: provider) }
-        }
+        ProviderKitModelCatalogAdapter.allLiveAudioModels()
     }
 
     /// Get pricing for a chat model by ID
     func pricing(for modelId: String) -> ModelPricing? {
-        for provider in chatProviders {
-            if let model = provider.models.first(where: { $0.id == modelId }) {
-                return model.pricing.toModelPricing()
-            }
-        }
-        return nil
+        ProviderKitModelCatalogAdapter.pricing(for: modelId)
     }
 
     /// Get model configuration by ID
     func modelConfig(for modelId: String) -> ModelConfig? {
-        for provider in chatProviders {
-            if let model = provider.models.first(where: { $0.id == modelId }) {
-                return model
-            }
-        }
-        return nil
+        ProviderKitModelCatalogAdapter.modelConfig(for: modelId)
     }
 
     // MARK: - TTS Voice Queries
@@ -561,7 +571,19 @@ final class UnifiedModelRegistry: ObservableObject {
 
     /// Get all MLX models
     func mlxModels() -> [MLXModelConfig] {
-        mlxProvider?.models ?? []
+        ProviderKitModelCatalogAdapter.models(for: .localMLX).map { model in
+            MLXModelConfig(
+                id: model.id,
+                displayName: model.name,
+                contextWindow: model.contextWindow,
+                modalities: model.modalities,
+                description: model.description,
+                sizeBytes: nil,
+                isBuiltIn: LocalMLXModel(rawValue: model.id)?.isBundled ?? false,
+                downloadURL: nil,
+                huggingFaceRepoId: model.id
+            )
+        }
     }
 
     /// Get MLX models as AIModel for backward compatibility
@@ -588,7 +610,16 @@ final class UnifiedModelRegistry: ObservableObject {
 
     /// Get all Foundation models
     func foundationModels() -> [FoundationModelConfig] {
-        foundationProvider?.models ?? []
+        ProviderKitModelCatalogAdapter.models(for: .appleFoundation).map { model in
+            FoundationModelConfig(
+                id: model.id,
+                displayName: model.name,
+                contextWindow: model.contextWindow,
+                modalities: model.modalities,
+                description: model.description,
+                status: nil
+            )
+        }
     }
 
     /// Get Foundation models as AIModel for backward compatibility
@@ -619,41 +650,12 @@ final class UnifiedModelRegistry: ObservableObject {
 
     /// Find a model by ID across all categories
     func model(for modelId: String) -> AIModel? {
-        // Check chat models
-        if let model = allChatModels().first(where: { $0.id == modelId }) {
-            return model
-        }
-
-        // Check MLX models
-        if let model = mlxModelsAsAIModels().first(where: { $0.id == modelId }) {
-            return model
-        }
-
-        // Check foundation models
-        if let model = foundationModelsAsAIModels().first(where: { $0.id == modelId }) {
-            return model
-        }
-
-        return nil
+        ProviderKitModelCatalogAdapter.model(for: modelId)
     }
 
     /// Get the provider for a model ID
     func provider(for modelId: String) -> AIProvider? {
-        for provider in chatProviders {
-            if provider.models.contains(where: { $0.id == modelId }) {
-                return provider.aiProvider
-            }
-        }
-
-        if mlxModels().contains(where: { $0.id == modelId }) {
-            return .localMLX
-        }
-
-        if foundationModels().contains(where: { $0.id == modelId }) {
-            return .appleFoundation
-        }
-
-        return nil
+        ProviderKitModelCatalogAdapter.provider(for: modelId)
     }
 
     // MARK: - Model Selection by Tier
@@ -671,22 +673,7 @@ final class UnifiedModelRegistry: ObservableObject {
     /// - Parameter tier: The selection tier to query
     /// - Returns: Array of (provider, modelConfig) tuples sorted by selection priority
     func modelsForTier(_ tier: ModelTier) -> [(AIProvider, ModelConfig)] {
-        var results: [(AIProvider, ModelConfig, Int)] = []
-
-        for providerConfig in chatProviders {
-            guard let provider = providerConfig.aiProvider else { continue }
-
-            for model in providerConfig.models {
-                if model.effectiveSelectionTiers.contains(tier) {
-                    results.append((provider, model, model.effectivePriority))
-                }
-            }
-        }
-
-        // Sort by priority (lower = higher priority)
-        return results
-            .sorted { $0.2 < $1.2 }
-            .map { ($0.0, $0.1) }
+        ProviderKitModelCatalogAdapter.modelsForTier(tier)
     }
 
     /// Select the best model for a tier from configured providers
@@ -698,35 +685,7 @@ final class UnifiedModelRegistry: ObservableObject {
         for tier: ModelTier,
         isProviderConfigured: (AIProvider) -> Bool
     ) -> ModelSelectionResult? {
-        // Try the requested tier first
-        for (provider, model) in modelsForTier(tier) {
-            if isProviderConfigured(provider) {
-                return ModelSelectionResult(
-                    provider: provider,
-                    modelId: model.id,
-                    modelConfig: model,
-                    selectedTier: tier,
-                    wasExactMatch: true
-                )
-            }
-        }
-
-        // Try fallback tiers
-        for fallbackTier in tier.fallbackOrder.dropFirst() {
-            for (provider, model) in modelsForTier(fallbackTier) {
-                if isProviderConfigured(provider) {
-                    return ModelSelectionResult(
-                        provider: provider,
-                        modelId: model.id,
-                        modelConfig: model,
-                        selectedTier: fallbackTier,
-                        wasExactMatch: false
-                    )
-                }
-            }
-        }
-
-        return nil
+        ProviderKitModelCatalogAdapter.selectModel(for: tier, isProviderConfigured: isProviderConfigured)
     }
 
     /// Select the best model for a tier, preferring a specific provider if configured
@@ -740,22 +699,11 @@ final class UnifiedModelRegistry: ObservableObject {
         preferring preferredProvider: AIProvider?,
         isProviderConfigured: (AIProvider) -> Bool
     ) -> ModelSelectionResult? {
-        // If we have a preferred provider, check it first
-        if let preferred = preferredProvider, isProviderConfigured(preferred) {
-            let providerModels = modelsForTier(tier).filter { $0.0 == preferred }
-            if let (provider, model) = providerModels.first {
-                return ModelSelectionResult(
-                    provider: provider,
-                    modelId: model.id,
-                    modelConfig: model,
-                    selectedTier: tier,
-                    wasExactMatch: true
-                )
-            }
-        }
-
-        // Fall back to any configured provider
-        return selectModel(for: tier, isProviderConfigured: isProviderConfigured)
+        ProviderKitModelCatalogAdapter.selectModel(
+            for: tier,
+            preferring: preferredProvider,
+            isProviderConfigured: isProviderConfigured
+        )
     }
 
     /// Get recommended models for each tier (for UI display)
@@ -866,9 +814,9 @@ extension AIProvider {
 
         switch self {
         case .localMLX:
-            return registry.mlxModelsAsAIModels()
+            return ProviderKitModelCatalogAdapter.models(for: .localMLX)
         case .appleFoundation:
-            return registry.foundationModelsAsAIModels()
+            return ProviderKitModelCatalogAdapter.models(for: .appleFoundation)
         default:
             return registry.chatModels(for: self)
         }

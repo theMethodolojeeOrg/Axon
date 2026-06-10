@@ -16,7 +16,7 @@ struct ModelSyncHeaderSection: View {
             Image(systemName: "cpu")
                 .foregroundColor(AppColors.signalMercury)
 
-            Text("Manage AI model definitions and pricing. Optionally sync model data via Perplexity.")
+            Text("Built-in model definitions, pricing, and selection tiers are provided by AxonProviderKit.")
                 .font(AppTypography.bodySmall())
                 .foregroundColor(AppColors.textSecondary)
 

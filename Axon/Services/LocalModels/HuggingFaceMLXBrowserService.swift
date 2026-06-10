@@ -296,7 +296,7 @@ final class HuggingFaceMLXBrowserService: ObservableObject {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
 
         do {
-            return try FileManager.default.allocatedSizeOfDirectory(at: url)
+            return try FileManager.default.axonAllocatedSizeOfDirectory(at: url)
         } catch {
             return nil
         }
@@ -347,10 +347,35 @@ final class HuggingFaceMLXBrowserService: ObservableObject {
         guard FileManager.default.fileExists(atPath: mlxModelsURL.path) else { return 0 }
 
         do {
-            return try FileManager.default.allocatedSizeOfDirectory(at: mlxModelsURL)
+            return try FileManager.default.axonAllocatedSizeOfDirectory(at: mlxModelsURL)
         } catch {
             return 0
         }
+    }
+}
+
+// MARK: - File Size Helper
+
+private extension FileManager {
+    func axonAllocatedSizeOfDirectory(at url: URL) throws -> Int64 {
+        guard let enumerator = self.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
+        ) else {
+            return 0
+        }
+
+        var totalSize: Int64 = 0
+
+        for case let fileURL as URL in enumerator {
+            guard let resourceValues = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey]),
+                  let size = resourceValues.totalFileAllocatedSize ?? resourceValues.fileAllocatedSize else {
+                continue
+            }
+            totalSize += Int64(size)
+        }
+
+        return totalSize
     }
 }
 

@@ -69,10 +69,10 @@ struct ProviderSummaryRow: View {
                             Spacer()
 
                             VStack(alignment: .trailing, spacing: 2) {
-                                Text("$\(model.pricing.inputPerMillion, specifier: "%.2f")/M in")
+                                Text(pricingText(model.pricing.inputPerMillion, tier: model.pricing.tier, suffix: "in"))
                                     .font(AppTypography.labelSmall())
                                     .foregroundColor(AppColors.textTertiary)
-                                Text("$\(model.pricing.outputPerMillion, specifier: "%.2f")/M out")
+                                Text(pricingText(model.pricing.outputPerMillion, tier: model.pricing.tier, suffix: "out"))
                                     .font(AppTypography.labelSmall())
                                     .foregroundColor(AppColors.textTertiary)
                             }
@@ -99,6 +99,18 @@ struct ProviderSummaryRow: View {
         case .reasoning: return AppColors.accentWarning
         case .fast: return AppColors.accentSuccess
         case .legacy: return AppColors.textTertiary
+        case .local: return AppColors.signalLichen
+        case .foundation: return AppColors.signalCopper
         }
+    }
+
+    private func pricingText(_ value: Double, tier: PricingTier?, suffix: String) -> String {
+        if tier == .unknown {
+            return "Pricing unknown"
+        }
+        if tier == .free {
+            return "Free"
+        }
+        return "$\(String(format: "%.2f", value))/M \(suffix)"
     }
 }

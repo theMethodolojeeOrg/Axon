@@ -45,18 +45,16 @@ final class CostService: ObservableObject {
     // MARK: - Public API
 
     func recordUsage(provider: AIProvider, modelId: String, inputTokens: Int, outputTokens: Int, cachedInputTokens: Int = 0, usedContextTokens: Int? = nil, inputIsAudio: Bool = false) {
-        // First try to get pricing from UnifiedModelRegistry (JSON-based, dynamic)
-        let pricing: ModelPricing
-        if let registryPricing = UnifiedModelRegistry.shared.pricing(for: modelId) {
-            pricing = registryPricing
-        } else if let configPricing = ModelConfigurationService.shared.pricing(for: modelId) {
-            // Try ModelConfigurationService as secondary source
-            pricing = configPricing
-        } else {
-            // Fall back to static registry for backward compatibility
-            let canonical = PricingKeyResolver.canonicalKey(for: modelId) ?? PricingKeyResolver.defaultKey(for: provider)
-            pricing = PricingRegistry.price(for: canonical, usedContextTokens: usedContextTokens, inputIsAudio: inputIsAudio)
-        }
+        let pricing = ProviderKitModelCatalogAdapter.pricing(
+            for: modelId,
+            usedContextTokens: usedContextTokens,
+            inputIsAudio: inputIsAudio
+        ) ?? ModelPricing(
+            inputPerMTokUSD: 0,
+            outputPerMTokUSD: 0,
+            cachedInputPerMTokUSD: nil,
+            notes: "Pricing unknown"
+        )
 
         let inputCost = (Double(inputTokens) / 1_000_000.0) * pricing.inputPerMTokUSD
         let outputCost = (Double(outputTokens) / 1_000_000.0) * pricing.outputPerMTokUSD

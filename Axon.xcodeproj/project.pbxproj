@@ -14,6 +14,8 @@
 		E217D7B62EEDDD5C00D3DAB2 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E217D7B52EEDDD5C00D3DAB2 /* CoreLocation.framework */; };
 		E22498CA2ED5D1880053D459 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = E22498C92ED5D1880053D459 /* MarkdownUI */; };
 		E231DA642F98D51400E46904 /* DevPathKit in Frameworks */ = {isa = PBXBuildFile; productRef = E231DA632F98D51400E46904 /* DevPathKit */; };
+		E23200012FBC000100000001 /* AxonProviderKitCore in Frameworks */ = {isa = PBXBuildFile; productRef = E23200032FBC000100000001 /* AxonProviderKitCore */; };
+		E23200022FBC000100000001 /* AxonProviderKit in Frameworks */ = {isa = PBXBuildFile; productRef = E23200042FBC000100000001 /* AxonProviderKit */; };
 		E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9A2EB23493009B116D /* FirebaseAuth */; };
 		E23FFF9D2EB23493009B116D /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9C2EB23493009B116D /* FirebaseCore */; };
 		E23FFF9F2EB23493009B116D /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = E23FFF9E2EB23493009B116D /* FirebaseFirestore */; };
@@ -25,9 +27,6 @@
 		E2403B012F03725C00CC9418 /* MLXFast in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B002F03725C00CC9418 /* MLXFast */; settings = {ATTRIBUTES = (Weak, ); }; };
 		E2403B032F03725C00CC9418 /* MLXLinalg in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B022F03725C00CC9418 /* MLXLinalg */; settings = {ATTRIBUTES = (Weak, ); }; };
 		E2403B052F03725C00CC9418 /* MLXNN in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B042F03725C00CC9418 /* MLXNN */; settings = {ATTRIBUTES = (Weak, ); }; };
-		E2403B0A2F0372D100CC9418 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B092F0372D100CC9418 /* MLXLLM */; };
-		E2403B0C2F0372D100CC9418 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B0B2F0372D100CC9418 /* MLXLMCommon */; };
-		E2403B102F0372D100CC9418 /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B0F2F0372D100CC9418 /* MLXVLM */; };
 		E2403B132F03739200CC9418 /* MLXUtilsLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B122F03739200CC9418 /* MLXUtilsLibrary */; };
 		E2403B1C2F037E0E00CC9418 /* MLXRandom in Frameworks */ = {isa = PBXBuildFile; productRef = E2403B1B2F037E0E00CC9418 /* MLXRandom */; settings = {ATTRIBUTES = (Weak, ); }; };
 		E254EDD82EB222B3000CDD9D /* FirebaseAI in Frameworks */ = {isa = PBXBuildFile; productRef = E254EDD72EB222B3000CDD9D /* FirebaseAI */; };
@@ -190,7 +189,6 @@
 				E217D4312EEA494A00D3DAB2 /* CloudKit.framework in Frameworks */,
 				E2403B1C2F037E0E00CC9418 /* MLXRandom in Frameworks */,
 				E23FFF9B2EB23493009B116D /* FirebaseAuth in Frameworks */,
-				E2403B0C2F0372D100CC9418 /* MLXLMCommon in Frameworks */,
 				E28554812FD8A4E900B7614B /* USECore in Frameworks */,
 				E27FB5F12ECD5E2F003C52BF /* SodiumFoundationCompat in Frameworks */,
 				E2118D6B2F5989BE0068E2C5 /* AxonArtifacts in Frameworks */,
@@ -199,10 +197,9 @@
 				E273631C2EBD237F0031CFF7 /* FlyingSocks in Frameworks */,
 				E23FFFA32EB23493009B116D /* FirebaseMessaging in Frameworks */,
 				E2D7BD0B2F45A4E100A9FB38 /* Yams in Frameworks */,
-				E2403B0A2F0372D100CC9418 /* MLXLLM in Frameworks */,
+				E23200012FBC000100000001 /* AxonProviderKitCore in Frameworks */,
 				E217D4352EEA4BFF00D3DAB2 /* CryptoTokenKit.framework in Frameworks */,
 				E254EDE02EB222B3000CDD9D /* FirebaseAnalyticsIdentitySupport in Frameworks */,
-				E2403B102F0372D100CC9418 /* MLXVLM in Frameworks */,
 				E28554832FD8A4E900B7614B /* USEManifests in Frameworks */,
 				E2403B012F03725C00CC9418 /* MLXFast in Frameworks */,
 				E2403AFF2F03725C00CC9418 /* MLXFFT in Frameworks */,
@@ -225,6 +222,7 @@
 				E2E5FD802EFF401E00E4835C /* KokoroSwift in Frameworks */,
 				E27FB5F32ECD5E2F003C52BF /* SodiumNIOCompat in Frameworks */,
 				E2C1DD8D2F4D0EA200DD6080 /* AxonArtifacts in Frameworks */,
+				E23200022FBC000100000001 /* AxonProviderKit in Frameworks */,
 				E2403B132F03739200CC9418 /* MLXUtilsLibrary in Frameworks */,
 				E254EDDE2EB222B3000CDD9D /* FirebaseAnalyticsCore in Frameworks */,
 				E285547F2FD8A4E900B7614B /* USEAuthoringCore in Frameworks */,
@@ -344,11 +342,10 @@
 				E2403B002F03725C00CC9418 /* MLXFast */,
 				E2403B022F03725C00CC9418 /* MLXLinalg */,
 				E2403B042F03725C00CC9418 /* MLXNN */,
-				E2403B092F0372D100CC9418 /* MLXLLM */,
-				E2403B0B2F0372D100CC9418 /* MLXLMCommon */,
-				E2403B0F2F0372D100CC9418 /* MLXVLM */,
 				E2403B122F03739200CC9418 /* MLXUtilsLibrary */,
 				E2403B1B2F037E0E00CC9418 /* MLXRandom */,
+				E23200032FBC000100000001 /* AxonProviderKitCore */,
+				E23200042FBC000100000001 /* AxonProviderKit */,
 				E2D7BD0A2F45A4E100A9FB38 /* Yams */,
 				E2C1DD8C2F4D0EA200DD6080 /* AxonArtifacts */,
 				E2118D6A2F5989BE0068E2C5 /* AxonArtifacts */,
@@ -469,12 +466,12 @@
 				E21FCC002EFA24B1009EF882 /* XCRemoteSwiftPackageReference "kokoro-ios" */,
 				E2E057E82F0357F1009339D8 /* XCRemoteSwiftPackageReference "swift-huggingface" */,
 				E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */,
-				E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
 				E2403B112F03739200CC9418 /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */,
 				E2D7BD092F45A4E100A9FB38 /* XCRemoteSwiftPackageReference "Yams" */,
 				E2118D692F5989BE0068E2C5 /* XCRemoteSwiftPackageReference "Axon-Artifacts" */,
 				E231DA622F98D51400E46904 /* XCLocalSwiftPackageReference "../DevPathKit" */,
 				E285547D2FD8A4E900B7614B /* XCLocalSwiftPackageReference "../USE-Package" */,
+				E23200002FBC000100000001 /* XCLocalSwiftPackageReference "../a_MethodolojeePackages/Axon-ProviderKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E254ED972EB21B76000CDD9D /* Products */;
@@ -1037,6 +1034,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		E23200002FBC000100000001 /* XCLocalSwiftPackageReference "../a_MethodolojeePackages/Axon-ProviderKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../a_MethodolojeePackages/Axon-ProviderKit";
+		};
 		E231DA622F98D51400E46904 /* XCLocalSwiftPackageReference "../DevPathKit" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../DevPathKit;
@@ -1078,14 +1079,6 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 0.29.1;
-			};
-		};
-		E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ml-explore/mlx-swift-examples";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.29.1;
 			};
 		};
 		E2403B112F03739200CC9418 /* XCRemoteSwiftPackageReference "MLXUtilsLibrary" */ = {
@@ -1153,6 +1146,16 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = DevPathKit;
 		};
+		E23200032FBC000100000001 /* AxonProviderKitCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E23200002FBC000100000001 /* XCLocalSwiftPackageReference "../a_MethodolojeePackages/Axon-ProviderKit" */;
+			productName = AxonProviderKitCore;
+		};
+		E23200042FBC000100000001 /* AxonProviderKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E23200002FBC000100000001 /* XCLocalSwiftPackageReference "../a_MethodolojeePackages/Axon-ProviderKit" */;
+			productName = AxonProviderKit;
+		};
 		E23FFF9A2EB23493009B116D /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E254EDD62EB222B3000CDD9D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
@@ -1207,21 +1210,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E2403AFB2F03725C00CC9418 /* XCRemoteSwiftPackageReference "mlx-swift" */;
 			productName = MLXNN;
-		};
-		E2403B092F0372D100CC9418 /* MLXLLM */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXLLM;
-		};
-		E2403B0B2F0372D100CC9418 /* MLXLMCommon */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXLMCommon;
-		};
-		E2403B0F2F0372D100CC9418 /* MLXVLM */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E2403B062F0372D100CC9418 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXVLM;
 		};
 		E2403B122F03739200CC9418 /* MLXUtilsLibrary */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -48,15 +48,13 @@ struct CurrentConfigSection: View {
                     }
                 }
 
-                if let lastSync = configService.lastSyncDate {
-                    HStack(spacing: 6) {
-                        Image(systemName: "clock")
-                            .font(.system(size: 12))
-                        Text("Last synced: \(lastSync.formatted(date: .abbreviated, time: .shortened))")
-                            .font(AppTypography.labelSmall())
-                    }
-                    .foregroundColor(AppColors.textTertiary)
+                HStack(spacing: 6) {
+                    Image(systemName: "shippingbox")
+                        .font(.system(size: 12))
+                    Text("Source: AxonProviderKit")
+                        .font(AppTypography.labelSmall())
                 }
+                .foregroundColor(AppColors.textTertiary)
             }
         }
     }

@@ -76,47 +76,13 @@ final class ModelConfigurationService: ObservableObject {
     /// Load configuration with fallback chain: active -> bundled.
     /// If active config is missing, seed it from bundled defaults.
     func loadConfiguration() {
-        logger.info("Loading model configuration...")
-        let activeFileExists = activeConfigURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
-
-        // Try to load active configuration
-        if let activeURL = activeConfigURL,
-           activeFileExists,
-           let catalog = loadCatalog(from: activeURL) {
-            activeCatalog = catalog
-            logger.info("Loaded active configuration v\(catalog.version) with \(catalog.providers.count) providers")
-        }
-        // Fall back to bundled configuration
-        else if let bundledURL = bundledConfigURL,
-                let catalog = loadCatalog(from: bundledURL) {
-            activeCatalog = catalog
-            logger.info("Loaded bundled configuration v\(catalog.version) with \(catalog.providers.count) providers")
-
-            // Seed missing or invalid active config so subsequent launches load from user storage.
-            if let activeURL = activeConfigURL {
-                do {
-                    if activeFileExists {
-                        try? FileManager.default.removeItem(at: activeURL)
-                    }
-                    try FileManager.default.copyItem(at: bundledURL, to: activeURL)
-                    logger.info("Seeded models-active.json from bundled defaults")
-                } catch {
-                    logger.error("Failed to seed active configuration: \(error.localizedDescription)")
-                }
-            }
-        } else {
-            logger.error("Failed to load any model configuration!")
-        }
-
-        // Check for pending draft
-        if let draftURL = draftConfigURL,
-           FileManager.default.fileExists(atPath: draftURL.path),
-           let catalog = loadCatalog(from: draftURL) {
-            draftCatalog = catalog
-            hasPendingDraft = true
-            draftIssues = catalog.validate()
-            logger.info("Found pending draft configuration v\(catalog.version)")
-        }
+        logger.info("Loading ProviderKit model configuration...")
+        let catalog = ProviderKitModelCatalogAdapter.catalogSnapshot()
+        activeCatalog = catalog
+        draftCatalog = nil
+        hasPendingDraft = false
+        draftIssues = []
+        logger.info("Loaded ProviderKit configuration v\(catalog.version) with \(catalog.providers.count) providers")
 
         // Load last sync date
         if let dateString = UserDefaults.standard.string(forKey: "ModelConfiguration.lastSyncDate"),
@@ -140,77 +106,13 @@ final class ModelConfigurationService: ObservableObject {
 
     /// Save a new draft configuration (from Perplexity sync or manual edit)
     func saveDraft(_ catalog: ModelCatalog) throws {
-        guard let draftURL = draftConfigURL else {
-            throw ConfigurationError.fileSystemError("Cannot determine draft file path")
-        }
-
-        // Validate before saving
-        let issues = catalog.validate()
-        if issues.contains(where: { issue in
-            if case .parseError = issue { return true }
-            return false
-        }) {
-            throw ConfigurationError.validationFailed(issues)
-        }
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(catalog)
-        try data.write(to: draftURL, options: .atomic)
-
-        draftCatalog = catalog
-        hasPendingDraft = true
-        draftIssues = issues
-
-        logger.info("Saved draft configuration v\(catalog.version)")
+        _ = catalog
+        throw ConfigurationError.providerKitCatalogIsReadOnly
     }
 
     /// Approve and activate the current draft
     func activateDraft() throws {
-        guard let draft = draftCatalog,
-              let draftURL = draftConfigURL,
-              let activeURL = activeConfigURL else {
-            throw ConfigurationError.noDraftAvailable
-        }
-
-        // Check for blocking issues
-        let blockingIssues = draftIssues.filter { issue in
-            switch issue {
-            case .parseError, .invalidPricing, .invalidContextWindow:
-                return true
-            default:
-                return false
-            }
-        }
-        if !blockingIssues.isEmpty {
-            throw ConfigurationError.validationFailed(blockingIssues)
-        }
-
-        // Backup current active configuration
-        if let currentActive = activeCatalog,
-           let backupURL = backupConfigURL {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted]
-            if let data = try? encoder.encode(currentActive) {
-                try? data.write(to: backupURL, options: .atomic)
-                logger.info("Backed up previous active configuration")
-            }
-        }
-
-        // Move draft to active
-        try? FileManager.default.removeItem(at: activeURL)
-        try FileManager.default.copyItem(at: draftURL, to: activeURL)
-        try FileManager.default.removeItem(at: draftURL)
-
-        activeCatalog = draft
-        draftCatalog = nil
-        hasPendingDraft = false
-        draftIssues = []
-
-        // Notify observers that configuration changed
-        NotificationCenter.default.post(name: .modelConfigurationDidChange, object: nil)
-
-        logger.info("Activated draft configuration v\(draft.version)")
+        throw ConfigurationError.providerKitCatalogIsReadOnly
     }
 
     /// Discard the current draft
@@ -227,106 +129,43 @@ final class ModelConfigurationService: ObservableObject {
 
     /// Rollback to the previous backup
     func rollbackToBackup() throws {
-        guard let backupURL = backupConfigURL,
-              let activeURL = activeConfigURL,
-              FileManager.default.fileExists(atPath: backupURL.path) else {
-            throw ConfigurationError.noBackupAvailable
-        }
-
-        guard let catalog = loadCatalog(from: backupURL) else {
-            throw ConfigurationError.invalidConfiguration("Backup file is corrupted")
-        }
-
-        try? FileManager.default.removeItem(at: activeURL)
-        try FileManager.default.copyItem(at: backupURL, to: activeURL)
-
-        activeCatalog = catalog
-        NotificationCenter.default.post(name: .modelConfigurationDidChange, object: nil)
-
-        logger.info("Rolled back to backup configuration v\(catalog.version)")
+        throw ConfigurationError.providerKitCatalogIsReadOnly
     }
 
     /// Reset to bundled defaults
     func resetToDefaults() throws {
-        guard let bundledURL = bundledConfigURL,
-              let activeURL = activeConfigURL else {
-            throw ConfigurationError.fileSystemError("Cannot access bundled configuration")
-        }
-
-        guard let catalog = loadCatalog(from: bundledURL) else {
-            throw ConfigurationError.invalidConfiguration("Bundled configuration is invalid")
-        }
-
-        // Backup current before reset
-        if let currentActive = activeCatalog,
-           let backupURL = backupConfigURL {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted]
-            if let data = try? encoder.encode(currentActive) {
-                try? data.write(to: backupURL, options: .atomic)
-            }
-        }
-
-        try? FileManager.default.removeItem(at: activeURL)
-        try FileManager.default.copyItem(at: bundledURL, to: activeURL)
-
+        let catalog = ProviderKitModelCatalogAdapter.catalogSnapshot()
         activeCatalog = catalog
         NotificationCenter.default.post(name: .modelConfigurationDidChange, object: nil)
 
-        logger.info("Reset to bundled defaults v\(catalog.version)")
+        logger.info("Reloaded ProviderKit defaults v\(catalog.version)")
     }
 
     // MARK: - Query Methods
 
     /// Get all models for a specific provider
     func models(for provider: AIProvider) -> [AIModel] {
-        guard let catalog = activeCatalog else { return [] }
-        guard let providerConfig = catalog.providers.first(where: { $0.id == provider.rawValue }) else {
-            return []
-        }
-        return providerConfig.models.map { $0.toAIModel(provider: provider) }
+        ProviderKitModelCatalogAdapter.models(for: provider)
     }
 
     /// Get all available models across all providers
     func allModels() -> [AIModel] {
-        guard let catalog = activeCatalog else { return [] }
-        return catalog.providers.flatMap { providerConfig -> [AIModel] in
-            guard let provider = providerConfig.aiProvider else { return [] }
-            return providerConfig.models.map { $0.toAIModel(provider: provider) }
-        }
+        ProviderKitModelCatalogAdapter.allModels()
     }
 
     /// Get pricing for a specific model ID
     func pricing(for modelId: String) -> ModelPricing? {
-        guard let catalog = activeCatalog else { return nil }
-        for provider in catalog.providers {
-            if let model = provider.models.first(where: { $0.id == modelId }) {
-                return model.pricing.toModelPricing()
-            }
-        }
-        return nil
+        ProviderKitModelCatalogAdapter.pricing(for: modelId)
     }
 
     /// Get model configuration by ID
     func modelConfig(for modelId: String) -> ModelConfig? {
-        guard let catalog = activeCatalog else { return nil }
-        for provider in catalog.providers {
-            if let model = provider.models.first(where: { $0.id == modelId }) {
-                return model
-            }
-        }
-        return nil
+        ProviderKitModelCatalogAdapter.modelConfig(for: modelId)
     }
 
     /// Get provider for a model ID
     func provider(for modelId: String) -> AIProvider? {
-        guard let catalog = activeCatalog else { return nil }
-        for provider in catalog.providers {
-            if provider.models.contains(where: { $0.id == modelId }) {
-                return provider.aiProvider
-            }
-        }
-        return nil
+        ProviderKitModelCatalogAdapter.provider(for: modelId)
     }
 
     // MARK: - Sync State
@@ -351,6 +190,7 @@ enum ConfigurationError: LocalizedError {
     case noDraftAvailable
     case noBackupAvailable
     case syncFailed(String)
+    case providerKitCatalogIsReadOnly
 
     var errorDescription: String? {
         switch self {
@@ -366,6 +206,8 @@ enum ConfigurationError: LocalizedError {
             return "No backup configuration available"
         case .syncFailed(let message):
             return "Sync failed: \(message)"
+        case .providerKitCatalogIsReadOnly:
+            return "Built-in model configuration is provided by AxonProviderKit and cannot be edited from Axon."
         }
     }
 }

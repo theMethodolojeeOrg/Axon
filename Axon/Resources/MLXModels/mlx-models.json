@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "defaultModelId": "google/gemma-4-E2B-it-MLX",
+  "models": [
+    {
+      "id": "google/gemma-4-E2B-it-MLX",
+      "displayName": "Gemma 4 E2B",
+      "summary": "Google's Gemma 4 model. Most capable bundled option. Bundled in app - ready instantly.",
+      "contextWindow": 8192,
+      "modalities": ["text"],
+      "bundled": true,
+      "localPath": "MLXModels/google_gemma-4-E2B-it-MLX"
+    },
+    {
+      "id": "mlx-community/Qwen3-VL-2B-Instruct-4bit",
+      "displayName": "Qwen3 VL 2B",
+      "summary": "Vision-language model. Bundled in app - ready instantly.",
+      "contextWindow": 8192,
+      "modalities": ["text", "vision"],
+      "bundled": true,
+      "localPath": "MLXModels/mlx-community_Qwen3-VL-2B-Instruct-4bit"
+    },
+    {
+      "id": "lmstudio-community/gemma-3-270m-it-MLX-8bit",
+      "displayName": "Gemma3 270M",
+      "summary": "Google's ultra-compact model. Fastest option. Bundled in app - ready instantly.",
+      "contextWindow": 8192,
+      "modalities": ["text"],
+      "bundled": true,
+      "localPath": "MLXModels/lmstudio-community_gemma-3-270m-it-MLX-8bit"
+    }
+  ],
+  "excludeDefaults": []
+}

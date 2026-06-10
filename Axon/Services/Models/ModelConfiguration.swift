@@ -136,6 +136,8 @@ enum ModelCategory: String, Codable, Sendable {
     case reasoning  // Chain-of-thought / extended thinking models
     case fast       // Quick, cost-effective models
     case legacy     // Older generation models
+    case local      // On-device local models
+    case foundation // Apple Foundation Models
 
     /// Default selection tiers based on category (used when selectionTiers not explicitly set)
     var defaultSelectionTiers: [ModelTier] {
@@ -148,6 +150,8 @@ enum ModelCategory: String, Codable, Sendable {
             return [.fast, .cheap, .balanced]
         case .legacy:
             return [.balanced]  // Legacy models are fallbacks
+        case .local, .foundation:
+            return [.cheap, .fast]
         }
     }
 }
@@ -204,6 +208,7 @@ enum PricingTier: String, Codable, Sendable {
     case priority
     case batch
     case flex
+    case unknown
 }
 
 // MARK: - Configuration Metadata

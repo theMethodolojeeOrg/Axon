@@ -21,20 +21,6 @@ struct ModelSyncSettingsView: View {
 
             CurrentConfigSection(configService: configService)
 
-            if configService.hasPendingDraft {
-                DraftSection(
-                    configService: configService,
-                    onActivate: activateDraft,
-                    onDiscard: discardDraft
-                )
-            }
-
-            SyncSection(
-                configService: configService,
-                syncService: syncService,
-                isPerplexityConfigured: isPerplexityConfigured
-            )
-
             ProviderDetailsSection(configService: configService)
 
             AdvancedSection(onReset: resetToDefaults)
@@ -64,7 +50,7 @@ struct ModelSyncSettingsView: View {
     private func resetToDefaults() {
         do {
             try configService.resetToDefaults()
-            viewModel.successMessage = "Reset to bundled defaults"
+            viewModel.successMessage = "Reloaded ProviderKit model catalog"
         } catch {
             viewModel.error = error.localizedDescription
         }
