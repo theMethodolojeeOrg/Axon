@@ -40,11 +40,31 @@ class ConversationService: ObservableObject {
     private var ephemeralConversationIds: Set<String> = []
 
     private init() {
+        // One-time repair of updatedAt timestamps scrambled by the title backfill.
+        repairConversationRecencyIfNeeded()
+
         // Load conversations from local Core Data immediately (instant UI)
         loadLocalConversations()
 
         // Update pending operations count
         pendingOperationsCount = localStore.pendingOperationCount
+    }
+
+    /// The auto-title backfill stamped `updatedAt = now` on every retitled conversation,
+    /// pushing old chats to the top of recency-sorted sidebars. Rewrite `updatedAt` from
+    /// each conversation's latest message timestamp, once.
+    private func repairConversationRecencyIfNeeded() {
+        let flagKey = "conversation.didRepairRecencyAfterTitleBackfill"
+        guard !UserDefaults.standard.bool(forKey: flagKey) else { return }
+
+        do {
+            let repaired = try localStore.repairConversationRecencyFromMessages()
+            UserDefaults.standard.set(true, forKey: flagKey)
+            print("[ConversationService] Repaired recency timestamps for \(repaired) conversations")
+        } catch {
+            // Leave the flag unset so the repair retries on next launch.
+            print("[ConversationService] Recency repair failed: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Local-First Data Access
@@ -357,7 +377,9 @@ class ConversationService: ObservableObject {
         }
     }
 
-    func updateConversation(id: String, title: String) async throws -> Conversation {
+    /// - Parameter touchUpdatedAt: Pass `false` for automated writes (e.g. auto-titling)
+    ///   so they don't count as user activity and reshuffle recency-sorted lists.
+    func updateConversation(id: String, title: String, touchUpdatedAt: Bool = true) async throws -> Conversation {
         // Find existing conversation
         guard let existingIndex = conversations.firstIndex(where: { $0.id == id }) else {
             throw ConversationError.notFound
@@ -397,7 +419,7 @@ class ConversationService: ObservableObject {
             }
         } else {
             // Local-first mode: Update locally
-            try localStore.updateLocalConversation(id: id, title: title)
+            try localStore.updateLocalConversation(id: id, title: title, touchUpdatedAt: touchUpdatedAt)
 
             // Create updated conversation model
             let updatedConversation = Conversation(
@@ -406,7 +428,7 @@ class ConversationService: ObservableObject {
                 title: title,
                 projectId: existing.projectId,
                 createdAt: existing.createdAt,
-                updatedAt: Date(),
+                updatedAt: touchUpdatedAt ? Date() : existing.updatedAt,
                 messageCount: existing.messageCount,
                 lastMessageAt: existing.lastMessageAt,
                 archived: existing.archived,

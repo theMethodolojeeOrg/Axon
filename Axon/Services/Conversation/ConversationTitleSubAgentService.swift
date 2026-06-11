@@ -122,7 +122,8 @@ final class ConversationTitleSubAgentService {
         applyGeneratedTitle(title, conversationId: conversationId)
 
         do {
-            _ = try await ConversationService.shared.updateConversation(id: conversationId, title: title)
+            // Automated write: must not bump updatedAt or the chat jumps in recency-sorted lists.
+            _ = try await ConversationService.shared.updateConversation(id: conversationId, title: title, touchUpdatedAt: false)
         } catch {
             print("[ConversationTitleSubAgentService] Failed to persist generated title for \(conversationId): \(error.localizedDescription)")
         }

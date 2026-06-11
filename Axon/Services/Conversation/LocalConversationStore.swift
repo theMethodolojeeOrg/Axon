@@ -344,8 +344,10 @@ class LocalConversationStore: ObservableObject {
         print("[LocalConversationStore] Deleted \(deletedCount) messages after message: \(messageId)")
     }
 
-    /// Update a conversation locally
-    func updateLocalConversation(id: String, title: String) throws {
+    /// Update a conversation locally.
+    /// - Parameter touchUpdatedAt: Pass `false` for automated writes (e.g. auto-titling)
+    ///   so they don't count as user activity and reshuffle recency-sorted lists.
+    func updateLocalConversation(id: String, title: String, touchUpdatedAt: Bool = true) throws {
         let context = persistence.container.viewContext
 
         let fetchRequest: NSFetchRequest<ConversationEntity> = ConversationEntity.fetchRequest()
@@ -356,7 +358,9 @@ class LocalConversationStore: ObservableObject {
         }
 
         entity.title = title
-        entity.updatedAt = Date()
+        if touchUpdatedAt {
+            entity.updatedAt = Date()
+        }
         entity.locallyModified = true
 
         // Only queue for sync if it's a synced conversation (not local-only)
@@ -374,6 +378,42 @@ class LocalConversationStore: ObservableObject {
 
         try persistence.saveContext(context)
         print("[LocalConversationStore] Updated local conversation: \(id)")
+    }
+
+    /// One-time repair: restore each conversation's `updatedAt` from its real activity
+    /// (latest message timestamp, falling back to lastMessageAt, then createdAt).
+    /// The title backfill previously stamped `updatedAt` with the launch date, which
+    /// scrambled recency-sorted sidebars. Local-only repair — does not queue sync ops.
+    /// - Returns: Number of conversations whose timestamp was rewritten.
+    func repairConversationRecencyFromMessages() throws -> Int {
+        let context = persistence.container.viewContext
+        let fetchRequest: NSFetchRequest<ConversationEntity> = ConversationEntity.fetchRequest()
+        let entities = try context.fetch(fetchRequest)
+
+        var repaired = 0
+        for entity in entities {
+            guard let conversationId = entity.id, !conversationId.isEmpty else { continue }
+
+            let msgFetch: NSFetchRequest<MessageEntity> = MessageEntity.fetchRequest()
+            msgFetch.predicate = NSPredicate(format: "conversationId == %@", conversationId)
+            msgFetch.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
+            msgFetch.fetchLimit = 1
+
+            let latestMessageAt = try context.fetch(msgFetch).first?.timestamp
+            guard let activityDate = latestMessageAt ?? entity.lastMessageAt ?? entity.createdAt else {
+                continue
+            }
+
+            if entity.updatedAt != activityDate {
+                entity.updatedAt = activityDate
+                repaired += 1
+            }
+        }
+
+        if repaired > 0 {
+            try persistence.saveContext(context)
+        }
+        return repaired
     }
 
     /// Delete a conversation locally (uses soft-delete to prevent resurrection)
