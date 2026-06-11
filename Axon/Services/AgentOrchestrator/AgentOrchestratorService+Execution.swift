@@ -399,7 +399,8 @@ extension AgentOrchestratorService {
 
         let body: [String: Any] = [
             "model": model,
-            "max_tokens": 4096,
+            // GPT-5-era models reject the legacy "max_tokens" on /chat/completions.
+            "max_completion_tokens": 4096,
             "messages": [
                 ["role": "system", "content": system],
                 ["role": "user", "content": userMessage]

@@ -105,8 +105,11 @@ class SettingsStorage {
     }
 
     /// Whether a manual display name override exists.
+    /// Whitespace-only values don't count, matching `resolvedConversationTitle`,
+    /// so a stray empty override can never permanently block auto-titling.
     func hasManualDisplayName(for conversationId: String) -> Bool {
-        displayName(for: conversationId) != nil
+        guard let name = displayName(for: conversationId) else { return false }
+        return !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     // MARK: - Conversation Generated Title Overrides

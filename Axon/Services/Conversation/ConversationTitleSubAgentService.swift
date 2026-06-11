@@ -72,6 +72,9 @@ final class ConversationTitleSubAgentService {
         )
 
         guard case .eligible(let firstUserMessage) = eligibility else {
+            if case .skipped(let reason) = eligibility {
+                print("[ConversationTitleSubAgentService] Skipped titling for \(conversation.id): \(reason)")
+            }
             return false
         }
 
@@ -90,6 +93,16 @@ final class ConversationTitleSubAgentService {
         inFlightConversationIds.insert(conversation.id)
         defer { inFlightConversationIds.remove(conversation.id) }
 
+        // Prefer Apple Intelligence (free, on-device, guided output); fall back to the
+        // cloud namer sub-agent job when unavailable or failing.
+        if let appleTitle = try? await AppleIntelligenceChatTitleService.shared.generateTitle(
+            userMessage: firstUserMessage,
+            assistantMessage: assistantMessage
+        ), !appleTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            await persistTitle(appleTitle, conversationId: conversation.id, source: "AppleIntelligence")
+            return true
+        }
+
         do {
             let generatedTitle = try await runNamerJob(
                 conversationId: conversation.id,
@@ -97,20 +110,24 @@ final class ConversationTitleSubAgentService {
                 assistantMessage: assistantMessage
             )
 
-            applyGeneratedTitle(generatedTitle, conversationId: conversation.id)
-
-            do {
-                _ = try await ConversationService.shared.updateConversation(id: conversation.id, title: generatedTitle)
-            } catch {
-                print("[ConversationTitleSubAgentService] Failed to persist generated title for \(conversation.id): \(error.localizedDescription)")
-            }
-
-            print("[ConversationTitleSubAgentService] Generated title for \(conversation.id): '\(generatedTitle)'")
+            await persistTitle(generatedTitle, conversationId: conversation.id, source: "Namer")
             return true
         } catch {
             print("[ConversationTitleSubAgentService] Namer failed for \(conversation.id): \(error.localizedDescription)")
             return false
         }
+    }
+
+    private func persistTitle(_ title: String, conversationId: String, source: String) async {
+        applyGeneratedTitle(title, conversationId: conversationId)
+
+        do {
+            _ = try await ConversationService.shared.updateConversation(id: conversationId, title: title)
+        } catch {
+            print("[ConversationTitleSubAgentService] Failed to persist generated title for \(conversationId): \(error.localizedDescription)")
+        }
+
+        print("[ConversationTitleSubAgentService] Generated title (\(source)) for \(conversationId): '\(title)'")
     }
 
     // MARK: - Internal Namer Job

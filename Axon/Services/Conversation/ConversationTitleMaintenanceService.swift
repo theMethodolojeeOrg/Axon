@@ -18,6 +18,7 @@ final class ConversationTitleMaintenanceService {
     }
 
     private let attemptsKey = "conversation.titleCatchUpAttempts"
+    private let namerFixResetKey = "conversation.titleCatchUp.didResetForNamerFix"
     private let localStore = LocalConversationStore.shared
     private let settingsStorage = SettingsStorage.shared
 
@@ -28,6 +29,14 @@ final class ConversationTitleMaintenanceService {
     private var didScheduleStartupPass = false
 
     private init() {
+        // One-time reset: earlier builds failed every namer job (unexecutable provider
+        // selected), poisoning the registry with 12h cooldowns. Clear it once so stuck
+        // conversations get retitled by the next startup pass.
+        if !UserDefaults.standard.bool(forKey: namerFixResetKey) {
+            UserDefaults.standard.removeObject(forKey: attemptsKey)
+            UserDefaults.standard.set(true, forKey: namerFixResetKey)
+        }
+
         let attempts = Self.loadAttempts(key: attemptsKey)
         self.registry = ConversationTitleCatchUpRegistry(attempts: attempts)
     }

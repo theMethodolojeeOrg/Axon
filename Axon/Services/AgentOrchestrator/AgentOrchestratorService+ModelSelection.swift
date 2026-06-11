@@ -18,6 +18,15 @@ extension AgentOrchestratorService {
 
     // MARK: - Select Model for Job
 
+    /// Providers the sub-agent executor can actually call (mirrors the switch in
+    /// `callProvider` in AgentOrchestratorService+Execution).
+    static let executableProviders: Set<AIProvider> = [.anthropic, .openai, .gemini, .xai, .deepseek]
+
+    /// Whether a provider is both supported by the sub-agent executor and has a valid API key.
+    func isProviderExecutableForSubAgents(_ provider: AIProvider) -> Bool {
+        Self.executableProviders.contains(provider) && isProviderConfigured(provider)
+    }
+
     /// Select the optimal model for a job based on:
     /// 1. Explicit override (highest priority)
     /// 2. Learned affinities (if sufficient data)
@@ -26,11 +35,11 @@ extension AgentOrchestratorService {
 
         // 1. Explicit override takes precedence
         if let provider = job.provider, let model = job.model {
-            if isProviderConfigured(provider) {
+            if isProviderExecutableForSubAgents(provider) {
                 logger.info("Using explicit override: \(provider.rawValue)/\(model)")
                 return (provider, model)
             } else {
-                logger.warning("Explicit provider \(provider.rawValue) not configured, falling back")
+                logger.warning("Explicit provider \(provider.rawValue) not executable for sub-agents, falling back")
             }
         }
 
@@ -70,7 +79,7 @@ extension AgentOrchestratorService {
             .filter { $0.totalAttempts >= minAttempts }
             .sorted { $0.affinityScore > $1.affinityScore }
 
-        if let best = exactMatches.first, isProviderConfigured(best.provider) {
+        if let best = exactMatches.first, isProviderExecutableForSubAgents(best.provider) {
             let reasoning = buildAffinityReasoning(for: best)
             return (best.provider, best.modelId, reasoning)
         }
@@ -82,7 +91,7 @@ extension AgentOrchestratorService {
             .sorted { $0.affinityScore > $1.affinityScore }
 
         for match in anyContextMatches {
-            if isProviderConfigured(match.provider) {
+            if isProviderExecutableForSubAgents(match.provider) {
                 let reasoning = buildAffinityReasoning(for: match)
                 return (match.provider, match.modelId, reasoning)
             }
@@ -129,7 +138,7 @@ extension AgentOrchestratorService {
         let registry = UnifiedModelRegistry.shared
 
         // Use the registry's tier-based selection (reads from JSON configs)
-        if let result = registry.selectModel(for: tier, isProviderConfigured: isProviderConfigured) {
+        if let result = registry.selectModel(for: tier, isProviderConfigured: isProviderExecutableForSubAgents) {
             if result.wasExactMatch {
                 logger.info("Tier \(tier.rawValue) selection: \(result.provider.rawValue)/\(result.modelId)")
             } else {

@@ -130,13 +130,37 @@ struct ConversationTitleNamerTests {
     @Test func catchUpQueueDedupesJobs() {
         var registry = ConversationTitleCatchUpRegistry()
 
-        #expect(registry.enqueue("c1"))
-        #expect(!registry.enqueue("c1"))
-        #expect(registry.enqueue("c2"))
+        let enqueuedC1 = registry.enqueue("c1")
+        let enqueuedC1Again = registry.enqueue("c1")
+        let enqueuedC2 = registry.enqueue("c2")
+        #expect(enqueuedC1)
+        #expect(!enqueuedC1Again)
+        #expect(enqueuedC2)
 
         #expect(registry.dequeue() == "c1")
         #expect(registry.dequeue() == "c2")
         #expect(registry.dequeue() == nil)
+    }
+
+    @MainActor
+    @Test func namerTierSelectionNeverPicksUnexecutableProvider() {
+        let executable = AgentOrchestratorService.executableProviders
+
+        // Sanity: the executor has no Apple Foundation / local MLX call path.
+        #expect(!executable.contains(.appleFoundation))
+        #expect(!executable.contains(.localMLX))
+
+        // Even with every provider "configured", the executor filter must keep tier
+        // selection inside the set of providers callProvider can actually dispatch.
+        for tier in SubAgentRole.namer.recommendedModelTiers {
+            let result = UnifiedModelRegistry.shared.selectModel(for: tier) { provider in
+                executable.contains(provider)
+            }
+            #expect(result != nil)
+            if let result {
+                #expect(executable.contains(result.provider))
+            }
+        }
     }
 
     @Test func failedAttemptsUseCooldownAndAvoidRetryLoops() {
