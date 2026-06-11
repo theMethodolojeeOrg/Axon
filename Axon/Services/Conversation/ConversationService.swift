@@ -606,7 +606,7 @@ class ConversationService: ObservableObject {
         return useOnDevice ? onDeviceOrchestrator : cloudOrchestrator
     }
 
-    func sendMessage(conversationId: String, content: String, attachments: [MessageAttachment] = [], enabledTools: [String] = []) async throws -> Message {
+    func sendMessage(conversationId: String, content: String, attachments: [MessageAttachment] = [], enabledTools: [String] = [], reusingUserMessage: Message? = nil) async throws -> Message {
         // Get API keys from storage
         let apiKeysStorage = APIKeysStorage.shared
         let anthropicKey = try? apiKeysStorage.getAPIKey(for: .anthropic)
@@ -723,15 +723,25 @@ class ConversationService: ObservableObject {
             modelParams: resolvedModelParams
         )
 
-        do {
-            // Add user message optimistically
-            let userMessage = Message(
+        // Add user message optimistically, unless we're regenerating from an
+        // already-edited message that is the last element of `messages`
+        let userMessage: Message
+        let didAppendOptimistically: Bool
+        if let reused = reusingUserMessage {
+            userMessage = reused
+            didAppendOptimistically = false
+        } else {
+            userMessage = Message(
                 conversationId: conversationId,
                 role: .user,
                 content: content,
                 attachments: attachments
             )
             messages.append(userMessage)
+            didAppendOptimistically = true
+        }
+
+        do {
 
             // Select orchestrator based on unified aiProcessing setting
             let orchestrator = getOrchestrator(settings: settings)
@@ -758,8 +768,10 @@ class ConversationService: ObservableObject {
             messages.append(assistantMessage)
             ConversationRuntimeOverrideManager.shared.consumeTurnLeaseOnSuccessfulReply(conversationId: conversationId)
 
-            // Save both messages to Core Data immediately
-            try await syncManager.saveMessagesToCoreData([userMessage, assistantMessage], conversationId: conversationId)
+            // Save to Core Data immediately. A reused (edited) user message was
+            // already persisted by editMessage, so only save the assistant reply.
+            let messagesToPersist = didAppendOptimistically ? [userMessage, assistantMessage] : [assistantMessage]
+            try await syncManager.saveMessagesToCoreData(messagesToPersist, conversationId: conversationId)
 
             // Shared post-reply titling entrypoint (used by both non-streaming and streaming).
             schedulePostReplyTitling(
@@ -799,8 +811,10 @@ class ConversationService: ObservableObject {
 
             return assistantMessage
         } catch {
-            // Remove optimistic message on error
-            messages.removeAll { $0.id == messages.last?.id && $0.role == .user }
+            // Remove optimistic message on error; keep a reused (edited) message in place
+            if didAppendOptimistically {
+                messages.removeAll { $0.id == userMessage.id && $0.role == .user }
+            }
             self.error = error.localizedDescription
             throw error
         }
@@ -1054,14 +1068,15 @@ class ConversationService: ObservableObject {
         messages = Array(messages.prefix(through: messageIndex))
 
         // 2. Edit the user message
-        _ = try await editMessage(conversationId: conversationId, messageId: messageId, content: content)
+        let editedMessage = try await editMessage(conversationId: conversationId, messageId: messageId, content: content)
 
-        // 3. Regenerate AI response by sending the edited content
+        // 3. Regenerate the AI response, reusing the edited message so no duplicate is appended
         let assistantMessage = try await sendMessage(
             conversationId: conversationId,
             content: content,
-            attachments: existingMessage.attachments ?? [],
-            enabledTools: enabledTools
+            attachments: editedMessage.attachments ?? [],
+            enabledTools: enabledTools,
+            reusingUserMessage: editedMessage
         )
 
         print("[ConversationService] Edit & regenerate completed for message: \(messageId)")
