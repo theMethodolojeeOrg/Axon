@@ -1048,8 +1048,11 @@ class ConversationService: ObservableObject {
         print("[ConversationService] Deleted message: \(messageId)")
     }
 
-    /// Edit a user message and regenerate the AI response (cascade delete subsequent messages)
-    func editAndRegenerate(conversationId: String, messageId: String, content: String, enabledTools: [String] = []) async throws -> Message {
+    /// Prepare a regeneration after editing a user message: cascade-deletes all
+    /// subsequent messages and applies the edit in place. Returns the updated user
+    /// message, which callers pass to a send pipeline as `reusingUserMessage`.
+    /// Shared by the streaming and non-streaming regeneration paths.
+    func prepareEditAndRegenerate(conversationId: String, messageId: String, content: String) async throws -> Message {
         // Verify the message exists and is a user message
         guard let existingIndex = messages.firstIndex(where: { $0.id == messageId }) else {
             throw ConversationError.notFound
@@ -1064,13 +1067,21 @@ class ConversationService: ObservableObject {
         try localStore.deleteMessagesAfter(messageId: messageId, conversationId: conversationId)
 
         // Remove from in-memory array too
-        let messageIndex = messages.firstIndex(where: { $0.id == messageId })!
-        messages = Array(messages.prefix(through: messageIndex))
+        messages = Array(messages.prefix(through: existingIndex))
 
         // 2. Edit the user message
-        let editedMessage = try await editMessage(conversationId: conversationId, messageId: messageId, content: content)
+        return try await editMessage(conversationId: conversationId, messageId: messageId, content: content)
+    }
 
-        // 3. Regenerate the AI response, reusing the edited message so no duplicate is appended
+    /// Edit a user message and regenerate the AI response (cascade delete subsequent messages)
+    func editAndRegenerate(conversationId: String, messageId: String, content: String, enabledTools: [String] = []) async throws -> Message {
+        let editedMessage = try await prepareEditAndRegenerate(
+            conversationId: conversationId,
+            messageId: messageId,
+            content: content
+        )
+
+        // Regenerate the AI response, reusing the edited message so no duplicate is appended
         let assistantMessage = try await sendMessage(
             conversationId: conversationId,
             content: content,

@@ -857,18 +857,45 @@ struct ChatContainerView: View {
                     messageToEdit = nil
                 },
                 onSaveAndRegenerate: { newContent in
-                    // Save and regenerate AI response
+                    // Save and regenerate AI response through the streaming pipeline
                     Task {
                         if let convId = conversation?.id {
                             let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
                             let enabledTools = settings.toolSettings.toolsEnabled ? Array(settings.toolSettings.enabledToolIds) : []
                             isLoading = true
-                            _ = try? await conversationService.editAndRegenerate(
-                                conversationId: convId,
-                                messageId: message.id,
-                                content: newContent,
-                                enabledTools: enabledTools
-                            )
+                            do {
+                                // Truncate subsequent messages and apply the edit in place
+                                let editedMessage = try await conversationService.prepareEditAndRegenerate(
+                                    conversationId: convId,
+                                    messageId: message.id,
+                                    content: newContent
+                                )
+
+                                // Mirror the composer: real streaming on-device, pseudo-stream otherwise
+                                let isOnDeviceMode = settings.deviceModeConfig.aiProcessing == .onDevice
+                                if useRealStreaming && isOnDeviceMode {
+                                    try await sendMessageWithStreaming(
+                                        conversationId: convId,
+                                        content: newContent,
+                                        attachments: editedMessage.attachments ?? [],
+                                        enabledTools: enabledTools,
+                                        reusingUserMessage: editedMessage
+                                    )
+                                } else {
+                                    let assistant = try await conversationService.sendMessage(
+                                        conversationId: convId,
+                                        content: newContent,
+                                        attachments: editedMessage.attachments ?? [],
+                                        enabledTools: enabledTools,
+                                        reusingUserMessage: editedMessage
+                                    )
+                                    startPseudoStream(for: assistant)
+                                    recordUsage(for: assistant, inputContent: newContent)
+                                }
+                            } catch {
+                                print("[ChatContainer] Edit & regenerate failed: \(error.localizedDescription)")
+                                cleanupStreamingState()
+                            }
                             isLoading = false
                         }
                     }
@@ -1768,22 +1795,28 @@ struct ChatContainerView: View {
         conversationId: String,
         content: String,
         attachments: [MessageAttachment],
-        enabledTools: [String]
+        enabledTools: [String],
+        reusingUserMessage: Message? = nil
     ) async throws {
-        // Create user message
-        let userMessage = Message(
-            conversationId: conversationId,
-            role: .user,
-            content: content,
-            attachments: attachments.isEmpty ? nil : attachments
-        )
-        conversationService.messages.append(userMessage)
+        // Create user message, unless regenerating from an already-edited message
+        // that is the last element of the conversation (and already persisted)
+        let userMessage: Message
+        if let reused = reusingUserMessage {
+            userMessage = reused
+        } else {
+            userMessage = Message(
+                conversationId: conversationId,
+                role: .user,
+                content: content,
+                attachments: attachments.isEmpty ? nil : attachments
+            )
+            conversationService.messages.append(userMessage)
 
-        // Save user message to Core Data immediately
-        // This ensures messages persist even if streaming is interrupted
-        let syncManager = ConversationSyncManager.shared
-        try await syncManager.saveMessagesToCoreData([userMessage], conversationId: conversationId)
-        print("[ChatContainer] 💾 Saved user message to Core Data")
+            // Save user message to Core Data immediately
+            // This ensures messages persist even if streaming is interrupted
+            try await ConversationSyncManager.shared.saveMessagesToCoreData([userMessage], conversationId: conversationId)
+            print("[ChatContainer] 💾 Saved user message to Core Data")
+        }
 
         // Create placeholder assistant message
         let assistantId = UUID().uuidString
