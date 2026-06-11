@@ -1034,13 +1034,13 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		E23200002FBC000100000001 /* XCLocalSwiftPackageReference "../a_MethodolojeePackages/Axon-ProviderKit" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = "../a_MethodolojeePackages/Axon-ProviderKit";
-		};
 		E231DA622F98D51400E46904 /* XCLocalSwiftPackageReference "../DevPathKit" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../DevPathKit;
+		};
+		E23200002FBC000100000001 /* XCLocalSwiftPackageReference "../a_MethodolojeePackages/Axon-ProviderKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../a_MethodolojeePackages/Axon-ProviderKit";
 		};
 		E285547D2FD8A4E900B7614B /* XCLocalSwiftPackageReference "../USE-Package" */ = {
 			isa = XCLocalSwiftPackageReference;

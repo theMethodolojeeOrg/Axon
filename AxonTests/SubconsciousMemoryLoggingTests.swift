@@ -121,4 +121,92 @@ final class SubconsciousMemoryLoggingTests: XCTestCase {
         XCTAssertEqual(filtered.ignored.count, 1)
         XCTAssertEqual(filtered.ignored.first?.tool, ToolId.codeExecution.rawValue)
     }
+
+    // MARK: - Runtime Resolution
+
+    @MainActor
+    func testResolverAppleFoundationProducesOnDeviceBackend() throws {
+        let settings = AppSettings()
+        var selection = SubconsciousMemoryLoggingSettings.default
+        selection.enabled = true
+        selection.builtInProvider = AIProvider.appleFoundation.rawValue
+
+        let result = MemoryService.shared.resolveSubconsciousRuntimeConfig(selection: selection, settings: settings)
+
+        let runtime = try result.get()
+        XCTAssertEqual(runtime.backend, .appleFoundation)
+        // AFM context is clamped to leave headroom for prompts and tool-feedback rounds.
+        XCTAssertLessThanOrEqual(runtime.contextWindow, 3_000)
+        XCTAssertGreaterThanOrEqual(runtime.contextWindow, 1_024)
+    }
+
+    /// Regression test for the always-on "Apple Intelligence is not currently supported"
+    /// banner: with no explicit subconscious provider selection, the resolver falls back
+    /// to the default provider (Apple Foundation) and must now resolve successfully
+    /// instead of returning the hard-block failure.
+    @MainActor
+    func testResolverDefaultProviderFallbackAppleFoundationSucceeds() throws {
+        var settings = AppSettings()
+        settings.defaultProvider = .appleFoundation
+        var selection = SubconsciousMemoryLoggingSettings.default
+        selection.enabled = true
+        selection.builtInProvider = nil
+
+        let result = MemoryService.shared.resolveSubconsciousRuntimeConfig(selection: selection, settings: settings)
+
+        let runtime = try result.get()
+        XCTAssertEqual(runtime.backend, .appleFoundation)
+    }
+
+    @MainActor
+    func testResolverLocalMLX() {
+        let settings = AppSettings()
+        var selection = SubconsciousMemoryLoggingSettings.default
+        selection.enabled = true
+        selection.builtInProvider = AIProvider.localMLX.rawValue
+
+        let result = MemoryService.shared.resolveSubconsciousRuntimeConfig(selection: selection, settings: settings)
+
+        #if targetEnvironment(simulator)
+        guard case .failure(let error) = result else {
+            return XCTFail("Expected simulator failure for local MLX")
+        }
+        XCTAssertTrue(error.message.contains("physical device"))
+        #else
+        switch result {
+        case .success(let runtime):
+            guard case .localMLX(let modelId) = runtime.backend else {
+                return XCTFail("Expected localMLX backend, got \(runtime.backend)")
+            }
+            XCTAssertEqual(modelId, runtime.model)
+        case .failure(let error):
+            // Acceptable only when no MLX models are configured in this environment.
+            XCTAssertTrue(error.message.contains("no models"), "Unexpected failure: \(error.message)")
+        }
+        #endif
+    }
+
+    /// Cloud providers must never hit the old on-device hard block; they either resolve
+    /// to an HTTP backend or fail solely because an API key is missing.
+    @MainActor
+    func testResolverCloudProviderResolvesToHTTPOrMissingKey() {
+        let settings = AppSettings()
+        var selection = SubconsciousMemoryLoggingSettings.default
+        selection.enabled = true
+        selection.builtInProvider = AIProvider.anthropic.rawValue
+
+        let result = MemoryService.shared.resolveSubconsciousRuntimeConfig(selection: selection, settings: settings)
+
+        switch result {
+        case .success(let runtime):
+            guard case .http(let provider, let apiKey, _) = runtime.backend else {
+                return XCTFail("Expected http backend, got \(runtime.backend)")
+            }
+            XCTAssertEqual(provider, "anthropic")
+            XCTAssertFalse(apiKey.isEmpty)
+        case .failure(let error):
+            XCTAssertTrue(error.message.contains("missing API key"), "Unexpected failure: \(error.message)")
+            XCTAssertFalse(error.message.contains("not currently supported"))
+        }
+    }
 }

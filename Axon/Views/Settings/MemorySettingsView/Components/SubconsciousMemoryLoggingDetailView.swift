@@ -224,13 +224,23 @@ struct SubconsciousMemoryLoggingDetailView: View {
                         }
 
                         if let provider = selectedProviderChoice.builtIn,
-                           provider == .appleFoundation || provider == .localMLX {
+                           provider == .appleFoundation {
                             Divider()
                                 .background(AppColors.divider)
 
-                            Text("This provider currently cannot run subconscious background logging. If selected, the chat thread will show an availability warning when a logging pass runs.")
+                            Text("Runs fully on-device. Requires Apple Intelligence to be enabled. The small on-device context window limits how much of the conversation each logging pass reviews.")
                                 .font(AppTypography.labelSmall())
-                                .foregroundColor(AppColors.accentWarning)
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+
+                        if let provider = selectedProviderChoice.builtIn,
+                           provider == .localMLX {
+                            Divider()
+                                .background(AppColors.divider)
+
+                            Text("Runs fully on-device using a local MLX model. Requires a physical Apple Silicon device; background logging will not run in the Simulator.")
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.textSecondary)
                         }
                     }
                     .padding()

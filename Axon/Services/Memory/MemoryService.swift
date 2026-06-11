@@ -825,7 +825,7 @@ class MemoryService: ObservableObject {
 
             let response: String
             do {
-                response = try await SubconsciousProviderHTTPClient.generate(
+                response = try await generateSubconsciousResponse(
                     system: systemPrompt,
                     messages: llmMessages,
                     runtime: runtime
@@ -890,7 +890,7 @@ class MemoryService: ObservableObject {
         subconsciousWarnings.removeValue(forKey: conversationId)
     }
 
-    private func resolveSubconsciousRuntimeConfig(
+    func resolveSubconsciousRuntimeConfig(
         selection: SubconsciousMemoryLoggingSettings,
         settings: AppSettings
     ) -> Result<SubconsciousRuntimeConfig, SubconsciousRuntimeResolutionError> {
@@ -909,12 +909,10 @@ class MemoryService: ObservableObject {
 
             return .success(
                 SubconsciousRuntimeConfig(
-                    provider: "openai-compatible",
+                    backend: .http(provider: "openai-compatible", apiKey: apiKey, baseUrl: customProvider.apiEndpoint),
                     providerDisplayName: customProvider.providerName,
                     model: selectedModel.modelCode,
-                    contextWindow: max(1_024, selectedModel.contextWindow),
-                    apiKey: apiKey,
-                    baseUrl: customProvider.apiEndpoint
+                    contextWindow: max(1_024, selectedModel.contextWindow)
                 )
             )
         }
@@ -922,13 +920,6 @@ class MemoryService: ObservableObject {
         let builtInProviderRaw = selection.builtInProvider ?? settings.defaultProvider.rawValue
         guard let builtInProvider = AIProvider(rawValue: builtInProviderRaw) else {
             return .failure(SubconsciousRuntimeResolutionError(message: "Subconscious model is unavailable: unknown provider selection."))
-        }
-
-        switch builtInProvider {
-        case .appleFoundation, .localMLX:
-            return .failure(SubconsciousRuntimeResolutionError(message: "Subconscious model is unavailable: \(builtInProvider.displayName) is not currently supported for background memory logging."))
-        default:
-            break
         }
 
         let availableModels: [AIModel] = {
@@ -961,6 +952,36 @@ class MemoryService: ObservableObject {
 
         let contextWindow = max(1_024, selectedModel.contextWindow)
 
+        switch builtInProvider {
+        case .appleFoundation:
+            // Apple Foundation Models have a small (~4k) context and throw on prompt
+            // overflow; clamp the window so rolling-context and injection budgets leave
+            // headroom for the system prompt and tool-feedback rounds.
+            return .success(
+                SubconsciousRuntimeConfig(
+                    backend: .appleFoundation,
+                    providerDisplayName: builtInProvider.displayName,
+                    model: selectedModel.id,
+                    contextWindow: min(contextWindow, 3_000)
+                )
+            )
+        case .localMLX:
+            #if targetEnvironment(simulator)
+            return .failure(SubconsciousRuntimeResolutionError(message: "Subconscious model is unavailable: \(builtInProvider.displayName) requires a physical device (Metal GPU)."))
+            #else
+            return .success(
+                SubconsciousRuntimeConfig(
+                    backend: .localMLX(modelId: selectedModel.id),
+                    providerDisplayName: builtInProvider.displayName,
+                    model: selectedModel.id,
+                    contextWindow: contextWindow
+                )
+            )
+            #endif
+        default:
+            break
+        }
+
         let providerApiKey: String? = {
             switch builtInProvider {
             case .anthropic: return try? apiKeysStorage.getAPIKey(for: .anthropic)
@@ -983,14 +1004,52 @@ class MemoryService: ObservableObject {
         let providerString = builtInProvider == .xai ? "grok" : builtInProvider.rawValue
         return .success(
             SubconsciousRuntimeConfig(
-                provider: providerString,
+                backend: .http(provider: providerString, apiKey: apiKey, baseUrl: nil),
                 providerDisplayName: builtInProvider.displayName,
                 model: selectedModel.id,
-                contextWindow: contextWindow,
-                apiKey: apiKey,
-                baseUrl: nil
+                contextWindow: contextWindow
             )
         )
+    }
+
+    private func generateSubconsciousResponse(
+        system: String,
+        messages: [SubconsciousLLMMessage],
+        runtime: SubconsciousRuntimeConfig
+    ) async throws -> String {
+        switch runtime.backend {
+        case .http(let provider, let apiKey, let baseUrl):
+            return try await SubconsciousProviderHTTPClient.generate(
+                system: system,
+                messages: messages,
+                provider: provider,
+                model: runtime.model,
+                apiKey: apiKey,
+                baseUrl: baseUrl
+            )
+        case .appleFoundation:
+            return try await OnDeviceTextGenerator.appleFoundation(
+                system: system,
+                messages: Self.toMessages(messages)
+            )
+        case .localMLX(let modelId):
+            return try await OnDeviceTextGenerator.localMLX(
+                modelId: modelId,
+                system: system,
+                messages: Self.toMessages(messages),
+                modelParams: nil
+            )
+        }
+    }
+
+    private static func toMessages(_ llmMessages: [SubconsciousLLMMessage]) -> [Message] {
+        llmMessages.map { message in
+            Message(
+                conversationId: "subconscious",
+                role: message.role == "assistant" ? .assistant : .user,
+                content: message.content
+            )
+        }
     }
 
     private func buildRollingContextMessages(from messages: [Message], tokenBudget: Int) -> [Message] {
@@ -1093,16 +1152,20 @@ class MemoryService: ObservableObject {
     }
 }
 
-private struct SubconsciousRuntimeConfig: Sendable {
-    let provider: String
+enum SubconsciousBackend: Equatable, Sendable {
+    case http(provider: String, apiKey: String, baseUrl: String?)
+    case appleFoundation
+    case localMLX(modelId: String)
+}
+
+struct SubconsciousRuntimeConfig: Equatable, Sendable {
+    let backend: SubconsciousBackend
     let providerDisplayName: String
     let model: String
     let contextWindow: Int
-    let apiKey: String
-    let baseUrl: String?
 }
 
-private struct SubconsciousRuntimeResolutionError: Error, LocalizedError, Sendable {
+struct SubconsciousRuntimeResolutionError: Error, LocalizedError, Sendable {
     let message: String
 
     var errorDescription: String? { message }
@@ -1117,91 +1180,94 @@ private enum SubconsciousProviderHTTPClient {
     static func generate(
         system: String,
         messages: [SubconsciousLLMMessage],
-        runtime: SubconsciousRuntimeConfig
+        provider: String,
+        model: String,
+        apiKey: String,
+        baseUrl: String?
     ) async throws -> String {
-        switch runtime.provider {
+        switch provider {
         case "anthropic":
             return try await callAnthropic(
-                apiKey: runtime.apiKey,
-                model: runtime.model,
+                apiKey: apiKey,
+                model: model,
                 system: system,
                 messages: messages
             )
         case "gemini":
             return try await callGemini(
-                apiKey: runtime.apiKey,
-                model: runtime.model,
+                apiKey: apiKey,
+                model: model,
                 system: system,
                 messages: messages
             )
         case "minimax":
             return try await callMiniMax(
-                apiKey: runtime.apiKey,
-                model: runtime.model,
+                apiKey: apiKey,
+                model: model,
                 system: system,
                 messages: messages
             )
         case "openai-compatible":
-            guard let baseUrl = runtime.baseUrl, !baseUrl.isEmpty else {
+            guard let baseUrl, !baseUrl.isEmpty else {
                 throw APIError.networkError("Missing custom provider base URL for subconscious logger")
             }
             return try await callOpenAICompatible(
-                apiKey: runtime.apiKey,
+                apiKey: apiKey,
                 baseUrl: baseUrl,
-                model: runtime.model,
+                model: model,
                 system: system,
                 messages: messages
             )
         case "openai":
             return try await callOpenAICompatible(
-                apiKey: runtime.apiKey,
+                apiKey: apiKey,
                 baseUrl: "https://api.openai.com/v1",
-                model: runtime.model,
+                model: model,
                 system: system,
                 messages: messages
             )
         case "grok":
             return try await callOpenAICompatible(
-                apiKey: runtime.apiKey,
+                apiKey: apiKey,
                 baseUrl: "https://api.x.ai/v1",
-                model: runtime.model,
+                model: model,
                 system: system,
                 messages: messages
             )
         case "perplexity":
             return try await callOpenAICompatible(
-                apiKey: runtime.apiKey,
+                apiKey: apiKey,
                 baseUrl: "https://api.perplexity.ai",
-                model: runtime.model,
+                model: model,
                 system: system,
                 messages: messages
             )
         case "deepseek":
             return try await callOpenAICompatible(
-                apiKey: runtime.apiKey,
+                apiKey: apiKey,
                 baseUrl: "https://api.deepseek.com",
-                model: runtime.model,
+                model: model,
                 system: system,
                 messages: messages
             )
         case "zai":
             return try await callOpenAICompatible(
-                apiKey: runtime.apiKey,
+                apiKey: apiKey,
                 baseUrl: "https://api.z.ai/api/paas/v4",
-                model: runtime.model,
+                model: model,
                 system: system,
                 messages: messages
             )
         case "mistral":
             return try await callOpenAICompatible(
-                apiKey: runtime.apiKey,
+                apiKey: apiKey,
                 baseUrl: "https://api.mistral.ai/v1",
-                model: runtime.model,
+                model: model,
                 system: system,
                 messages: messages
             )
         default:
-            throw APIError.networkError("Unsupported subconscious provider: \(runtime.provider)")
+            throw APIError.networkError("Unsupported subconscious provider: \(provider)")
         }
     }
 
