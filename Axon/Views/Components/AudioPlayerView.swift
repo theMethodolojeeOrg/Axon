@@ -175,6 +175,26 @@ struct AudioPlayerView: View {
                                 .foregroundColor(AppColors.textSecondary)
                         }
                     }
+
+                    if let saveError {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(AppColors.accentError)
+
+                            Text(saveError)
+                                .font(AppTypography.labelSmall())
+                                .foregroundColor(AppColors.accentError)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(AppColors.accentError.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
                 }
                 .padding(16)
                 .background(
@@ -214,6 +234,8 @@ struct AudioPlayerView: View {
     }
 
     private func saveAudio() {
+        saveError = nil
+
         guard let audioExport = ttsService.getCurrentAudioForExport() else {
             saveError = "No audio available to save"
             return
@@ -249,6 +271,7 @@ struct AudioPlayerView: View {
 
                 rootViewController.present(activityVC, animated: true) {
                     // Show success feedback
+                    saveError = nil
                     withAnimation {
                         showingSaveSuccess = true
                     }
@@ -259,9 +282,13 @@ struct AudioPlayerView: View {
                         }
                     }
                 }
+            } else {
+                saveError = "Unable to present share sheet"
             }
         } catch {
-            saveError = "Failed to save audio: \(error.localizedDescription)"
+            DispatchQueue.main.async {
+                saveError = "Failed to save audio: \(error.localizedDescription)"
+            }
         }
     }
     #endif
@@ -279,6 +306,7 @@ struct AudioPlayerView: View {
                 do {
                     try data.write(to: url)
                     DispatchQueue.main.async {
+                        saveError = nil
                         withAnimation {
                             showingSaveSuccess = true
                         }

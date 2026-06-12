@@ -37,6 +37,16 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
     @Published var currentMessageId: String?
     @Published var hasCachedAudio = false // Track if any audio is cached
 
+    private struct CurrentAudioExport {
+        let messageId: String
+        let data: Data
+        let format: TTSAudioFormat
+    }
+
+    private static let searchableAudioFormats: [TTSAudioFormat] = [.mp3, .wav, .m4a, .caf]
+
+    private var currentAudioExport: CurrentAudioExport?
+
     // Cache for generated audio by message ID
     private var audioCache: [String: Data] = [:] {
         didSet {
@@ -92,6 +102,7 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         currentTime = 0
         duration = 0
         generationToken = nil
+        currentAudioExport = nil
     }
 
     func pause() {
@@ -112,10 +123,9 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
     func hasGeneratedAudio(for messageId: String, settings: AppSettings? = nil) -> Bool {
         let key = cacheKey(for: messageId, settings: settings)
         if audioCache[key] != nil { return true }
-        // Check all formats on disk (mp3, wav, m4a)
-        return FileManager.default.fileExists(atPath: audioFileURL(for: key, format: .mp3).path) ||
-               FileManager.default.fileExists(atPath: audioFileURL(for: key, format: .wav).path) ||
-               FileManager.default.fileExists(atPath: audioFileURL(for: key, format: .m4a).path)
+        return Self.searchableAudioFormats.contains { format in
+            FileManager.default.fileExists(atPath: audioFileURL(for: key, format: format).path)
+        }
     }
 
     /// Get the currently playing audio data and format for saving/exporting
@@ -123,18 +133,27 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
     func getCurrentAudioForExport() -> (data: Data, format: TTSAudioFormat, suggestedFilename: String)? {
         guard let messageId = currentMessageId else { return nil }
 
-        // Check memory cache first
-        if let data = audioCache[messageId] {
-            let format = audioFormatCache[messageId] ?? .mp3
-            let filename = generateFilename(for: messageId, format: format)
-            return (data, format, filename)
+        if let currentAudioExport, currentAudioExport.messageId == messageId {
+            let filename = generateFilename(for: messageId, format: currentAudioExport.format)
+            return (currentAudioExport.data, currentAudioExport.format, filename)
         }
 
-        // Try all formats on disk
-        for format in [TTSAudioFormat.mp3, .wav, .m4a] {
-            if let data = loadAudioFromDisk(for: messageId, format: format) {
+        // Check memory cache first
+        for cacheKey in candidateCacheKeys(for: messageId) {
+            if let data = audioCache[cacheKey] {
+                let format = audioFormatCache[cacheKey] ?? .mp3
                 let filename = generateFilename(for: messageId, format: format)
                 return (data, format, filename)
+            }
+
+            // Try all formats on disk
+            for format in Self.searchableAudioFormats {
+                if let data = loadAudioFromDisk(for: cacheKey, format: format) {
+                    audioCache[cacheKey] = data
+                    audioFormatCache[cacheKey] = format
+                    let filename = generateFilename(for: messageId, format: format)
+                    return (data, format, filename)
+                }
             }
         }
 
@@ -185,6 +204,16 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         return "\(messageId)_md\(strip)_sf\(friendly)"
     }
 
+    private func candidateCacheKeys(for messageId: String) -> [String] {
+        [
+            messageId,
+            "\(messageId)_md0_sf0",
+            "\(messageId)_md1_sf0",
+            "\(messageId)_md0_sf1",
+            "\(messageId)_md1_sf1"
+        ]
+    }
+
     private func cacheAudio(_ data: Data, for messageId: String, format: TTSAudioFormat, settings: AppSettings?) {
         let key = cacheKey(for: messageId, settings: settings)
 
@@ -207,8 +236,8 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
             return (data, format)
         }
 
-        // Check disk - try all formats (mp3, wav, m4a)
-        for format in [TTSAudioFormat.mp3, .wav, .m4a] {
+        // Check disk - try all supported TTS export formats
+        for format in Self.searchableAudioFormats {
             if let data = loadAudioFromDisk(for: key, format: format) {
                 // Populate memory cache
                 audioCache[key] = data
@@ -358,6 +387,31 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
             return nil
         }
     }
+
+    #if DEBUG
+    func setCurrentAudioForExportTesting(messageId: String, data: Data, format: TTSAudioFormat) {
+        currentMessageId = messageId
+        currentAudioExport = CurrentAudioExport(messageId: messageId, data: data, format: format)
+    }
+
+    func cacheAudioForExportTesting(_ data: Data, messageId: String, format: TTSAudioFormat, settings: AppSettings?) {
+        currentMessageId = messageId
+        currentAudioExport = nil
+        cacheAudio(data, for: messageId, format: format, settings: settings)
+    }
+
+    func setCurrentMessageIdForExportTesting(_ messageId: String) {
+        currentMessageId = messageId
+        currentAudioExport = nil
+    }
+
+    func resetAudioExportTesting() {
+        currentMessageId = nil
+        currentAudioExport = nil
+        audioCache.removeAll()
+        audioFormatCache.removeAll()
+    }
+    #endif
 
     // MARK: - AVAudioPlayerDelegate
 
@@ -979,6 +1033,11 @@ final class TTSPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegat
         // Set the current message ID
         self.currentMessageId = messageId
         self.currentTime = 0
+        if let messageId {
+            self.currentAudioExport = CurrentAudioExport(messageId: messageId, data: audioData, format: format)
+        } else {
+            self.currentAudioExport = nil
+        }
         print("[TTSPlaybackService] Set currentMessageId to: \(messageId ?? "nil")")
         print("[TTSPlaybackService] isPlaying before play: \(self.isPlaying)")
 
