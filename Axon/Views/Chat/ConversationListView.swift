@@ -98,7 +98,7 @@ struct ConversationListView: View {
                 )
 
                 }
-                .appSheetMaterial()
+                .appSizedSheet(.compactForm)
 }
             .task {
                 await loadConversations()

@@ -137,6 +137,18 @@ class WorkspaceViewModel: ObservableObject {
     }
 
     func startEditing(_ workspace: Workspace) {
+        if selectedWorkspace != nil {
+            selectedWorkspace = nil
+            editingWorkspace = workspace
+            Task { [weak self] in
+                await Task.yield()
+                await MainActor.run {
+                    self?.showEditSheet = true
+                }
+            }
+            return
+        }
+
         editingWorkspace = workspace
         showEditSheet = true
     }

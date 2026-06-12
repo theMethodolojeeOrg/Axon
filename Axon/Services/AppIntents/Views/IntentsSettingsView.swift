@@ -47,14 +47,14 @@ struct IntentsSettingsView: View {
             ImportShortcutSheet()
 
             }
-            .appSheetMaterial()
+            .appSizedSheet(.form)
 }
         .sheet(isPresented: $showingAddPort) {
             Group {
             AddCustomPortSheet()
 
             }
-            .appSheetMaterial()
+            .appSizedSheet(.form)
 }
     }
 
@@ -611,4 +611,3 @@ private struct AddCustomPortSheet: View {
 #Preview {
     IntentsSettingsView()
 }
-

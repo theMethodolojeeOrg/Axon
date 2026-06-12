@@ -53,7 +53,7 @@ struct SharingSettingsView: View {
             RequestDetailSheet(request: request)
 
             }
-            .appSheetMaterial()
+            .appSizedSheet(.detail)
 }
         .sheet(item: $showingInvitationDetail) {
             invitation in
@@ -61,7 +61,7 @@ struct SharingSettingsView: View {
             InvitationDetailSheet(invitation: invitation)
 
             }
-            .appSheetMaterial()
+            .appSizedSheet(.detail)
 }
     }
 

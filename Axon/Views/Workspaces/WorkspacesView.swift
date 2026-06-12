@@ -55,6 +55,7 @@ struct WorkspacesView: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
             // FAB for creating new workspace
             VStack {
@@ -73,7 +74,9 @@ struct WorkspacesView: View {
                     .padding()
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Success/Error toast overlays
         .overlay(alignment: .top) {
             if let message = viewModel.successMessage {
@@ -100,7 +103,7 @@ struct WorkspacesView: View {
                 .environmentObject(viewModel)
 
             }
-            .appSheetMaterial()
+            .appSizedSheet(.form)
 }
         .sheet(isPresented: $viewModel.showEditSheet) {
             Group {
@@ -110,7 +113,7 @@ struct WorkspacesView: View {
             }
 
             }
-            .appSheetMaterial()
+            .appSizedSheet(.form)
 }
         .sheet(item: $viewModel.selectedWorkspace) {
             workspace in
@@ -119,7 +122,7 @@ struct WorkspacesView: View {
                 .environmentObject(viewModel)
 
             }
-            .appSheetMaterial()
+            .appSizedSheet(.detail)
 }
     }
 }

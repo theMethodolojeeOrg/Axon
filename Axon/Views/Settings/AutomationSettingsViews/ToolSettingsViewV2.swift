@@ -61,7 +61,7 @@ struct ToolSettingsViewV2: View {
             })
 
             }
-            .appSheetMaterial()
+            .appSizedSheet(.detail)
 }
     }
 
@@ -950,4 +950,3 @@ private struct ToolSettingsFlowLayout: Layout {
     }
     .background(AppSurfaces.color(.contentBackground))
 }
-

@@ -114,7 +114,7 @@ struct APIKeysSettingsView: View {
             )
 
             }
-            .appSheetMaterial()
+            .appSizedSheet(.compactForm)
 }
         .sheet(item: $selectedCustomProvider) {
             customProvider in
@@ -134,7 +134,7 @@ struct APIKeysSettingsView: View {
             )
 
             }
-            .appSheetMaterial()
+            .appSizedSheet(.compactForm)
 }
     }
 }

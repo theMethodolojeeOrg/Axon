@@ -127,7 +127,7 @@ struct MacSidebarContentView: View {
             WorkspacesView()
 
             }
-            .appSheetMaterial()
+            .appSizedSheet(.browser)
 }
         .task {
             let retention = SettingsStorage.shared.loadSettings()?.archiveRetentionDays ?? 30

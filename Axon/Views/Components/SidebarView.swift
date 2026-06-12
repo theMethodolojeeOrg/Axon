@@ -181,7 +181,7 @@ struct SidebarView: View {
             WorkspacesView()
 
             }
-            .appSheetMaterial()
+            .appSizedSheet(.browser)
 }
     }
 

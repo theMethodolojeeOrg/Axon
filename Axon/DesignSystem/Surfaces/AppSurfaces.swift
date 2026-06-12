@@ -51,6 +51,28 @@ enum AppSurfaces {
     }
 }
 
+enum AppSheetSize {
+    case compactForm
+    case form
+    case detail
+    case browser
+
+    #if os(macOS)
+    var macFrame: (minWidth: CGFloat, idealWidth: CGFloat, minHeight: CGFloat, idealHeight: CGFloat) {
+        switch self {
+        case .compactForm:
+            return (420, 480, 260, 340)
+        case .form:
+            return (480, 560, 500, 650)
+        case .detail:
+            return (560, 680, 540, 720)
+        case .browser:
+            return (640, 760, 560, 720)
+        }
+    }
+    #endif
+}
+
 private struct AppSurfaceModifier: ViewModifier {
     let role: AppSurfaceRole
 
@@ -108,6 +130,40 @@ private struct AppSheetMaterialModifier: ViewModifier {
     }
 }
 
+private struct AppSizedSheetModifier: ViewModifier {
+    let size: AppSheetSize
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if os(macOS)
+        let frame = size.macFrame
+        content
+            .frame(
+                minWidth: frame.minWidth,
+                idealWidth: frame.idealWidth,
+                minHeight: frame.minHeight,
+                idealHeight: frame.idealHeight
+            )
+            .appSheetMaterial()
+        #else
+        switch size {
+        case .compactForm, .form:
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .appSheetMaterial()
+        case .detail, .browser:
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .appSheetMaterial()
+        }
+        #endif
+    }
+}
+
 extension View {
     func appSurface(_ role: AppSurfaceRole) -> some View {
         modifier(AppSurfaceModifier(role: role))
@@ -130,5 +186,9 @@ extension View {
 
     func appSheetMaterial() -> some View {
         modifier(AppSheetMaterialModifier())
+    }
+
+    func appSizedSheet(_ size: AppSheetSize = .form) -> some View {
+        modifier(AppSizedSheetModifier(size: size))
     }
 }
