@@ -416,12 +416,24 @@ final class AgentStateHandler: ToolHandlerV2 {
         }
 
         let targetModelId = request.model ?? currentModelId
-        let availableModels = resolvedChatModels(for: targetProvider)
-        guard availableModels.contains(where: { $0.id == targetModelId }) else {
-            let modelIds = availableModels.map { $0.id }.joined(separator: ", ")
+        let runtimeCatalog = AgentRuntimeCatalog.snapshot(settings: settings)
+        guard let targetProviderStatus = runtimeCatalog.provider(id: targetProvider.rawValue) else {
+            return ToolResultV2.failure(
+                toolId: toolId,
+                error: "Provider '\(targetProvider.rawValue)' is not available in the runtime catalog."
+            )
+        }
+        guard let targetModelStatus = targetProviderStatus.model(id: targetModelId) else {
+            let modelIds = targetProviderStatus.models.map { $0.id }.joined(separator: ", ")
             return ToolResultV2.failure(
                 toolId: toolId,
                 error: "Model '\(targetModelId)' is not available for \(targetProvider.displayName). Available: \(modelIds)"
+            )
+        }
+        guard !hasProviderOrModelMutation || targetModelStatus.usableNow else {
+            return ToolResultV2.failure(
+                toolId: toolId,
+                error: "Model '\(targetModelId)' is not usable for \(targetProvider.displayName): \(targetModelStatus.unavailableReason ?? targetProviderStatus.unavailableReason ?? "runtime target is unavailable")"
             )
         }
 
@@ -718,11 +730,6 @@ final class AgentStateHandler: ToolHandlerV2 {
         return nil
     }
 
-    private func resolvedChatModels(for provider: AIProvider) -> [AIModel] {
-        let registryModels = UnifiedModelRegistry.shared.chatModels(for: provider)
-        return registryModels.isEmpty ? provider.availableModels : registryModels
-    }
-
     private func parseBuiltInProvider(_ value: String) -> AIProvider? {
         let normalized = normalizeProviderString(value).trimmingCharacters(in: .whitespacesAndNewlines)
         if let direct = AIProvider(rawValue: normalized) {
@@ -830,5 +837,236 @@ final class AgentStateHandler: ToolHandlerV2 {
             return double
         }
         return nil
+    }
+}
+
+@MainActor
+enum AgentRuntimeCatalog {
+    struct Snapshot {
+        let providers: [ProviderStatus]
+
+        func provider(id: String) -> ProviderStatus? {
+            providers.first { $0.id == id }
+        }
+
+        var structured: [String: Any] {
+            [
+                "providers": providers.map(\.structured)
+            ]
+        }
+
+        var markdown: String {
+            var lines: [String] = []
+            lines.append("\n## Runtime Options")
+            lines.append("")
+            lines.append("Use these provider/model ids with `agent_state_configure_runtime`. `usableNow` reflects configured local state; catalog entries that are not usable are listed with a reason.")
+            lines.append("")
+
+            for provider in providers {
+                let status = provider.usableNow ? "usable" : "unavailable"
+                let reason = provider.unavailableReason.map { " - \($0)" } ?? ""
+                lines.append("### \(provider.displayName) (`\(provider.id)`) - \(status)\(reason)")
+                lines.append("- configuredKey: \(provider.configuredKey)")
+                lines.append("- deviceAvailable: \(provider.deviceAvailable)")
+                lines.append("- models:")
+
+                for model in provider.models {
+                    let modelStatus = model.usableNow ? "usable" : "unavailable"
+                    let modelReason = model.unavailableReason.map { " - \($0)" } ?? ""
+                    lines.append("  - `\(model.id)` (\(model.name)): \(modelStatus)\(modelReason)")
+                }
+                lines.append("")
+            }
+
+            return lines.joined(separator: "\n")
+        }
+    }
+
+    struct ProviderStatus {
+        let id: String
+        let displayName: String
+        let configuredKey: Bool
+        let deviceAvailable: Bool
+        let modelExists: Bool
+        let usableNow: Bool
+        let unavailableReason: String?
+        let models: [ModelStatus]
+
+        func model(id: String) -> ModelStatus? {
+            models.first { $0.id == id }
+        }
+
+        var structured: [String: Any] {
+            [
+                "id": id,
+                "displayName": displayName,
+                "configuredKey": configuredKey,
+                "deviceAvailable": deviceAvailable,
+                "modelExists": modelExists,
+                "usableNow": usableNow,
+                "unavailableReason": unavailableReason.map { $0 as Any } ?? NSNull(),
+                "models": models.map(\.structured)
+            ]
+        }
+    }
+
+    struct ModelStatus {
+        let id: String
+        let name: String
+        let configuredKey: Bool
+        let deviceAvailable: Bool
+        let modelExists: Bool
+        let usableNow: Bool
+        let unavailableReason: String?
+
+        var structured: [String: Any] {
+            [
+                "id": id,
+                "name": name,
+                "configuredKey": configuredKey,
+                "deviceAvailable": deviceAvailable,
+                "modelExists": modelExists,
+                "usableNow": usableNow,
+                "unavailableReason": unavailableReason.map { $0 as Any } ?? NSNull()
+            ]
+        }
+    }
+
+    static var apiKeyConfiguredOverride: ((APIProvider) -> Bool)?
+    static var providerAvailabilityOverride: ((AIProvider) -> Bool)?
+    static var mlxModelDownloadedOverride: ((String) -> Bool)?
+
+    static func resetTestingOverrides() {
+        apiKeyConfiguredOverride = nil
+        providerAvailabilityOverride = nil
+        mlxModelDownloadedOverride = nil
+    }
+
+    static func snapshot() -> Snapshot {
+        snapshot(settings: SettingsViewModel.shared.settings)
+    }
+
+    static func snapshot(settings: AppSettings) -> Snapshot {
+        Snapshot(providers: AIProvider.allCases.map { providerStatus(for: $0, settings: settings) })
+    }
+
+    private static func providerStatus(for provider: AIProvider, settings: AppSettings) -> ProviderStatus {
+        let models = ProviderKitModelCatalogAdapter.models(for: provider)
+        let configuredKey = isKeyConfigured(for: provider)
+        let deviceAvailable = isDeviceAvailable(for: provider)
+        let providerReason = providerUnavailableReason(
+            provider: provider,
+            configuredKey: configuredKey,
+            deviceAvailable: deviceAvailable,
+            hasModels: !models.isEmpty
+        )
+        let modelStatuses = models.map { model in
+            modelStatus(
+                model,
+                provider: provider,
+                configuredKey: configuredKey,
+                deviceAvailable: deviceAvailable,
+                providerReason: providerReason,
+                settings: settings
+            )
+        }
+        let usableNow = modelStatuses.contains { $0.usableNow }
+
+        return ProviderStatus(
+            id: provider.rawValue,
+            displayName: provider.displayName,
+            configuredKey: configuredKey,
+            deviceAvailable: deviceAvailable,
+            modelExists: !models.isEmpty,
+            usableNow: usableNow,
+            unavailableReason: usableNow ? nil : providerReason ?? "No usable models are available.",
+            models: modelStatuses
+        )
+    }
+
+    private static func modelStatus(
+        _ model: AIModel,
+        provider: AIProvider,
+        configuredKey: Bool,
+        deviceAvailable: Bool,
+        providerReason: String?,
+        settings: AppSettings
+    ) -> ModelStatus {
+        let modelExists = true
+        let localReason = localModelUnavailableReason(model: model, provider: provider, settings: settings)
+        let unavailableReason = providerReason ?? localReason
+        let usableNow = configuredKey && deviceAvailable && modelExists && unavailableReason == nil
+
+        return ModelStatus(
+            id: model.id,
+            name: model.name,
+            configuredKey: configuredKey,
+            deviceAvailable: deviceAvailable,
+            modelExists: modelExists,
+            usableNow: usableNow,
+            unavailableReason: unavailableReason
+        )
+    }
+
+    private static func isKeyConfigured(for provider: AIProvider) -> Bool {
+        guard let apiProvider = provider.apiProvider else {
+            return true
+        }
+        if let override = apiKeyConfiguredOverride {
+            return override(apiProvider)
+        }
+        return APIKeysStorage.shared.isConfigured(apiProvider)
+    }
+
+    private static func isDeviceAvailable(for provider: AIProvider) -> Bool {
+        if let override = providerAvailabilityOverride {
+            return override(provider)
+        }
+        return provider.isAvailable
+    }
+
+    private static func providerUnavailableReason(
+        provider: AIProvider,
+        configuredKey: Bool,
+        deviceAvailable: Bool,
+        hasModels: Bool
+    ) -> String? {
+        if !hasModels {
+            return "No ProviderKit models are available for \(provider.displayName)."
+        }
+        if !deviceAvailable {
+            return provider.unavailableReason ?? "\(provider.displayName) is not available on this device."
+        }
+        if !configuredKey, let apiProvider = provider.apiProvider {
+            return "Missing API key for \(apiProvider.displayName)."
+        }
+        return nil
+    }
+
+    private static func localModelUnavailableReason(
+        model: AIModel,
+        provider: AIProvider,
+        settings: AppSettings
+    ) -> String? {
+        guard provider == .localMLX else {
+            return nil
+        }
+        if isMLXModelPresent(model.id, settings: settings) {
+            return nil
+        }
+        return "MLX model is not bundled or downloaded."
+    }
+
+    private static func isMLXModelPresent(_ modelId: String, settings: AppSettings) -> Bool {
+        if LocalMLXModel(rawValue: modelId)?.isBundled == true {
+            return true
+        }
+        if settings.userMLXModels.contains(where: { $0.repoId == modelId && $0.downloadStatus == .downloaded }) {
+            return true
+        }
+        if let override = mlxModelDownloadedOverride {
+            return override(modelId)
+        }
+        return MLXModelService.shared.isModelDownloaded(modelId: modelId)
     }
 }

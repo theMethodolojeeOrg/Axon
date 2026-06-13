@@ -124,14 +124,22 @@ final class DiscoveryHandler: ToolHandlerV2 {
                 output += "- **\(name)\(required)** (\(param.type.rawValue)): \(param.description ?? "")\n"
             }
         }
+
+        var structured: [String: Any] = [
+            "id": manifest.tool.id,
+            "name": manifest.tool.name
+        ]
+
+        if manifest.tool.id == "agent_state_configure_runtime" {
+            let runtimeOptions = AgentRuntimeCatalog.snapshot()
+            output += runtimeOptions.markdown
+            structured["runtimeOptions"] = runtimeOptions.structured
+        }
         
         return ToolResultV2.success(
             toolId: "get_tool_details",
             output: output,
-            structured: [
-                "id": manifest.tool.id,
-                "name": manifest.tool.name
-            ]
+            structured: structured
         )
     }
     

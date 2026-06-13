@@ -94,7 +94,7 @@
     "handler": "agent_state"
   },
   "ai": {
-    "systemPromptSection": "### agent_state_configure_runtime\nConfigure your runtime provider/model/sampling for this conversation or a temporary turn lease.\n\nUse JSON input:\n```tool_request\n{\"tool\":\"agent_state_configure_runtime\",\"query\":\"{\\\"action\\\":\\\"set\\\",\\\"scope\\\":\\\"turn\\\",\\\"turns\\\":2,\\\"provider\\\":\\\"anthropic\\\",\\\"model\\\":\\\"claude-sonnet-4-6\\\",\\\"sampling\\\":{\\\"temperature\\\":0.3}}\"}\n```",
+    "systemPromptSection": "### agent_state_configure_runtime\nConfigure your runtime provider/model/sampling for this conversation or a temporary turn lease.\n\nCall `get_tool_details` with `agent_state_configure_runtime` to inspect the current ProviderKit-backed provider/model catalog, including key/device/download availability and `usableNow` status.\n\nUse JSON input:\n```tool_request\n{\"tool\":\"agent_state_configure_runtime\",\"query\":\"{\\\"action\\\":\\\"set\\\",\\\"scope\\\":\\\"turn\\\",\\\"turns\\\":2,\\\"provider\\\":\\\"anthropic\\\",\\\"model\\\":\\\"claude-sonnet-4-6\\\",\\\"sampling\\\":{\\\"temperature\\\":0.3}}\"}\n```",
     "usageExamples": [
       {
         "description": "Set a 2-turn lease on provider/model",
