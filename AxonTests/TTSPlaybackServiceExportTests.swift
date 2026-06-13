@@ -71,6 +71,28 @@ final class TTSPlaybackServiceExportTests: XCTestCase {
         XCTAssertEqual(exported?.suggestedFilename.hasSuffix(".caf"), true)
     }
 
+    func testClearingMemoryCacheKeepsDiskBackedAudioExportAvailable() {
+        let messageId = uniqueMessageId()
+        let audioData = Data([0x49, 0x44, 0x33, 0x09, 0x08, 0x07])
+
+        service.cacheAudioForExportTesting(
+            audioData,
+            messageId: messageId,
+            format: .mp3,
+            settings: nil
+        )
+        defer { cleanupAudioFile(cacheKey: messageId, format: .mp3) }
+
+        service.clearMemoryCache()
+        service.setCurrentMessageIdForExportTesting(messageId)
+
+        let exported = service.getCurrentAudioForExport()
+
+        XCTAssertEqual(exported?.data, audioData)
+        XCTAssertEqual(exported?.format, .mp3)
+        XCTAssertEqual(exported?.suggestedFilename.hasSuffix(".mp3"), true)
+    }
+
     private func uniqueMessageId() -> String {
         "tts-export-\(UUID().uuidString)"
     }

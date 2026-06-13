@@ -45,7 +45,11 @@ class ConversationSearchService: ObservableObject {
 
         for conversation in toSearch {
             // Load messages for this conversation
-            let messages = syncManager.loadLocalMessages(conversationId: conversation.id)
+            let messages = syncManager.loadLocalMessages(
+                conversationId: conversation.id,
+                limit: 100,
+                includeHeavyFields: false
+            )
 
             // Skip empty conversations
             guard !messages.isEmpty else { continue }

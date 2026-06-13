@@ -108,13 +108,13 @@ class CloudConversationOrchestrator: ConversationOrchestrator {
                 let resolvedMimeType = AttachmentMimePolicyService.resolveMimeType(for: attachment)
                 switch attachment.type {
                 case .image:
-                    if let base64 = attachment.base64 {
+                    if let base64 = try? attachment.inlineBase64() {
                         parts.append(.object([
                             "type": .string("image_base64"),
                             "media_type": .string(resolvedMimeType),
                             "data": .string(base64)
                         ]))
-                    } else if let url = attachment.url {
+                    } else if let url = attachment.remoteURLString {
                         parts.append(.object([
                             "type": .string("image_url"),
                             "image_url": .object([
@@ -123,13 +123,13 @@ class CloudConversationOrchestrator: ConversationOrchestrator {
                         ]))
                     }
                 case .document:
-                    if let base64 = attachment.base64 {
+                    if let base64 = try? attachment.inlineBase64() {
                         parts.append(.object([
                             "type": .string("file_base64"),
                             "media_type": .string(resolvedMimeType),
                             "data": .string(base64)
                         ]))
-                    } else if let url = attachment.url {
+                    } else if let url = attachment.remoteURLString {
                         var fileUrlDict: [String: AnyCodable] = ["url": .string(url)]
                         fileUrlDict["mime_type"] = .string(resolvedMimeType)
 
@@ -139,13 +139,13 @@ class CloudConversationOrchestrator: ConversationOrchestrator {
                         ]))
                     }
                 case .audio:
-                    if let base64 = attachment.base64 {
+                    if let base64 = try? attachment.inlineBase64() {
                         parts.append(.object([
                             "type": .string("audio_base64"),
                             "media_type": .string(resolvedMimeType),
                             "data": .string(base64)
                         ]))
-                    } else if let url = attachment.url {
+                    } else if let url = attachment.remoteURLString {
                         parts.append(.object([
                             "type": .string("audio_url"),
                             "audio_url": .object([
@@ -154,13 +154,13 @@ class CloudConversationOrchestrator: ConversationOrchestrator {
                         ]))
                     }
                 case .video:
-                    if let base64 = attachment.base64 {
+                    if let base64 = try? attachment.inlineBase64() {
                         parts.append(.object([
                             "type": .string("video_base64"),
                             "media_type": .string(resolvedMimeType),
                             "data": .string(base64)
                         ]))
-                    } else if let url = attachment.url {
+                    } else if let url = attachment.remoteURLString {
                         parts.append(.object([
                             "type": .string("video_url"),
                             "video_url": .object([

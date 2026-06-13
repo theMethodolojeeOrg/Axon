@@ -2704,12 +2704,12 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
         // Add image attachments
         for attachment in msg.attachments ?? [] where attachment.type == .image {
-            if let urlStr = attachment.url, let url = URL(string: urlStr) {
+            if let urlStr = attachment.remoteURLString, let url = URL(string: urlStr) {
                 parts.append([
                     "type": "image_url",
                     "image_url": ["url": url.absoluteString]
                 ])
-            } else if let base64 = attachment.base64 {
+            } else if let base64 = try? attachment.inlineBase64() {
                 let mimeType = AttachmentMimePolicyService.resolveMimeType(for: attachment)
                 parts.append([
                     "type": "image_url",
@@ -2876,12 +2876,12 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
         // Add image attachments
         for attachment in msg.attachments ?? [] where attachment.type == .image {
-            if let urlStr = attachment.url, let url = URL(string: urlStr) {
+            if let urlStr = attachment.remoteURLString, let url = URL(string: urlStr) {
                 parts.append([
                     "type": "image_url",
                     "image_url": ["url": url.absoluteString]
                 ])
-            } else if let base64 = attachment.base64 {
+            } else if let base64 = try? attachment.inlineBase64() {
                 let mimeType = AttachmentMimePolicyService.resolveMimeType(for: attachment)
                 parts.append([
                     "type": "image_url",
@@ -3065,7 +3065,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
     private func anthropicMediaBlock(type: String, attachment: MessageAttachment) -> [String: Any]? {
         let mimeType = resolvedMimeType(for: attachment)
 
-        if let base64 = attachment.base64 {
+        if let base64 = try? attachment.inlineBase64() {
             // Base64 encoded content
             return [
                 "type": type,
@@ -3075,7 +3075,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     "data": base64
                 ]
             ]
-        } else if let url = attachment.url {
+        } else if let url = attachment.remoteURLString {
             // URL-based content (supported since March 2025)
             return [
                 "type": type,
@@ -3107,7 +3107,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             switch attachment.type {
             case .image:
                 // Image support via image_url
-                if let base64 = attachment.base64 {
+                if let base64 = try? attachment.inlineBase64() {
                     parts.append([
                         "type": "image_url",
                         "image_url": [
@@ -3115,7 +3115,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                             "detail": "high"
                         ]
                     ])
-                } else if let url = attachment.url {
+                } else if let url = attachment.remoteURLString {
                     parts.append([
                         "type": "image_url",
                         "image_url": [
@@ -3127,7 +3127,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
 
             case .audio:
                 // GPT-4o supports audio via input_audio
-                if let base64 = attachment.base64 {
+                if let base64 = try? attachment.inlineBase64() {
                     // Format: audio/wav, audio/mp3, etc. -> extract format
                     let format = mimeType.components(separatedBy: "/").last ?? "wav"
                     parts.append([
@@ -3137,7 +3137,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                             "format": format
                         ]
                     ])
-                } else if attachment.url != nil {
+                } else if attachment.remoteURLString != nil || attachment.localFileURL != nil {
                     print("[OnDeviceOrchestrator] OpenAI/OpenAI-compatible payload dropped audio URL attachment '\(attachment.name ?? attachment.id)' (\(mimeType)); input_audio requires inline/base64 data.")
                 }
                 // Note: OpenAI doesn't support audio URLs directly
@@ -3182,7 +3182,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             // Only support JPEG and PNG per xAI docs
             guard mimeType == "image/jpeg" || mimeType == "image/png" else { continue }
 
-            if let base64 = attachment.base64 {
+            if let base64 = try? attachment.inlineBase64() {
                 parts.append([
                     "type": "image_url",
                     "image_url": [
@@ -3190,7 +3190,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                         "detail": "high"
                     ]
                 ])
-            } else if let url = attachment.url {
+            } else if let url = attachment.remoteURLString {
                 parts.append([
                     "type": "image_url",
                     "image_url": [
@@ -3218,15 +3218,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         for attachment in message.attachments ?? [] {
             let mimeType = resolvedMimeType(for: attachment)
 
-            if let base64 = attachment.base64 {
-                // Check file size for inline data (Gemini limit is 20MB)
-                if let data = Data(base64Encoded: base64) {
-                    let fileSizeMB = Double(data.count) / (1024 * 1024)
-                    if fileSizeMB > 20 {
-                        print("[OnDeviceOrchestrator] Warning: Attachment '\(attachment.name ?? "unknown")' is \(String(format: "%.1f", fileSizeMB))MB, which exceeds Gemini's 20MB inline limit.")
-                    }
-                }
-
+            if let base64 = try? attachment.inlineBase64() {
                 // Inline data for base64 encoded content
                 // Per Gemini docs: mime_type is crucial for ALL non-image files
                 parts.append([
@@ -3235,7 +3227,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                         "data": base64
                     ]
                 ])
-            } else if let url = attachment.url {
+            } else if let url = attachment.remoteURLString {
                 // File data for URLs - include mime_type for all media types
                 // Per Gemini docs: mime_type is crucial for PDFs, audio, and video
                 var fileData: [String: Any] = ["file_uri": url]

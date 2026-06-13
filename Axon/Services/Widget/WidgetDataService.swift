@@ -61,7 +61,10 @@ final class WidgetDataService {
 
         for conversation in recentConversations {
             // Load messages for each conversation
-            let messages = localStore.loadMessages(conversationId: conversation.id)
+            let messages = (try? localStore.loadMessages(
+                for: conversation.id,
+                limit: maxMessagesPerConversation
+            )) ?? []
             let snapshot = createSnapshot(from: conversation, messages: messages)
             updateRecentConversations(&store, with: snapshot)
         }

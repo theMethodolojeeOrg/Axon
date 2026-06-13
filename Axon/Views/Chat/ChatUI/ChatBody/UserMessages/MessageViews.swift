@@ -279,8 +279,8 @@ struct UserMessageView: View {
     @ViewBuilder
     private func attachmentView(for attachment: MessageAttachment) -> some View {
         #if canImport(UIKit)
-        if attachment.type == .image, let base64 = attachment.base64,
-           let data = Data(base64Encoded: base64),
+        if attachment.type == .image,
+           let data = try? attachment.inlineData(),
            let uiImage = UIImage(data: data) {
             Image(uiImage: uiImage)
                 .resizable()
@@ -490,8 +490,8 @@ struct AssistantMessageView: View {
     @ViewBuilder
     private func attachmentView(for attachment: MessageAttachment) -> some View {
         #if canImport(UIKit)
-        if attachment.type == .image, let base64 = attachment.base64,
-           let data = Data(base64Encoded: base64),
+        if attachment.type == .image,
+           let data = try? attachment.inlineData(),
            let uiImage = UIImage(data: data) {
             Image(uiImage: uiImage)
                 .resizable()

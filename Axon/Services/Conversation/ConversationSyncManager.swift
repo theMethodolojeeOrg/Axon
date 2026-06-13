@@ -506,16 +506,30 @@ class ConversationSyncManager: ObservableObject {
         }
     }
 
-    /// Load messages for a conversation from Core Data
-    func loadLocalMessages(conversationId: String) -> [Message] {
+    /// Load messages for a conversation from Core Data.
+    /// - Parameters:
+    ///   - limit: When set, fetches the most recent N messages and returns them oldest-first.
+    ///   - includeHeavyFields: Set false for search/context scans that do not need attachments,
+    ///     tool payloads, reasoning, or debug JSON.
+    func loadLocalMessages(
+        conversationId: String,
+        limit: Int? = nil,
+        includeHeavyFields: Bool = true
+    ) -> [Message] {
         let context = persistence.container.viewContext
         let fetchRequest: NSFetchRequest<MessageEntity> = MessageEntity.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "conversationId == %@", conversationId)
-        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: true)]
+        fetchRequest.sortDescriptors = [
+            NSSortDescriptor(key: "timestamp", ascending: limit == nil)
+        ]
+        fetchRequest.fetchBatchSize = min(limit ?? 100, 100)
+        if let limit {
+            fetchRequest.fetchLimit = limit
+        }
 
         do {
             let entities = try context.fetch(fetchRequest)
-            return entities.compactMap { entity in
+            let messages: [Message] = entities.compactMap { entity -> Message? in
                 guard let id = entity.id,
                       let conversationId = entity.conversationId,
                       let roleString = entity.role,
@@ -523,6 +537,20 @@ class ConversationSyncManager: ObservableObject {
                       let content = entity.content,
                       let timestamp = entity.timestamp else {
                     return nil
+                }
+
+                guard includeHeavyFields else {
+                    return Message(
+                        id: id,
+                        conversationId: conversationId,
+                        role: role,
+                        content: content,
+                        hiddenReason: entity.hiddenReason,
+                        timestamp: timestamp,
+                        modelName: entity.modelName,
+                        providerName: entity.providerName,
+                        isDeleted: entity.messageIsDeleted ? true : nil
+                    )
                 }
 
                 // Deserialize attachments from JSON if present
@@ -581,9 +609,11 @@ class ConversationSyncManager: ObservableObject {
                     memoryOperations: memoryOperations,
                     reasoning: reasoning,
                     contextDebugInfo: contextDebugInfo,
-                    liveToolCalls: liveToolCalls
+                    liveToolCalls: liveToolCalls,
+                    isDeleted: entity.messageIsDeleted ? true : nil
                 )
             }
+            return limit == nil ? messages : Array(messages.reversed())
         } catch {
             print("[ConversationSyncManager] Error loading local messages: \(error)")
             return []

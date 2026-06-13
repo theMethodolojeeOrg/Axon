@@ -8,8 +8,8 @@ import Foundation
 /// Builds a ZIP bundle containing JSON + Markdown + attachment payloads where possible.
 ///
 /// Attachment strategy:
-/// - If MessageAttachment.base64 is present, we write it into attachments/<messageId>/<attachmentId>.<ext>
-/// - If attachment only has a URL, we do NOT download it (no network surprises). We include a small .json reference file.
+/// - If MessageAttachment has inline base64 or a local file URL, we write bytes into attachments/<messageId>/<attachmentId>.<ext>
+/// - If attachment only has a remote URL, we do NOT download it (no network surprises). We include a small .json reference file.
 ///
 /// Implementation note:
 /// We use the system `zip` command on macOS (available by default) via `Process`.
@@ -47,8 +47,7 @@ struct ChatZipExporter {
             for attachment in attachments {
                 let attachmentId = attachment.id
 
-                if let base64 = attachment.base64 {
-                    let data = Data(base64Encoded: base64) ?? Data()
+                if let data = attachmentData(for: attachment) {
                     let ext = fileExtension(for: attachment)
                     let filename = "\(attachmentId).\(ext)"
                     try data.write(to: msgFolder.appendingPathComponent(filename), options: .atomic)
@@ -93,6 +92,15 @@ struct ChatZipExporter {
         #endif
 
         return zipURL
+    }
+
+    private func attachmentData(for attachment: MessageAttachment) -> Data? {
+        if let base64 = attachment.base64 {
+            return Data(base64Encoded: base64)
+        }
+
+        guard let fileURL = attachment.localFileURL else { return nil }
+        return try? Data(contentsOf: fileURL)
     }
 
     private func fileExtension(for attachment: MessageAttachment) -> String {

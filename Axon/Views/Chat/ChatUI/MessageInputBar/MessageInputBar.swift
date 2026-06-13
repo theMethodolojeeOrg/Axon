@@ -30,6 +30,52 @@ extension MessageAttachment.AttachmentType {
     }
 }
 
+private enum MessageAttachmentFileStore {
+    static func makeAttachment(
+        data: Data,
+        type: MessageAttachment.AttachmentType,
+        name: String,
+        mimeType: String?
+    ) throws -> MessageAttachment {
+        guard data.count <= MessageAttachment.maxInlinePayloadBytes else {
+            throw NSError(
+                domain: "MessageAttachmentFileStore",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Attachment is larger than the 20 MB inline send limit."]
+            )
+        }
+
+        let directory = try attachmentsDirectory()
+        let safeName = sanitizedFileName(name)
+        let fileURL = directory.appendingPathComponent("\(UUID().uuidString)-\(safeName)")
+        try data.write(to: fileURL, options: .atomic)
+
+        return MessageAttachment(
+            type: type,
+            url: fileURL.absoluteString,
+            base64: nil,
+            name: name,
+            mimeType: mimeType
+        )
+    }
+
+    private static func attachmentsDirectory() throws -> URL {
+        let directory = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Axon/Attachments", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    private static func sanitizedFileName(_ name: String) -> String {
+        let cleaned = name
+            .components(separatedBy: CharacterSet(charactersIn: "/:\\?%*|\"<>"))
+            .joined(separator: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? "attachment" : cleaned
+    }
+}
+
 // MARK: - Attachment Hub
 
 private struct AttachmentHubSheet: View {
@@ -924,8 +970,7 @@ struct MessageInputBar: View {
         ZStack(alignment: .topTrailing) {
             // Preview
             if attachment.wrappedValue.type == .image,
-               let base64 = attachment.wrappedValue.base64,
-               let data = Data(base64Encoded: base64),
+               let data = try? attachment.wrappedValue.inlineData(),
                let image = PlatformImageCodec.image(from: data) {
                 #if canImport(UIKit)
                 Image(uiImage: image)
@@ -1183,10 +1228,9 @@ struct MessageInputBar: View {
                     return
                 }
 
-                let base64 = compressedData.base64EncodedString()
-                let attachment = MessageAttachment(
+                let attachment = try MessageAttachmentFileStore.makeAttachment(
+                    data: compressedData,
                     type: .image,
-                    base64: base64,
                     name: "image.jpg",
                     mimeType: "image/jpeg"
                 )
@@ -1221,7 +1265,6 @@ struct MessageInputBar: View {
 
             do {
                 let data = try Data(contentsOf: url)
-                let base64 = data.base64EncodedString()
 
                 // Check file size for video
                 if type == .video {
@@ -1231,9 +1274,9 @@ struct MessageInputBar: View {
                     }
                 }
 
-                let attachment = MessageAttachment(
+                let attachment = try MessageAttachmentFileStore.makeAttachment(
+                    data: data,
                     type: type,
-                    base64: base64,
                     name: url.lastPathComponent,
                     mimeType: url.mimeType
                 )
@@ -1273,11 +1316,10 @@ struct MessageInputBar: View {
 
             do {
                 let data = try Data(contentsOf: url)
-                let base64 = data.base64EncodedString()
 
-                let attachment = MessageAttachment(
+                let attachment = try MessageAttachmentFileStore.makeAttachment(
+                    data: data,
                     type: url.attachmentType,
-                    base64: base64,
                     name: url.lastPathComponent,
                     mimeType: url.mimeType
                 )

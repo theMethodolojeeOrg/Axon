@@ -221,6 +221,14 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
         debugLog(.liveSession, "Mic toggled: \(self.isMicEnabled ? "enabled" : "disabled")")
     }
 
+    func handleMemoryPressure() {
+        threadService.handleMemoryPressure()
+        if latestTranscript.count > 20_000 {
+            latestTranscript = String(latestTranscript.suffix(20_000))
+        }
+        debugLog(.liveSession, "Handled memory pressure")
+    }
+
     private func startAudioEngine() async throws {
         debugLog(.liveSession, "🎤 Initializing AVAudioEngine...")
 
@@ -409,6 +417,9 @@ class LiveSessionService: ObservableObject, LiveProviderDelegate {
     func onTextDelta(_ text: String) {
         debugLog(.liveSession, "Text delta: \(text)")
         latestTranscript += text
+        if latestTranscript.count > 20_000 {
+            latestTranscript = String(latestTranscript.suffix(20_000))
+        }
 
         // Record assistant transcript (streaming)
         if isRecordingEnabled {

@@ -512,14 +512,18 @@ class ConversationService: ObservableObject {
 
     // MARK: - Messages
 
-    func getMessages(conversationId: String, limit: Int = 50) async throws -> [Message] {
+    func getMessages(conversationId: String, limit: Int = 200) async throws -> [Message] {
         print("[ConversationService] 📥 getMessages called")
         print("[ConversationService] Conversation ID: \(conversationId)")
         print("[ConversationService] Limit: \(limit)")
 
         // For local-only conversations, always use local store
         if conversationId.hasPrefix("local_") {
-            let localMessages = localStore.loadMessages(conversationId: conversationId)
+            let localMessages = syncManager.loadLocalMessages(
+                conversationId: conversationId,
+                limit: limit,
+                includeHeavyFields: true
+            )
             print("[ConversationService] ✅ Loaded \(localMessages.count) messages from local store (offline conversation)")
             self.messages = localMessages
             return localMessages
@@ -531,7 +535,11 @@ class ConversationService: ObservableObject {
         print("[ConversationService] Expected message count from conversation: \(expectedMessageCount)")
 
         // First, load from Core Data (instant)
-        let localMessages = syncManager.loadLocalMessages(conversationId: conversationId)
+        let localMessages = syncManager.loadLocalMessages(
+            conversationId: conversationId,
+            limit: limit,
+            includeHeavyFields: true
+        )
         print("[ConversationService] Local messages in Core Data: \(localMessages.count)")
 
         // If no backend configured, always use local messages
@@ -542,7 +550,8 @@ class ConversationService: ObservableObject {
         }
 
         // Only use local messages if we have ALL of them
-        if !localMessages.isEmpty && localMessages.count >= expectedMessageCount {
+        let expectedBound = expectedMessageCount > 0 ? min(expectedMessageCount, limit) : limit
+        if !localMessages.isEmpty && localMessages.count >= expectedBound {
             print("[ConversationService] ✅ Loaded \(localMessages.count) messages from Core Data (complete)")
             self.messages = localMessages
             return localMessages
@@ -558,13 +567,17 @@ class ConversationService: ObservableObject {
     }
 
     /// Force refresh messages from API (for pull-to-refresh)
-    func refreshMessages(conversationId: String, limit: Int = 50) async throws -> [Message] {
+    func refreshMessages(conversationId: String, limit: Int = 200) async throws -> [Message] {
         print("[ConversationService] 🔄 refreshMessages called")
         print("[ConversationService] Conversation ID: \(conversationId)")
 
         // If no backend configured, just return local messages
         guard apiClient.isBackendConfigured else {
-            let localMessages = syncManager.loadLocalMessages(conversationId: conversationId)
+            let localMessages = syncManager.loadLocalMessages(
+                conversationId: conversationId,
+                limit: limit,
+                includeHeavyFields: true
+            )
             print("[ConversationService] No backend configured, returning \(localMessages.count) local messages")
             self.messages = localMessages
             return localMessages
@@ -614,6 +627,12 @@ class ConversationService: ObservableObject {
             self.error = error.localizedDescription
             throw error
         }
+    }
+
+    func trimLoadedMessagesForMemoryPressure(maxCount: Int = 120) {
+        guard messages.count > maxCount else { return }
+        messages = Array(messages.suffix(maxCount))
+        print("[ConversationService] Trimmed loaded messages to \(messages.count) after memory pressure")
     }
 
     // MARK: - Orchestration

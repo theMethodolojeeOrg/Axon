@@ -156,15 +156,7 @@ class GeminiToolService: ObservableObject {
         for attachment in message.attachments ?? [] {
             let mimeType = resolvedMimeType(for: attachment)
 
-            if let base64 = attachment.base64 {
-                // Check file size for inline data (Gemini limit is 20MB)
-                if let data = Data(base64Encoded: base64) {
-                    let fileSizeMB = Double(data.count) / (1024 * 1024)
-                    if fileSizeMB > 20 {
-                        print("[GeminiToolService] Warning: Attachment '\(attachment.name ?? "unknown")' is \(String(format: "%.1f", fileSizeMB))MB, which exceeds Gemini's 20MB inline limit.")
-                    }
-                }
-
+            if let base64 = try? attachment.inlineBase64() {
                 // Inline data for base64 encoded content (files <20MB)
                 // Per Gemini docs: mime_type is crucial for ALL non-image files
                 parts.append([
@@ -173,7 +165,7 @@ class GeminiToolService: ObservableObject {
                         "data": base64
                     ]
                 ])
-            } else if let url = attachment.url {
+            } else if let url = attachment.remoteURLString {
                 // File data for URLs - include mime_type for all media types
                 // Per Gemini docs: mime_type is crucial for PDFs, audio, and video
                 var fileData: [String: Any] = ["file_uri": url]

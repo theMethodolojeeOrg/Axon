@@ -259,5 +259,14 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             print("[AppDelegate] API Server stopped")
         }
     }
+
+    func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
+        Task { @MainActor in
+            LiveSessionService.shared.handleMemoryPressure()
+            TTSPlaybackService.shared.clearMemoryCache()
+            ConversationService.shared.trimLoadedMessagesForMemoryPressure()
+            print("[AppDelegate] Memory warning handled")
+        }
+    }
 }
 #endif

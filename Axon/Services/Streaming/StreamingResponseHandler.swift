@@ -852,7 +852,7 @@ class StreamingResponseHandler {
     private func anthropicMediaBlock(type: String, attachment: MessageAttachment) -> [String: Any]? {
         let mimeType = resolvedMimeType(for: attachment)
 
-        if let base64 = attachment.base64 {
+        if let base64 = try? attachment.inlineBase64() {
             return [
                 "type": type,
                 "source": [
@@ -861,7 +861,7 @@ class StreamingResponseHandler {
                     "data": base64
                 ]
             ]
-        } else if let url = attachment.url {
+        } else if let url = attachment.remoteURLString {
             return [
                 "type": type,
                 "source": [
@@ -891,7 +891,7 @@ class StreamingResponseHandler {
 
             switch attachment.type {
             case .image:
-                if let base64 = attachment.base64 {
+                if let base64 = try? attachment.inlineBase64() {
                     parts.append([
                         "type": "image_url",
                         "image_url": [
@@ -899,7 +899,7 @@ class StreamingResponseHandler {
                             "detail": "high"
                         ]
                     ])
-                } else if let url = attachment.url {
+                } else if let url = attachment.remoteURLString {
                     parts.append([
                         "type": "image_url",
                         "image_url": [
@@ -910,7 +910,7 @@ class StreamingResponseHandler {
                 }
 
             case .audio:
-                if let base64 = attachment.base64 {
+                if let base64 = try? attachment.inlineBase64() {
                     let format = mimeType.components(separatedBy: "/").last ?? "wav"
                     parts.append([
                         "type": "input_audio",
@@ -919,7 +919,7 @@ class StreamingResponseHandler {
                             "format": format
                         ]
                     ])
-                } else if attachment.url != nil {
+                } else if attachment.remoteURLString != nil || attachment.localFileURL != nil {
                     print("[StreamingHTTP] OpenAI-compatible payload dropped audio URL attachment '\(attachment.name ?? attachment.id)' (\(mimeType)); input_audio requires inline/base64 data.")
                 }
 
@@ -954,7 +954,7 @@ class StreamingResponseHandler {
 
             guard mimeType == "image/jpeg" || mimeType == "image/png" else { continue }
 
-            if let base64 = attachment.base64 {
+            if let base64 = try? attachment.inlineBase64() {
                 parts.append([
                     "type": "image_url",
                     "image_url": [
@@ -962,7 +962,7 @@ class StreamingResponseHandler {
                         "detail": "high"
                     ]
                 ])
-            } else if let url = attachment.url {
+            } else if let url = attachment.remoteURLString {
                 parts.append([
                     "type": "image_url",
                     "image_url": [
@@ -990,14 +990,14 @@ class StreamingResponseHandler {
         for attachment in message.attachments ?? [] {
             let mimeType = resolvedMimeType(for: attachment)
 
-            if let base64 = attachment.base64 {
+            if let base64 = try? attachment.inlineBase64() {
                 parts.append([
                     "inline_data": [
                         "mime_type": mimeType,
                         "data": base64
                     ]
                 ])
-            } else if let url = attachment.url {
+            } else if let url = attachment.remoteURLString {
                 var fileData: [String: Any] = ["file_uri": url]
                 fileData["mime_type"] = mimeType
                 parts.append(["file_data": fileData])

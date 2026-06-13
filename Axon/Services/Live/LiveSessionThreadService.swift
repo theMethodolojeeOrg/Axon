@@ -10,6 +10,171 @@ import Foundation
 import AVFoundation
 import Combine
 
+// MARK: - File-backed Audio Store
+
+final class LiveRecordingAudioStore {
+    private let fileManager: FileManager
+    private let rootDirectory: URL
+
+    private var sessionId: String?
+    private var sessionDirectory: URL?
+    private var turnOrdinal = 0
+
+    private var userHandle: FileHandle?
+    private var userURL: URL?
+    private var userByteCount = 0
+
+    private var assistantHandle: FileHandle?
+    private var assistantURL: URL?
+    private var assistantByteCount = 0
+
+    init(fileManager: FileManager = .default, rootDirectory: URL? = nil) {
+        self.fileManager = fileManager
+        if let rootDirectory {
+            self.rootDirectory = rootDirectory
+        } else {
+            let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            self.rootDirectory = appSupport.appendingPathComponent("Axon/LiveRecordings/Audio", isDirectory: true)
+        }
+        try? fileManager.createDirectory(at: self.rootDirectory, withIntermediateDirectories: true)
+    }
+
+    func startSession(id: String) {
+        closeActiveFiles()
+        sessionId = id
+        turnOrdinal = 0
+        userByteCount = 0
+        assistantByteCount = 0
+        let directory = rootDirectory.appendingPathComponent(id, isDirectory: true)
+        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        sessionDirectory = directory
+    }
+
+    func endSession() {
+        closeActiveFiles()
+        sessionId = nil
+        sessionDirectory = nil
+    }
+
+    func appendUserAudio(buffer: AVAudioPCMBuffer) {
+        guard let data = buffer.toRecordingData(), !data.isEmpty else { return }
+        append(data, role: .user)
+    }
+
+    func appendAssistantAudio(data: Data) {
+        guard !data.isEmpty else { return }
+        append(data, role: .assistant)
+    }
+
+    func finishUserTurn() -> URL? {
+        defer {
+            closeUserFile()
+            userURL = nil
+            userByteCount = 0
+        }
+        guard userByteCount > 0 else {
+            if let userURL {
+                try? fileManager.removeItem(at: userURL)
+            }
+            return nil
+        }
+        return userURL
+    }
+
+    func finishAssistantTurn() -> URL? {
+        defer {
+            closeAssistantFile()
+            assistantURL = nil
+            assistantByteCount = 0
+        }
+        guard assistantByteCount > 0 else {
+            if let assistantURL {
+                try? fileManager.removeItem(at: assistantURL)
+            }
+            return nil
+        }
+        return assistantURL
+    }
+
+    func flushActiveFiles() {
+        userHandle?.synchronizeFile()
+        assistantHandle?.synchronizeFile()
+    }
+
+    func discardSession() {
+        let directory = sessionDirectory
+        endSession()
+        if let directory {
+            try? fileManager.removeItem(at: directory)
+        }
+    }
+
+    func deleteSession(id: String) {
+        let directory = rootDirectory.appendingPathComponent(id, isDirectory: true)
+        try? fileManager.removeItem(at: directory)
+    }
+
+    private func append(_ data: Data, role: LiveTurnRole) {
+        switch role {
+        case .user:
+            guard let handle = handle(for: .user) else { return }
+            handle.write(data)
+            userByteCount += data.count
+        case .assistant:
+            guard let handle = handle(for: .assistant) else { return }
+            handle.write(data)
+            assistantByteCount += data.count
+        }
+    }
+
+    private func handle(for role: LiveTurnRole) -> FileHandle? {
+        switch role {
+        case .user:
+            if let userHandle { return userHandle }
+            guard let url = makeTurnURL(role: .user) else { return nil }
+            fileManager.createFile(atPath: url.path, contents: nil)
+            userURL = url
+            userHandle = try? FileHandle(forWritingTo: url)
+            return userHandle
+        case .assistant:
+            if let assistantHandle { return assistantHandle }
+            guard let url = makeTurnURL(role: .assistant) else { return nil }
+            fileManager.createFile(atPath: url.path, contents: nil)
+            assistantURL = url
+            assistantHandle = try? FileHandle(forWritingTo: url)
+            return assistantHandle
+        }
+    }
+
+    private func makeTurnURL(role: LiveTurnRole) -> URL? {
+        guard let directory = sessionDirectory else { return nil }
+        turnOrdinal += 1
+        let filename = String(format: "turn-%04d-%@.pcm", turnOrdinal, role.rawValue)
+        return directory.appendingPathComponent(filename)
+    }
+
+    private func closeActiveFiles() {
+        closeUserFile()
+        closeAssistantFile()
+        userURL = nil
+        assistantURL = nil
+        userByteCount = 0
+        assistantByteCount = 0
+    }
+
+    private func closeUserFile() {
+        userHandle?.synchronizeFile()
+        userHandle?.closeFile()
+        userHandle = nil
+    }
+
+    private func closeAssistantFile() {
+        assistantHandle?.synchronizeFile()
+        assistantHandle?.closeFile()
+        assistantHandle = nil
+    }
+}
+
 // MARK: - Models
 
 /// A single turn in a Live session conversation
@@ -119,8 +284,7 @@ final class LiveSessionThreadService: ObservableObject {
     private var sessionStartTime: Date?
 
     // Audio recording
-    private var userAudioChunks: [Data] = []
-    private var assistantAudioChunks: [Data] = []
+    private let audioStore = LiveRecordingAudioStore()
     private var currentUserTranscript: String = ""
     private var currentAssistantTranscript: String = ""
     private var userSpeechStartTime: Date?
@@ -163,8 +327,7 @@ final class LiveSessionThreadService: ObservableObject {
         sessionStartTime = Date()
 
         turns = []
-        userAudioChunks = []
-        assistantAudioChunks = []
+        audioStore.startSession(id: sessionId ?? UUID().uuidString)
         currentUserTranscript = ""
         currentAssistantTranscript = ""
 
@@ -210,6 +373,7 @@ final class LiveSessionThreadService: ObservableObject {
         debugLog(.liveSession, "[ThreadService] Ended session with \(turns.count) turns")
 
         // Reset state
+        audioStore.endSession()
         self.sessionId = nil
         sessionStartTime = nil
 
@@ -222,10 +386,7 @@ final class LiveSessionThreadService: ObservableObject {
     func recordUserAudio(buffer: AVAudioPCMBuffer) {
         guard isRecording else { return }
 
-        // Convert buffer to data
-        if let data = buffer.toRecordingData() {
-            userAudioChunks.append(data)
-        }
+        audioStore.appendUserAudio(buffer: buffer)
 
         // Track speech start time
         if userSpeechStartTime == nil {
@@ -236,7 +397,13 @@ final class LiveSessionThreadService: ObservableObject {
     /// Record assistant audio chunk
     func recordAssistantAudio(data: Data) {
         guard isRecording else { return }
-        assistantAudioChunks.append(data)
+        audioStore.appendAssistantAudio(data: data)
+    }
+
+    /// Flush file-backed audio and drop transient buffers on memory pressure.
+    func handleMemoryPressure() {
+        audioStore.flushActiveFiles()
+        debugLog(.liveSession, "[ThreadService] Flushed active Live recording audio after memory pressure")
     }
 
     // MARK: - Transcript Capture
@@ -253,15 +420,21 @@ final class LiveSessionThreadService: ObservableObject {
     }
 
     private func finalizeCurrentUserTurn() {
-        guard !currentUserTranscript.isEmpty else { return }
-
-        let audioData = combineAudioChunks(userAudioChunks)
+        let audioFileURL = audioStore.finishUserTurn()
+        guard !currentUserTranscript.isEmpty else {
+            if let audioFileURL {
+                try? fileManager.removeItem(at: audioFileURL)
+            }
+            userSpeechStartTime = nil
+            return
+        }
         let duration = userSpeechStartTime.map { Int(Date().timeIntervalSince($0) * 1000) }
 
         let turn = LiveSessionTurn(
             role: .user,
             transcript: currentUserTranscript,
-            audioData: audioData,
+            audioData: nil,
+            audioFileURL: audioFileURL,
             durationMs: duration
         )
 
@@ -270,7 +443,6 @@ final class LiveSessionThreadService: ObservableObject {
 
         // Reset
         currentUserTranscript = ""
-        userAudioChunks = []
         userSpeechStartTime = nil
     }
 
@@ -311,14 +483,19 @@ final class LiveSessionThreadService: ObservableObject {
     }
 
     private func finalizeCurrentAssistantTurn() {
-        guard !currentAssistantTranscript.isEmpty else { return }
-
-        let audioData = combineAudioChunks(assistantAudioChunks)
+        let audioFileURL = audioStore.finishAssistantTurn()
+        guard !currentAssistantTranscript.isEmpty else {
+            if let audioFileURL {
+                try? fileManager.removeItem(at: audioFileURL)
+            }
+            return
+        }
 
         let turn = LiveSessionTurn(
             role: .assistant,
             transcript: currentAssistantTranscript,
-            audioData: audioData
+            audioData: nil,
+            audioFileURL: audioFileURL
         )
 
         turns.append(turn)
@@ -326,16 +503,6 @@ final class LiveSessionThreadService: ObservableObject {
 
         // Reset
         currentAssistantTranscript = ""
-        assistantAudioChunks = []
-    }
-
-    private func combineAudioChunks(_ chunks: [Data]) -> Data? {
-        guard !chunks.isEmpty else { return nil }
-        var combined = Data()
-        for chunk in chunks {
-            combined.append(chunk)
-        }
-        return combined
     }
 
     // MARK: - Conversion to Chat Thread
@@ -476,8 +643,13 @@ final class LiveSessionThreadService: ObservableObject {
 
         let turn = recordingsToPlay[currentPlaybackTurnIndex]
 
-        // Play audio if available
-        if let audioData = turn.audioData {
+        // Play audio if available. Prefer file-backed recordings; fall back to legacy embedded Data.
+        if let audioFileURL = turn.audioFileURL {
+            playAudioFile(audioFileURL) { [weak self] in
+                self?.currentPlaybackTurnIndex += 1
+                self?.playNextTurn()
+            }
+        } else if let audioData = turn.audioData {
             playAudioData(audioData) { [weak self] in
                 self?.currentPlaybackTurnIndex += 1
                 self?.playNextTurn()
@@ -492,6 +664,16 @@ final class LiveSessionThreadService: ObservableObject {
 
         // Update progress
         playbackProgress = Double(currentPlaybackTurnIndex + 1) / Double(recordingsToPlay.count)
+    }
+
+    private func playAudioFile(_ url: URL, completion: @escaping () -> Void) {
+        do {
+            let data = try Data(contentsOf: url)
+            playAudioData(data, completion: completion)
+        } catch {
+            debugLog(.liveSession, "[ThreadService] Playback file error: \(error.localizedDescription)")
+            completion()
+        }
     }
 
     private func playAudioData(_ data: Data, completion: @escaping () -> Void) {
@@ -583,6 +765,7 @@ final class LiveSessionThreadService: ObservableObject {
     func deleteRecording(id: String) async {
         let fileURL = recordingsDirectory.appendingPathComponent("\(id).json")
         try? fileManager.removeItem(at: fileURL)
+        audioStore.deleteSession(id: id)
     }
 }
 

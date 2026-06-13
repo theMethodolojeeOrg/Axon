@@ -119,16 +119,8 @@ class GeminiMediaProxyService: ObservableObject {
         var parts: [[String: Any]] = []
 
         // Add the media
-        if let base64 = attachment.base64 {
+        if let base64 = try? attachment.inlineBase64() {
             let mimeType = attachment.mimeType ?? defaultMimeType(for: attachment.type)
-            
-            // Check file size for inline data (Gemini limit is 20MB)
-            if let data = Data(base64Encoded: base64) {
-                let fileSizeMB = Double(data.count) / (1024 * 1024)
-                if fileSizeMB > 20 {
-                    print("[GeminiMediaProxy] Warning: Attachment '\(attachment.name ?? "unknown")' is \(String(format: "%.1f", fileSizeMB))MB, which exceeds Gemini's 20MB inline limit.")
-                }
-            }
 
             parts.append([
                 "inline_data": [
@@ -136,7 +128,7 @@ class GeminiMediaProxyService: ObservableObject {
                     "data": base64
                 ]
             ])
-        } else if let fileUrl = attachment.url {
+        } else if let fileUrl = attachment.remoteURLString {
             var fileData: [String: Any] = ["file_uri": fileUrl]
             
             // Always include mime_type for file_data to be safe

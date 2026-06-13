@@ -275,10 +275,12 @@ struct ToolCall: Codable, Equatable, Identifiable {
 }
 
 struct MessageAttachment: Codable, Equatable, Identifiable {
+    static let maxInlinePayloadBytes = 20 * 1024 * 1024
+
     let id: String
     let type: AttachmentType
-    let url: String?      // For remote URLs
-    let base64: String?   // For local uploads
+    let url: String?      // For remote URLs or local file URLs
+    let base64: String?   // Legacy/local inline uploads
     let name: String?
     let mimeType: String?
 
@@ -304,6 +306,56 @@ struct MessageAttachment: Codable, Equatable, Identifiable {
         self.name = name
         self.mimeType = mimeType
     }
+
+    var localFileURL: URL? {
+        guard let url, let parsed = URL(string: url), parsed.isFileURL else { return nil }
+        return parsed
+    }
+
+    var remoteURLString: String? {
+        guard let url else { return nil }
+        guard let parsed = URL(string: url) else { return url }
+        return parsed.isFileURL ? nil : url
+    }
+
+    func inlineData(maxBytes: Int = MessageAttachment.maxInlinePayloadBytes) throws -> Data? {
+        if let base64 {
+            guard base64.count <= ((maxBytes + 2) / 3) * 4 + 4 else {
+                throw AttachmentInlinePayloadError.exceedsLimit
+            }
+            guard let data = Data(base64Encoded: base64) else {
+                throw AttachmentInlinePayloadError.invalidBase64
+            }
+            guard data.count <= maxBytes else {
+                throw AttachmentInlinePayloadError.exceedsLimit
+            }
+            return data
+        }
+
+        guard let localFileURL else { return nil }
+        let values = try localFileURL.resourceValues(forKeys: [.fileSizeKey])
+        if let fileSize = values.fileSize, fileSize > maxBytes {
+            throw AttachmentInlinePayloadError.exceedsLimit
+        }
+        let data = try Data(contentsOf: localFileURL)
+        guard data.count <= maxBytes else {
+            throw AttachmentInlinePayloadError.exceedsLimit
+        }
+        return data
+    }
+
+    func inlineBase64(maxBytes: Int = MessageAttachment.maxInlinePayloadBytes) throws -> String? {
+        if let base64 {
+            _ = try inlineData(maxBytes: maxBytes)
+            return base64
+        }
+        return try inlineData(maxBytes: maxBytes)?.base64EncodedString()
+    }
+}
+
+enum AttachmentInlinePayloadError: Error, Equatable {
+    case exceedsLimit
+    case invalidBase64
 }
 
 // MARK: - Memory Operations
