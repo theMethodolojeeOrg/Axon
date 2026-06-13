@@ -235,6 +235,14 @@ final class ToolInputNormalizationV2Tests: XCTestCase {
         XCTAssertFalse(ToolInputNormalizationV2.isTemporalLikeTag("swift"))
     }
 
+    func testGeneratedTemporalStorageTagDetectionPreservesWeekdays() {
+        XCTAssertTrue(ToolInputNormalizationV2.isGeneratedTemporalStorageTag("today"))
+        XCTAssertTrue(ToolInputNormalizationV2.isGeneratedTemporalStorageTag("2026"))
+        XCTAssertTrue(ToolInputNormalizationV2.isGeneratedTemporalStorageTag("spring"))
+        XCTAssertFalse(ToolInputNormalizationV2.isGeneratedTemporalStorageTag("monday"))
+        XCTAssertFalse(ToolInputNormalizationV2.isGeneratedTemporalStorageTag("swift"))
+    }
+
     func testGenerateSemanticTagsExcludesTemporalNoiseAndStopwords() {
         let content = "Today we should really discuss swift concurrency and payment retry logic in checkout."
         let tags = ToolInputNormalizationV2.generateSemanticTags(from: content, maxCount: 4)
@@ -268,15 +276,69 @@ final class MemoryHandlerTagCompositionTests: XCTestCase {
         XCTAssertTrue(tags.allSatisfy { !ToolInputNormalizationV2.isTemporalLikeTag($0) })
     }
 
-    func testTemporalOnlyTagsGenerateSemanticTagsAndKeepTemporalTags() {
+    func testTemporalOnlyTagsGenerateSemanticTagsAndDropGeneratedTemporalTags() {
         let tags = handler.composeCreateMemoryTags(
             content: "Investigated race conditions in swift concurrency task cancellation for sync engine.",
             rawTags: "today, this_week, 2026"
         )
 
-        XCTAssertTrue(tags.contains("today"))
-        XCTAssertTrue(tags.contains("this_week"))
-        XCTAssertTrue(tags.contains("2026"))
+        XCTAssertFalse(tags.contains("today"))
+        XCTAssertFalse(tags.contains("this_week"))
+        XCTAssertFalse(tags.contains("2026"))
         XCTAssertTrue(tags.contains { !ToolInputNormalizationV2.isTemporalLikeTag($0) })
+    }
+
+    func testWeekdayTagsArePreservedAsPatternTags() {
+        let tags = handler.composeCreateMemoryTags(
+            content: "Monday planning has a recurring architecture review cadence.",
+            rawTags: "today, Monday, 2026"
+        )
+
+        XCTAssertEqual(tags, ["monday"])
+    }
+
+    func testMemoryStorageCleanupDropsGeneratedTemporalTagsAndKeepsWeekdays() {
+        let tags = Memory.storedSemanticTags(from: ["Swift", "today", "spring", "2026", "Monday", "swift"])
+
+        XCTAssertEqual(tags, ["swift", "monday"])
+    }
+
+    func testTemporalCleanupMetadataBacksUpOriginalTags() {
+        let memory = Memory(
+            userId: "test",
+            content: "Test memory",
+            type: .egoic,
+            confidence: 0.8,
+            tags: ["swift", "today", "monday"]
+        )
+
+        let metadata = memory.metadataBackingUpTemporalCleanup()
+
+        XCTAssertEqual(metadata[Memory.temporalTagCleanupVersionKey]?.stringValue, Memory.temporalTagCleanupVersion)
+        XCTAssertEqual(
+            metadata[Memory.temporalTagCleanupOriginalTagsKey]?.arrayValue?.compactMap(\.stringValue),
+            ["swift", "today", "monday"]
+        )
+    }
+}
+
+@MainActor
+final class HeuristicInjectionTests: XCTestCase {
+    func testBuildInjectionContextUsesCognitiveHeuristicsBlock() {
+        let service = HeuristicsService.shared
+        let block = service.buildInjectionContext(heuristics: [
+            Heuristic(
+                type: .frequency,
+                dimension: .narrative,
+                content: "I keep returning to Swift concurrency and cancellation semantics.",
+                sourceTagSample: ["swift", "concurrency"],
+                confidence: 0.95
+            )
+        ])
+
+        XCTAssertTrue(block.contains("## Cognitive Heuristics"))
+        XCTAssertTrue(block.contains("Frequency"))
+        XCTAssertTrue(block.contains("Swift concurrency"))
+        XCTAssertTrue(block.contains("swift, concurrency"))
     }
 }

@@ -254,7 +254,7 @@ class SalienceService: ObservableObject {
     }
 
     private func calculateRelevanceScore(memory: Memory, context: ConversationContext) -> Double {
-        let memoryText = (memory.content + " " + memory.tags.joined(separator: " ")).lowercased()
+        let memoryText = (memory.content + " " + memory.semanticVisibleTags.joined(separator: " ")).lowercased()
 
         // Count topic matches
         var matches = 0
@@ -399,7 +399,7 @@ class SalienceService: ObservableObject {
     }
 
     private func estimateTokens(for memory: Memory) -> Int {
-        let text = memory.content + memory.tags.joined(separator: " ") + (memory.context ?? "")
+        let text = memory.content + memory.semanticVisibleTags.joined(separator: " ") + (memory.context ?? "")
         return Int(Double(text.count) * tokensPerChar) + 50 // +50 for formatting
     }
 
@@ -494,8 +494,8 @@ class SalienceService: ObservableObject {
             line += " *(conf: \(conf)%)*"
         }
 
-        if !memory.tags.isEmpty {
-            line += " `[\(memory.tags.prefix(3).joined(separator: ", "))]`"
+        if !memory.semanticVisibleTags.isEmpty {
+            line += " `[\(memory.semanticVisibleTags.prefix(3).joined(separator: ", "))]`"
         }
 
         return line
@@ -662,7 +662,7 @@ extension SalienceService {
 
         // Filter memories that match any of the specified tags
         let matchingMemories = memories.filter { memory in
-            let memoryTags = Set(memory.tags.map { normalizeTag($0) })
+            let memoryTags = Set(memory.refreshedTemporalTags.map { normalizeTag($0) })
             return !memoryTags.isDisjoint(with: normalizedTags)
         }
 
@@ -792,8 +792,8 @@ extension SalienceService {
         line += " *(conf: \(conf)%)*"
 
         // Show matching tags
-        if !memory.tags.isEmpty {
-            line += " `[\(memory.tags.prefix(3).joined(separator: ", "))]`"
+        if !memory.semanticVisibleTags.isEmpty {
+            line += " `[\(memory.semanticVisibleTags.prefix(3).joined(separator: ", "))]`"
         }
 
         return line

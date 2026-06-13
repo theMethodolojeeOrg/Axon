@@ -125,7 +125,7 @@ class WorkspaceService: ObservableObject {
 
         // Return memories that have at least one tag matching the workspace's associated tags
         return memoryViewModel.memories.filter { memory in
-            !Set(memory.tags).isDisjoint(with: workspaceTags)
+            !Set(memory.semanticVisibleTags).isDisjoint(with: workspaceTags)
         }
     }
 

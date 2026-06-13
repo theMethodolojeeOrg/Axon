@@ -162,7 +162,7 @@ class MemoryViewModel: ObservableObject {
         for memory in memories {
             // Filter by archive status when counting
             if showArchived != memory.isArchived { continue }
-            for tag in memory.tags {
+            for tag in memory.semanticVisibleTags {
                 tagCounts[tag, default: 0] += 1
             }
         }
@@ -188,14 +188,14 @@ class MemoryViewModel: ObservableObject {
 
         // Tag filter
         if let tag = selectedTag {
-            result = result.filter { $0.tags.contains(tag) }
+            result = result.filter { $0.semanticVisibleTags.contains(tag) }
         }
 
         // Search filter
         if !searchText.isEmpty {
             result = result.filter {
                 $0.content.localizedCaseInsensitiveContains(searchText) ||
-                $0.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
+                $0.semanticVisibleTags.contains { $0.localizedCaseInsensitiveContains(searchText) }
             }
         }
 
@@ -561,9 +561,9 @@ class MemoryViewModel: ObservableObject {
         let mergedContent = issue.memories.map { $0.content }.joined(separator: "\n\n---\n\n")
 
         // Combine tags
-        var allTags = Set(primary.tags)
+        var allTags = Set(primary.semanticVisibleTags)
         for memory in others {
-            allTags.formUnion(memory.tags)
+            allTags.formUnion(memory.semanticVisibleTags)
         }
 
         Task {
@@ -725,9 +725,9 @@ class MemoryViewModel: ObservableObject {
                 let others = Array(issue.memories.dropFirst())
 
                 let mergedContent = issue.memories.map { $0.content }.joined(separator: "\n\n---\n\n")
-                var allTags = Set(primary.tags)
+                var allTags = Set(primary.semanticVisibleTags)
                 for memory in others {
-                    allTags.formUnion(memory.tags)
+                    allTags.formUnion(memory.semanticVisibleTags)
                 }
 
                 do {

@@ -37,7 +37,7 @@ struct MemoryDetailView: View {
         _content = State(initialValue: memory.content)
         _selectedType = State(initialValue: memory.type)
         _confidence = State(initialValue: memory.confidence)
-        _tags = State(initialValue: memory.tags.joined(separator: ", "))
+        _tags = State(initialValue: memory.semanticVisibleTags.joined(separator: ", "))
         _context = State(initialValue: memory.context ?? "")
     }
     
@@ -195,10 +195,10 @@ struct MemoryDetailView: View {
                                 .background(AppSurfaces.color(.controlBackground))
                                 .cornerRadius(8)
                         } else {
-                            if !memory.tags.isEmpty {
+                            if !memory.semanticVisibleTags.isEmpty {
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 8) {
-                                        ForEach(memory.tags, id: \.self) { tag in
+                                        ForEach(memory.semanticVisibleTags, id: \.self) { tag in
                                             Text("#\(tag)")
                                                 .font(AppTypography.labelSmall())
                                                 .foregroundColor(AppColors.signalMercury)
@@ -331,7 +331,7 @@ struct MemoryDetailView: View {
                         content = memory.content
                         selectedType = memory.type
                         confidence = memory.confidence
-                        tags = memory.tags.joined(separator: ", ")
+                        tags = memory.semanticVisibleTags.joined(separator: ", ")
                         context = memory.context ?? ""
                         isEditing = false
                     }
@@ -521,10 +521,10 @@ struct MemoryDetailView: View {
                                     .background(AppSurfaces.color(.controlBackground))
                                     .cornerRadius(8)
                             } else {
-                                if !memory.tags.isEmpty {
+                                if !memory.semanticVisibleTags.isEmpty {
                                     ScrollView(.horizontal, showsIndicators: false) {
                                         HStack(spacing: 8) {
-                                            ForEach(memory.tags, id: \.self) { tag in
+                                            ForEach(memory.semanticVisibleTags, id: \.self) { tag in
                                                 Text("#\(tag)")
                                                     .font(AppTypography.labelSmall())
                                                     .foregroundColor(AppColors.signalMercury)
@@ -657,7 +657,7 @@ struct MemoryDetailView: View {
                             content = memory.content
                             selectedType = memory.type
                             confidence = memory.confidence
-                            tags = memory.tags.joined(separator: ", ")
+                            tags = memory.semanticVisibleTags.joined(separator: ", ")
                             context = memory.context ?? ""
                             isEditing = false
                         }

@@ -410,8 +410,8 @@ struct WorkspaceMemoryRow: View {
                     .foregroundColor(AppColors.textSecondary)
                     .lineLimit(3)
 
-                if !memory.tags.isEmpty {
-                    Text(memory.tags.prefix(4).map { "#\($0)" }.joined(separator: " "))
+                if !memory.semanticVisibleTags.isEmpty {
+                    Text(memory.semanticVisibleTags.prefix(4).map { "#\($0)" }.joined(separator: " "))
                         .font(AppTypography.labelSmall())
                         .foregroundColor(AppColors.signalMercury)
                 }

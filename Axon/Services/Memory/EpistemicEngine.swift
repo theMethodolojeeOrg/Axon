@@ -195,7 +195,7 @@ class EpistemicEngine: ObservableObject {
         // Filter by topic relevance (if topics extracted)
         if !intent.topics.isEmpty {
             result = result.filter { memory in
-                let memoryText = (memory.content + " " + memory.tags.joined(separator: " ")).lowercased()
+                let memoryText = (memory.content + " " + memory.refreshedTemporalTags.joined(separator: " ")).lowercased()
                 return intent.topics.contains { topic in
                     memoryText.contains(topic)
                 }

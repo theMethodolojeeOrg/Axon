@@ -248,18 +248,18 @@ actor HeuristicsSynthesisEngine {
 
     /// Recency: Analyze temporal tag patterns
     private func synthesizeRecency(memories: [Memory], settings: HeuristicsSettings, runId: String) async throws -> [Heuristic] {
-        // Get recent memories (today, this_week)
+        // Get recent memories using computed temporal labels rather than stored tag noise.
         let temporalTags = ["today", "this_week", "yesterday"]
         let recentMemories = memories.filter { memory in
-            memory.tags.contains { temporalTags.contains($0) }
+            memory.refreshedTemporalTags.contains { temporalTags.contains($0) }
         }
 
         guard !recentMemories.isEmpty else { return [] }
 
         // Get non-temporal tags from recent memories
         let recentTags = recentMemories
-            .flatMap { $0.tags }
-            .filter { !Memory.temporalTags.contains($0) }
+            .flatMap { $0.semanticVisibleTags }
+            .filter { !Memory.isGeneratedTemporalStorageTag($0) }
 
         let tagCounts = Dictionary(grouping: recentTags, by: { $0 })
             .mapValues { $0.count }
@@ -319,8 +319,8 @@ actor HeuristicsSynthesisEngine {
         let newMemories = memories.filter { $0.createdAt >= oneMonthAgo }
 
         // Find tags that appear in both old and new memories
-        let oldTags = Set(oldMemories.flatMap { $0.tags }.filter { !Memory.temporalTags.contains($0) })
-        let newTags = Set(newMemories.flatMap { $0.tags }.filter { !Memory.temporalTags.contains($0) })
+        let oldTags = Set(oldMemories.flatMap { $0.semanticVisibleTags }.filter { !Memory.isGeneratedTemporalStorageTag($0) })
+        let newTags = Set(newMemories.flatMap { $0.semanticVisibleTags }.filter { !Memory.isGeneratedTemporalStorageTag($0) })
 
         let persistentTags = oldTags.intersection(newTags)
 
@@ -461,9 +461,9 @@ actor HeuristicsSynthesisEngine {
             do {
                 // Get memory snippets for context
                 let taggedMemories = memories.filter { memory in
-                    memory.tags.contains { candidates.contains($0) }
+                    memory.semanticVisibleTags.contains { candidates.contains($0) }
                 }
-                let snippets = taggedMemories.prefix(10).map { "\($0.tags.filter { candidates.contains($0) }.joined(separator: ", ")): \($0.content.prefix(100))" }.joined(separator: "\n")
+                let snippets = taggedMemories.prefix(10).map { "\($0.semanticVisibleTags.filter { candidates.contains($0) }.joined(separator: ", ")): \($0.content.prefix(100))" }.joined(separator: "\n")
 
                 let prompt = """
                 From the following tags, select the 3 most intriguing or unusual ones that might warrant deeper exploration or curiosity:
@@ -501,8 +501,8 @@ actor HeuristicsSynthesisEngine {
         var tagCounts: [String: Int] = [:]
 
         for memory in memories {
-            for tag in memory.tags {
-                if excludeTemporal && Memory.temporalTags.contains(tag) {
+            for tag in memory.semanticVisibleTags {
+                if excludeTemporal && Memory.isGeneratedTemporalStorageTag(tag) {
                     continue
                 }
                 tagCounts[tag, default: 0] += 1
@@ -517,7 +517,7 @@ actor HeuristicsSynthesisEngine {
         let tagSet = Set(tags)
         return memories
             .filter { memory in
-                memory.tags.contains { tagSet.contains($0) }
+                memory.semanticVisibleTags.contains { tagSet.contains($0) }
             }
             .sorted { $0.createdAt > $1.createdAt }
             .prefix(limit)

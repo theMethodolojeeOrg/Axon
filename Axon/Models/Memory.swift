@@ -278,6 +278,88 @@ struct MemorySearchRequest: Codable {
 // MARK: - Temporal Tags
 
 extension Memory {
+    static let temporalTagCleanupOriginalTagsKey = "temporalTagCleanupOriginalTags"
+    static let temporalTagCleanupAtKey = "temporalTagCleanupAt"
+    static let temporalTagCleanupVersionKey = "temporalTagCleanupVersion"
+    static let temporalTagCleanupVersion = "preserve-weekdays-v1"
+
+    nonisolated static let weekdayPatternTags = Set([
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"
+    ])
+
+    nonisolated static let generatedTemporalStorageTags = Set([
+        "today", "yesterday", "tomorrow",
+        "this_week", "this_month", "recent_months", "older",
+        "spring", "summer", "fall", "autumn", "winter"
+    ])
+
+    /// Normalize a user/model-supplied tag for storage and matching.
+    static func normalizedStoredTag(_ raw: String) -> String? {
+        var value = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        while value.hasPrefix("#") {
+            value.removeFirst()
+        }
+        value = value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: " ", with: "_")
+        return value.isEmpty ? nil : value
+    }
+
+    /// Tags that are generated from `createdAt` should not be persisted as semantic tags.
+    /// Weekday tags are intentionally preserved because they can carry recurring-pattern signal.
+    static func isGeneratedTemporalStorageTag(_ raw: String) -> Bool {
+        guard let tag = normalizedStoredTag(raw) else { return false }
+        if generatedTemporalStorageTags.contains(tag) {
+            return true
+        }
+        if let year = Int(tag), (1900...2100).contains(year) {
+            return true
+        }
+        return false
+    }
+
+    /// Stored tag set after removing generated temporal noise while preserving semantic tags and weekdays.
+    static func storedSemanticTags(from tags: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+
+        for rawTag in tags {
+            guard let tag = normalizedStoredTag(rawTag),
+                  !isGeneratedTemporalStorageTag(tag),
+                  !seen.contains(tag) else {
+                continue
+            }
+            seen.insert(tag)
+            result.append(tag)
+        }
+
+        return result
+    }
+
+    static func weekdayTag(for date: Date, calendar: Calendar = .current) -> String {
+        let weekday = calendar.component(.weekday, from: date)
+        let weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+        return weekdays[weekday - 1]
+    }
+
+    /// Tags shown in tag chips/search facets. Filters old generated temporal tags even before cleanup runs.
+    var semanticVisibleTags: [String] {
+        Memory.storedSemanticTags(from: tags)
+    }
+
+    func metadataBackingUpTemporalCleanup(at date: Date = Date()) -> [String: AnyCodable] {
+        var updated = metadata
+
+        if updated[Memory.temporalTagCleanupOriginalTagsKey] == nil {
+            updated[Memory.temporalTagCleanupOriginalTagsKey] = .array(tags.map { .string($0) })
+        }
+
+        let formatter = ISO8601DateFormatter()
+        updated[Memory.temporalTagCleanupAtKey] = .string(formatter.string(from: date))
+        updated[Memory.temporalTagCleanupVersionKey] = .string(Memory.temporalTagCleanupVersion)
+        return updated
+    }
+
     /// Generate temporal tags based on a date for automatic temporal context
     /// These tags help the assistant understand WHEN things happened
     /// - Parameter date: The date to generate tags for (typically memory creation date)
@@ -316,9 +398,7 @@ extension Memory {
 
         // Day of week for recent memories (helps with "what did we discuss on Monday")
         if daysDiff <= 7 {
-            let weekday = calendar.component(.weekday, from: date)
-            let weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
-            tags.append(weekdays[weekday - 1])
+            tags.append(weekdayTag(for: date, calendar: calendar))
         }
 
         return tags
@@ -327,20 +407,10 @@ extension Memory {
     /// Refresh temporal tags based on current date
     /// Used when retrieving memories to ensure relative tags are accurate
     var refreshedTemporalTags: [String] {
-        // Filter out old temporal tags and add fresh ones
-        let temporalPatterns = ["today", "yesterday", "this_week", "this_month",
-                                "recent_months", "older", "winter", "spring",
-                                "summer", "fall", "monday", "tuesday", "wednesday",
-                                "thursday", "friday", "saturday", "sunday"]
-
-        var nonTemporalTags = tags.filter { tag in
-            // Keep tags that aren't temporal (year tags like "2025" are also temporal but static)
-            !temporalPatterns.contains(tag.lowercased()) && Int(tag) == nil
+        var refreshed = semanticVisibleTags
+        for temporalTag in Memory.temporalTags(for: createdAt) where !refreshed.contains(temporalTag) {
+            refreshed.append(temporalTag)
         }
-
-        // Add fresh temporal tags
-        nonTemporalTags.append(contentsOf: Memory.temporalTags(for: createdAt))
-
-        return nonTemporalTags
+        return refreshed
     }
 }

@@ -101,6 +101,11 @@ struct AxonApp: App {
                     await WidgetDataService.shared.initializeFromExistingConversations()
                 }
 
+                Task { @MainActor in
+                    await MemoryService.shared.cleanupGeneratedTemporalTagsIfNeeded()
+                    await HeuristicsMaintenanceCoordinator.shared.run(reason: "launch")
+                }
+
                 // If app lock is disabled, mark as unlocked
                 if !settingsViewModel.settings.appLockEnabled {
                     isUnlocked = true
@@ -157,6 +162,7 @@ struct AxonApp: App {
 
             Task { @MainActor in
                 await BridgeConnectionManager.shared.handleAppDidBecomeActive()
+                await HeuristicsMaintenanceCoordinator.shared.run(reason: "foreground")
             }
 
             // Check if we need to re-lock based on timeout

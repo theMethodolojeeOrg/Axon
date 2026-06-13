@@ -1884,12 +1884,18 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         promptParts.append(base)
         promptParts.append(contentsOf: systemMessages)
 
-        // --- Context Injection: Heuristics vs Memories ---
+        // --- Context Injection: Heuristics + Memories ---
         var usedMemories: [Memory] = []
+        let contextBudget = isSmallModel ? smallModelOpt.smallModelTokenBudget : 2000
+        let heuristicBudget = heuristicsSettings.enabled ? Int(Double(contextBudget) * heuristicsSettings.heuristicsMemoryRatio) : 0
+        let memoryBudget = max(256, contextBudget - heuristicBudget)
+        let heuristicLimit = max(1, min(8, max(heuristicBudget, 120) / 120))
 
         if isSmallModel && smallModelOpt.useHeuristicsOnly && heuristicsSettings.enabled {
             // Small model optimization: use compressed heuristics instead of raw memories
-            let heuristics = await MainActor.run { heuristicsService.heuristicsForInjection(limit: 6) }
+            let heuristics = await MainActor.run {
+                heuristicsService.heuristicsForInjection(conversation: messages, limit: heuristicLimit)
+            }
 
             if !heuristics.isEmpty {
                 let heuristicsBlock = await MainActor.run {
@@ -1901,12 +1907,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 print("[Epistemic] Small model: injected \(heuristics.count) heuristics instead of raw memories")
             } else if !memories.isEmpty {
                 // Fallback to minimal memories if no heuristics available
-                let tokenBudget = smallModelOpt.smallModelTokenBudget
                 let settings = MemoryInjectionSettings.minimal
                 let injection = await salienceService.injectSalient(
                     conversation: messages,
                     memories: memories,
-                    availableTokens: tokenBudget,
+                    availableTokens: contextBudget,
                     correlationId: correlationId,
                     settings: settings,
                     userName: userName
@@ -1920,21 +1925,38 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                     print("[Epistemic] Small model fallback: injected \(memoriesCount) memories (no heuristics available)")
                 }
             }
-        } else if !memories.isEmpty {
-            // Standard memory injection for larger models
-            let injection = await salienceService.injectSalient(
-                conversation: messages,
-                memories: memories,
-                availableTokens: 2000, // Reserve tokens for memories
-                correlationId: correlationId,
-                userName: userName
-            )
+        } else {
+            if heuristicsSettings.enabled {
+                let heuristics = await MainActor.run {
+                    heuristicsService.heuristicsForInjection(conversation: messages, limit: heuristicLimit)
+                }
+                if !heuristics.isEmpty {
+                    let heuristicsBlock = await MainActor.run {
+                        heuristicsService.buildInjectionContext(heuristics: heuristics)
+                    }
+                    promptParts.append(heuristicsBlock)
+                    memoriesCount += heuristics.count
+                    memoriesTokens += TokenEstimator.estimate(heuristicsBlock)
+                    print("[Epistemic] Injected \(heuristics.count) cognitive heuristics")
+                }
+            }
 
-            if !injection.isEmpty {
-                promptParts.append(injection.injectionBlock)
-                usedMemories = injection.selectedMemories.map { $0.memory }
-                memoriesCount = usedMemories.count
-                memoriesTokens = TokenEstimator.estimate(injection.injectionBlock)
+            if !memories.isEmpty {
+                // Standard memory injection for larger models
+                let injection = await salienceService.injectSalient(
+                    conversation: messages,
+                    memories: memories,
+                    availableTokens: memoryBudget,
+                    correlationId: correlationId,
+                    userName: userName
+                )
+
+                if !injection.isEmpty {
+                    promptParts.append(injection.injectionBlock)
+                    usedMemories = injection.selectedMemories.map { $0.memory }
+                    memoriesCount += usedMemories.count
+                    memoriesTokens += TokenEstimator.estimate(injection.injectionBlock)
+                }
             }
         }
 

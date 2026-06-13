@@ -138,19 +138,21 @@ final class MemoryHandler: ToolHandlerV2 {
     ///
     /// Behavior:
     /// - Parse tag-like input from arrays/csv/json-array-string.
-    /// - If no non-temporal tags are present, generate semantic tags from content (up to 4).
+    /// - Drop generated temporal storage tags (today/season/year) while preserving weekdays.
+    /// - If no storable tags are present, generate semantic tags from content (up to 4).
     func composeCreateMemoryTags(content: String, rawTags: Any?) -> [String] {
-        var normalized = ToolInputNormalizationV2.parseNormalizedStringArray(rawTags)
-        let hasNonTemporalTag = normalized.contains { !ToolInputNormalizationV2.isTemporalLikeTag($0) }
+        let parsed = ToolInputNormalizationV2.parseNormalizedStringArray(rawTags)
+        var normalized = Memory.storedSemanticTags(from: parsed)
+        let hasStoredTag = !normalized.isEmpty
 
-        if !hasNonTemporalTag {
+        if !hasStoredTag {
             let semanticTags = ToolInputNormalizationV2.generateSemanticTags(
                 from: content,
                 maxCount: 4,
-                excluding: normalized
+                excluding: parsed
             )
             normalized.append(contentsOf: semanticTags)
-            normalized = ToolInputNormalizationV2.parseNormalizedStringArray(normalized)
+            normalized = Memory.storedSemanticTags(from: normalized)
         }
 
         return normalized
@@ -191,7 +193,7 @@ final class MemoryHandler: ToolHandlerV2 {
         // This searches through stored memories with semantic matching
         let matchingMemories = memoryService.memories.filter { memory in
             memory.content.localizedCaseInsensitiveContains(query) ||
-            memory.tags.contains { $0.localizedCaseInsensitiveContains(query) }
+            memory.refreshedTemporalTags.contains { $0.localizedCaseInsensitiveContains(query) }
         }
         
         let limitedResults = Array(matchingMemories.prefix(10))
@@ -206,7 +208,7 @@ final class MemoryHandler: ToolHandlerV2 {
         var output = "Found \(limitedResults.count) relevant memories:\n\n"
         for (index, memory) in limitedResults.enumerated() {
             output += "\(index + 1). [\(memory.type.rawValue)] \(memory.content.prefix(200))\n"
-            output += "   Tags: \(memory.tags.joined(separator: ", "))\n\n"
+            output += "   Tags: \(memory.semanticVisibleTags.joined(separator: ", "))\n\n"
         }
         
         return ToolResultV2.success(

@@ -383,11 +383,11 @@ private struct MemoryComparisonRow: View {
                 .foregroundColor(AppColors.textTertiary)
 
                 // Tags preview
-                if !memory.tags.isEmpty {
+                if !memory.semanticVisibleTags.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: "tag")
                             .font(.system(size: 10))
-                        Text(memory.tags.prefix(3).map { "#\($0)" }.joined(separator: " "))
+                        Text(memory.semanticVisibleTags.prefix(3).map { "#\($0)" }.joined(separator: " "))
                             .font(AppTypography.labelSmall())
                             .lineLimit(1)
                     }

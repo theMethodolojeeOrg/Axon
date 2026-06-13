@@ -14,6 +14,7 @@ class LiveContextBuilder {
     static let shared = LiveContextBuilder()
 
     private let salienceService = SalienceService.shared
+    private let heuristicsService = HeuristicsService.shared
 
     private init() {}
 
@@ -32,13 +33,23 @@ class LiveContextBuilder {
         let basePrompt = buildLiveBasePrompt()
         promptParts.append(basePrompt)
 
-        // 2. Memory injection (memories contain user info)
-        let memoriesBlock = await buildMemoryInjection(tokenBudget: tokenBudget)
+        let heuristicsSettings = SettingsStorage.shared.loadSettingsOrDefault().heuristicsSettings
+        let heuristicBudget = heuristicsSettings.enabled ? Int(Double(tokenBudget) * heuristicsSettings.heuristicsMemoryRatio) : 0
+        let memoryBudget = max(256, tokenBudget - heuristicBudget)
+
+        // 2. Cognitive heuristics (compressed patterns)
+        let heuristicsBlock = buildHeuristicsInjection(tokenBudget: heuristicBudget)
+        if !heuristicsBlock.isEmpty {
+            promptParts.append(heuristicsBlock)
+        }
+
+        // 3. Memory injection (memories contain user info)
+        let memoriesBlock = await buildMemoryInjection(tokenBudget: memoryBudget)
         if !memoriesBlock.isEmpty {
             promptParts.append(memoriesBlock)
         }
 
-        // 3. Voice-specific instructions
+        // 4. Voice-specific instructions
         promptParts.append(buildVoiceGuidelines())
 
         return promptParts.joined(separator: "\n\n")
@@ -94,6 +105,13 @@ class LiveContextBuilder {
         return injection.injectionBlock
     }
 
+    private func buildHeuristicsInjection(tokenBudget: Int) -> String {
+        guard tokenBudget > 0 else { return "" }
+        let limit = max(1, min(8, max(tokenBudget, 120) / 120))
+        let heuristics = heuristicsService.heuristicsForInjection(limit: limit)
+        return heuristicsService.buildInjectionContext(heuristics: heuristics)
+    }
+
     /// Load memories from MemoryService
     private func loadMemoriesForLive() async -> [Memory] {
         return await withCheckedContinuation { continuation in
@@ -135,13 +153,15 @@ extension LiveContextBuilder {
         )
 
         let baseTokens = TokenEstimator.estimate(buildLiveBasePrompt())
+        let heuristicsBlock = buildHeuristicsInjection(tokenBudget: 450)
+        let heuristicsTokens = TokenEstimator.estimate(heuristicsBlock)
         let memoryTokens = TokenEstimator.estimate(injection.injectionBlock)
         let guidelineTokens = TokenEstimator.estimate(buildVoiceGuidelines())
-        let totalTokens = baseTokens + memoryTokens + guidelineTokens
+        let totalTokens = baseTokens + heuristicsTokens + memoryTokens + guidelineTokens
 
         return """
         [LiveContext] Total: ~\(totalTokens) tokens
-        [LiveContext] Breakdown - Base: \(baseTokens), Memories: \(memoryTokens) (\(injection.selectedMemories.count)), Guidelines: \(guidelineTokens)
+        [LiveContext] Breakdown - Base: \(baseTokens), Heuristics: \(heuristicsTokens), Memories: \(memoryTokens) (\(injection.selectedMemories.count)), Guidelines: \(guidelineTokens)
         """
     }
 }

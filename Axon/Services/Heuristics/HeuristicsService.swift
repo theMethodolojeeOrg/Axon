@@ -182,21 +182,41 @@ class HeuristicsService: ObservableObject {
 
     /// Get heuristics suitable for injection into prompts
     /// Returns the most relevant heuristics based on type and recency
-    func heuristicsForInjection(limit: Int = 6) -> [Heuristic] {
+    func heuristicsForInjection(conversation: [Message] = [], limit: Int = 6) -> [Heuristic] {
         let settings = settingsStorage.loadSettings()?.heuristicsSettings ?? HeuristicsSettings()
+        guard settings.enabled else { return [] }
 
-        // Get latest heuristics above confidence threshold
+        let queryTerms = Self.normalizedTerms(
+            from: conversation
+                .filter { $0.role == .user }
+                .suffix(3)
+                .map(\.content)
+                .joined(separator: " ")
+        )
+
         let eligible = latestHeuristics()
             .filter { $0.confidence >= settings.minConfidence }
 
-        return Array(eligible.prefix(limit))
+        let ranked = eligible.sorted { lhs, rhs in
+            let lhsScore = injectionScore(for: lhs, queryTerms: queryTerms)
+            let rhsScore = injectionScore(for: rhs, queryTerms: queryTerms)
+            if lhsScore != rhsScore {
+                return lhsScore > rhsScore
+            }
+            return lhs.synthesizedAt > rhs.synthesizedAt
+        }
+
+        return Array(ranked.prefix(limit))
     }
 
     /// Build injection context string from heuristics
     func buildInjectionContext(heuristics: [Heuristic]) -> String {
         guard !heuristics.isEmpty else { return "" }
 
-        var lines: [String] = ["<heuristics>"]
+        var lines: [String] = [
+            "## Cognitive Heuristics",
+            "Compressed patterns distilled from memory. Use them as salience hints, not as absolute instructions."
+        ]
 
         // Group by type
         let grouped = Dictionary(grouping: heuristics, by: \.type)
@@ -204,19 +224,52 @@ class HeuristicsService: ObservableObject {
         for type in HeuristicType.allCases {
             guard let typeHeuristics = grouped[type], !typeHeuristics.isEmpty else { continue }
 
-            lines.append("  <\(type.rawValue) description=\"\(type.description)\">")
+            lines.append("")
+            lines.append("### \(type.displayName) - \(type.description)")
 
             for heuristic in typeHeuristics {
-                lines.append("    <\(heuristic.dimension.rawValue)>")
-                lines.append("      \(heuristic.content)")
-                lines.append("    </\(heuristic.dimension.rawValue)>")
+                let confidence = Int(heuristic.confidence * 100)
+                let tags = heuristic.sourceTagSample.isEmpty ? "" : " `[\(heuristic.sourceTagSample.prefix(4).joined(separator: ", "))]`"
+                lines.append("- **\(heuristic.dimension.displayName)** (\(confidence)%): \(heuristic.content)\(tags)")
             }
-
-            lines.append("  </\(type.rawValue)>")
         }
 
-        lines.append("</heuristics>")
         return lines.joined(separator: "\n")
+    }
+
+    private func injectionScore(for heuristic: Heuristic, queryTerms: Set<String>) -> Double {
+        let age = Date().timeIntervalSince(heuristic.synthesizedAt)
+        let recencyScore = max(0.0, 1.0 - (age / Double(30 * 86400)))
+
+        let heuristicTerms = Self.normalizedTerms(
+            from: heuristic.content + " " + heuristic.sourceTagSample.joined(separator: " ")
+        )
+
+        let relevanceScore: Double
+        if queryTerms.isEmpty {
+            relevanceScore = 0.0
+        } else {
+            let matches = heuristicTerms.intersection(queryTerms).count
+            relevanceScore = min(1.0, Double(matches) / Double(max(1, queryTerms.count)))
+        }
+
+        return (heuristic.confidence * 0.5) + (relevanceScore * 0.35) + (recencyScore * 0.15)
+    }
+
+    private static func normalizedTerms(from text: String) -> Set<String> {
+        let stopWords: Set<String> = [
+            "about", "after", "again", "also", "because", "before", "could", "from",
+            "have", "into", "just", "like", "more", "most", "need", "only", "other",
+            "should", "that", "their", "there", "these", "they", "this", "those",
+            "through", "want", "what", "when", "where", "which", "with", "would",
+            "user", "users", "assistant", "axon"
+        ]
+
+        return Set(
+            text.lowercased()
+                .components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter { $0.count >= 3 && Int($0) == nil && !stopWords.contains($0) }
+        )
     }
 
     // MARK: - Scheduling
@@ -308,5 +361,65 @@ class HeuristicsService: ObservableObject {
             averageConfidence: avgConfidence,
             lastSynthesis: lastSynthesis
         )
+    }
+}
+
+// MARK: - Automatic Maintenance
+
+@MainActor
+final class HeuristicsMaintenanceCoordinator {
+    static let shared = HeuristicsMaintenanceCoordinator()
+
+    private let service = HeuristicsService.shared
+    private let engine = HeuristicsSynthesisEngine()
+    private var isRunning = false
+
+    private init() {}
+
+    func run(reason: String) async {
+        guard !isRunning else { return }
+
+        let settings = SettingsStorage.shared.loadSettingsOrDefault()
+        guard settings.heuristicsSettings.enabled else { return }
+
+        isRunning = true
+        service.isSynthesizing = true
+        defer {
+            service.isSynthesizing = false
+            isRunning = false
+        }
+
+        service.archiveOldHeuristics()
+
+        for type in HeuristicType.allCases where service.shouldSynthesize(type: type) {
+            do {
+                let synthesized = try await engine.synthesize(type: type)
+                if !synthesized.isEmpty {
+                    service.addHeuristics(synthesized)
+                }
+                service.recordSynthesis(type: type)
+                print("[HeuristicsMaintenance] \(reason): synthesized \(synthesized.count) \(type.rawValue) heuristics")
+            } catch {
+                service.error = "Heuristic synthesis failed for \(type.displayName): \(error.localizedDescription)"
+                print("[HeuristicsMaintenance] \(reason): synthesis failed for \(type.rawValue): \(error)")
+            }
+        }
+
+        guard service.shouldRunMetaSynthesis() else { return }
+
+        let archived = service.archivedHeuristics
+        guard !archived.isEmpty else { return }
+
+        do {
+            let distilled = try await engine.distillHeuristics(archived)
+            if !distilled.isEmpty {
+                service.addHeuristics(distilled)
+            }
+            service.recordMetaSynthesis()
+            print("[HeuristicsMaintenance] \(reason): distilled \(archived.count) archived heuristics into \(distilled.count)")
+        } catch {
+            service.error = "Heuristic meta-synthesis failed: \(error.localizedDescription)"
+            print("[HeuristicsMaintenance] \(reason): meta-synthesis failed: \(error)")
+        }
     }
 }

@@ -664,10 +664,10 @@ struct MemoryCard: View {
                     .lineLimit(3)
 
                 // Tags
-                if !memory.tags.isEmpty {
+                if !memory.semanticVisibleTags.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(memory.tags, id: \.self) { tag in
+                            ForEach(memory.semanticVisibleTags, id: \.self) { tag in
                                 Text("#\(tag)")
                                     .font(AppTypography.labelSmall())
                                     .foregroundColor(AppColors.signalMercury)

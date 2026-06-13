@@ -249,6 +249,13 @@ enum ToolInputNormalizationV2 {
         return false
     }
 
+    /// Temporal labels generated from memory creation dates should not be persisted as semantic tags.
+    /// Weekdays are not included here because they are intentionally preserved as pattern tags.
+    static func isGeneratedTemporalStorageTag(_ value: String) -> Bool {
+        guard let normalized = normalizeTag(value) else { return false }
+        return Memory.isGeneratedTemporalStorageTag(normalized)
+    }
+
     /// Generate simple semantic tags from content when explicit non-temporal tags are absent.
     /// Returns at most `maxCount` normalized tags.
     static func generateSemanticTags(

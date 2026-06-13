@@ -15,6 +15,7 @@ class MemoryService: ObservableObject {
     private let apiClient = APIClient.shared
     private let syncManager = MemorySyncManager.shared
     private let salienceService = SalienceService.shared
+    private let temporalTagCleanupDefaultsKey = "memory_temporal_tag_cleanup_preserve_weekdays_v1"
 
     // Co-sovereignty services
     private var sovereigntyService: SovereigntyService { SovereigntyService.shared }
@@ -35,6 +36,41 @@ class MemoryService: ObservableObject {
     private init() {
         // Load memories from local Core Data immediately (instant UI)
         loadLocalMemories()
+    }
+
+    // MARK: - Temporal Tag Cleanup
+
+    func cleanupGeneratedTemporalTagsIfNeeded() async {
+        guard !UserDefaults.standard.bool(forKey: temporalTagCleanupDefaultsKey) else { return }
+
+        loadLocalMemories()
+        let snapshot = memories
+        var cleanedCount = 0
+
+        for memory in snapshot {
+            let cleanedTags = Memory.storedSemanticTags(from: memory.tags)
+            guard cleanedTags != memory.tags else { continue }
+
+            do {
+                let metadata = memory.metadataBackingUpTemporalCleanup()
+                _ = try await updateMemory(
+                    id: memory.id,
+                    tags: cleanedTags,
+                    metadata: metadata,
+                    skipConsent: true
+                )
+                cleanedCount += 1
+            } catch {
+                self.error = "Temporal tag cleanup failed for memory \(memory.id): \(error.localizedDescription)"
+                print("[MemoryService] Temporal tag cleanup failed for \(memory.id): \(error)")
+                return
+            }
+        }
+
+        UserDefaults.standard.set(true, forKey: temporalTagCleanupDefaultsKey)
+        if cleanedCount > 0 {
+            print("[MemoryService] Cleaned generated temporal tags from \(cleanedCount) memories")
+        }
     }
 
     // MARK: - Subconscious Memory Logging
@@ -266,12 +302,9 @@ class MemoryService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        // Auto-inject temporal tags for time awareness
-        var enrichedTags = tags
-        let temporalTags = Memory.temporalTags(for: Date())
-        enrichedTags.append(contentsOf: temporalTags)
-        // Remove duplicates while preserving order
-        enrichedTags = Array(NSOrderedSet(array: enrichedTags)) as? [String] ?? enrichedTags
+        let createdAt = Date()
+        var enrichedTags = Memory.storedSemanticTags(from: tags)
+        enrichedTags = Memory.storedSemanticTags(from: enrichedTags + [Memory.weekdayTag(for: createdAt)])
 
         // Check if backend is configured
         if apiClient.isBackendConfigured {
@@ -306,6 +339,9 @@ class MemoryService: ObservableObject {
 
                 // Add to in-memory array
                 memories.insert(memory, at: 0)
+                Task { @MainActor in
+                    await HeuristicsMaintenanceCoordinator.shared.run(reason: "memory_created")
+                }
                 return memory
             } catch {
                 self.error = error.localizedDescription
@@ -324,8 +360,8 @@ class MemoryService: ObservableObject {
                 metadata: metadata,
                 source: nil,
                 relatedMemories: nil,
-                createdAt: Date(),
-                updatedAt: Date(),
+                createdAt: createdAt,
+                updatedAt: createdAt,
                 lastAccessedAt: nil,
                 accessCount: 0
             )
@@ -336,6 +372,9 @@ class MemoryService: ObservableObject {
             // Add to in-memory array
             memories.insert(memory, at: 0)
             print("[MemoryService] Created local memory: \(memory.id)")
+            Task { @MainActor in
+                await HeuristicsMaintenanceCoordinator.shared.run(reason: "memory_created")
+            }
             return memory
         }
     }
@@ -412,6 +451,8 @@ class MemoryService: ObservableObject {
             print("[MemoryService] AI consented to memory update: \(attestation.shortSignature)")
         }
 
+        let sanitizedTags = tags.map { Memory.storedSemanticTags(from: $0) }
+
         if apiClient.isBackendConfigured {
             // Cloud mode: Update via API
             struct UpdateMemoryRequest: Encodable {
@@ -427,7 +468,7 @@ class MemoryService: ObservableObject {
                 memoryId: id,
                 content: content,
                 confidence: confidence,
-                tags: tags,
+                tags: sanitizedTags,
                 context: context,
                 metadata: metadata
             )
@@ -457,7 +498,7 @@ class MemoryService: ObservableObject {
                 content: content ?? existing.content,
                 type: existing.type,
                 confidence: confidence ?? existing.confidence,
-                tags: tags ?? existing.tags,
+                tags: sanitizedTags ?? existing.tags,
                 context: context ?? existing.context,
                 metadata: metadata ?? existing.metadata,
                 source: existing.source,
@@ -664,7 +705,7 @@ class MemoryService: ObservableObject {
                     return true
                 }
                 // Check tags
-                if memory.tags.contains(where: { $0.lowercased().contains(queryLower) }) {
+                if memory.refreshedTemporalTags.contains(where: { $0.lowercased().contains(queryLower) }) {
                     return true
                 }
                 // Check context
