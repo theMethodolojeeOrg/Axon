@@ -45,6 +45,7 @@ struct AppContainerView: View {
     @State private var currentView: MainView = .chat
     @State private var showChatInfo = false
     @State private var showLaunchScreen: Bool = true
+    @State private var runtimeTitleRefreshToken = 0
 
     #if os(macOS)
     @StateObject private var artifactPresenter = CodeArtifactPresenter()
@@ -127,6 +128,9 @@ struct AppContainerView: View {
                 await handleAgentActionRequest(notification)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .conversationRuntimeOverridesDidChange)) { _ in
+            runtimeTitleRefreshToken += 1
+        }
         .task {
             // Eagerly load V2 tools at app startup so they're available immediately
             // This runs once when the view appears and loads tools in the background
@@ -157,6 +161,7 @@ struct AppContainerView: View {
                 },
                 presenter: artifactPresenter
             )
+            .navigationTitle(macDetailNavigationTitle)
             .toolbar {
                 if currentView == .chat {
                     ToolbarItem {
@@ -382,6 +387,54 @@ struct AppContainerView: View {
         case .create:
             return "Create"
         }
+    }
+
+    #if os(macOS)
+    private var macDetailNavigationTitle: String {
+        switch currentView {
+        case .chat:
+            return activeChatRuntimeTitle
+        default:
+            return navigationTitle
+        }
+    }
+    #endif
+
+    private var activeChatRuntimeTitle: String {
+        _ = runtimeTitleRefreshToken
+
+        let settings = settingsViewModel.settings
+
+        if let conversationId = selectedConversation?.id {
+            let resolved = ConversationModelResolver.resolve(conversationId: conversationId, settings: settings)
+            let runtime = ConversationRuntimeOverrideManager.shared.resolve(
+                conversationId: conversationId,
+                baseProvider: resolved.normalizedProvider,
+                baseModel: resolved.modelId,
+                baseProviderDisplayName: resolved.providerName,
+                baseModelParams: settings.modelGenerationSettings
+            )
+            let modelDisplayName = displayName(forModelId: runtime.model, provider: runtime.provider)
+                ?? (runtime.model == resolved.modelId ? resolved.modelDisplayName : runtime.model)
+
+            return "\(runtime.providerDisplayName) - \(modelDisplayName)"
+        }
+
+        let resolved = ConversationModelResolver.resolveGlobal(settings: settings)
+        return "\(resolved.providerName) - \(resolved.modelDisplayName)"
+    }
+
+    private func displayName(forModelId modelId: String, provider providerString: String) -> String? {
+        let runtimeManager = ConversationRuntimeOverrideManager.shared
+
+        if let provider = runtimeManager.parseProvider(providerString),
+           let model = UnifiedModelRegistry.shared.model(for: modelId)
+                ?? UnifiedModelRegistry.shared.chatModels(for: provider).first(where: { $0.id == modelId })
+                ?? provider.availableModels.first(where: { $0.id == modelId }) {
+            return model.name
+        }
+
+        return UnifiedModelRegistry.shared.model(for: modelId)?.name
     }
 
     private func startNewChat() {

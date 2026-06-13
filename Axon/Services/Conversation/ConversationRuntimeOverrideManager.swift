@@ -104,6 +104,7 @@ final class ConversationRuntimeOverrideManager {
         let key = conversationOverridesKey(for: conversationId)
         if let data = try? JSONEncoder().encode(overrides) {
             UserDefaults.standard.set(data, forKey: key)
+            postRuntimeOverridesDidChange(conversationId: conversationId)
         }
     }
 
@@ -178,6 +179,7 @@ final class ConversationRuntimeOverrideManager {
         let key = turnLeaseKey(for: conversationId)
         if let data = try? JSONEncoder().encode(lease) {
             UserDefaults.standard.set(data, forKey: key)
+            postRuntimeOverridesDidChange(conversationId: conversationId)
         }
     }
 
@@ -192,6 +194,7 @@ final class ConversationRuntimeOverrideManager {
 
     func clearTurnLease(conversationId: String) {
         UserDefaults.standard.removeObject(forKey: turnLeaseKey(for: conversationId))
+        postRuntimeOverridesDidChange(conversationId: conversationId)
     }
 
     /// Decrement turn lease only after a successful assistant reply.
@@ -211,7 +214,16 @@ final class ConversationRuntimeOverrideManager {
         let key = turnLeaseKey(for: conversationId)
         if let data = try? JSONEncoder().encode(lease) {
             UserDefaults.standard.set(data, forKey: key)
+            postRuntimeOverridesDidChange(conversationId: conversationId)
         }
+    }
+
+    private func postRuntimeOverridesDidChange(conversationId: String) {
+        NotificationCenter.default.post(
+            name: .conversationRuntimeOverridesDidChange,
+            object: nil,
+            userInfo: ["conversationId": conversationId]
+        )
     }
 
     func normalizeProvider(_ provider: String) -> String {
@@ -274,4 +286,8 @@ final class ConversationRuntimeOverrideManager {
             settings.topKEnabled = true
         }
     }
+}
+
+extension Notification.Name {
+    static let conversationRuntimeOverridesDidChange = Notification.Name("ConversationRuntimeOverridesDidChange")
 }

@@ -140,6 +140,11 @@ class ConversationOverridesManager {
         }
         
         saveOverrides(overrides, for: conversationId)
+        NotificationCenter.default.post(
+            name: .conversationRuntimeOverridesDidChange,
+            object: nil,
+            userInfo: ["conversationId": conversationId]
+        )
     }
     
     // MARK: - Live Settings Loading
