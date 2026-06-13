@@ -410,7 +410,7 @@ final class AgentStateConfigureRuntimeDiscoveryTests: XCTestCase {
         super.tearDown()
     }
 
-    func testGetToolDetailsIncludesRuntimeOptions() async throws {
+    func testGetToolDetailsIncludesCallGrammarAndRuntimeCatalogPointer() async throws {
         AgentRuntimeCatalog.apiKeyConfiguredOverride = { provider in
             provider == .openai
         }
@@ -424,27 +424,43 @@ final class AgentStateConfigureRuntimeDiscoveryTests: XCTestCase {
         )
 
         XCTAssertTrue(result.success)
-        XCTAssertTrue(result.output.contains("## Runtime Options"))
-        XCTAssertTrue(result.output.contains("`agent_state_configure_runtime`"))
-        XCTAssertTrue(result.output.contains("usableNow"))
+        XCTAssertTrue(result.output.contains("## Parameters"))
+        XCTAssertTrue(result.output.contains("`set`"))
+        XCTAssertTrue(result.output.contains("`clear`"))
+        XCTAssertTrue(result.output.contains("`conversation`"))
+        XCTAssertTrue(result.output.contains("`turn`"))
+        XCTAssertTrue(result.output.contains("default: `set`"))
+        XCTAssertTrue(result.output.contains("default: `conversation`"))
+        XCTAssertTrue(result.output.contains("range: 1-100"))
+        XCTAssertTrue(result.output.contains("`temperature` (number)"))
+        XCTAssertTrue(result.output.contains("`top_p` (number)"))
+        XCTAssertTrue(result.output.contains("`top_k` (integer)"))
+        XCTAssertTrue(result.output.contains("## Examples"))
+        XCTAssertTrue(result.output.contains("Set a 2-turn lease on provider/model"))
+        XCTAssertTrue(result.output.contains("## When to use"))
+        XCTAssertTrue(result.output.contains("Temporarily switch model"))
+        XCTAssertTrue(result.output.contains("## System prompt guidance"))
+        XCTAssertTrue(result.output.contains("Call `get_runtime_catalog`"))
+        XCTAssertFalse(result.output.contains("## Runtime Options"))
+        XCTAssertTrue(result.output.contains("agent_state_configure_runtime"))
+        XCTAssertTrue(result.output.contains("Call `get_runtime_catalog` to inspect current provider/model availability"))
 
-        let runtimeOptions = try XCTUnwrap(result.structuredOutput?["runtimeOptions"] as? [String: Any])
-        let providers = try XCTUnwrap(runtimeOptions["providers"] as? [[String: Any]])
-        XCTAssertTrue(providers.contains { ($0["id"] as? String) == AxonProvider.openai.rawValue })
-        XCTAssertTrue(providers.contains { ($0["id"] as? String) == AxonProvider.appleFoundation.rawValue })
-        XCTAssertTrue(providers.contains { ($0["id"] as? String) == AxonProvider.localMLX.rawValue })
+        XCTAssertNil(result.structuredOutput?["runtimeOptions"])
+        XCTAssertEqual(result.structuredOutput?["runtimeCatalogTool"] as? String, "get_runtime_catalog")
     }
 
-    func testRuntimeOptionsStructuredOutputIncludesStatusFieldsAndUnavailableReasons() async throws {
+    func testGetRuntimeCatalogStructuredOutputIncludesStatusFieldsAndUnavailableReasons() async throws {
         AgentRuntimeCatalog.apiKeyConfiguredOverride = { _ in false }
 
-        await ToolPluginLoader.shared.loadAllTools()
-
         let result = try await handler.executeV2(
-            inputs: ["query": "agent_state_configure_runtime"],
-            manifest: try manifest(),
+            inputs: [:],
+            manifest: try manifest(id: "get_runtime_catalog"),
             context: .empty
         )
+
+        XCTAssertTrue(result.success)
+        XCTAssertTrue(result.output.contains("# Runtime Catalog"))
+        XCTAssertTrue(result.output.contains("usableNow"))
 
         let runtimeOptions = try XCTUnwrap(result.structuredOutput?["runtimeOptions"] as? [String: Any])
         let providers = try XCTUnwrap(runtimeOptions["providers"] as? [[String: Any]])
@@ -465,14 +481,55 @@ final class AgentStateConfigureRuntimeDiscoveryTests: XCTestCase {
         XCTAssertTrue((firstModel["unavailableReason"] as? String)?.contains("Missing API key") == true)
     }
 
-    private func manifest() throws -> ToolManifest {
+    func testGetRuntimeCatalogRespectsProviderUsableOnlyAndIncludeModels() async throws {
+        AgentRuntimeCatalog.apiKeyConfiguredOverride = { provider in
+            provider == .openai
+        }
+        AgentRuntimeCatalog.providerAvailabilityOverride = { provider in
+            provider == .openai
+        }
+
+        let result = try await handler.executeV2(
+            inputs: [
+                "query": "{\"provider\":\"\(AxonProvider.openai.rawValue)\",\"usable_only\":true,\"include_models\":false}"
+            ],
+            manifest: try manifest(id: "get_runtime_catalog"),
+            context: .empty
+        )
+
+        XCTAssertTrue(result.success)
+        XCTAssertTrue(result.output.contains("provider filter: `\(AxonProvider.openai.rawValue)`"))
+        XCTAssertFalse(result.output.contains("- models:"))
+
+        let runtimeOptions = try XCTUnwrap(result.structuredOutput?["runtimeOptions"] as? [String: Any])
+        XCTAssertEqual(runtimeOptions["usableOnly"] as? Bool, true)
+        XCTAssertEqual(runtimeOptions["includeModels"] as? Bool, false)
+        let providers = try XCTUnwrap(runtimeOptions["providers"] as? [[String: Any]])
+        XCTAssertEqual(providers.count, 1)
+        XCTAssertTrue(providers.contains { ($0["id"] as? String) == AxonProvider.openai.rawValue })
+        XCTAssertNil(providers.first?["models"])
+    }
+
+    func testGetRuntimeCatalogFailsForUnknownProvider() async throws {
+        let result = try await handler.executeV2(
+            inputs: ["query": "not_a_provider"],
+            manifest: try manifest(id: "get_runtime_catalog"),
+            context: .empty
+        )
+
+        XCTAssertFalse(result.success)
+        XCTAssertTrue(result.output.contains("Unknown provider 'not_a_provider'"))
+        XCTAssertTrue(result.output.contains("Valid providers:"))
+    }
+
+    private func manifest(id: String = "get_tool_details") throws -> ToolManifest {
         let json = """
         {
           "version": "1.0.0",
           "tool": {
-            "id": "get_tool_details",
-            "name": "Get Tool Details",
-            "description": "Get tool details.",
+            "id": "\(id)",
+            "name": "Discovery Test Tool",
+            "description": "Discovery test tool.",
             "category": "discovery",
             "requiresApproval": false
           },

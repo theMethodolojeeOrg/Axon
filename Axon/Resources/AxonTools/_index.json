@@ -52,6 +52,7 @@
       "tools": [
         "core/discovery/list_tools/tool_list_tools.json",
         "core/discovery/get_tool_details/tool_get_tool_details.json",
+        "core/discovery/get_runtime_catalog/tool_get_runtime_catalog.json",
         "core/discovery/discover_ports/tool_discover_ports.json",
         "core/discovery/invoke_port/tool_invoke_port.json"
       ]
@@ -362,6 +363,7 @@
     "discovery": [
       "list_tools",
       "get_tool_details",
+      "get_runtime_catalog",
       "discover_ports",
       "invoke_port"
     ],

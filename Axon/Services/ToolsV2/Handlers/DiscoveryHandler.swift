@@ -14,7 +14,7 @@ import UIKit
 /// Handler for discovery-related tools
 ///
 /// Registered handlers:
-/// - `discovery` → list_tools, get_tool_details, discover_ports, invoke_port
+/// - `discovery` → list_tools, get_tool_details, get_runtime_catalog, discover_ports, invoke_port
 @MainActor
 final class DiscoveryHandler: ToolHandlerV2 {
     
@@ -41,6 +41,8 @@ final class DiscoveryHandler: ToolHandlerV2 {
             return executeListTools(inputs: inputs)
         case "get_tool_details":
             return executeGetToolDetails(inputs: inputs)
+        case "get_runtime_catalog":
+            return executeGetRuntimeCatalog(inputs: inputs)
         case "discover_ports":
             return executeDiscoverPorts(inputs: inputs)
         case "invoke_port":
@@ -118,12 +120,9 @@ final class DiscoveryHandler: ToolHandlerV2 {
         output += "**Requires Approval:** \(manifest.tool.effectiveRequiresApproval ? "Yes" : "No")\n"
         
         if let params = manifest.parameters, !params.isEmpty {
-            output += "\n## Parameters\n\n"
-            for (name, param) in params.sorted(by: { $0.key < $1.key }) {
-                let required = (param.required ?? false) ? "*" : ""
-                output += "- **\(name)\(required)** (\(param.type.rawValue)): \(param.description ?? "")\n"
-            }
+            output += renderParameters(params)
         }
+        output += renderAIGuidance(manifest.ai)
 
         var structured: [String: Any] = [
             "id": manifest.tool.id,
@@ -131,9 +130,9 @@ final class DiscoveryHandler: ToolHandlerV2 {
         ]
 
         if manifest.tool.id == "agent_state_configure_runtime" {
-            let runtimeOptions = AgentRuntimeCatalog.snapshot()
-            output += runtimeOptions.markdown
-            structured["runtimeOptions"] = runtimeOptions.structured
+            output += "\n## Runtime Catalog\n\n"
+            output += "Call `get_runtime_catalog` to inspect current provider/model availability, key/device/download status, and `usableNow` values.\n"
+            structured["runtimeCatalogTool"] = "get_runtime_catalog"
         }
         
         return ToolResultV2.success(
@@ -141,6 +140,338 @@ final class DiscoveryHandler: ToolHandlerV2 {
             output: output,
             structured: structured
         )
+    }
+
+    // MARK: - get_runtime_catalog
+
+    private struct RuntimeCatalogRequest {
+        let provider: String?
+        let usableOnly: Bool
+        let includeModels: Bool
+    }
+
+    private func executeGetRuntimeCatalog(inputs: [String: Any]) -> ToolResultV2 {
+        let request = parseRuntimeCatalogRequest(inputs)
+        let catalog = AgentRuntimeCatalog.snapshot()
+        let validProviderIds = catalog.providers.map(\.id).sorted()
+
+        var providers = catalog.providers
+        if let provider = request.provider, !provider.isEmpty {
+            guard validProviderIds.contains(provider) else {
+                return ToolResultV2.failure(
+                    toolId: "get_runtime_catalog",
+                    error: "Unknown provider '\(provider)'. Valid providers: \(validProviderIds.joined(separator: ", "))"
+                )
+            }
+            providers = providers.filter { $0.id == provider }
+        }
+
+        if request.usableOnly {
+            providers = providers
+                .filter(\.usableNow)
+                .map { provider in
+                    AgentRuntimeCatalog.ProviderStatus(
+                        id: provider.id,
+                        displayName: provider.displayName,
+                        configuredKey: provider.configuredKey,
+                        deviceAvailable: provider.deviceAvailable,
+                        modelExists: provider.modelExists,
+                        usableNow: provider.usableNow,
+                        unavailableReason: provider.unavailableReason,
+                        models: provider.models.filter(\.usableNow)
+                    )
+                }
+        }
+
+        let output = renderRuntimeCatalog(
+            providers: providers,
+            includeModels: request.includeModels,
+            usableOnly: request.usableOnly,
+            providerFilter: request.provider
+        )
+
+        return ToolResultV2.success(
+            toolId: "get_runtime_catalog",
+            output: output,
+            structured: [
+                "runtimeOptions": [
+                    "providerFilter": request.provider.map { $0 as Any } ?? NSNull(),
+                    "usableOnly": request.usableOnly,
+                    "includeModels": request.includeModels,
+                    "providers": providers.map { runtimeProviderStructured($0, includeModels: request.includeModels) }
+                ]
+            ]
+        )
+    }
+
+    private func renderParameters(_ params: [String: ToolParameterV2]) -> String {
+        var output = "\n## Parameters\n\n"
+        for (name, param) in params.sorted(by: { $0.key < $1.key }) {
+            let required = param.isRequired ? "*" : ""
+            output += "- **\(name)\(required)** (\(param.type.rawValue)): \(param.description ?? "")\n"
+            output += renderParameterDetails(param, indent: "  ")
+        }
+        return output
+    }
+
+    private func renderParameterDetails(_ param: ToolParameterV2, indent: String) -> String {
+        var output = ""
+
+        if let enumValues = param.`enum`, !enumValues.isEmpty {
+            if let descriptions = param.enumDescriptions, !descriptions.isEmpty {
+                for value in enumValues {
+                    if let description = descriptions[value] {
+                        output += "\(indent)- `\(value)` - \(description)\n"
+                    } else {
+                        output += "\(indent)- `\(value)`\n"
+                    }
+                }
+            } else {
+                output += "\(indent)- allowed: \(enumValues.map { "`\($0)`" }.joined(separator: ", "))\n"
+            }
+        }
+
+        if let defaultValue = param.defaultValue {
+            output += "\(indent)- default: `\(formatAnyCodable(defaultValue))`\n"
+        }
+
+        if let min = param.minimum, let max = param.maximum {
+            output += "\(indent)- range: \(formatNumber(min))-\(formatNumber(max))\n"
+        } else if let min = param.minimum {
+            output += "\(indent)- min: \(formatNumber(min))\n"
+        } else if let max = param.maximum {
+            output += "\(indent)- max: \(formatNumber(max))\n"
+        }
+
+        if let minLength = param.minLength, let maxLength = param.maxLength {
+            output += "\(indent)- length: \(minLength)-\(maxLength)\n"
+        } else if let minLength = param.minLength {
+            output += "\(indent)- minLength: \(minLength)\n"
+        } else if let maxLength = param.maxLength {
+            output += "\(indent)- maxLength: \(maxLength)\n"
+        }
+
+        if let pattern = param.pattern {
+            output += "\(indent)- pattern: `\(pattern)`\n"
+        }
+
+        if let minItems = param.minItems, let maxItems = param.maxItems {
+            output += "\(indent)- items: \(minItems)-\(maxItems)\n"
+        } else if let minItems = param.minItems {
+            output += "\(indent)- minItems: \(minItems)\n"
+        } else if let maxItems = param.maxItems {
+            output += "\(indent)- maxItems: \(maxItems)\n"
+        }
+
+        if let item = param.items {
+            output += "\(indent)- item type: \(item.type.rawValue)\n"
+            output += renderParameterDetails(item, indent: indent + "  ")
+        }
+
+        if let properties = param.properties, !properties.isEmpty {
+            output += "\(indent)- properties:\n"
+            for (propertyName, property) in properties.sorted(by: { $0.key < $1.key }) {
+                let required = property.isRequired ? "*" : ""
+                let description = property.description.map { ": \($0)" } ?? ""
+                output += "\(indent)  - `\(propertyName)\(required)` (\(property.type.rawValue))\(description)\n"
+                output += renderParameterDetails(property, indent: indent + "    ")
+            }
+        }
+
+        return output
+    }
+
+    private func renderAIGuidance(_ ai: ToolAIConfig?) -> String {
+        guard let ai else { return "" }
+
+        var output = ""
+        if let examples = ai.usageExamples, !examples.isEmpty {
+            output += "\n## Examples\n\n"
+            for example in examples {
+                output += "- \(example.description):\n"
+                output += "  ```json\n"
+                output += indentBlock(example.input, by: "  ")
+                output += "\n  ```\n"
+                if let expectedOutput = example.expectedOutput, !expectedOutput.isEmpty {
+                    output += "  Expected: \(expectedOutput)\n"
+                }
+            }
+        }
+
+        if let whenToUse = ai.whenToUse, !whenToUse.isEmpty {
+            output += "\n## When to use\n\n"
+            for item in whenToUse {
+                output += "- \(item)\n"
+            }
+        }
+
+        if let whenNotToUse = ai.whenNotToUse, !whenNotToUse.isEmpty {
+            output += "\n## When NOT to use\n\n"
+            for item in whenNotToUse {
+                output += "- \(item)\n"
+            }
+        }
+
+        if let systemPromptSection = ai.systemPromptSection, !systemPromptSection.isEmpty {
+            output += "\n## System prompt guidance\n\n"
+            output += systemPromptSection
+            output += "\n"
+        }
+
+        return output
+    }
+
+    private func parseRuntimeCatalogRequest(_ inputs: [String: Any]) -> RuntimeCatalogRequest {
+        var parsedInputs = inputs
+        if let query = inputs["query"] as? String {
+            let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.hasPrefix("{"),
+               let data = trimmed.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                parsedInputs = json
+            } else if !trimmed.isEmpty {
+                parsedInputs["provider"] = trimmed
+            }
+        }
+
+        let provider = (parsedInputs["provider"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return RuntimeCatalogRequest(
+            provider: provider?.isEmpty == true ? nil : provider,
+            usableOnly: boolValue(parsedInputs["usable_only"]) ?? false,
+            includeModels: boolValue(parsedInputs["include_models"]) ?? true
+        )
+    }
+
+    private func renderRuntimeCatalog(
+        providers: [AgentRuntimeCatalog.ProviderStatus],
+        includeModels: Bool,
+        usableOnly: Bool,
+        providerFilter: String?
+    ) -> String {
+        var lines: [String] = []
+        lines.append("# Runtime Catalog")
+        lines.append("")
+        lines.append("Use these provider/model ids with `agent_state_configure_runtime`. `usableNow` reflects configured local state.")
+        if let providerFilter {
+            lines.append("- provider filter: `\(providerFilter)`")
+        }
+        lines.append("- usable_only: \(usableOnly)")
+        lines.append("- include_models: \(includeModels)")
+        lines.append("")
+
+        guard !providers.isEmpty else {
+            lines.append("No runtime providers matched the requested filters.")
+            return lines.joined(separator: "\n")
+        }
+
+        for provider in providers {
+            let status = provider.usableNow ? "usable" : "unavailable"
+            let reason = provider.unavailableReason.map { " - \($0)" } ?? ""
+            lines.append("## \(provider.displayName) (`\(provider.id)`) - \(status)\(reason)")
+            lines.append("- configuredKey: \(provider.configuredKey)")
+            lines.append("- deviceAvailable: \(provider.deviceAvailable)")
+            lines.append("- modelExists: \(provider.modelExists)")
+            lines.append("- usableNow: \(provider.usableNow)")
+
+            if includeModels {
+                lines.append("- models:")
+                if provider.models.isEmpty {
+                    lines.append("  - none")
+                } else {
+                    for model in provider.models {
+                        let modelStatus = model.usableNow ? "usable" : "unavailable"
+                        let modelReason = model.unavailableReason.map { " - \($0)" } ?? ""
+                        lines.append("  - `\(model.id)` (\(model.name)): \(modelStatus)\(modelReason)")
+                    }
+                }
+            }
+            lines.append("")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private func runtimeProviderStructured(
+        _ provider: AgentRuntimeCatalog.ProviderStatus,
+        includeModels: Bool
+    ) -> [String: Any] {
+        var structured: [String: Any] = [
+            "id": provider.id,
+            "displayName": provider.displayName,
+            "configuredKey": provider.configuredKey,
+            "deviceAvailable": provider.deviceAvailable,
+            "modelExists": provider.modelExists,
+            "usableNow": provider.usableNow,
+            "unavailableReason": provider.unavailableReason.map { $0 as Any } ?? NSNull()
+        ]
+
+        if includeModels {
+            structured["models"] = provider.models.map(\.structured)
+        }
+
+        return structured
+    }
+
+    private func boolValue(_ value: Any?) -> Bool? {
+        if let bool = value as? Bool {
+            return bool
+        }
+        if let number = value as? NSNumber {
+            return number.boolValue
+        }
+        if let string = value as? String {
+            switch string.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "true", "yes", "1":
+                return true
+            case "false", "no", "0":
+                return false
+            default:
+                return nil
+            }
+        }
+        return nil
+    }
+
+    private func formatAnyCodable(_ value: AnyCodableV2) -> String {
+        switch value.value {
+        case let string as String:
+            return string
+        case let bool as Bool:
+            return bool ? "true" : "false"
+        case let int as Int:
+            return "\(int)"
+        case let double as Double:
+            return formatNumber(double)
+        case let array as [Any]:
+            return formatJSON(array)
+        case let dict as [String: Any]:
+            return formatJSON(dict)
+        default:
+            return "\(value.value)"
+        }
+    }
+
+    private func formatJSON(_ value: Any) -> String {
+        guard JSONSerialization.isValidJSONObject(value),
+              let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+              let string = String(data: data, encoding: .utf8) else {
+            return "\(value)"
+        }
+        return string
+    }
+
+    private func formatNumber(_ value: Double) -> String {
+        if value.rounded() == value {
+            return "\(Int(value))"
+        }
+        return "\(value)"
+    }
+
+    private func indentBlock(_ text: String, by indent: String) -> String {
+        text.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { indent + $0 }
+            .joined(separator: "\n")
     }
     
     // MARK: - discover_ports

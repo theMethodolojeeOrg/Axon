@@ -1,0 +1,59 @@
+{
+  "version": "1.0.0",
+  "tool": {
+    "id": "get_runtime_catalog",
+    "name": "Get Runtime Catalog",
+    "description": "Inspect current provider/model runtime availability for agent self-configuration.",
+    "category": "discovery",
+    "icon": { "sfSymbol": "list.bullet.rectangle" },
+    "requiresApproval": false,
+    "tags": ["discovery", "runtime", "provider", "model", "catalog"]
+  },
+  "parameters": {
+    "provider": {
+      "type": "string",
+      "required": false,
+      "description": "Optional provider ID filter, e.g. anthropic, openai, localMLX."
+    },
+    "usable_only": {
+      "type": "boolean",
+      "required": false,
+      "description": "Only include providers and models that are usable now.",
+      "default": false
+    },
+    "include_models": {
+      "type": "boolean",
+      "required": false,
+      "description": "Include model rows under each provider.",
+      "default": true
+    }
+  },
+  "inputFormat": { "style": "json" },
+  "execution": {
+    "type": "internal_handler",
+    "handler": "discovery"
+  },
+  "ai": {
+    "systemPromptSection": "### get_runtime_catalog\nInspect the current ProviderKit-backed runtime catalog before calling agent_state_configure_runtime with provider/model IDs.\n\n**Format:**\n```tool_request\n{\"tool\":\"get_runtime_catalog\",\"query\":\"{\\\"provider\\\":\\\"anthropic\\\",\\\"usable_only\\\":true}\"}\n```\n\n**Returns:** Provider/model IDs, key/device/download availability, unavailable reasons, and usableNow status.",
+    "usageExamples": [
+      { "description": "Full runtime catalog", "input": "{}" },
+      { "description": "Only usable Anthropic models", "input": "{\"provider\":\"anthropic\",\"usable_only\":true}" },
+      { "description": "Provider summary only", "input": "{\"include_models\":false}" }
+    ],
+    "whenToUse": [
+      "Before selecting provider/model IDs for agent_state_configure_runtime",
+      "When a runtime target fails because it is unavailable",
+      "When checking whether local, key-backed, or downloaded models are usable now"
+    ],
+    "whenNotToUse": [
+      "To learn a tool's call grammar; use get_tool_details instead",
+      "To change runtime state; use agent_state_configure_runtime instead"
+    ]
+  },
+  "sovereignty": {
+    "actionCategory": "discovery_query",
+    "approvalDescription": "Read runtime provider/model catalog",
+    "scopes": ["discovery.read"],
+    "riskLevel": "low"
+  }
+}
