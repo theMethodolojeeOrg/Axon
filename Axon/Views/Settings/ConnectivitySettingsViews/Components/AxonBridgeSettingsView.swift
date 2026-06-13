@@ -539,7 +539,7 @@ struct AxonBridgeSettingsView: View {
                             .font(AppTypography.bodySmall(.medium))
                             .foregroundColor(AppColors.textPrimary)
 
-                        Text("The bottom terminal opens in the active bridge workspace when one is connected.")
+                        Text(terminalWorkspacePreferenceDescription)
                             .font(AppTypography.labelSmall())
                             .foregroundColor(AppColors.textSecondary)
                     }
@@ -641,6 +641,14 @@ struct AxonBridgeSettingsView: View {
     private var terminalFallbackLabel: String {
         let path = bridgeSettings.settings.terminalDefaultDirectory
         return path.isEmpty ? "Home directory" : path
+    }
+
+    private var terminalWorkspacePreferenceDescription: String {
+        #if os(macOS)
+        return "Terminal.app opens in the active bridge workspace when one is connected."
+        #else
+        return "The bottom terminal opens in the active bridge workspace when one is connected."
+        #endif
     }
 
     #if os(macOS)

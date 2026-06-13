@@ -33,24 +33,43 @@ final class TerminalSessionController: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let bridgeManager: BridgeConnectionManager
     private let bridgeSettings: BridgeSettingsStorage
+    #if os(macOS)
+    private let terminalLauncher: TerminalAppLaunching = MacTerminalLauncher()
+    #endif
 
     private init() {
         self.bridgeManager = BridgeConnectionManager.shared
         self.bridgeSettings = BridgeSettingsStorage.shared
+        #if os(macOS)
+        self.isDrawerOpen = false
+        if BridgeSettingsStorage.shared.settings.terminalDrawerOpen {
+            BridgeSettingsStorage.shared.setTerminalDrawerOpen(false)
+        }
+        #else
         self.isDrawerOpen = BridgeSettingsStorage.shared.settings.terminalDrawerOpen
+        #endif
         self.drawerHeight = BridgeSettingsStorage.shared.settings.terminalDrawerHeight
     }
 
     func toggleDrawer() {
+        #if os(macOS)
+        Task {
+            await openExternalTerminal()
+        }
+        #else
         isDrawerOpen.toggle()
         if isDrawerOpen && !isRunning && buffer.isEmpty {
             Task {
                 await start()
             }
         }
+        #endif
     }
 
     func start(cols: Int = 100, rows: Int = 30) async {
+        #if os(macOS)
+        await openExternalTerminal()
+        #else
         await transport?.close()
         cancellables.removeAll()
         buffer = ""
@@ -96,6 +115,7 @@ final class TerminalSessionController: ObservableObject {
             isRunning = false
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
+        #endif
     }
 
     func sendPendingInput() {
@@ -132,9 +152,15 @@ final class TerminalSessionController: ObservableObject {
     }
 
     func restart() {
+        #if os(macOS)
+        Task {
+            await openExternalTerminal()
+        }
+        #else
         Task {
             await start()
         }
+        #endif
     }
 
     private func append(_ output: String) {
@@ -144,4 +170,27 @@ final class TerminalSessionController: ObservableObject {
             buffer = String(buffer.suffix(maxCount))
         }
     }
+
+    #if os(macOS)
+    private func openExternalTerminal() async {
+        isDrawerOpen = false
+        isRunning = false
+        errorMessage = nil
+        buffer = ""
+
+        do {
+            let request = try MacTerminalLaunchResolver.resolve(
+                settings: bridgeSettings.settings,
+                connectedSession: bridgeManager.connectedSession
+            )
+            workingDirectory = request.directoryURL.path
+            workingDirectorySource = request.source
+            try await terminalLauncher.openTerminal(at: request.directoryURL)
+        } catch {
+            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            errorMessage = message
+            debugLog(.developerSettings, "Failed to open Terminal.app: \(message)")
+        }
+    }
+    #endif
 }

@@ -178,7 +178,7 @@ struct AppContainerView: View {
                             }) {
                                 Label("Terminal", systemImage: "terminal")
                             }
-                            .help(terminalController.isDrawerOpen ? "Hide Terminal" : "Show Terminal")
+                            .help("Open Terminal")
                         }
 
                         ToolbarItem {
@@ -680,9 +680,6 @@ struct ChatContainerView: View {
                 }
                 #if os(macOS)
                 composerOrSoloToolbar
-                if terminalController.isDrawerOpen {
-                    TerminalDrawerView(controller: terminalController)
-                }
                 #endif
             }
             .overlay(alignment: .top) {

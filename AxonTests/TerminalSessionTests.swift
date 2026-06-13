@@ -51,6 +51,75 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertEqual(resolved.source, .home)
     }
 
+    #if os(macOS)
+    func testMacTerminalLaunchPrefersConnectedWorkspaceWhenEnabled() throws {
+        let session = BridgeSession(
+            workspaceId: "workspace-1",
+            workspaceName: "Axon",
+            workspaceRoot: "/Users/tom/Projects/Axon",
+            capabilities: [],
+            extensionVersion: "test"
+        )
+        var settings = BridgeSettings()
+        settings.preferBridgeWorkspaceForTerminal = true
+        settings.terminalDefaultDirectory = "/Users/tom/Fallback"
+
+        let request = try MacTerminalLaunchResolver.resolve(
+            settings: settings,
+            connectedSession: session,
+            homeDirectory: "/Users/tom",
+            isDirectory: { $0 == "/Users/tom/Projects/Axon" }
+        )
+
+        XCTAssertEqual(request.directoryURL.path, "/Users/tom/Projects/Axon")
+        XCTAssertEqual(request.source, .bridgeWorkspace)
+    }
+
+    func testMacTerminalLaunchFallsBackToConfiguredDirectory() throws {
+        var settings = BridgeSettings()
+        settings.preferBridgeWorkspaceForTerminal = true
+        settings.terminalDefaultDirectory = "/Users/tom/Fallback"
+
+        let request = try MacTerminalLaunchResolver.resolve(
+            settings: settings,
+            connectedSession: nil,
+            homeDirectory: "/Users/tom",
+            isDirectory: { $0 == "/Users/tom/Fallback" }
+        )
+
+        XCTAssertEqual(request.directoryURL.path, "/Users/tom/Fallback")
+        XCTAssertEqual(request.source, .configuredDirectory)
+    }
+
+    func testMacTerminalLaunchFallsBackToHomeDirectory() throws {
+        let request = try MacTerminalLaunchResolver.resolve(
+            settings: BridgeSettings(),
+            connectedSession: nil,
+            homeDirectory: "/Users/tom",
+            isDirectory: { $0 == "/Users/tom" }
+        )
+
+        XCTAssertEqual(request.directoryURL.path, "/Users/tom")
+        XCTAssertEqual(request.source, .home)
+    }
+
+    func testMacTerminalLaunchRejectsInvalidWorkingDirectory() {
+        XCTAssertThrowsError(
+            try MacTerminalLaunchResolver.resolve(
+                settings: BridgeSettings(),
+                connectedSession: nil,
+                homeDirectory: "/Users/tom/Missing",
+                isDirectory: { _ in false }
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? MacTerminalLauncherError,
+                .invalidWorkingDirectory("/Users/tom/Missing")
+            )
+        }
+    }
+    #endif
+
     func testBridgeTerminalSessionMessagesRoundTrip() throws {
         let start = TerminalSessionStartParams(
             cwd: "/Users/tom/Projects/Axon",
