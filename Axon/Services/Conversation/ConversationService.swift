@@ -26,6 +26,12 @@ class ConversationService: ObservableObject {
     @Published var error: String?
     @Published var isSyncing = false
 
+    struct AssistantRegenerationContext: Equatable {
+        let assistantIndex: Int
+        let userIndex: Int
+        let userMessage: Message
+    }
+
     // Offline mode support
     @Published var isOfflineMode = false
     @Published var pendingOperationsCount = 0
@@ -1114,6 +1120,25 @@ class ConversationService: ObservableObject {
         return try await editMessage(conversationId: conversationId, messageId: messageId, content: content)
     }
 
+    /// Prepare a regeneration from an assistant toolbar action by pruning the
+    /// stale assistant response and later branch, then returning the user turn
+    /// that should be sent again.
+    func prepareAssistantRegenerate(conversationId: String, assistantMessageId: String) throws -> Message {
+        let context = try Self.assistantRegenerationContext(
+            in: messages,
+            conversationId: conversationId,
+            assistantMessageId: assistantMessageId
+        )
+
+        try localStore.deleteMessagesAfter(
+            messageId: context.userMessage.id,
+            conversationId: conversationId
+        )
+
+        messages = Array(messages.prefix(through: context.userIndex))
+        return context.userMessage
+    }
+
     /// Edit a user message and regenerate the AI response (cascade delete subsequent messages)
     func editAndRegenerate(conversationId: String, messageId: String, content: String, enabledTools: [String] = []) async throws -> Message {
         let editedMessage = try await prepareEditAndRegenerate(
@@ -1136,6 +1161,40 @@ class ConversationService: ObservableObject {
     }
 
     // MARK: - Helpers
+
+    static func assistantRegenerationContext(
+        in messages: [Message],
+        conversationId: String,
+        assistantMessageId: String
+    ) throws -> AssistantRegenerationContext {
+        guard let assistantIndex = messages.firstIndex(where: {
+            $0.id == assistantMessageId && $0.conversationId == conversationId
+        }) else {
+            throw ConversationError.notFound
+        }
+
+        guard messages[assistantIndex].role == .assistant else {
+            throw ConversationError.invalidData
+        }
+
+        guard assistantIndex > 0 else {
+            throw ConversationError.invalidData
+        }
+
+        for index in stride(from: assistantIndex - 1, through: 0, by: -1) {
+            let candidate = messages[index]
+            guard candidate.conversationId == conversationId else { continue }
+            if candidate.role == .user && candidate.isDeleted != true {
+                return AssistantRegenerationContext(
+                    assistantIndex: assistantIndex,
+                    userIndex: index,
+                    userMessage: candidate
+                )
+            }
+        }
+
+        throw ConversationError.invalidData
+    }
 
     func clearCurrentConversation() {
         currentConversation = nil

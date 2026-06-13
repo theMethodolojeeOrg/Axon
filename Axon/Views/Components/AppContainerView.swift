@@ -1251,17 +1251,48 @@ struct ChatContainerView: View {
                                             Task {
                                                 let convId = conversationService.currentConversation?.id ?? conversation.id
                                                 regeneratingMessageIds.insert(msg.id)
-                                                do {
-                                                    let assistant = try await conversationService.regenerateAssistantMessage(
-                                                        conversationId: convId,
-                                                        messageId: msg.id
-                                                    )
-                                                    // Stream the regenerated assistant content
-                                                    startPseudoStream(for: assistant) {
+                                                isLoading = true
+                                                var didHandOffToPseudoStream = false
+                                                defer {
+                                                    isLoading = false
+                                                    if !didHandOffToPseudoStream {
                                                         regeneratingMessageIds.remove(msg.id)
                                                     }
+                                                }
+
+                                                do {
+                                                    let settings = SettingsStorage.shared.loadSettings() ?? AppSettings()
+                                                    let enabledTools = settings.toolSettings.toolsEnabled ? Array(settings.toolSettings.enabledToolIds) : []
+                                                    let userMessage = try conversationService.prepareAssistantRegenerate(
+                                                        conversationId: convId,
+                                                        assistantMessageId: msg.id
+                                                    )
+
+                                                    let isOnDeviceMode = settings.deviceModeConfig.aiProcessing == .onDevice
+                                                    if useRealStreaming && isOnDeviceMode {
+                                                        try await sendMessageWithStreaming(
+                                                            conversationId: convId,
+                                                            content: userMessage.content,
+                                                            attachments: userMessage.attachments ?? [],
+                                                            enabledTools: enabledTools,
+                                                            reusingUserMessage: userMessage
+                                                        )
+                                                    } else {
+                                                        let assistant = try await conversationService.sendMessage(
+                                                            conversationId: convId,
+                                                            content: userMessage.content,
+                                                            attachments: userMessage.attachments ?? [],
+                                                            enabledTools: enabledTools,
+                                                            reusingUserMessage: userMessage
+                                                        )
+                                                        didHandOffToPseudoStream = true
+                                                        startPseudoStream(for: assistant) {
+                                                            regeneratingMessageIds.remove(msg.id)
+                                                        }
+                                                        recordUsage(for: assistant, inputContent: userMessage.content)
+                                                    }
                                                 } catch {
-                                                    regeneratingMessageIds.remove(msg.id)
+                                                    cleanupStreamingState()
                                                     print("Failed to regenerate: \(error)")
                                                 }
                                             }
@@ -2355,9 +2386,15 @@ struct ChatContainerView: View {
     // Simulate streaming by progressively revealing the assistant's content
     private func startPseudoStream(for assistant: Message, onComplete: (() -> Void)? = nil) {
         // Guard only assistant role
-        guard assistant.role == .assistant else { return }
+        guard assistant.role == .assistant else {
+            onComplete?()
+            return
+        }
         let full = assistant.content
-        guard !full.isEmpty else { return }
+        guard !full.isEmpty else {
+            onComplete?()
+            return
+        }
 
         // Start from empty override and progressively fill
         streamingOverrides[assistant.id] = ""
