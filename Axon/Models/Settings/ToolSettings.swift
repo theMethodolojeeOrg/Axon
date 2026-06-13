@@ -57,6 +57,16 @@ struct ToolSettings: Codable, Equatable, Sendable {
     /// Tool execution timeout in seconds
     var toolTimeout: Int = 30
 
+    /// Lower-bound-only value used at execution time.
+    var effectiveMaxToolCallsPerTurn: Int {
+        max(1, maxToolCallsPerTurn)
+    }
+
+    /// Lower-bound-only value used at execution time.
+    var effectiveToolTimeoutSeconds: Int {
+        max(1, toolTimeout)
+    }
+
     /// Enable experimental features
     var experimentalFeaturesEnabled: Bool = false
 

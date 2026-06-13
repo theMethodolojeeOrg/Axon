@@ -48,6 +48,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
     ///   - maxToolCalls: Maximum number of tool calls allowed per turn (from settings)
     func generateToolSystemPrompt(enabledTools: Set<ToolId>, maxToolCalls: Int = 5) -> String {
         guard !enabledTools.isEmpty else { return "" }
+        let effectiveMaxToolCalls = max(1, maxToolCalls)
 
         var prompt = """
 
@@ -55,7 +56,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
         You have access to the following tools. When you need real-time information, current data, or to perform calculations, you can request a tool be executed by responding with a JSON tool request block.
 
-        **Tool Call Limit:** You may use up to \(maxToolCalls) tool call\(maxToolCalls == 1 ? "" : "s") per response. Plan your tool usage efficiently.
+        **Tool Call Limit:** You may use up to \(effectiveMaxToolCalls) tool call\(effectiveMaxToolCalls == 1 ? "" : "s") per response. Plan your tool usage efficiently.
 
         To use a tool, include a code block with the tool request in this exact format:
         ```tool_request
@@ -939,6 +940,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
     /// This reduces context bloat by letting Axon discover tools on-demand rather than receiving all definitions upfront.
     func generateMinimalToolSystemPrompt(enabledTools: Set<ToolId>, maxToolCalls: Int = 5) -> String {
         guard !enabledTools.isEmpty else { return "" }
+        let effectiveMaxToolCalls = max(1, maxToolCalls)
 
         // Categorize enabled tools for the summary
         let categories = categorizeEnabledTools(enabledTools)
@@ -959,7 +961,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         prompt += """
 
 
-        **Tool Call Limit:** You may use up to \(maxToolCalls) tool call\(maxToolCalls == 1 ? "" : "s") per response.
+        **Tool Call Limit:** You may use up to \(effectiveMaxToolCalls) tool call\(effectiveMaxToolCalls == 1 ? "" : "s") per response.
 
         To discover and use these tools, use the following discovery tools:
 
@@ -2228,6 +2230,10 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Parse inputs from the query
         // The query can be JSON for complex inputs or a simple string for single-param tools
         var inputs: [String: Any] = [:]
+        let timeoutSeconds = SettingsStorage.shared
+            .loadSettingsOrDefault()
+            .toolSettings
+            .effectiveToolTimeoutSeconds
 
         // Try to parse as JSON first
         if let data = request.query.data(using: .utf8),
@@ -2260,7 +2266,11 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 print("[ToolProxy] Tool '\(tool.id)' \(isSession ? "session-" : "")approved with signature: \(record.shortSignature)")
 
                 do {
-                    let result = try await dynamicToolEngine.execute(toolId: tool.id, inputs: inputs)
+                    let result = try await dynamicToolEngine.execute(
+                        toolId: tool.id,
+                        inputs: inputs,
+                        timeoutSeconds: timeoutSeconds
+                    )
                     // Return result with approval info
                     return ToolResult(
                         tool: tool.id,
@@ -2339,7 +2349,11 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 // Pre-approved via co-sovereignty trust tier - execute directly
                 print("[ToolProxy] Tool '\(tool.id)' pre-approved via trust tier: \(tierName)")
                 do {
-                    let result = try await dynamicToolEngine.execute(toolId: tool.id, inputs: inputs)
+                    let result = try await dynamicToolEngine.execute(
+                        toolId: tool.id,
+                        inputs: inputs,
+                        timeoutSeconds: timeoutSeconds
+                    )
                     return ToolResult(
                         tool: tool.id,
                         success: result.success,
@@ -2370,7 +2384,11 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
         // No approval required - execute directly
         do {
-            let result = try await dynamicToolEngine.execute(toolId: tool.id, inputs: inputs)
+            let result = try await dynamicToolEngine.execute(
+                toolId: tool.id,
+                inputs: inputs,
+                timeoutSeconds: timeoutSeconds
+            )
             return result.toToolResult()
         } catch let error as DynamicToolError {
             return ToolResult(
@@ -3354,7 +3372,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                 ### Tool Settings
                 - **Master Toggle:** \(settings.toolSettings.toolsEnabled ? "Enabled" : "Disabled")
                 - **Enabled Tools:** \(settings.toolSettings.enabledTools.map { $0.rawValue }.joined(separator: ", "))
-                - **Max Calls/Turn:** \(settings.toolSettings.maxToolCallsPerTurn)
+                - **Max Calls/Turn:** \(settings.toolSettings.effectiveMaxToolCallsPerTurn)
 
                 ### Co-Sovereignty
                 - **Enabled:** \(settings.sovereigntySettings.enabled ? "Yes" : "No")

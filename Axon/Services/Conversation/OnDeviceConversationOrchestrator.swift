@@ -260,7 +260,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         }
         if useToolProxy {
             let maxToolCalls = await MainActor.run {
-                SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
+                SettingsViewModel.shared.settings.toolSettings.effectiveMaxToolCallsPerTurn
             }
             // Use unified routing service for V1/V2 system prompt generation
             let toolPrompt = await ToolRoutingService.shared.generateToolSystemPrompt(
@@ -365,7 +365,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         if useToolProxy {
             // Get max tool calls from settings
             let maxToolCalls = await MainActor.run {
-                SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
+                SettingsViewModel.shared.settings.toolSettings.effectiveMaxToolCallsPerTurn
             }
 
             let (finalResponse, toolUsed, sources, memOps) = try await handleToolProxyLoop(
@@ -551,7 +551,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         }
         if useToolProxy {
             let maxToolCalls = await MainActor.run {
-                SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
+                SettingsViewModel.shared.settings.toolSettings.effectiveMaxToolCallsPerTurn
             }
             // Use unified routing service for V1/V2 system prompt generation
             let toolPrompt = await ToolRoutingService.shared.generateToolSystemPrompt(
@@ -671,7 +671,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             // Internal tools (list_tools, create_memory, etc.) work without it
             if useToolProxy {
                 let maxToolCalls = await MainActor.run {
-                    SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
+                    SettingsViewModel.shared.settings.toolSettings.effectiveMaxToolCallsPerTurn
                 }
                 let geminiKey = config.geminiKey ?? ""
                 try await handleStreamingToolProxyLoop(
@@ -802,7 +802,7 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         // If stop sequence fired, rawStreamResponse is the pre-fence visible text.
         // The tool proxy loop will detect stoppedByStopSequence and do a two-phase call.
         let maxToolCalls = await MainActor.run {
-            SettingsViewModel.shared.settings.toolSettings.maxToolCallsPerTurn
+            SettingsViewModel.shared.settings.toolSettings.effectiveMaxToolCallsPerTurn
         }
 
         // Text already streamed to user — don't re-emit the initial visible prefix

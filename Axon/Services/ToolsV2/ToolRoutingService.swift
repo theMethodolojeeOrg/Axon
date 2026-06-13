@@ -66,10 +66,11 @@ final class ToolRoutingService: ObservableObject {
         enabledToolIds: Set<String>,
         maxToolCalls: Int = 5
     ) async -> String {
+        let effectiveMaxToolCalls = max(1, maxToolCalls)
         if toolsToggle.isV2Active {
             return generateV2SystemPrompt()
         } else {
-            return await generateV1SystemPrompt(enabledToolIds: enabledToolIds, maxToolCalls: maxToolCalls)
+            return await generateV1SystemPrompt(enabledToolIds: enabledToolIds, maxToolCalls: effectiveMaxToolCalls)
         }
     }
 
@@ -83,7 +84,7 @@ final class ToolRoutingService: ObservableObject {
         }
         
         // Get settings for max tool calls
-        let maxToolCalls = SettingsStorage.shared.loadSettingsOrDefault().toolSettings.maxToolCallsPerTurn
+        let maxToolCalls = SettingsStorage.shared.loadSettingsOrDefault().toolSettings.effectiveMaxToolCallsPerTurn
         
         // Categorize tools
         let enabledTools = pluginLoader.loadedTools.filter { $0.isEnabled }

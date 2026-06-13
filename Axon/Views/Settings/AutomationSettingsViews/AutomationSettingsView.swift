@@ -165,77 +165,34 @@ private struct ToolExecutionConfigSection: View {
                 Divider()
                     .background(AppColors.divider)
 
-                // Max Tool Calls Per Turn
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Max Tool Calls Per Turn")
-                            .font(AppTypography.bodyMedium())
-                            .foregroundColor(AppColors.textPrimary)
-
-                        Spacer()
-
-                        Text("\(viewModel.settings.toolSettings.maxToolCallsPerTurn)")
-                            .font(AppTypography.bodyMedium(.medium))
-                            .foregroundColor(AppColors.signalMercury)
+                PositiveIntegerSettingRow(
+                    title: "Max Tool Calls Per Turn",
+                    value: viewModel.settings.toolSettings.maxToolCallsPerTurn,
+                    description: "Maximum number of tool calls per response",
+                    accessibilityIdentifier: "maxToolCallsPerTurnInput"
+                ) { newValue in
+                    Task {
+                        var updated = viewModel.settings.toolSettings
+                        updated.maxToolCallsPerTurn = newValue
+                        await viewModel.updateSetting(\.toolSettings, updated)
                     }
-
-                    Slider(
-                        value: Binding(
-                            get: { Double(viewModel.settings.toolSettings.maxToolCallsPerTurn) },
-                            set: { newValue in
-                                Task {
-                                    var updated = viewModel.settings.toolSettings
-                                    updated.maxToolCallsPerTurn = Int(newValue)
-                                    await viewModel.updateSetting(\.toolSettings, updated)
-                                }
-                            }
-                        ),
-                        in: 1...10,
-                        step: 1
-                    )
-                    .tint(AppColors.signalMercury)
-
-                    Text("Maximum number of tool calls per response")
-                        .font(AppTypography.labelSmall())
-                        .foregroundColor(AppColors.textTertiary)
                 }
 
                 Divider()
                     .background(AppColors.divider)
 
-                // Tool Timeout
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Tool Timeout")
-                            .font(AppTypography.bodyMedium())
-                            .foregroundColor(AppColors.textPrimary)
-
-                        Spacer()
-
-                        Text("\(viewModel.settings.toolSettings.toolTimeout)s")
-                            .font(AppTypography.bodyMedium(.medium))
-                            .foregroundColor(AppColors.signalMercury)
+                PositiveIntegerSettingRow(
+                    title: "Tool Timeout",
+                    value: viewModel.settings.toolSettings.toolTimeout,
+                    unitSuffix: "s",
+                    description: "How long to wait for tool execution before timing out",
+                    accessibilityIdentifier: "toolTimeoutInput"
+                ) { newValue in
+                    Task {
+                        var updated = viewModel.settings.toolSettings
+                        updated.toolTimeout = newValue
+                        await viewModel.updateSetting(\.toolSettings, updated)
                     }
-
-                    Slider(
-                        value: Binding(
-                            get: { Double(viewModel.settings.toolSettings.toolTimeout) },
-                            set: { newValue in
-                                Task {
-                                    var updated = viewModel.settings.toolSettings
-                                    updated.toolTimeout = Int(newValue)
-                                    await viewModel.updateSetting(\.toolSettings, updated)
-                                }
-                            }
-                        ),
-                        in: 10...120,
-                        step: 10
-                    )
-                    .tint(AppColors.signalMercury)
-
-                    Text("How long to wait for tool execution before timing out")
-                        .font(AppTypography.labelSmall())
-                        .foregroundColor(AppColors.textTertiary)
                 }
 
                 Divider()
@@ -285,6 +242,135 @@ private struct ToolExecutionConfigSection: View {
             .foregroundColor(AppColors.textTertiary)
             .padding(.horizontal, 4)
         }
+    }
+}
+
+// MARK: - Positive Integer Setting Row
+
+private struct PositiveIntegerSettingRow: View {
+    let title: String
+    let value: Int
+    let unitSuffix: String?
+    let description: String
+    let accessibilityIdentifier: String
+    let onValueChange: (Int) -> Void
+
+    @State private var text = ""
+    @State private var validationMessage: String?
+
+    init(
+        title: String,
+        value: Int,
+        unitSuffix: String? = nil,
+        description: String,
+        accessibilityIdentifier: String,
+        onValueChange: @escaping (Int) -> Void
+    ) {
+        self.title = title
+        self.value = value
+        self.unitSuffix = unitSuffix
+        self.description = description
+        self.accessibilityIdentifier = accessibilityIdentifier
+        self.onValueChange = onValueChange
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(title)
+                    .font(AppTypography.bodyMedium())
+                    .foregroundColor(AppColors.textPrimary)
+
+                Spacer()
+
+                HStack(spacing: 6) {
+                    TextField("1", text: $text)
+                        .font(AppTypography.bodyMedium(.medium))
+                        .foregroundColor(validationMessage == nil ? AppColors.signalMercury : AppColors.accentError)
+                        .multilineTextAlignment(.trailing)
+                        .positiveIntegerKeyboard()
+                        .textFieldStyle(.plain)
+                        .frame(width: 96)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(AppSurfaces.color(.inputBackground))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(validationMessage == nil ? AppColors.divider : AppColors.accentError, lineWidth: 1)
+                        )
+                        .cornerRadius(6)
+                        .accessibilityIdentifier(accessibilityIdentifier)
+
+                    if let unitSuffix {
+                        Text(unitSuffix)
+                            .font(AppTypography.bodyMedium(.medium))
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+            }
+
+            Text(description)
+                .font(AppTypography.labelSmall())
+                .foregroundColor(AppColors.textTertiary)
+
+            if let validationMessage {
+                Text(validationMessage)
+                    .font(AppTypography.labelSmall())
+                    .foregroundColor(AppColors.accentError)
+            }
+        }
+        .onAppear {
+            text = String(value)
+            validateAndSave(text)
+        }
+        .onChange(of: value) { newValue in
+            let newText = String(newValue)
+            if validationMessage == nil && text != newText {
+                text = newText
+            }
+        }
+        .onChange(of: text) { newText in
+            validateAndSave(newText)
+        }
+    }
+
+    private func validateAndSave(_ candidate: String) {
+        let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            validationMessage = "Enter a positive whole number."
+            return
+        }
+
+        guard trimmed.allSatisfy(\.isNumber) else {
+            validationMessage = "Use digits only."
+            return
+        }
+
+        guard let parsed = Int(trimmed) else {
+            validationMessage = "Number is too large."
+            return
+        }
+
+        guard parsed >= 1 else {
+            validationMessage = "Value must be at least 1."
+            return
+        }
+
+        validationMessage = nil
+        if parsed != value {
+            onValueChange(parsed)
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func positiveIntegerKeyboard() -> some View {
+        #if os(iOS)
+        self.keyboardType(.numberPad)
+        #else
+        self
+        #endif
     }
 }
 

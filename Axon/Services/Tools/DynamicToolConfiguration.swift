@@ -308,11 +308,17 @@ struct PipelineExecutionContext: Sendable {
     var inputs: [String: Any]
     var stepOutputs: [String: Any]
     var secrets: [String: String]
+    var requestTimeoutSeconds: TimeInterval
 
-    init(inputs: [String: Any] = [:], secrets: [String: String] = [:]) {
+    init(
+        inputs: [String: Any] = [:],
+        secrets: [String: String] = [:],
+        requestTimeoutSeconds: TimeInterval = 30
+    ) {
         self.inputs = inputs
         self.stepOutputs = [:]
         self.secrets = secrets
+        self.requestTimeoutSeconds = requestTimeoutSeconds
     }
 
     /// Resolve a template string like "{{input.topic}}" or "{{steps.research.output}}"

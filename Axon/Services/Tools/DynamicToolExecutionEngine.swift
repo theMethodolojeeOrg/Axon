@@ -34,7 +34,8 @@ final class DynamicToolExecutionEngine: ObservableObject {
     /// Execute a dynamic tool with given inputs
     func execute(
         toolId: String,
-        inputs: [String: Any]
+        inputs: [String: Any],
+        timeoutSeconds: Int? = nil
     ) async throws -> DynamicToolResult {
         guard let tool = configService.tool(withId: toolId) else {
             throw DynamicToolError.toolNotFound(toolId)
@@ -66,8 +67,15 @@ final class DynamicToolExecutionEngine: ObservableObject {
             }
         }
 
+        let effectiveTimeoutSeconds = timeoutSeconds
+            ?? SettingsStorage.shared.loadSettingsOrDefault().toolSettings.effectiveToolTimeoutSeconds
+
         // Create execution context
-        var context = PipelineExecutionContext(inputs: inputs, secrets: secrets)
+        var context = PipelineExecutionContext(
+            inputs: inputs,
+            secrets: secrets,
+            requestTimeoutSeconds: TimeInterval(effectiveTimeoutSeconds)
+        )
 
         // Execute pipeline
         let totalSteps = Double(tool.pipeline.count)
@@ -167,11 +175,26 @@ final class DynamicToolExecutionEngine: ObservableObject {
         let response: String
         switch provider {
         case .anthropic:
-            response = try await callAnthropicAPI(apiKey: apiKey, model: modelId, messages: messages)
+            response = try await callAnthropicAPI(
+                apiKey: apiKey,
+                model: modelId,
+                messages: messages,
+                timeout: context.requestTimeoutSeconds
+            )
         case .openai:
-            response = try await callOpenAIAPI(apiKey: apiKey, model: modelId, messages: messages)
+            response = try await callOpenAIAPI(
+                apiKey: apiKey,
+                model: modelId,
+                messages: messages,
+                timeout: context.requestTimeoutSeconds
+            )
         case .gemini:
-            response = try await callGeminiAPI(apiKey: apiKey, model: modelId, messages: messages)
+            response = try await callGeminiAPI(
+                apiKey: apiKey,
+                model: modelId,
+                messages: messages,
+                timeout: context.requestTimeoutSeconds
+            )
         default:
             throw DynamicToolError.executionFailed("Provider \(providerStr) not supported for model calls")
         }
@@ -222,7 +245,7 @@ final class DynamicToolExecutionEngine: ObservableObject {
 
         var request = URLRequest(url: url)
         request.httpMethod = methodStr
-        request.timeoutInterval = 60
+        request.timeoutInterval = context.requestTimeoutSeconds
 
         // Add headers
         if let headers = config.headers {
@@ -405,7 +428,8 @@ final class DynamicToolExecutionEngine: ObservableObject {
     private func callAnthropicAPI(
         apiKey: String,
         model: String,
-        messages: [[String: Any]]
+        messages: [[String: Any]],
+        timeout: TimeInterval
     ) async throws -> String {
         let url = URL(string: "https://api.anthropic.com/v1/messages")!
 
@@ -414,6 +438,7 @@ final class DynamicToolExecutionEngine: ObservableObject {
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = timeout
 
         // Convert messages format for Anthropic
         var anthropicMessages: [[String: Any]] = []
@@ -460,7 +485,8 @@ final class DynamicToolExecutionEngine: ObservableObject {
     private func callOpenAIAPI(
         apiKey: String,
         model: String,
-        messages: [[String: Any]]
+        messages: [[String: Any]],
+        timeout: TimeInterval
     ) async throws -> String {
         let url = URL(string: "https://api.openai.com/v1/chat/completions")!
 
@@ -468,6 +494,7 @@ final class DynamicToolExecutionEngine: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = timeout
 
         let body: [String: Any] = [
             "model": model,
@@ -498,13 +525,15 @@ final class DynamicToolExecutionEngine: ObservableObject {
     private func callGeminiAPI(
         apiKey: String,
         model: String,
-        messages: [[String: Any]]
+        messages: [[String: Any]],
+        timeout: TimeInterval
     ) async throws -> String {
         let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)")!
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = timeout
 
         // Convert to Gemini format
         var contents: [[String: Any]] = []
