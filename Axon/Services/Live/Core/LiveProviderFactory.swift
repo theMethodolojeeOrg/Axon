@@ -76,10 +76,10 @@ final class LiveProviderFactory {
         case .openai:
             return detectOpenAICapabilities(modelId: modelId)
 
-        case .localMLX:
+        case .localMLX, .aiEdge:
             return .onDeviceMLX
 
-        case .anthropic, .xai, .perplexity, .deepseek, .zai, .minimax, .mistral:
+        case .anthropic, .xai, .perplexity, .deepseek, .zai, .minimax, .mistral, .venice:
             // These providers use HTTP streaming with STT/TTS
             return .httpStreaming
 
@@ -149,7 +149,7 @@ final class LiveProviderFactory {
 
     /// Get all providers that support Live mode
     var liveEnabledProviders: [AIProvider] {
-        AIProvider.allCases.filter { supportsLiveMode(provider: $0) }
+        AIProvider.providerKitBackedCases.filter { supportsLiveMode(provider: $0) }
     }
 
     /// Get providers that support native real-time (lowest latency)
@@ -159,12 +159,12 @@ final class LiveProviderFactory {
 
     /// Get providers that require HTTP streaming fallback
     var httpStreamingProviders: [AIProvider] {
-        [.anthropic, .xai, .perplexity, .deepseek, .zai, .minimax, .mistral]
+        [.anthropic, .xai, .perplexity, .deepseek, .zai, .minimax, .mistral, .venice]
     }
 
     /// Get providers that run on-device
     var onDeviceProviders: [AIProvider] {
-        [.localMLX]
+        [.localMLX, .aiEdge]
     }
 }
 

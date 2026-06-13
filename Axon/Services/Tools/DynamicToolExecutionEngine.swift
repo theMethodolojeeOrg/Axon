@@ -221,8 +221,10 @@ final class DynamicToolExecutionEngine: ObservableObject {
         case .zai: return .zai
         case .minimax: return .minimax
         case .mistral: return .mistral
+        case .venice: return .venice
         case .appleFoundation: return .openai  // Apple Foundation doesn't have API key - fallback to OpenAI for dynamic tools
         case .localMLX: return .openai  // Local MLX models - fallback to OpenAI for dynamic tools
+        case .aiEdge: return .openai  // AI Edge models are local - fallback to OpenAI for dynamic tools
         }
     }
 

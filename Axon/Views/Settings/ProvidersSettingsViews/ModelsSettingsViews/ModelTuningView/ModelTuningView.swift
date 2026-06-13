@@ -98,14 +98,14 @@ struct ModelTuningView: View {
     private var allModels: [AIModel] {
         // Use registry for all chat models
         let registry = UnifiedModelRegistry.shared
-        return AIProvider.allCases.flatMap { provider in
+        return AIProvider.providerKitBackedCases.flatMap { provider in
             let registryModels = registry.chatModels(for: provider)
             return registryModels.isEmpty ? provider.availableModels : registryModels
         }
     }
 
     private var filteredProviders: [AIProvider] {
-        let providers = AIProvider.allCases.filter { provider in
+        let providers = AIProvider.providerKitBackedCases.filter { provider in
             !modelsForProvider(provider).isEmpty
         }
 

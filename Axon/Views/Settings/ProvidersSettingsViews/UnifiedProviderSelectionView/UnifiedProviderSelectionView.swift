@@ -15,17 +15,27 @@ extension SettingsViewModel {
     /// - Always visible: on-device providers (Apple Intelligence, local MLX)
     /// - Cloud providers: only visible if an API key is configured
     func isBuiltInProviderSelectable(_ provider: AIProvider) -> Bool {
-        switch provider {
-        case .appleFoundation, .localMLX:
-            return true
-        default:
-            // For all cloud providers, only show if user has configured the API key.
-            // AIProvider raw values match APIProvider raw values for these cases.
-            guard let apiProvider = APIProvider(rawValue: provider.rawValue) else {
-                return false
-            }
-            return isAPIKeyConfigured(apiProvider)
+        if provider.isOnDevice {
+            return provider.isAvailable && !provider.availableModels.isEmpty
         }
+
+        guard let apiProvider = provider.apiProvider else {
+            return false
+        }
+        return isAPIKeyConfigured(apiProvider) && !provider.availableModels.isEmpty
+    }
+
+    func builtInProviderUnavailableReason(_ provider: AIProvider) -> String? {
+        if provider.availableModels.isEmpty {
+            return "No models available"
+        }
+        if provider.isOnDevice {
+            return provider.unavailableReason
+        }
+        guard let apiProvider = provider.apiProvider else {
+            return "Unsupported provider"
+        }
+        return isAPIKeyConfigured(apiProvider) ? nil : "API key required"
     }
 
     /// Whether a custom provider should be selectable.
@@ -36,7 +46,7 @@ extension SettingsViewModel {
 
     /// Get all providers (built-in + custom) as unified list
     func allUnifiedProviders() -> [UnifiedProvider] {
-        var providers: [UnifiedProvider] = AIProvider.allCases.map { .builtIn($0) }
+        var providers: [UnifiedProvider] = AIProvider.providerKitBackedCases.map { .builtIn($0) }
         providers.append(contentsOf: settings.customProviders.map { .custom($0) })
         return providers
     }
@@ -61,12 +71,12 @@ extension SettingsViewModel {
     /// Best-effort fallback provider when the current selection becomes unavailable.
     func fallbackUnifiedProvider() -> UnifiedProvider? {
         // 1) Prefer Apple Intelligence when available on this OS
-        if AIProvider.appleFoundation.isAvailable {
+        if isBuiltInProviderSelectable(.appleFoundation) {
             return .builtIn(.appleFoundation)
         }
 
         // 2) Prefer local MLX when available (physical device)
-        if AIProvider.localMLX.isAvailable {
+        if isBuiltInProviderSelectable(.localMLX) {
             return .builtIn(.localMLX)
         }
 
@@ -112,6 +122,7 @@ extension SettingsViewModel {
     func selectUnifiedProvider(_ provider: UnifiedProvider) async {
         switch provider {
         case .builtIn(let aiProvider):
+            guard isBuiltInProviderSelectable(aiProvider) else { return }
             // Switch to built-in provider
             settings.selectedCustomProviderId = nil
             settings.selectedCustomModelId = nil
@@ -125,6 +136,7 @@ extension SettingsViewModel {
             }
 
         case .custom(let config):
+            guard isCustomProviderSelectable(config.id) else { return }
             // Switch to custom provider
             await updateSetting(\.selectedCustomProviderId, config.id)
 

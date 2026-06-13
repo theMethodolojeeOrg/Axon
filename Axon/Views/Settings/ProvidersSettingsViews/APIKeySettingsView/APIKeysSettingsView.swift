@@ -25,7 +25,7 @@ struct APIKeysSettingsView: View {
             // AI Provider Keys Section
             SettingsSection(title: "AI Provider Keys") {
                 VStack(spacing: 12) {
-                    ForEach(APIProvider.allCases.filter { $0 != APIProvider.elevenlabs }) { provider in
+                    ForEach(APIProvider.chatProviders) { provider in
                         APIKeyRow(
                             provider: provider,
                             isConfigured: viewModel.isAPIKeyConfigured(provider),
@@ -50,24 +50,28 @@ struct APIKeysSettingsView: View {
 
             // ElevenLabs Section
             SettingsSection(title: "Text-to-Speech") {
-                APIKeyRow(
-                    provider: .elevenlabs,
-                    isConfigured: viewModel.isAPIKeyConfigured(.elevenlabs),
-                    onEdit: {
-                        editingKeyValue = viewModel.getAPIKey(.elevenlabs) ?? ""
-                        selectedProvider = .elevenlabs
-                    },
-                    onClear: {
-                        Task {
-                            await viewModel.clearAPIKey(.elevenlabs)
-                        }
-                    },
-                    onGetKey: {
-                        if let url = APIProvider.elevenlabs.infoURL {
-                            AppURLRouter.open(url)
-                        }
+                VStack(spacing: 12) {
+                    ForEach(APIProvider.ttsProviders) { provider in
+                        APIKeyRow(
+                            provider: provider,
+                            isConfigured: viewModel.isAPIKeyConfigured(provider),
+                            onEdit: {
+                                editingKeyValue = viewModel.getAPIKey(provider) ?? ""
+                                selectedProvider = provider
+                            },
+                            onClear: {
+                                Task {
+                                    await viewModel.clearAPIKey(provider)
+                                }
+                            },
+                            onGetKey: {
+                                if let url = provider.infoURL {
+                                    AppURLRouter.open(url)
+                                }
+                            }
+                        )
                     }
-                )
+                }
             }
 
             // Custom Provider Keys Section

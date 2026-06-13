@@ -402,7 +402,7 @@ class APIKeysStorage {
         var migratedCount = 0
 
         // Migrate built-in provider keys
-        for provider in APIProvider.allCases {
+        for provider in APIProvider.credentialSettingsProviders {
             let legacyKey = "api_key_\(provider.rawValue)"
             if let legacyValue = try? legacyStorage.retrieve(forKey: legacyKey), !legacyValue.isEmpty {
                 do {

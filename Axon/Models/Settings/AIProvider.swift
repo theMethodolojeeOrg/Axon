@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import AxonProviderKitCore
 
 // MARK: - AI Providers
 
@@ -19,13 +20,39 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
     case zai = "zai"
     case minimax = "minimax"
     case mistral = "mistral"
+    case venice = "venice"
     case appleFoundation = "appleFoundation"
     case localMLX = "localMLX"
+    case aiEdge = "aiEdge"
 
-    var id: String { rawValue }
+    nonisolated var id: String { rawValue }
 
     /// Map AIProvider to APIProvider for key storage and low-level service calls
-    var apiProvider: APIProvider? {
+    nonisolated var apiProvider: APIProvider? {
+        APIProvider(chatProvider: self)
+    }
+
+    nonisolated var displayName: String {
+        providerKitProvider?.displayName ?? rawValue
+    }
+
+    var availableModels: [AIModel] {
+        ProviderKitModelCatalogAdapter.models(for: self)
+    }
+
+    /// Whether this provider is available on the current device/OS
+    nonisolated var isAvailable: Bool {
+        providerKitProvider?.isAvailable ?? false
+    }
+
+    /// Human-readable reason if provider is unavailable
+    nonisolated var unavailableReason: String? {
+        providerKitProvider?.unavailabilityReason
+    }
+
+    /// ProviderKit counterpart for built-in providers. ProviderKit's generic
+    /// OpenAI-compatible provider remains represented by Axon's custom providers.
+    nonisolated var providerKitProvider: AxonProviderKitCore.AIProvider? {
         switch self {
         case .anthropic: return .anthropic
         case .openai: return .openai
@@ -36,70 +63,42 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable, Sendable {
         case .zai: return .zai
         case .minimax: return .minimax
         case .mistral: return .mistral
-        case .appleFoundation, .localMLX:
-            return nil
+        case .venice: return .venice
+        case .appleFoundation: return .appleIntelligence
+        case .localMLX: return .mlx
+        case .aiEdge: return .aiEdge
         }
     }
 
-    var displayName: String {
-        switch self {
-        case .anthropic: return "Anthropic (Claude)"
-        case .openai: return "OpenAI (GPT)"
-        case .gemini: return "Google Gemini"
-        case .xai: return "xAI (Grok)"
-        case .perplexity: return "Perplexity (Sonar)"
-        case .deepseek: return "DeepSeek"
-        case .zai: return "Z.ai (GLM)"
-        case .minimax: return "MiniMax"
-        case .mistral: return "Mistral AI"
-        case .appleFoundation: return "Apple Intelligence"
-        case .localMLX: return "On-Device (MLX)"
-        }
+    nonisolated var isOnDevice: Bool {
+        providerKitProvider?.isOnDevice ?? false
     }
 
-    var availableModels: [AIModel] {
-        ProviderKitModelCatalogAdapter.models(for: self)
+    nonisolated var requiresAPIKey: Bool {
+        providerKitProvider?.requiresAPIKey ?? false
     }
 
-    /// Whether this provider is available on the current device/OS
-    var isAvailable: Bool {
-        switch self {
-        case .appleFoundation:
-            // Apple Foundation Models require iOS 26+ / macOS 26+
-            if #available(iOS 26.0, macOS 26.0, *) {
-                return true
+    nonisolated static var providerKitBackedCases: [AIProvider] {
+        AxonProviderKitCore.AIModelCatalog
+            .availableProviders(policy: .all)
+            .compactMap { provider in
+                switch provider {
+                case .anthropic: return .anthropic
+                case .openai: return .openai
+                case .gemini: return .gemini
+                case .xai: return .xai
+                case .perplexity: return .perplexity
+                case .deepseek: return .deepseek
+                case .zai: return .zai
+                case .minimax: return .minimax
+                case .mistral: return .mistral
+                case .venice: return .venice
+                case .appleIntelligence: return .appleFoundation
+                case .mlx: return .localMLX
+                case .aiEdge: return .aiEdge
+                case .openAICompatible: return nil
+                }
             }
-            return false
-        case .localMLX:
-            // MLX models require physical device with Apple Silicon (Metal GPU)
-            #if targetEnvironment(simulator)
-            return false
-            #else
-            return true
-            #endif
-        default:
-            // Cloud providers are always available (API key validation happens separately)
-            return true
-        }
-    }
-
-    /// Human-readable reason if provider is unavailable
-    var unavailableReason: String? {
-        switch self {
-        case .appleFoundation:
-            if #available(iOS 26.0, macOS 26.0, *) {
-                return nil
-            }
-            return "Requires iOS 26.0+ or macOS 26.0+"
-        case .localMLX:
-            #if targetEnvironment(simulator)
-            return "Requires physical device (MLX uses Metal GPU)"
-            #else
-            return nil
-            #endif
-        default:
-            return nil
-        }
     }
 
     /// Find context window for a model ID across all providers

@@ -30,7 +30,7 @@ struct SubconsciousMemoryLoggingDetailView: View {
     }
 
     private var providerChoices: [ProviderChoice] {
-        let builtIns = AIProvider.allCases.map { provider in
+        let builtIns = AIProvider.providerKitBackedCases.map { provider in
             ProviderChoice(
                 id: "builtin:\(provider.rawValue)",
                 title: provider.displayName,
@@ -526,4 +526,3 @@ struct SubconsciousMemoryLoggingDetailView: View {
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 }
-

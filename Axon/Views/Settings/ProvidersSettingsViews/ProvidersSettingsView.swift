@@ -14,8 +14,9 @@ struct ProvidersSettingsView: View {
     // MARK: - Dynamic Subtitles
 
     private var apiKeysSubtitle: String {
-        let configuredCount = APIProvider.allCases.filter { viewModel.isAPIKeyConfigured($0) }.count
-        let total = APIProvider.allCases.count
+        let credentialProviders = APIProvider.credentialSettingsProviders
+        let configuredCount = credentialProviders.filter { viewModel.isAPIKeyConfigured($0) }.count
+        let total = credentialProviders.count
         if configuredCount == 0 {
             return "No keys configured"
         } else if configuredCount == total {

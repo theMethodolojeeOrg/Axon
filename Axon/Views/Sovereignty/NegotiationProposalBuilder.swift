@@ -258,7 +258,7 @@ struct NegotiationProposalBuilder: View {
             // Available providers picker
             Picker("New Provider", selection: $selectedProviderId) {
                 Text("Select...").tag("")
-                ForEach(AIProvider.allCases) { provider in
+                ForEach(AIProvider.providerKitBackedCases) { provider in
                     Text(provider.displayName).tag("builtin_\(provider.rawValue)")
                 }
             }

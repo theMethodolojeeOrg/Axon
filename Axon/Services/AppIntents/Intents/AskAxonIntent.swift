@@ -168,6 +168,7 @@ struct AskAxonIntent: AppIntent {
             zaiKey: try? apiKeys.getAPIKey(for: .zai),
             minimaxKey: try? apiKeys.getAPIKey(for: .minimax),
             mistralKey: try? apiKeys.getAPIKey(for: .mistral),
+            veniceKey: try? apiKeys.getAPIKey(for: .venice),
             customBaseUrl: customBaseUrl,
             customApiKey: customApiKey,
             modelParams: settings.modelGenerationSettings

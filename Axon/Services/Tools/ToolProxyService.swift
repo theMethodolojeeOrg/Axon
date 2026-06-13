@@ -3263,7 +3263,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
             // List all available providers and their models
             result = "## Available Providers & Models\n\n"
 
-            for provider in AIProvider.allCases {
+            for provider in AIProvider.providerKitBackedCases {
                 let isCurrent = provider == settings.defaultProvider
                 let availability = provider.isAvailable ? "" : " *(unavailable: \(provider.unavailableReason ?? "unknown"))*"
 
@@ -3458,7 +3458,7 @@ class ToolProxyService: NSObject, ObservableObject, CLLocationManagerDelegate {
                         **You specified:** `\(target)`
 
                         **Valid providers:**
-                        \(AIProvider.allCases.map { "- `\($0.rawValue)` (\($0.displayName))" }.joined(separator: "\n"))
+                        \(AIProvider.providerKitBackedCases.map { "- `\($0.rawValue)` (\($0.displayName))" }.joined(separator: "\n"))
                         """,
                     sources: nil,
                     memoryOperation: nil

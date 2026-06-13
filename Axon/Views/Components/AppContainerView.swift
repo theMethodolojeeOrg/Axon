@@ -2035,6 +2035,7 @@ struct ChatContainerView: View {
         let zaiKey = try? apiKeysStorage.getAPIKey(for: .zai)
         let minimaxKey = try? apiKeysStorage.getAPIKey(for: .minimax)
         let mistralKey = try? apiKeysStorage.getAPIKey(for: .mistral)
+        let veniceKey = try? apiKeysStorage.getAPIKey(for: .venice)
 
         // Get custom provider config if needed - check conversation overrides first
         var customBaseUrl: String? = nil
@@ -2079,6 +2080,7 @@ struct ChatContainerView: View {
             zaiKey: zaiKey,
             minimaxKey: minimaxKey,
             mistralKey: mistralKey,
+            veniceKey: veniceKey,
             customBaseUrl: customBaseUrl,
             customApiKey: customApiKey,
             modelParams: resolvedModelParams

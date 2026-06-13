@@ -74,6 +74,7 @@ final class ConversationTitleOrchestrator {
         let zaiKey = try? apiKeysStorage.getAPIKey(for: .zai)
         let minimaxKey = try? apiKeysStorage.getAPIKey(for: .minimax)
         let mistralKey = try? apiKeysStorage.getAPIKey(for: .mistral)
+        let veniceKey = try? apiKeysStorage.getAPIKey(for: .venice)
 
         // Custom provider support (openai-compatible)
         // There is no dedicated AIProvider enum case for custom providers.
@@ -183,6 +184,7 @@ final class ConversationTitleOrchestrator {
             zaiKey: zaiKey,
             minimaxKey: minimaxKey,
             mistralKey: mistralKey,
+            veniceKey: veniceKey,
             customBaseUrl: customBaseUrl,
             customApiKey: customApiKey,
             modelParams: nil  // Title generation uses hardcoded low temperature
@@ -470,8 +472,10 @@ private extension AIProvider {
         case .zai: return ("zai", self.displayName)
         case .minimax: return ("minimax", self.displayName)
         case .mistral: return ("mistral", self.displayName)
+        case .venice: return ("venice", self.displayName)
         case .appleFoundation: return ("appleFoundation", self.displayName)
         case .localMLX: return ("localMLX", self.displayName)
+        case .aiEdge: return ("aiEdge", self.displayName)
         }
     }
 }

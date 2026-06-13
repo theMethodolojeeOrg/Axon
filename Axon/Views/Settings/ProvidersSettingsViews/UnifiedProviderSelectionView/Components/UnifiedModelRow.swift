@@ -81,8 +81,7 @@ struct UnifiedModelRow: View {
     }
 
     private func builtInPricingText(for model: AIModel) -> String? {
-        if let key = PricingKeyResolver.canonicalKey(for: model.id) ?? PricingKeyResolver.canonicalKey(for: model.name) {
-            let pricing = PricingRegistry.price(for: key)
+        if let pricing = ProviderKitModelCatalogAdapter.pricing(for: model.id) {
             var parts: [String] = []
             parts.append(String(format: "$%.2f in / $%.2f out per 1M tokens", pricing.inputPerMTokUSD, pricing.outputPerMTokUSD))
             if let cached = pricing.cachedInputPerMTokUSD {

@@ -1282,7 +1282,7 @@ struct ProviderSelectionSection: View {
 
     var body: some View {
         GeneralSettingsSection(title: "AI Provider") {
-            let allProviders = viewModel.selectableUnifiedProviders()
+            let allProviders = viewModel.allUnifiedProviders()
             let isProviderChangeAllowed = SovereigntyService.shared.isProviderChangeAllowed()
             let providerRestrictionReason = SovereigntyService.shared.providerChangeRestrictionReason()
 
@@ -1314,16 +1314,18 @@ struct ProviderSelectionSection: View {
             ) {
                 #if os(macOS)
                 Section("Built-in Providers") {
-                    ForEach(AIProvider.allCases.filter { viewModel.isBuiltInProviderSelectable($0) }) { aiProvider in
+                    ForEach(AIProvider.providerKitBackedCases) { aiProvider in
+                        let isSelectable = viewModel.isBuiltInProviderSelectable(aiProvider)
                         MenuButtonItem(
                             id: "builtin_\(aiProvider.rawValue)",
-                            label: aiProvider.displayName,
+                            label: providerMenuLabel(for: aiProvider, isSelectable: isSelectable),
                             isSelected: currentProvider?.id == "builtin_\(aiProvider.rawValue)"
                         ) {
-                            if let selected = allProviders.first(where: { $0.id == "builtin_\(aiProvider.rawValue)" }) {
+                            if isSelectable, let selected = allProviders.first(where: { $0.id == "builtin_\(aiProvider.rawValue)" }) {
                                 Task { await viewModel.selectUnifiedProvider(selected) }
                             }
                         }
+                        .disabled(!isSelectable)
                     }
                 }
 
@@ -1345,8 +1347,11 @@ struct ProviderSelectionSection: View {
                 }
                 #else
                 Section("Built-in Providers") {
-                    ForEach(AIProvider.allCases.filter { viewModel.isBuiltInProviderSelectable($0) }) { aiProvider in
-                        Text(aiProvider.displayName).tag("builtin_\(aiProvider.rawValue)")
+                    ForEach(AIProvider.providerKitBackedCases) { aiProvider in
+                        let isSelectable = viewModel.isBuiltInProviderSelectable(aiProvider)
+                        Text(providerMenuLabel(for: aiProvider, isSelectable: isSelectable))
+                            .tag("builtin_\(aiProvider.rawValue)")
+                            .disabled(!isSelectable)
                     }
                 }
 
@@ -1363,6 +1368,13 @@ struct ProviderSelectionSection: View {
             .disabled(!isProviderChangeAllowed)
             .opacity(isProviderChangeAllowed ? 1.0 : 0.6)
         }
+    }
+
+    private func providerMenuLabel(for provider: AIProvider, isSelectable: Bool) -> String {
+        guard !isSelectable, let reason = viewModel.builtInProviderUnavailableReason(provider) else {
+            return provider.displayName
+        }
+        return "\(provider.displayName) (\(reason))"
     }
 }
 

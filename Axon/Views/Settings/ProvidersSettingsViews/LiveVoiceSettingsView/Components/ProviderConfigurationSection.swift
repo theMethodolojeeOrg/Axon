@@ -14,7 +14,9 @@ struct ProviderConfigurationSection: View {
 
     /// Providers that support real-time voice conversations
     private var liveCapableProviders: [AIProvider] {
-        [.openai, .anthropic, .gemini]
+        AIProvider.providerKitBackedCases.filter { provider in
+            !provider.isOnDevice && LiveProviderFactory.shared.supportsLiveMode(provider: provider)
+        }
     }
 
     var body: some View {
@@ -44,6 +46,11 @@ struct ProviderConfigurationSection: View {
 
         if !liveModels.isEmpty {
             return liveModels.map { $0.id }
+        }
+
+        let chatModels = UnifiedModelRegistry.shared.chatModels(for: provider)
+        if !chatModels.isEmpty {
+            return chatModels.map { $0.id }
         }
 
         // Fallback to hardcoded list for backwards compatibility

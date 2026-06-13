@@ -301,7 +301,7 @@ final class StreamingHTTPLiveProvider: LiveProviderProtocol {
             return "grok"
         case .deepseek:
             return "deepseek"
-        case .perplexity, .minimax, .mistral, .zai:
+        case .perplexity, .minimax, .mistral, .zai, .venice:
             return "openai-compatible"
         default:
             return "openai-compatible"
@@ -320,6 +320,8 @@ final class StreamingHTTPLiveProvider: LiveProviderProtocol {
             return "https://api.minimax.chat/v1/text/chatcompletion_v2"
         case .mistral:
             return "https://api.mistral.ai/v1/chat/completions"
+        case .venice:
+            return "https://api.venice.ai/api/v1/chat/completions"
         case .zai:
             return nil  // Use default
         default:

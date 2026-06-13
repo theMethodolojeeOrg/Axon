@@ -36,7 +36,7 @@ final class CostService: ObservableObject {
 
     private init() {
         // Initialize with zeroes for all providers for predictable UI
-        AIProvider.allCases.forEach { provider in
+        AIProvider.providerKitBackedCases.forEach { provider in
             monthlyTotalsUSD[provider] = 0
             todaysTotalsUSD[provider] = 0
         }
@@ -414,8 +414,10 @@ struct PricingKeyResolver {
         case .zai: return .glm47
         case .minimax: return .minimaxM2
         case .mistral: return .codestral
+        case .venice: return .gpt5Mini
         case .appleFoundation: return .claudeHaiku45  // Apple Intelligence is free, no pricing key needed - fallback for display
         case .localMLX: return .claudeHaiku45  // Local MLX models are free, no pricing key needed - fallback for display
+        case .aiEdge: return .claudeHaiku45  // On-device models are free, no pricing key needed - fallback for display
         }
     }
 }

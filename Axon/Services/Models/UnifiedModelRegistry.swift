@@ -813,10 +813,8 @@ extension AIProvider {
         }
 
         switch self {
-        case .localMLX:
-            return ProviderKitModelCatalogAdapter.models(for: .localMLX)
-        case .appleFoundation:
-            return ProviderKitModelCatalogAdapter.models(for: .appleFoundation)
+        case .localMLX, .appleFoundation, .venice, .aiEdge:
+            return ProviderKitModelCatalogAdapter.models(for: self)
         default:
             return registry.chatModels(for: self)
         }

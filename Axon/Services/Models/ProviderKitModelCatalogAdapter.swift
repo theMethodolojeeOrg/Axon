@@ -17,33 +17,13 @@ enum ProviderKitModelCatalogAdapter {
 
     static let appleFoundationModelId = "apple-foundation-default"
 
-    private static let providerOrder: [AIProvider] = [
-        .anthropic,
-        .openai,
-        .gemini,
-        .xai,
-        .perplexity,
-        .deepseek,
-        .zai,
-        .minimax,
-        .mistral,
-        .appleFoundation,
-        .localMLX
-    ]
+    nonisolated static var providerOrder: [AIProvider] {
+        AIModelCatalog
+            .availableProviders(policy: policy)
+            .compactMap(axonProvider(for:))
+    }
 
-    private static let policy = AIProviderAccessPolicy.allowing([
-        .anthropic,
-        .openai,
-        .gemini,
-        .xai,
-        .perplexity,
-        .deepseek,
-        .zai,
-        .minimax,
-        .mistral,
-        .appleIntelligence,
-        .mlx
-    ])
+    nonisolated private static let policy: AIProviderAccessPolicy = .all
 
     static func bootstrapMLXCatalog() {
         if MLXModelConfigLoader.shared.config.models.isEmpty {
@@ -60,22 +40,10 @@ enum ProviderKitModelCatalogAdapter {
     }
 
     static func providerKitProvider(for provider: AIProvider) -> PKProvider? {
-        switch provider {
-        case .anthropic: return .anthropic
-        case .openai: return .openai
-        case .gemini: return .gemini
-        case .xai: return .xai
-        case .perplexity: return .perplexity
-        case .deepseek: return .deepseek
-        case .zai: return .zai
-        case .minimax: return .minimax
-        case .mistral: return .mistral
-        case .appleFoundation: return .appleIntelligence
-        case .localMLX: return .mlx
-        }
+        provider.providerKitProvider
     }
 
-    static func axonProvider(for provider: PKProvider) -> AIProvider? {
+    nonisolated static func axonProvider(for provider: PKProvider) -> AIProvider? {
         switch provider {
         case .anthropic: return .anthropic
         case .openai: return .openai
@@ -86,9 +54,11 @@ enum ProviderKitModelCatalogAdapter {
         case .zai: return .zai
         case .minimax: return .minimax
         case .mistral: return .mistral
+        case .venice: return .venice
         case .appleIntelligence: return .appleFoundation
         case .mlx: return .localMLX
-        case .venice, .openAICompatible, .aiEdge:
+        case .aiEdge: return .aiEdge
+        case .openAICompatible:
             return nil
         }
     }
@@ -113,13 +83,13 @@ enum ProviderKitModelCatalogAdapter {
     }
 
     static func chatModels(for provider: AIProvider) -> [AIModel] {
-        guard provider != .localMLX && provider != .appleFoundation else { return [] }
+        guard !provider.isOnDevice else { return [] }
         return models(for: provider)
     }
 
     static func allChatModels() -> [AIModel] {
         providerOrder
-            .filter { $0 != .localMLX && $0 != .appleFoundation }
+            .filter { !$0.isOnDevice }
             .flatMap { models(for: $0) }
     }
 

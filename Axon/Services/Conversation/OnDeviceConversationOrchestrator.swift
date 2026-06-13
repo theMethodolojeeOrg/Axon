@@ -9,6 +9,8 @@
 
 import Foundation
 import CoreLocation
+import AxonProviderKit
+import AxonProviderKitCore
 
 /// Result from provider API calls including content and optional reasoning
 struct ProviderResponse {
@@ -1101,7 +1103,11 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
         case "grok": return config.grokKey
         case "deepseek": return config.deepseekKey
         case "perplexity": return config.perplexityKey
+        case "zai": return config.zaiKey
+        case "minimax": return config.minimaxKey
+        case "mistral": return config.mistralKey
         case "openai-compatible": return config.customApiKey
+        case "venice": return config.veniceKey
         default: return nil
         }
     }
@@ -1729,6 +1735,17 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             )
             return ProviderResponse(content: content)
 
+        case "venice":
+            guard let apiKey = config.veniceKey else { throw APIError.unauthorized }
+            return try await ProviderKitRuntimeBridge.callProvider(
+                provider: .venice,
+                apiKey: apiKey,
+                model: config.model,
+                system: system,
+                messages: messages,
+                modelParams: config.modelParams
+            )
+
         case "openai-compatible":
             guard let apiKey = config.customApiKey, let baseUrl = config.customBaseUrl else { throw APIError.unauthorized }
             return try await callOpenAICompatible(
@@ -1757,6 +1774,16 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
                 modelParams: config.modelParams
             )
             return ProviderResponse(content: content)
+
+        case "aiEdge":
+            return try await ProviderKitRuntimeBridge.callProvider(
+                provider: .aiEdge,
+                apiKey: nil,
+                model: config.model,
+                system: system,
+                messages: messages,
+                modelParams: config.modelParams
+            )
 
         default:
             throw APIError.networkError("Provider \(provider) not supported in On-Device mode yet.")
@@ -3275,5 +3302,121 @@ class OnDeviceConversationOrchestrator: ConversationOrchestrator {
             messages: messages,
             modelParams: modelParams
         )
+    }
+}
+
+// MARK: - ProviderKit Runtime Bridge
+
+private enum ProviderKitRuntimeBridge {
+    static func callProvider(
+        provider: AIProvider,
+        apiKey: String?,
+        model: String,
+        system: String?,
+        messages: [Message],
+        modelParams: ModelGenerationSettings?
+    ) async throws -> ProviderResponse {
+        guard let providerKitProvider = provider.providerKitProvider else {
+            throw APIError.networkError("Provider \(provider.rawValue) is not backed by ProviderKit.")
+        }
+
+        let client = ProviderClient()
+        let providerKitMessages = try messages.map(providerKitMessage(from:))
+        let maxTokens = resolvedMaxTokens(from: modelParams, fallback: provider == .aiEdge ? 512 : 4096)
+
+        let response: AxonProviderKitCore.Message
+        switch providerKitProvider {
+        case .aiEdge:
+            response = try await client.sendToAIEdge(
+                messages: providerKitMessages,
+                model: model,
+                system: system,
+                maxTokens: maxTokens
+            )
+        default:
+            guard let apiKey, !apiKey.isEmpty else {
+                throw APIError.unauthorized
+            }
+            response = try await client.send(
+                messages: providerKitMessages,
+                provider: providerKitProvider,
+                model: ProviderKitModelCatalogAdapter.providerKitModelId(for: model, provider: provider),
+                apiKey: apiKey,
+                system: system,
+                maxTokens: maxTokens
+            )
+        }
+
+        return ProviderResponse(
+            content: response.content,
+            reasoning: response.reasoning
+        )
+    }
+
+    private static func providerKitMessage(from message: Message) throws -> AxonProviderKitCore.Message {
+        AxonProviderKitCore.Message(
+            id: message.id,
+            role: providerKitRole(from: message.role),
+            content: message.content,
+            timestamp: message.timestamp,
+            tokens: providerKitTokens(from: message.tokens),
+            modelName: message.modelName,
+            providerName: message.providerName,
+            attachments: try message.attachments?.map(providerKitAttachment(from:)),
+            reasoning: message.reasoning
+        )
+    }
+
+    private static func providerKitRole(from role: MessageRole) -> AxonProviderKitCore.MessageRole {
+        switch role {
+        case .user:
+            return .user
+        case .assistant:
+            return .assistant
+        case .system:
+            return .system
+        }
+    }
+
+    private static func providerKitTokens(from tokens: TokenUsage?) -> AxonProviderKitCore.TokenUsage? {
+        guard let tokens else { return nil }
+        return AxonProviderKitCore.TokenUsage(
+            input: tokens.input,
+            output: tokens.output,
+            total: tokens.total
+        )
+    }
+
+    private static func providerKitAttachment(from attachment: MessageAttachment) throws -> AxonProviderKitCore.MessageAttachment {
+        AxonProviderKitCore.MessageAttachment(
+            id: attachment.id,
+            type: providerKitAttachmentType(from: attachment.type),
+            url: attachment.remoteURLString,
+            base64: try attachment.inlineBase64(),
+            name: attachment.name,
+            mimeType: attachment.mimeType
+        )
+    }
+
+    private static func providerKitAttachmentType(
+        from type: MessageAttachment.AttachmentType
+    ) -> AxonProviderKitCore.AttachmentType {
+        switch type {
+        case .image:
+            return .image
+        case .document:
+            return .document
+        case .audio:
+            return .audio
+        case .video:
+            return .video
+        }
+    }
+
+    private static func resolvedMaxTokens(from modelParams: ModelGenerationSettings?, fallback: Int) -> Int {
+        guard let modelParams, modelParams.maxResponseTokensEnabled else {
+            return fallback
+        }
+        return max(1, modelParams.maxResponseTokens)
     }
 }

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import AxonProviderKitCore
 
 // MARK: - API Provider
 
@@ -20,66 +21,100 @@ enum APIProvider: String, CaseIterable, Identifiable {
     case zai = "zai"
     case minimax = "minimax"
     case mistral = "mistral"
+    case venice = "venice"
 
-    var id: String { rawValue }
+    nonisolated var id: String { rawValue }
 
-    var displayName: String {
+    nonisolated init?(chatProvider provider: AIProvider) {
+        guard provider.requiresAPIKey,
+              let providerKitProvider = provider.providerKitProvider,
+              providerKitProvider != .openAICompatible else {
+            return nil
+        }
+        self.init(rawValue: providerKitProvider.rawValue)
+    }
+
+    nonisolated var displayName: String {
+        if let providerKitProvider {
+            return providerKitProvider.displayName
+        }
+
         switch self {
-        case .openai: return "OpenAI"
-        case .anthropic: return "Anthropic"
-        case .gemini: return "Google Gemini"
-        case .xai: return "xAI"
         case .elevenlabs: return "ElevenLabs"
-        case .perplexity: return "Perplexity"
-        case .deepseek: return "DeepSeek"
-        case .zai: return "Z.ai (Zhipu)"
-        case .minimax: return "MiniMax"
-        case .mistral: return "Mistral AI"
+        default: return rawValue
         }
     }
 
-    var apiKeyPlaceholder: String {
+    nonisolated var apiKeyPlaceholder: String {
+        if let placeholder = providerKitProvider?.apiKeyPlaceholder {
+            return placeholder
+        }
+
         switch self {
-        case .openai: return "sk-..."
-        case .anthropic: return "sk-ant-..."
-        case .gemini: return "AIza..."
-        case .xai: return "xai-..."
         case .elevenlabs: return "sk_..."
-        case .perplexity: return "pplx-..."
-        case .deepseek: return "sk-..."
-        case .zai: return "..."
-        case .minimax: return "..."
-        case .mistral: return "..."
+        default: return "..."
         }
     }
 
-    var infoURL: URL? {
+    nonisolated var infoURL: URL? {
+        if let providerKitURL = providerKitProvider?.credentialInfoURL {
+            return providerKitURL
+        }
+
         switch self {
-        case .openai: return URL(string: "https://platform.openai.com/account/api-keys")
-        case .anthropic: return URL(string: "https://console.anthropic.com/account/keys")
-        case .gemini: return URL(string: "https://aistudio.google.com/app/apikey")
-        case .xai: return URL(string: "https://console.x.ai")
         case .elevenlabs: return URL(string: "https://elevenlabs.io/app/settings/api-keys")
-        case .perplexity: return URL(string: "https://www.perplexity.ai/settings/api")
-        case .deepseek: return URL(string: "https://platform.deepseek.com/api_keys")
-        case .zai: return URL(string: "https://bigmodel.cn/usercenter/apikeys")
-        case .minimax: return URL(string: "https://platform.minimax.io/user-center/basic-information/interface-key")
-        case .mistral: return URL(string: "https://console.mistral.ai/api-keys")
+        default: return nil
         }
     }
 
-    var description: String {
-        switch self {
-        case .openai: return "Required for GPT models"
-        case .anthropic: return "Required for Claude models"
-        case .gemini: return "Required for Gemini models"
-        case .xai: return "Required for Grok models"
-        case .elevenlabs: return "Required for text-to-speech"
-        case .perplexity: return "Required for Sonar models (online search)"
-        case .deepseek: return "Required for DeepSeek models"
-        case .zai: return "Required for GLM models"
-        case .minimax: return "Required for MiniMax M2 models"
-        case .mistral: return "Required for Mistral and Pixtral models"
+    nonisolated var description: String {
+        if let providerKitProvider {
+            return providerKitProvider.credentialDescription
         }
+
+        switch self {
+        case .elevenlabs: return "Required for text-to-speech"
+        default: return "Required for \(displayName) models"
+        }
+    }
+
+    nonisolated var providerKitProvider: AxonProviderKitCore.AIProvider? {
+        AxonProviderKitCore.AIProvider(rawValue: rawValue)
+    }
+
+    nonisolated static var chatProviders: [APIProvider] {
+        AIProvider.providerKitBackedCases.compactMap(APIProvider.init(chatProvider:))
+    }
+
+    nonisolated static var ttsProviders: [APIProvider] {
+        [.elevenlabs]
+    }
+
+    nonisolated static var credentialSettingsProviders: [APIProvider] {
+        chatProviders + ttsProviders
+    }
+
+    nonisolated static var chatProviderCount: Int {
+        chatProviders.count
+    }
+}
+
+extension AIProvider {
+    nonisolated var credentialDescription: String {
+        providerKitProvider?.credentialDescription ?? ""
+    }
+
+    nonisolated var credentialInfoURL: URL? {
+        providerKitProvider?.credentialInfoURL
+    }
+
+    nonisolated var apiKeyPlaceholder: String? {
+        providerKitProvider?.apiKeyPlaceholder
+    }
+}
+
+extension APIProvider {
+    nonisolated var chatProvider: AIProvider? {
+        AIProvider.providerKitBackedCases.first { $0.rawValue == rawValue }
     }
 }

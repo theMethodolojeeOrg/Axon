@@ -42,12 +42,9 @@ struct NativeLiveSettingsView: View {
 
             if !viewModel.settings.liveSettings.useOnDeviceModels {
                 Picker("Default Provider", selection: $viewModel.settings.liveSettings.defaultProvider) {
-                    Text("Gemini Live").tag(AIProvider.gemini)
-                    Text("OpenAI Realtime").tag(AIProvider.openai)
-                    Text("Anthropic").tag(AIProvider.anthropic)
-                    Text("xAI (Grok)").tag(AIProvider.xai)
-                    Text("Perplexity").tag(AIProvider.perplexity)
-                    Text("DeepSeek").tag(AIProvider.deepseek)
+                    ForEach(nativeLiveCloudProviders, id: \.self) { provider in
+                        Text(LiveProviderHelpers.displayName(for: provider)).tag(provider)
+                    }
                 }
 
                 // Show execution mode indicator
@@ -66,6 +63,10 @@ struct NativeLiveSettingsView: View {
                 Text("Native real-time providers (Gemini, OpenAI) have lowest latency. Others use STT/TTS.")
             }
         }
+    }
+
+    private var nativeLiveCloudProviders: [AIProvider] {
+        LiveProviderFactory.shared.liveEnabledProviders.filter { !$0.isOnDevice }
     }
 
     // MARK: - Cloud Provider Section

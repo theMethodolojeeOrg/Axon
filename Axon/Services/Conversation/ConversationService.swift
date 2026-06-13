@@ -665,6 +665,7 @@ class ConversationService: ObservableObject {
         let zaiKey = try? apiKeysStorage.getAPIKey(for: .zai)
         let minimaxKey = try? apiKeysStorage.getAPIKey(for: .minimax)
         let mistralKey = try? apiKeysStorage.getAPIKey(for: .mistral)
+        let veniceKey = try? apiKeysStorage.getAPIKey(for: .venice)
 
         // Load provider/model from settings with conversation overrides
         // modelId is the API identifier (e.g., "claude-haiku-4-5-20251001")
@@ -765,6 +766,7 @@ class ConversationService: ObservableObject {
             zaiKey: zaiKey,
             minimaxKey: minimaxKey,
             mistralKey: mistralKey,
+            veniceKey: veniceKey,
             customBaseUrl: customBaseUrl,
             customApiKey: customApiKey,
             modelParams: resolvedModelParams
@@ -890,6 +892,7 @@ class ConversationService: ObservableObject {
         let zaiKey = try? apiKeysStorage.getAPIKey(for: .zai)
         let minimaxKey = try? apiKeysStorage.getAPIKey(for: .minimax)
         let mistralKey = try? apiKeysStorage.getAPIKey(for: .mistral)
+        let veniceKey = try? apiKeysStorage.getAPIKey(for: .venice)
 
         // Handle custom provider (simplified for regen, assuming same logic as sendMessage)
         var customBaseUrl: String? = nil
@@ -932,6 +935,7 @@ class ConversationService: ObservableObject {
             zaiKey: zaiKey,
             minimaxKey: minimaxKey,
             mistralKey: mistralKey,
+            veniceKey: veniceKey,
             customBaseUrl: customBaseUrl,
             customApiKey: customApiKey,
             modelParams: settings.modelGenerationSettings

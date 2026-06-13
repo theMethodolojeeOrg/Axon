@@ -57,7 +57,7 @@ struct ProviderParameterSupport {
             return ProviderParameterSupport(supportsTemperature: false, supportsTopP: false, supportsTopK: false)
         case "localmlx", "local_mlx", "local-mlx":
             return ProviderParameterSupport(supportsTemperature: true, supportsTopP: true, supportsTopK: false)
-        case "openai", "grok", "perplexity", "deepseek", "zai", "mistral", "minimax":
+        case "openai", "grok", "perplexity", "deepseek", "zai", "mistral", "minimax", "venice":
             return ProviderParameterSupport(supportsTemperature: true, supportsTopP: true, supportsTopK: false)
         case "openai-compatible":
             return ProviderParameterSupport(supportsTemperature: true, supportsTopP: true, supportsTopK: false)

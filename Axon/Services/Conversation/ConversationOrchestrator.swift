@@ -40,6 +40,7 @@ struct OrchestrationConfig {
     let zaiKey: String?
     let minimaxKey: String?
     let mistralKey: String?
+    let veniceKey: String?
     // Custom Provider
     let customBaseUrl: String?
     let customApiKey: String?

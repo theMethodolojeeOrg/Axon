@@ -633,7 +633,7 @@ struct SovereigntySettingsView: View {
             )
         ) {
             Section("Built-in Providers") {
-                ForEach(AIProvider.allCases.filter { viewModel.isBuiltInProviderSelectable($0) }) { provider in
+                ForEach(AIProvider.providerKitBackedCases.filter { viewModel.isBuiltInProviderSelectable($0) }) { provider in
                     #if os(macOS)
                     MenuButtonItem(
                         id: "builtin_\(provider.rawValue)",

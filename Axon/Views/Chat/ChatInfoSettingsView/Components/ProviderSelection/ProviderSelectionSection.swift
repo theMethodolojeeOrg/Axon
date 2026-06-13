@@ -18,7 +18,7 @@ struct ChatProviderSelectionSection: View {
     
     var body: some View {
         ChatInfoSection(title: "AI Provider") {
-            let allProviders = settingsViewModel.selectableUnifiedProviders()
+            let allProviders = settingsViewModel.allUnifiedProviders()
             let currentProvider = resolveCurrentProvider(from: allProviders)
             let isProviderChangeAllowed = sovereigntyService.isProviderChangeAllowed()
             let providerRestrictionReason = sovereigntyService.providerChangeRestrictionReason()
@@ -64,11 +64,27 @@ struct ChatProviderSelectionSection: View {
         let provider = selectedProvider ?? settingsViewModel.currentUnifiedProvider()
         
         return provider.flatMap { p in
-            if allProviders.contains(where: { $0.id == p.id }) {
+            if allProviders.contains(where: { $0.id == p.id }), isSelectable(p) {
                 return p
             }
             return settingsViewModel.fallbackUnifiedProvider()
         } ?? settingsViewModel.fallbackUnifiedProvider()
+    }
+
+    private func isSelectable(_ provider: UnifiedProvider) -> Bool {
+        switch provider {
+        case .builtIn(let builtIn):
+            return settingsViewModel.isBuiltInProviderSelectable(builtIn)
+        case .custom(let config):
+            return settingsViewModel.isCustomProviderSelectable(config.id)
+        }
+    }
+
+    private func providerMenuLabel(for provider: AIProvider, isSelectable: Bool) -> String {
+        guard !isSelectable, let reason = settingsViewModel.builtInProviderUnavailableReason(provider) else {
+            return provider.displayName
+        }
+        return "\(provider.displayName) (\(reason))"
     }
     
     // MARK: - macOS Menu
@@ -77,16 +93,18 @@ struct ChatProviderSelectionSection: View {
     @ViewBuilder
     private func macOSProviderMenu(allProviders: [UnifiedProvider], currentProvider: UnifiedProvider?) -> some View {
         Section("Built-in Providers") {
-            ForEach(AIProvider.allCases.filter { settingsViewModel.isBuiltInProviderSelectable($0) }) { provider in
+            ForEach(AIProvider.providerKitBackedCases) { provider in
+                let isSelectable = settingsViewModel.isBuiltInProviderSelectable(provider)
                 MenuButtonItem(
                     id: "builtin_\(provider.rawValue)",
-                    label: provider.displayName,
+                    label: providerMenuLabel(for: provider, isSelectable: isSelectable),
                     isSelected: currentProvider?.id == "builtin_\(provider.rawValue)"
                 ) {
-                    if let unified = allProviders.first(where: { $0.id == "builtin_\(provider.rawValue)" }) {
+                    if isSelectable, let unified = allProviders.first(where: { $0.id == "builtin_\(provider.rawValue)" }) {
                         onProviderSelected(unified)
                     }
                 }
+                .disabled(!isSelectable)
             }
         }
         
@@ -117,8 +135,11 @@ struct ChatProviderSelectionSection: View {
     @ViewBuilder
     private func iOSProviderMenu(allProviders: [UnifiedProvider]) -> some View {
         Section("Built-in Providers") {
-            ForEach(AIProvider.allCases.filter { settingsViewModel.isBuiltInProviderSelectable($0) }) { provider in
-                Text(provider.displayName).tag("builtin_\(provider.rawValue)")
+            ForEach(AIProvider.providerKitBackedCases) { provider in
+                let isSelectable = settingsViewModel.isBuiltInProviderSelectable(provider)
+                Text(providerMenuLabel(for: provider, isSelectable: isSelectable))
+                    .tag("builtin_\(provider.rawValue)")
+                    .disabled(!isSelectable)
             }
         }
         

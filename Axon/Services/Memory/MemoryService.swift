@@ -1034,7 +1034,8 @@ class MemoryService: ObservableObject {
             case .zai: return try? apiKeysStorage.getAPIKey(for: .zai)
             case .minimax: return try? apiKeysStorage.getAPIKey(for: .minimax)
             case .mistral: return try? apiKeysStorage.getAPIKey(for: .mistral)
-            case .appleFoundation, .localMLX: return nil
+            case .venice: return try? apiKeysStorage.getAPIKey(for: .venice)
+            case .appleFoundation, .localMLX, .aiEdge: return nil
             }
         }()
 

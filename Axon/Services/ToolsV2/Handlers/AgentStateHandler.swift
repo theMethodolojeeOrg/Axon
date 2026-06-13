@@ -407,7 +407,7 @@ final class AgentStateHandler: ToolHandlerV2 {
             guard let parsed = parseBuiltInProvider(requestedProvider) else {
                 return ToolResultV2.failure(
                     toolId: toolId,
-                    error: "Unknown or unsupported provider '\(requestedProvider)'. Built-in providers: \(AIProvider.allCases.map { $0.rawValue }.joined(separator: ", "))"
+                    error: "Unknown or unsupported provider '\(requestedProvider)'. Built-in providers: \(AIProvider.providerKitBackedCases.map { $0.rawValue }.joined(separator: ", "))"
                 )
             }
             targetProvider = parsed
@@ -947,7 +947,7 @@ enum AgentRuntimeCatalog {
     }
 
     static func snapshot(settings: AppSettings) -> Snapshot {
-        Snapshot(providers: AIProvider.allCases.map { providerStatus(for: $0, settings: settings) })
+        Snapshot(providers: AIProvider.providerKitBackedCases.map { providerStatus(for: $0, settings: settings) })
     }
 
     private static func providerStatus(for provider: AIProvider, settings: AppSettings) -> ProviderStatus {

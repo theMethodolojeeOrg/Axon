@@ -95,7 +95,7 @@ class APIKeysSettingsViewModel: ObservableObject {
             return
         }
         
-        for provider in APIProvider.allCases {
+        for provider in APIProvider.credentialSettingsProviders {
             // Don't overwrite existing local key.
             if core.apiKeysStorage.isConfigured(provider) {
                 print("[APIKeysSettingsViewModel] API key already configured locally: \(provider.rawValue)")

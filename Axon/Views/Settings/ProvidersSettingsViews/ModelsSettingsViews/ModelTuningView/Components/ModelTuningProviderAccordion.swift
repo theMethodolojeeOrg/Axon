@@ -99,8 +99,10 @@ struct ModelTuningProviderAccordion: View {
         case .zai: return "globe.asia.australia"
         case .minimax: return "m.circle"
         case .mistral: return "wind"
+        case .venice: return "building.columns"
         case .appleFoundation: return "apple.logo"
         case .localMLX: return "desktopcomputer"
+        case .aiEdge: return "cpu"
         }
     }
 }

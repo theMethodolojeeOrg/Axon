@@ -12,7 +12,7 @@ final class ProviderKitModelCatalogAdapterTests: XCTestCase {
     }
 
     func testProviderMappingsCoverAxonBuiltIns() {
-        for provider in AxonProvider.allCases {
+        for provider in AxonProvider.providerKitBackedCases {
             XCTAssertNotNil(
                 ProviderKitModelCatalogAdapter.providerKitProvider(for: provider),
                 "Missing ProviderKit mapping for \(provider.rawValue)"
@@ -27,12 +27,13 @@ final class ProviderKitModelCatalogAdapterTests: XCTestCase {
             ProviderKitModelCatalogAdapter.axonProvider(for: .mlx),
             .localMLX
         )
-        XCTAssertNil(ProviderKitModelCatalogAdapter.axonProvider(for: .venice))
-        XCTAssertNil(ProviderKitModelCatalogAdapter.axonProvider(for: .aiEdge))
+        XCTAssertEqual(ProviderKitModelCatalogAdapter.axonProvider(for: .venice), .venice)
+        XCTAssertEqual(ProviderKitModelCatalogAdapter.axonProvider(for: .aiEdge), .aiEdge)
+        XCTAssertNil(ProviderKitModelCatalogAdapter.axonProvider(for: .openAICompatible))
     }
 
     func testEveryAxonBuiltInProviderHasModels() {
-        for provider in AxonProvider.allCases {
+        for provider in AxonProvider.providerKitBackedCases {
             XCTAssertFalse(
                 ProviderKitModelCatalogAdapter.models(for: provider).isEmpty,
                 "Expected ProviderKit models for \(provider.rawValue)"
@@ -54,6 +55,13 @@ final class ProviderKitModelCatalogAdapterTests: XCTestCase {
         XCTAssertTrue(modelIds.contains("google/gemma-4-E2B-it-MLX"))
         XCTAssertTrue(modelIds.contains("mlx-community/Qwen3-VL-2B-Instruct-4bit"))
         XCTAssertTrue(modelIds.contains("lmstudio-community/gemma-3-270m-it-MLX-8bit"))
+    }
+
+    func testProviderKitOnlyConcreteProvidersAreVisible() {
+        XCTAssertFalse(ProviderKitModelCatalogAdapter.models(for: .venice).isEmpty)
+        XCTAssertFalse(ProviderKitModelCatalogAdapter.models(for: .aiEdge).isEmpty)
+        XCTAssertEqual(AxonProvider.venice.apiProvider, .venice)
+        XCTAssertNil(AxonProvider.aiEdge.apiProvider)
     }
 
     func testPricingKnownFreeAndUnknownStates() {

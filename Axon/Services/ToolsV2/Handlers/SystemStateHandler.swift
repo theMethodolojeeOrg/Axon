@@ -184,7 +184,7 @@ final class SystemStateHandler: ToolHandlerV2 {
     private func queryProviders(_ settings: AppSettings) -> ToolResultV2 {
         var output = "# Available Providers\n\n"
         
-        for provider in AIProvider.allCases {
+        for provider in AIProvider.providerKitBackedCases {
             let isCurrent = provider == settings.defaultProvider
             let icon = isCurrent ? "✅" : "○"
             output += "\(icon) **\(provider.displayName)**\n"
@@ -320,7 +320,7 @@ final class SystemStateHandler: ToolHandlerV2 {
         guard let targetProvider = parseProvider(providerString) else {
             return ToolResultV2.failure(
                 toolId: "change_system_state",
-                error: "Unknown provider: \(providerString). Available: \(AIProvider.allCases.map { $0.rawValue }.joined(separator: ", "))"
+                error: "Unknown provider: \(providerString). Available: \(AIProvider.providerKitBackedCases.map { $0.rawValue }.joined(separator: ", "))"
             )
         }
         
@@ -415,7 +415,7 @@ final class SystemStateHandler: ToolHandlerV2 {
         guard let targetProvider = parseProvider(providerString) else {
             return ToolResultV2.failure(
                 toolId: "change_system_state",
-                error: "Unknown provider: \(providerString). Available: \(AIProvider.allCases.map { $0.rawValue }.joined(separator: ", "))"
+                error: "Unknown provider: \(providerString). Available: \(AIProvider.providerKitBackedCases.map { $0.rawValue }.joined(separator: ", "))"
             )
         }
         

@@ -19,7 +19,9 @@ enum LiveProviderHelpers {
         case .xai: return "xAI"
         case .perplexity: return "Perplexity"
         case .deepseek: return "DeepSeek"
+        case .venice: return "Venice"
         case .localMLX: return "MLX"
+        case .aiEdge: return "AI Edge"
         default: return provider.displayName
         }
     }
@@ -39,6 +41,8 @@ enum LiveProviderHelpers {
         case "xai": return "xAI (Grok)"
         case "perplexity": return "Perplexity"
         case "deepseek": return "DeepSeek"
+        case "venice": return "Venice"
+        case "aiEdge": return "AI Edge"
         case "mlx": return "MLX (Offline)"
         default: return provider.capitalized
         }
@@ -62,9 +66,9 @@ enum LiveProviderHelpers {
         switch provider {
         case "openai", "gemini":
             return .cloudWebSocket
-        case "anthropic", "xai", "perplexity", "deepseek":
+        case "anthropic", "xai", "perplexity", "deepseek", "venice":
             return .cloudHTTPStreaming
-        case "mlx":
+        case "mlx", "aiEdge":
             return .onDeviceMLX
         default:
             return .cloudHTTPStreaming

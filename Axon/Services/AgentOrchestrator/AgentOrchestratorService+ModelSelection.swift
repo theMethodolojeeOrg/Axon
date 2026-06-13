@@ -154,31 +154,22 @@ extension AgentOrchestratorService {
 
     /// Check if a provider has a valid API key configured
     func isProviderConfigured(_ provider: AIProvider) -> Bool {
+        if provider.isOnDevice {
+            return provider.isAvailable
+        }
+
         switch provider {
-        case .appleFoundation:
-            #if canImport(FoundationModels)
-            return true
-            #else
-            return false
-            #endif
-        case .localMLX:
-            // Check if running on device with MLX support
-            #if targetEnvironment(simulator)
-            return false
-            #else
-            return true
-            #endif
+        case .appleFoundation, .localMLX, .aiEdge:
+            return provider.isAvailable
         default:
-            if let apiProvider = provider.apiProvider {
-                return (try? apiKeysStorage.getAPIKey(for: apiProvider))?.isEmpty == false
-            }
-            return false
+            guard let apiProvider = provider.apiProvider else { return false }
+            return (try? apiKeysStorage.getAPIKey(for: apiProvider))?.isEmpty == false
         }
     }
 
     /// Get all configured providers
     func getConfiguredProviders() -> [AIProvider] {
-        AIProvider.allCases.filter { isProviderConfigured($0) }
+        AIProvider.providerKitBackedCases.filter { isProviderConfigured($0) }
     }
 
     // MARK: - Model Recommendation
