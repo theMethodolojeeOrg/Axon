@@ -511,6 +511,7 @@ struct MessageInputBar: View {
     let onSend: () -> Void
     let onStop: (() -> Void)?
     let focus: FocusState<Bool>.Binding?
+    let onStartLiveSession: (() -> Void)?
 
     // ViewModel handles attachment capability and slash command state
     @StateObject private var viewModel: MessageInputViewModel
@@ -539,7 +540,8 @@ struct MessageInputBar: View {
         onSend: @escaping () -> Void,
         onStop: (() -> Void)? = nil,
         focus: FocusState<Bool>.Binding? = nil,
-        conversationId: String? = nil
+        conversationId: String? = nil,
+        onStartLiveSession: (() -> Void)? = nil
     ) {
         self._text = text
         self._attachments = attachments
@@ -548,6 +550,7 @@ struct MessageInputBar: View {
         self.onSend = onSend
         self.onStop = onStop
         self.focus = focus
+        self.onStartLiveSession = onStartLiveSession
         self._viewModel = StateObject(wrappedValue: MessageInputViewModel(conversationId: conversationId))
     }
 
@@ -586,6 +589,10 @@ struct MessageInputBar: View {
 
     private var sendButtonForeground: Color {
         canSend || isLoading ? .white : AppColors.textSecondary.opacity(0.55)
+    }
+
+    private var liveVoiceButtonForeground: Color {
+        isLoading ? AppColors.textSecondary.opacity(0.45) : AppColors.signalMercury
     }
 
     private var bridgeStatusSummary: String? {
@@ -836,6 +843,12 @@ struct MessageInputBar: View {
 
             textInputArea
 
+            #if os(iOS)
+            if onStartLiveSession != nil {
+                liveVoiceButton
+            }
+            #endif
+
             sendButton
         }
         .padding(.horizontal, 8)
@@ -1067,6 +1080,34 @@ struct MessageInputBar: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: canSend)
         .accessibilityLabel(isLoading ? "Stop Generating" : "Send Message")
     }
+
+    #if os(iOS)
+    @ViewBuilder
+    private var liveVoiceButton: some View {
+        Button {
+            guard !isLoading else { return }
+            onStartLiveSession?()
+        } label: {
+            Image(systemName: "waveform.circle")
+                .font(.system(size: ChatVisualTokens.composerControlGlyphSize + 1, weight: .semibold))
+                .foregroundColor(liveVoiceButtonForeground)
+                .frame(width: ChatVisualTokens.composerSendIconFrame, height: ChatVisualTokens.composerSendIconFrame)
+                .background(
+                    Circle()
+                        .fill(AppSurfaces.color(.controlBackground).opacity(0.8))
+                        .overlay(
+                            Circle()
+                                .stroke(AppSurfaces.color(.cardBorder).opacity(0.65), lineWidth: 1)
+                        )
+                )
+                .frame(width: ChatVisualTokens.composerControlSize, height: ChatVisualTokens.composerControlSize)
+        }
+        .buttonStyle(.plain)
+        .disabled(isLoading)
+        .opacity(isLoading ? 0.55 : 1.0)
+        .accessibilityLabel("Start Live Voice")
+    }
+    #endif
 
     #if os(macOS)
     @ViewBuilder

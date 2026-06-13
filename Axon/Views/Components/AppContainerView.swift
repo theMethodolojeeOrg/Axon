@@ -46,6 +46,7 @@ struct AppContainerView: View {
     @State private var showChatInfo = false
     @State private var showLaunchScreen: Bool = true
     @State private var runtimeTitleRefreshToken = 0
+    @State private var isMobileChatActionsExpanded = false
 
     #if os(macOS)
     @StateObject private var artifactPresenter = CodeArtifactPresenter()
@@ -158,6 +159,7 @@ struct AppContainerView: View {
                 startNewChat: startNewChat,
                 onConversationCreated: { conv in
                     selectedConversation = conv
+                    collapseMobileChatActions()
                 },
                 presenter: artifactPresenter
             )
@@ -231,7 +233,9 @@ struct AppContainerView: View {
                         onNewChat: startNewChat,
                         onConversationCreated: { conv in
                             selectedConversation = conv
-                        }
+                            collapseMobileChatActions()
+                        },
+                        onStartLiveSession: startLiveSession
                     )
                 case .cognition:
                     CognitionView()
@@ -252,6 +256,7 @@ struct AppContainerView: View {
                         tint: AppColors.textPrimary
                     ) {
                         withAnimation {
+                            isMobileChatActionsExpanded = false
                             showSidebar.toggle()
                         }
                     }
@@ -259,62 +264,17 @@ struct AppContainerView: View {
 
                 // Center title
                 ToolbarItem(placement: .principal) {
-                    HStack(spacing: 10) {
-                        Text(navigationTitle)
-                            .font(AppTypography.titleMedium())
-                            .foregroundColor(AppColors.textPrimary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-
-                        if currentView == .chat, selectedConversation != nil {
-                            ToolsStatusMenu(style: .pill)
-                                .fixedSize()
-                        }
-                    }
+                    Text(navigationTitle)
+                        .font(AppTypography.titleMedium())
+                        .foregroundColor(AppColors.textPrimary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
 
                 // Trailing chat actions
                 ToolbarItem {
                     if currentView == .chat {
-                        HStack(spacing: 8) {
-                            if selectedConversation != nil {
-                                chatToolbarButton(
-                                    icon: "info.circle",
-                                    tint: AppColors.signalMercury,
-                                    accessibilityLabel: "Chat Info"
-                                ) {
-                                    showChatInfo = true
-                                }
-                            }
-
-                            if selectedConversation != nil {
-                                chatToolbarButton(
-                                    icon: "terminal",
-                                    tint: AppColors.signalMercury,
-                                    accessibilityLabel: terminalController.isDrawerOpen ? "Hide Terminal" : "Show Terminal"
-                                ) {
-                                    terminalController.toggleDrawer()
-                                }
-                            }
-
-                            chatToolbarButton(
-                                icon: "square.and.pencil",
-                                tint: AppColors.signalMercury,
-                                accessibilityLabel: "New Chat"
-                            ) {
-                                startNewChat()
-                            }
-
-                            if selectedConversation != nil {
-                                chatToolbarButton(
-                                    icon: "waveform.circle",
-                                    tint: AppColors.signalMercury,
-                                    accessibilityLabel: "Start Live Session"
-                                ) {
-                                    startLiveSession()
-                                }
-                            }
-                        }
+                        iosChatActionToolbar
                     }
                 }
             }
@@ -368,6 +328,77 @@ struct AppContainerView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel ?? icon)
+    }
+
+    @ViewBuilder
+    private var iosChatActionToolbar: some View {
+        HStack(spacing: 8) {
+            if isMobileChatActionsExpanded {
+                if selectedConversation != nil {
+                    chatToolbarButton(
+                        icon: "info.circle",
+                        tint: AppColors.signalMercury,
+                        accessibilityLabel: "Chat Info"
+                    ) {
+                        collapseMobileChatActions()
+                        showChatInfo = true
+                    }
+
+                    chatToolbarButton(
+                        icon: "terminal",
+                        tint: AppColors.signalMercury,
+                        accessibilityLabel: terminalController.isDrawerOpen ? "Hide Terminal" : "Show Terminal"
+                    ) {
+                        collapseMobileChatActions()
+                        terminalController.toggleDrawer()
+                    }
+
+                    toolbarToolsMenu
+                }
+
+                chatToolbarButton(
+                    icon: "square.and.pencil",
+                    tint: AppColors.signalMercury,
+                    accessibilityLabel: "New Chat"
+                ) {
+                    collapseMobileChatActions()
+                    startNewChat()
+                }
+            } else {
+                chatToolbarButton(
+                    icon: "ellipsis",
+                    tint: AppColors.signalMercury,
+                    accessibilityLabel: "Show Chat Controls"
+                ) {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        isMobileChatActionsExpanded = true
+                    }
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: isMobileChatActionsExpanded)
+    }
+
+    private var toolbarToolsMenu: some View {
+        ToolsStatusMenu(style: .iconOnly)
+            .frame(width: ChatVisualTokens.toolbarButtonSize, height: ChatVisualTokens.toolbarButtonSize)
+            .background(
+                Circle()
+                    .fill(AppSurfaces.color(.controlBackground).opacity(0.7))
+            )
+            .overlay(
+                Circle()
+                    .stroke(AppSurfaces.color(.cardBorder).opacity(0.6), lineWidth: 1)
+            )
+            .accessibilityLabel("Tools")
+    }
+
+    private func collapseMobileChatActions() {
+        #if !os(macOS)
+        withAnimation(.easeInOut(duration: 0.18)) {
+            isMobileChatActionsExpanded = false
+        }
+        #endif
     }
 
     private var navigationTitle: String {
@@ -438,6 +469,8 @@ struct AppContainerView: View {
     }
 
     private func startNewChat() {
+        collapseMobileChatActions()
+
         // Generate summary for the previous conversation before starting new chat
         // This provides continuity context for the new conversation
         if let previousConversation = selectedConversation,
@@ -477,6 +510,8 @@ struct AppContainerView: View {
     }
 
     private func selectConversation(_ conversation: Conversation) {
+        collapseMobileChatActions()
+
         // Generate summary for the previous conversation before switching
         // This provides continuity context for future conversations
         if let previousConversation = selectedConversation,
@@ -512,6 +547,8 @@ struct AppContainerView: View {
     }
 
     private func navigateToView(_ view: MainView) {
+        collapseMobileChatActions()
+
         // Discard any ephemeral conversation when navigating away from chat
         // This prevents empty "New Chat" threads from accumulating
         if view != .chat, let currentId = selectedConversation?.id {
@@ -655,6 +692,7 @@ struct ChatContainerView: View {
     let conversation: Conversation?
     let onNewChat: () -> Void
     let onConversationCreated: (Conversation) -> Void
+    let onStartLiveSession: (() -> Void)?
 
     @StateObject private var conversationService = ConversationService.shared
     @StateObject private var memoryService = MemoryService.shared
@@ -1013,7 +1051,8 @@ struct ChatContainerView: View {
                 onSend: sendMessage,
                 onStop: stopGeneration,
                 focus: $isInputFocused,
-                conversationId: conversation?.id
+                conversationId: conversation?.id,
+                onStartLiveSession: conversation == nil ? nil : onStartLiveSession
             )
         }
     }

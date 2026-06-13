@@ -37,7 +37,8 @@ struct MacDetailWithInspector: View {
                         ChatContainerView(
                             conversation: selectedConversation,
                             onNewChat: startNewChat,
-                            onConversationCreated: onConversationCreated
+                            onConversationCreated: onConversationCreated,
+                            onStartLiveSession: nil
                         )
                         // Route any code-block artifact presentation up to the root presenter.
                         .environment(\.presentCodeArtifact) { artifact in

@@ -56,7 +56,8 @@ struct ConversationListView: View {
                                 NavigationLink(destination: ChatContainerView(
                                     conversation: conversation,
                                     onNewChat: {},
-                                    onConversationCreated: { _ in }
+                                    onConversationCreated: { _ in },
+                                    onStartLiveSession: nil
                                 )) {
                                     ConversationRow(conversation: conversation)
                                 }
